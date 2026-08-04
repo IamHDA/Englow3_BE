@@ -4,7 +4,7 @@ Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH
 Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>` mới sang phase kế.
 
 **Cập nhật lần cuối:** 2026-08-04
-**Đang ở:** STOP GATE 0 — chờ `APPROVE PHASE 0`
+**Đang ở:** STOP GATE 1 — chờ `APPROVE PHASE 1`
 
 ---
 
@@ -18,6 +18,7 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 | B4 | §2.8 work order bảo xuất DDL ra `data_pipeline/migrations/`, nhưng repo dùng Flyway đọc `classpath:db/migration` và `ddl-auto: validate` | Phase 2 | Đề xuất: xuất vào `src/main/resources/db/migration/V1__content_tables.sql` — chờ xác nhận |
 | B5 | Chưa chốt TTS engine (chi phí + license khác nhau nhiều) | Phase 8 | Owner chốt tại GATE 7 |
 | B6 | Chưa có nguồn ảnh cho Part 1 Listening | Phase 8 | (a) ảnh CC0 · (b) sinh ảnh · (c) để `audio_url=null` + `blocked_on: "image_asset"` |
+| B7 | **Sản lượng item theo chỉ tiêu work order không đủ cho BKT hội tụ ở domain grammar.** 90 grammar concept nhưng Phase 6 (5 câu/point, chỉ B1–C1) + Phase 7 (Part 5+6 = 46 câu) chỉ ra ~3.2 item/concept, ngưỡng cần là 10–30 | Phase 4, 6, 7 | (a) nâng `quick_exercises` lên 12–15 câu/point **và** mở syllabus ra A1–C1 → ~12 item/concept · (b) sinh 3–4 bộ đề Reading thay vì 1 · (c) gộp grammar còn ~40 concept |
 
 ---
 
@@ -36,17 +37,18 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 
 ---
 
-## Phase 1 — Concept Taxonomy
+## Phase 1 — Concept Taxonomy ✅ HOÀN THÀNH (chờ duyệt)
 
-- [ ] `taxonomy/concepts.yaml` — ≥100 concept, dự kiến ~147:
-  - [ ] Grammar 60–90 concept, A1→C1, bám English Grammar Profile band
-  - [ ] Reading skills: `rc_main_idea`, `rc_detail`, `rc_inference`, `rc_vocab_in_context`, `rc_paraphrase`, `rc_not_true`, `rc_cross_reference`, `rc_intent`
-  - [ ] Listening skills: `lc_photo_action`, `lc_photo_state`, `lc_wh_question`, `lc_yes_no`, `lc_indirect_response`, `lc_gist`, `lc_detail`, `lc_inference`, `lc_speaker_role`, `lc_graphic_reference`
-  - [ ] Vocabulary: topic × CEFR band
-  - [ ] Speaking/Writing: theo rubric dimension
-- [ ] `validators/check_taxonomy.py` — unique id, DAG không cycle, parent tồn tại, `p_guess` khớp số đáp án (3→0.33, 4→0.25), mọi `p_*` ∈ (0,1)
-- [ ] `reports/taxonomy_summary.md` — phân bố theo domain × CEFR, độ sâu cây, node lá
-- [ ] Nhắm ~10–30 item/concept. Nếu ước tính >200 concept → DỪNG, hỏi Owner
+- [x] `taxonomy/concepts.yaml` — **171 concept** (150 lá + 21 gom nhóm), dưới ngưỡng 200:
+  - [x] Grammar 90 leaf concept, A1→C1, 16 nhóm gom
+  - [x] Reading skills 9 leaf — đủ 9 dạng của enum `QuestionType` §3.1
+  - [x] Listening skills 11 leaf — đủ 11 dạng của enum §3.1
+  - [x] Vocabulary 28 leaf — 8 topic × band tương ứng
+  - [x] Speaking 6 leaf + Writing 6 leaf — theo rubric dimension
+- [x] `validators/check_taxonomy.py` — unique id, DAG không cycle, parent tồn tại, `p_guess` khớp số đáp án (3→0.33, 4→0.25, rubric→0.05), mọi `p_*` ∈ (0,1), cảnh báo prerequisite ngược band
+- [x] `reports/taxonomy_summary.md` — sinh tự động, 568 dòng
+- [x] Chứng minh validator từ chối: 6 lỗi cố ý đều bị bắt, exit 1
+- [ ] ~~Nhắm 10–30 item/concept~~ → **grammar chỉ đạt ~3.2, xem blocker B7**
 
 **→ STOP GATE 1**
 
