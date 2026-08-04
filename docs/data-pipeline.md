@@ -19,22 +19,40 @@ Mã nguồn nằm ở [`data_pipeline/`](../data_pipeline/) ở gốc repo.
 | `reports/` | Báo cáo QA, coverage, phân bố |
 | `tests/` | pytest — gồm fixture cố ý sai để chứng minh validator thật sự từ chối |
 
-## Setup
+## Setup trên máy mới
 
 ```bash
-cd data_pipeline
-make install        # tạo .venv (python3.12) + cài requirements
+git clone https://github.com/IamHDA/Englow3_BE.git
+cd Englow3_BE/data_pipeline
+make bootstrap
 cp .env.example .env
 ```
+
+`make bootstrap` tự lo hết: cài [uv](https://docs.astral.sh/uv/) vào `~/.local/bin`
+nếu chưa có, tải CPython 3.12 standalone, tạo `.venv`, cài `requirements.txt`,
+rồi chạy `make doctor` để xác nhận.
+
+Không cần `sudo`, không đụng Python hệ thống, không cần Homebrew. Gỡ sạch bằng
+`rm -rf .venv ~/.local/share/uv ~/.local/bin/uv`.
+
+Nếu máy đã sẵn `python3.12` trong `PATH` thì `make install` cũng được.
+
+**Cần Python 3.11+.** macOS mặc định là 3.9 — không chạy được. `make doctor`
+sẽ báo lỗi nếu phiên bản không đạt.
 
 ## Lệnh
 
 ```bash
-make taxonomy                      # Phase 1 — check DAG, p_* ranges
+make doctor                        # kiểm tra môi trường
+make taxonomy                      # Phase 1 — check DAG, p_* ranges, sinh summary
 make schema                        # Phase 2 — Pydantic → JSON Schema + DDL
 make validate BATCH=<path>         # Phase 3 — validate 1 batch
 make test                          # pytest
 ```
+
+## Trạng thái
+
+Xem [TODO.md](TODO.md) — checklist từng phase và danh sách blocker đang chờ quyết.
 
 ## Ràng buộc bất di bất dịch
 
