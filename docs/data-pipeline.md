@@ -1,7 +1,8 @@
 # data_pipeline
 
 Data pipeline cho hệ thống học tiếng Anh A1–C1 + luyện thi định dạng TOEIC.
-Nguồn chân lý: [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](../AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
+Nguồn chân lý: [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
+Mã nguồn nằm ở [`data_pipeline/`](../data_pipeline/) ở gốc repo.
 
 ## Cấu trúc
 

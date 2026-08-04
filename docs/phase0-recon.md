@@ -9,6 +9,9 @@
 
 Repo là **Spring Boot backend mới khởi tạo, gần như trống**. Toàn bộ mã nguồn Java hiện có là 1 file.
 
+> Đây là ảnh chụp hiện trạng **tại thời điểm recon**, trước khi dựng skeleton.
+> Sau Phase 0, tài liệu đã chuyển vào `docs/` và có thêm `data_pipeline/` (xem §6).
+
 ```
 Englow3_BE/
 ├── pom.xml
@@ -121,16 +124,26 @@ Spring Boot) sẽ cần Java 21 — cùng vấn đề quyền Homebrew. → **C�
 ## 6. Đã dựng
 
 ```
-data_pipeline/
+docs/                     ← toàn bộ tài liệu viết tay
+├── README.md             (index)
+├── AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md
+├── TODO.md               (checklist 13 phase + blocker)
+├── data-pipeline.md      (layout + ràng buộc của data_pipeline/)
+└── phase0-recon.md       (file này)
+
+data_pipeline/            ← mã nguồn + artifact sinh ra
 ├── .env.example          (template env, KHÔNG chứa secret)
 ├── Makefile              (venv/install/taxonomy/schema/validate/test)
-├── README.md
 ├── requirements.txt
 ├── .venv/                (Python 3.12.13, git-ignored)
 ├── taxonomy/  schemas/{,json/}  seeds/  generators/  validators/
 ├── output/{flashcards,grammar,exams,speaking_writing,prompts}/
 └── rejects/  reports/  tests/fixtures/
 ```
+
+`reports/` giữ nguyên trong `data_pipeline/` vì đó là **output do script sinh ra**
+(`validation_<batch_id>.json`, `taxonomy_summary.md`, `flashcard_qa.md`, ...) —
+work order tham chiếu đường dẫn này ở mọi phase. `docs/` chỉ chứa tài liệu viết tay.
 
 `.gitignore` đã thêm: `data_pipeline/.venv/`, `__pycache__/`, `.pytest_cache/`, `.env`.
 

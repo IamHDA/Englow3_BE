@@ -1,6 +1,6 @@
 # TODO — English Learning Data Pipeline
 
-Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](../AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
+Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
 Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>` mới sang phase kế.
 
 **Cập nhật lần cuối:** 2026-08-04
@@ -30,7 +30,7 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 - [ ] ~~Kiểm tra Postgres version + `vector` extension~~ → **FAIL, blocked bởi B1**
 - [x] Dựng cây thư mục `data_pipeline/`
 - [x] `requirements.txt` + cài đặt (Python 3.12.13 qua `uv`, hệ thống chỉ có 3.9.6)
-- [x] `reports/phase0_recon.md`
+- [x] [`docs/phase0-recon.md`](phase0-recon.md)
 
 **→ STOP GATE 0**
 
