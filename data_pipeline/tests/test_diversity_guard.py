@@ -143,3 +143,54 @@ def test_regex_metacharacters_in_lemma():
     assert skeleton("The o'clock chime rang.", "o'clock") == "The § chime rang."
     assert skeleton("Use cost-effective methods.", "cost-effective") == \
         "Use § methods."
+
+
+# --- Cổng ghi: phải chặn TRƯỚC khi tạo file -----------------------------------
+
+def test_guarded_write_refuses_and_creates_no_file(tmp_path):
+    """Lưới chắn chỉ có tác dụng khi nằm trước lệnh ghi.
+
+    Đợt dữ liệu 2026-08-06 hỏng vì generator ghi trước, kiểm sau — lúc đó file
+    đã nằm trên đĩa và đã được báo cáo là hợp lệ.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generators"))
+    from guarded_write import DiversityRejected, guarded_write_batch
+    import pytest
+
+    payload = {"flashcards": [
+        {"lemma": f"word{i}", "pos": "noun", "sense_label_en": f"sense{i}",
+         "definition": {"en": f"The noun 'word{i}', used in general contexts.",
+                        "vi": f"Danh từ 'word{i}', dùng trong ngữ cảnh chung."},
+         "examples": [{"sentence": f"Please review the usage of 'word{i}'.",
+                       "translation": f"Hãy xem lại cách dùng 'word{i}'."}]}
+        for i in range(50)]}
+
+    out = tmp_path / "batch.json"
+    with pytest.raises(DiversityRejected):
+        guarded_write_batch(payload, out, quiet=True)
+    assert not out.exists(), "file KHÔNG được tạo khi lưới chắn từ chối"
+
+
+def test_guarded_write_accepts_varied_content(tmp_path):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generators"))
+    from guarded_write import guarded_write_batch
+
+    varied = [
+        ("vacation", "Leisure time away from work.", "kỳ nghỉ",
+         "She spent her vacation in the mountains.", "Cô ấy nghỉ trên núi."),
+        ("invoice", "A bill listing goods and prices.", "hoá đơn",
+         "Attach the invoice before submitting.", "Đính kèm hoá đơn trước khi nộp."),
+        ("airport", "An airfield with a control tower.", "sân bay",
+         "Fog closed the airport for hours.", "Sương mù đóng cửa sân bay nhiều giờ."),
+        ("negotiate", "To reach agreement by discussion.", "đàm phán",
+         "They negotiate contracts each spring.", "Họ đàm phán hợp đồng mỗi mùa xuân."),
+    ]
+    payload = {"flashcards": [
+        {"lemma": l, "pos": "noun", "sense_label_en": l,
+         "definition": {"en": de, "vi": dv},
+         "examples": [{"sentence": se, "translation": sv}]}
+        for l, de, dv, se, sv in varied]}
+
+    out = tmp_path / "ok.json"
+    guarded_write_batch(payload, out, quiet=True)
+    assert out.exists()

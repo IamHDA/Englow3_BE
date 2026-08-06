@@ -24,6 +24,8 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     BatchMetadata, CommonMistake, Definition, Example, GrammarBatch,
     GrammarPoint, ModuleType, ReviewStatus
@@ -246,7 +248,7 @@ async def main_async():
     )
 
     out_path = OUT_DIR / "grammar_batch_001.json"
-    out_path.write_text(json.dumps(batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    guarded_write_batch(batch, out_path)   # lưới chắn TRƯỚC khi ghi
     print(f"Đã xuất {out_path.name} ({len(all_points)} bài ngữ pháp chân thực & {len(all_points)*3} L1 Transfer Mistakes!)")
 
 def main():

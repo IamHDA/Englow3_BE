@@ -29,6 +29,8 @@ from nltk.corpus import wordnet as wn
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     BatchMetadata, Collocation, Definition, Example, Flashcard, FlashcardBatch,
     ModuleType, Option, ReviewStatus
@@ -330,7 +332,7 @@ async def main_async():
             flashcards=sub_cards,
         )
         out_path = OUT_DIR / f"flashcard_batch_{batch_num:03d}.json"
-        out_path.write_text(json.dumps(batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        guarded_write_batch(batch, out_path)   # lưới chắn TRƯỚC khi ghi
         print(f"Đã xuất {out_path.name} ({len(sub_cards)} thẻ từ vựng chân thực)")
 
     print("\nHOÀN THÀNH TẠO 3,000 FLASHCARDS CHÂN THỰC 100% BẰNG GROQ API!")
