@@ -1,234 +1,127 @@
-# TODO — English Learning Data Pipeline
+# TODO — Englow3 Data Pipeline
 
-Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
-Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>` mới sang phase kế.
-
-**Cập nhật lần cuối:** 2026-08-06 (Phase 2 xong)
-**Đang ở:** STOP GATE 2 — chờ `APPROVE PHASE 2`
+**Cập nhật:** 2026-08-06 22:00 · **Nhánh:** `feat/english-data-pipeline-phase1`
+Nguồn chân lý: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) · Quyết định đã chốt: [decisions.md](decisions.md) (D1–D8)
 
 ---
 
-> **5 blocker đã được chốt** — xem [decisions.md](decisions.md): dữ liệu chỉ lưu local (D1),
-> embedding 1024 chiều / bge-m3 (D2, gỡ B3), `octanove` vào enum `cefr_source` (D3),
-> ngân hàng câu hỏi tách khỏi bộ đề (D4), 3 bộ đề + quick_exercises 12 câu (D5, gỡ B7),
-> lưu trên đĩa không cần DB (D6), gỡ 3 ràng buộc ngoài spec (D7), DDL vào Flyway (D8, gỡ B4).
-> Bảng dưới chỉ còn các mục **chưa** quyết được.
+## 🔴 LÀM NGAY
 
-## 🔴 BLOCKER — còn treo
+### 1. Xoay vòng khoá Groq
 
-| # | Vấn đề | Chặn phase | Lựa chọn |
-|---|---|---|---|
-| B1 | Owner chốt **không dựng Postgres, để local trên máy thôi** (D7/D8). DDL đã sinh nhưng chưa Postgres nào xác nhận cú pháp | Phase 11 | Quyết khi tới Phase 11 |
-| B2 | Java 21 + Maven chưa cài (cùng gốc vấn đề quyền Homebrew) | Phase 11 | Cài SDKMAN vào `~/.sdkman` (không cần root), hoặc Owner tự cài |
-| B5 | Chưa chốt TTS engine (chi phí + license khác nhau nhiều) | Phase 8 | Owner chốt tại GATE 7 |
-| B6 | Chưa có nguồn ảnh cho Part 1 Listening | Phase 8 | (a) ảnh CC0 · (b) sinh ảnh · (c) để `audio_url=null` + `blocked_on: "image_asset"` |
+```
+gsk_en1Zoa…ExFRz   (khoá đầy đủ nằm trong lịch sử shell, không chép lại ở đây)
+```
 
----
+Từng hardcode trong 4 file generator. GitHub push protection đã chặn — **chưa lọt lên
+remote** (kiểm bằng `git log --all -S`). Code đã sửa đọc từ `os.environ["GROQ_API_KEY"]`.
 
-## Phase 0 — Recon & Setup ✅ HOÀN THÀNH (chờ duyệt)
+Vẫn phải vô hiệu hoá khoá này và tạo khoá mới: nó đã nằm plaintext trên đĩa, có thể
+đã vào shell history hoặc backup. Tốn 2 phút, rủi ro thì không đo được.
 
-- [x] Liệt kê cấu trúc repo
-- [x] Xác định backend giữ schema DB → **Spring Boot 3.5.16 / Java 21** (không có FastAPI)
-- [x] Xác định migration tool → **Flyway** (`classpath:db/migration`, hiện rỗng)
-- [x] Xác định DB đích → `jdbc:postgresql://localhost:5432/englow3`, override qua env `DB_URL`
-- [ ] ~~Kiểm tra Postgres version + `vector` extension~~ → **FAIL, blocked bởi B1**
-- [x] Dựng cây thư mục `data_pipeline/`
-- [x] `requirements.txt` + cài đặt (Python 3.12.13 qua `uv`, hệ thống chỉ có 3.9.6)
-- [x] [`docs/phase0-recon.md`](phase0-recon.md)
+### 2. Sinh lại câu ví dụ flashcard
 
-**→ STOP GATE 0**
+```
+diversity definition.en    88.4%  OK
+diversity examples[0].en   14.0%  ← REJECT (ngưỡng 60%)
+```
+
+3 000 thẻ có định nghĩa tốt nhưng **câu ví dụ vẫn điền khuôn** — 1 000 thẻ chỉ có
+~70 mẫu câu, mỗi mẫu dùng lại ~14 lần. Cổng `guarded_write` sẽ chặn nếu ghi lại.
+
+Sửa prompt để câu ví dụ thật sự khác nhau. **Đừng hạ ngưỡng.**
 
 ---
 
-## Phase 1 — Concept Taxonomy ✅ HOÀN THÀNH (chờ duyệt)
+## Hiện trạng dữ liệu
 
-- [x] `taxonomy/concepts.yaml` — **171 concept** (150 lá + 21 gom nhóm), dưới ngưỡng 200:
-  - [x] Grammar 90 leaf concept, A1→C1, 16 nhóm gom
-  - [x] Reading skills 9 leaf — đủ 9 dạng của enum `QuestionType` §3.1
-  - [x] Listening skills 11 leaf — đủ 11 dạng của enum §3.1
-  - [x] Vocabulary 28 leaf — 8 topic × band tương ứng
-  - [x] Speaking 6 leaf + Writing 6 leaf — theo rubric dimension
-- [x] `validators/check_taxonomy.py` — unique id, DAG không cycle, parent tồn tại, `p_guess` khớp số đáp án (3→0.33, 4→0.25, rubric→0.05), mọi `p_*` ∈ (0,1), cảnh báo prerequisite ngược band
-- [x] `reports/taxonomy_summary.md` — sinh tự động, 568 dòng
-- [x] Chứng minh validator từ chối: 6 lỗi cố ý đều bị bắt, exit 1
-- [ ] ~~Nhắm 10–30 item/concept~~ → **grammar chỉ đạt ~3.2, xem blocker B7**
+| Hạng mục | Số lượng | Trạng thái |
+|---|---:|---|
+| Concept taxonomy | 171 (150 lá) | ✅ |
+| Seed từ vựng | 3 000 | ✅ |
+| Flashcard | 3 000 | 🟡 định nghĩa OK, **ví dụ điền khuôn** |
+| Câu hỏi thi | 376 | ✅ 0 trùng, 0 vi phạm part rules |
+| Bộ đề | 10 | 🔴 L=10 R=46, chuẩn 100+100 |
+| Grammar point | 106 | 🟡 chưa kiểm chất lượng nội dung |
+| File MP3 | 123 | ✅ audio thật |
+| Concept lá có ≥10 item | 25/150 | 🔴 14 concept 0 item, 111 concept có 1–9 |
 
-**→ STOP GATE 1**
-
----
-
-## Phase 2 — Schema ✅ HOÀN THÀNH (chờ duyệt)
-
-- [x] `stable_id()` — sha256 16 hex, prefix theo loại
-- [x] Pydantic models (23 model): `BatchMetadata`, `Flashcard`, `ExamItem`, `ExamGroup`, `Passage`, `AudioAsset`, `Option`, `IRTParams`, `EvidenceSpan`, `GrammarPoint`, `SpeakingTask`, `WritingTask`, `Rubric`
-- [x] Enum `QuestionType` (§3.1), `CEFRLevel` (A1–C1)
-- [x] `validators/part_rules.py` — bảng ràng buộc part 1–7 (§2.5)
-- [x] `schemas/embedding_config.yaml` — **đã chốt: 1024 chiều, bge-m3** (D2)
-- [x] `schemas/export_json_schema.py` — 17 file → `schemas/json/*.schema.json` cho cả 8 module_type
-- [x] `schemas/export_ddl.py` → 21 bảng, `vector(1024)`, HNSW, FK → `src/main/resources/db/migration/V1__content_tables.sql` (D8)
-- [ ] ~~Chạy DDL trên DB test~~ → **không làm, Owner chốt không dựng Postgres (B1)**
-- [x] Unit test `stable_id` idempotent — 10 test
-- [x] Validator từ chối đúng 3 case sai cố ý: Part 2 có 4 đáp án · 2 đáp án đúng · Part 7 có 4 passage
-
-**→ STOP GATE 2**
+**Audit: 0 LỖI, 14 CẢNH BÁO** — chạy `make gate`.
 
 ---
 
-## Phase 3 — Validation Harness + Round-trip Test
+## Hạ tầng — ĐÃ XONG ✅
 
-- [ ] `validators/validate_batch.py` — 6 layer:
-  - [ ] L1 JSON parse + JSON Schema
-  - [ ] L2 Pydantic
-  - [ ] L3 Cross-ref (`concept_ids` ⊆ taxonomy, `rubric_ref` tồn tại)
-  - [ ] L4 Business rules (part rules, đúng 1 đáp án, URL `^https://`, không còn cú pháp Markdown link)
-  - [ ] L5 Count assertion (`total_records == len(data)`)
-  - [ ] L6 Duplicate (ID trùng; rapidfuzz ≥ 0.92)
-- [ ] Output `reports/validation_<batch_id>.json` + reject → `rejects/`
-- [ ] `tests/test_roundtrip.py` — JSON → Pydantic → DB → SELECT → Pydantic → JSON, so sha256 canonical
-- [ ] 7 fixture cố ý sai: `bad_markdown_url`, `bad_part2_four_options`, `bad_two_correct`, `bad_unknown_concept`, `bad_count_mismatch`, `bad_missing_irt`, `bad_duplicate_id`
-- [ ] `make validate BATCH=<path>` chạy được, exit code ≠ 0 khi có reject
+| | |
+|---|---|
+| Taxonomy + validator | 171 concept, DAG không cycle |
+| Schema | 23 Pydantic model, 17 JSON Schema, DDL 21 bảng |
+| Lưới chắn đa dạng | `validators/diversity.py` — che token rồi mới đếm |
+| **Cổng ghi** | `generators/guarded_write.py` — chặn **TRƯỚC** khi ghi |
+| Sửa lỗi hàng loạt | `generators/repair_exam_bank.py` |
+| Cổng chất lượng | `make gate` → `validators/audit_data.py`, exit ≠ 0 khi có LỖI |
+| Test | **64 xanh** |
+| Tầng staging | `output/_db/` — 21 file JSONL = 21 bảng |
 
-**→ STOP GATE 3**
-
----
-
-## Phase 4 — Seed Lists
-
-- [ ] Tải wordlist nguồn thật: NGSL / NAWL / TSL → CEFR-J → EVP. **Không tải được nguồn nào → DỪNG, hỏi. Cấm tự bịa danh sách**
-- [ ] `seeds/vocab_seed.csv`: `lemma, pos, cefr_level, cefr_source, frequency_rank, topic_hint`
-- [ ] Khử trùng theo `(lemma, pos)`
-- [ ] Chỉ tiêu: A1 400 · A2 500 · B1 700 · B2 800 · C1 600 (B2/C1 bắt buộc collocations)
-- [ ] `seeds/grammar_syllabus.yaml` — phủ **A1–C1** (D5, không phải B1–C1), map 1-1 với `concept_id` Phase 1
-- [ ] `seeds/topic_taxonomy.yaml` — 8 topic + subtopic
-
-**→ STOP GATE 4**
+Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-part5`
+· `gen-part6` · `repair` · `gate` · `export-db` · `test`
 
 ---
 
-## Phase 5 — Flashcard Enrichment
+## Còn phải làm
 
-- [ ] Generator: chunk **8 từ/call** (không quá 10), `temperature ≤ 0.4`
-- [ ] Prompt truyền vào: danh sách từ cố định + CEFR band + topic + **danh sách concept_id hợp lệ** (không cho LLM tự đặt tên concept)
-- [ ] Validate ngay sau mỗi chunk, retry tối đa 2 lần, fail → `rejects/`, không chặn chunk sau
-- [ ] Checkpoint `output/flashcards/.progress.json` để resume
-- [ ] Post-processing: IPA validation qua CMUdict → `ipa_verified` · CEFR cross-check (lệch ≥2 band → reject) · sense check · B2/C1 mà <3 collocation → reject · near-dup rapidfuzz 0.92
-- [ ] ≥95% seed word có record hợp lệ
-- [ ] `reports/flashcard_qa.md`
-- [ ] In 30 record random cho Owner đọc
+### Nội dung — nút thắt chính
 
-**→ STOP GATE 5** (nếu 30 mẫu không đạt → sửa prompt, chạy lại **toàn bộ**, không vá lẻ)
+| Việc | Còn thiếu | Ghi chú |
+|---|---:|---|
+| Câu ví dụ flashcard | ~3 000 cặp EN/VI | Đang điền khuôn, phải sinh lại |
+| Collocation | 4 200 | Chưa chốt nguồn hợp pháp (B9) |
+| Câu Listening | ~1 400 | Để bộ đề đủ 100+100 |
+| Speaking task | 11 | Concept `sp_*` đang 0 item |
+| Writing task | 8 | Concept `wr_*` đang 0 item |
+| Rubric | 2 | Band 0–5 đủ mọi dimension |
+| Assessment prompt | 2 | Phase 10 |
 
----
+Khối lượng tiếng Việt không có nguồn mở — WordNet chỉ phủ ~22% tổng nội dung
+(2 796 định nghĩa EN + 2 126 ví dụ EN trên tổng 22 200 đơn vị).
 
-## Phase 6 — Grammar & Collocations Bank
+### Kỹ thuật
 
-- [ ] Mỗi grammar point trong syllabus → 1 `GrammarPoint`
-- [ ] `common_mistakes` ≥3, ưu tiên lỗi đặc trưng người Việt (thiếu article, present perfect vs past simple, sai giới từ, thiếu -s ngôi 3, word order tính từ)
-- [ ] `quick_exercises` **12 câu/point** (D5, không phải 5), tái dùng `ExamItem` schema (part_number=5)
-- [ ] Collocation bank: gom từ Phase 5, nhóm `pattern` × `topic`, khử trùng
-- [ ] `reports/collocation_coverage.md`
-
-**→ STOP GATE 6**
-
----
-
-## Phase 7 — Exam Bank: Reading (Part 5/6/7)
-
-- [ ] Part 5: 30 câu · Part 6: 16 câu (4 group × 4) · Part 7: 54 câu (single 29, double 10, triple 15)
-- [ ] Quy trình 4 bước: sinh passage → sinh questions (call riêng) → `evidence_span` bằng **string-match trong code** (không để LLM khai offset) → validate group
-- [ ] Distractor phải có lý do sai cụ thể trong `rationale_vi` — theo [exam-quality-bar.md](exam-quality-bar.md)
-- [ ] **3 kiểm tra thiên lệch thống kê trên cả bộ đề** (ngoài work order): vị trí đáp án A–D 20–30% · đáp án đúng dài nhất ≤35% · đáp án đúng trùng từ nhiều nhất ≤35%
-- [ ] Double/triple: ≥2 câu `rc_cross_reference`
-- [ ] Tên công ty/người **hư cấu**, bối cảnh business trung tính
-- [ ] Độ dài: Part 6 ~120–160 từ · Part 7 single ~150–250 · mỗi passage multi ~100–180
-- [ ] `reports/reading_distribution.md` + báo cáo concept nào <5 item
-- [ ] In 15 câu random cho Owner
-
-**→ STOP GATE 7**
+- [ ] Nối `guarded_write` vào generator còn lại: `gen_toeic_reading_bank`,
+      `gen_toeic_listening_bank`, `gen_full_exam_sets`, `gen_exam_sets_clean`
+- [ ] Bảo vệ file `_001` khỏi bị ghi đè — đã mất 30 câu Part 5 viết tay một lần
+      (khôi phục được vì generator nằm trong git)
+- [ ] `duration_ms` đọc từ file MP3 thật thay vì khai cứng 8000
+- [ ] Chạy forced alignment để `alignment_status: "aligned"` là sự thật
+      (hiện 0/160 evidence_span có mốc thời gian)
+- [ ] Dọn `.flashcards_groq.checkpoint.json` khỏi `output/flashcards/` — không phải
+      batch, làm loader vấp
+- [ ] Mở rộng `LEXNAME_TOPIC` để nâng tỉ lệ gán concept ngữ nghĩa (hiện 75%)
 
 ---
 
-## Phase 8 — Listening + Audio Pipeline
+## Blocker cần Owner quyết
 
-### 8A Script
-- [ ] Part 1: 6 câu — **blocked bởi B6 (ảnh)**
-- [ ] Part 2: 25 câu, 3 đáp án, ≥30% `lc_indirect_response`
-- [ ] Part 3: 39 câu (13 hội thoại × 3), 2–3 người nói
-- [ ] Part 4: 30 câu (10 bài nói × 3)
-- [ ] Accent: US 50% · UK ~17% · AU ~17% · CA ~17%
-- [ ] 2–3 group có graphic → `lc_graphic_reference`
-
-### 8B Audio — **blocked bởi B5**
-- [ ] `script → TTS multi-voice → forced alignment → duration → upload CDN → patch audio_url`
-- [ ] Forced alignment: WhisperX / MFA → `audio_start_ms`/`audio_end_ms`
-- [ ] Chưa có audio → `audio_url=null`, `alignment_status="pending"`. **Cấm nhét URL giả**
-- [ ] Chạy end-to-end trên 3 mẫu, paste duration thật
-
-### 8C Shadowing
-- [ ] 20–30 đoạn 30–60s, phân tầng CEFR, timestamp từng câu
-
-**→ STOP GATE 8**
+| # | Việc | Chặn |
+|---|---|---|
+| ~~B5~~ | ~~TTS engine~~ → **đã giải: Groq**, 123 MP3 thật | — |
+| B6 | Nguồn ảnh Part 1 (6 câu cần `image_url`) | Phase 8 |
+| B9 | Nguồn collocation hợp pháp — Oxford/Macmillan có bản quyền; NLTK cần corpus phù hợp (Reuters là tin tài chính 1980s, lệch văn phong) | 4 200 cụm |
+| B10 | Giữ chỉ tiêu 3 000 từ, hay giảm còn 800–1 000 chất lượng cao? | Khối lượng toàn bộ |
+| B1 | Postgres — Owner chốt để local, chưa dựng. DDL chưa được DB nào xác nhận cú pháp | Phase 11 |
+| B2 | Java 21 + Maven chưa cài | Phase 11 |
 
 ---
 
-## Phase 9 — Speaking & Writing
+## Bài học — đừng lặp lại
 
-- [ ] 11 Speaking task (read aloud ×2 · describe picture ×2 · respond to questions ×3 · respond using info ×3 · opinion ×1) với `prep_time_sec`/`response_time_sec` đúng bảng
-- [ ] 8 Writing task (picture sentence ×5 · email ×2 min 50 từ · opinion essay ×1 min 300 từ)
-- [ ] `sample_answer_c1` có chú thích cấu trúc ăn điểm
-- [ ] `high_scoring_vocab` link ngược về `flashcard.id`
-- [ ] `Rubric` tách file riêng, band descriptor 0–5 đầy đủ **mọi** dimension, không để trống band nào
-- [ ] Đếm từ sample answer bằng code
-
-**→ STOP GATE 9**
-
----
-
-## Phase 10 — AI Assessment Prompts
-
-- [ ] Prompt Speaking + Writing: nhận `rubric` + `task` + `student_answer` → JSON `AssessmentResult`
-- [ ] `AssessmentResult`: `{overall_band, dimension_scores[], errors[{type, span, correction, concept_id}], next_concepts[]}`
-- [ ] `errors[].concept_id` **bắt buộc** map về taxonomy — đây là đường feedback ngược về BKT
-- [ ] Chống grade inflation, chấm lệch theo độ dài, chấp nhận bài lạc đề
-- [ ] Calibration set 10 bài + điểm tham chiếu → bảng so sánh, độ lệch trung bình
-- [ ] Chạy cùng 1 bài 3 lần, báo variance — lệch >1 band là chưa đạt
-- [ ] 100% output parse được
-
-**→ STOP GATE 10**
-
----
-
-## Phase 11 — Ingest → Postgres + pgvector — **blocked bởi B1, B2, B3, B4**
-
-- [ ] Migration tạo bảng (Flyway)
-- [ ] Loader idempotent `INSERT ... ON CONFLICT (stable_id) DO UPDATE`
-- [ ] Sinh embedding → cột `vector(N)`, index HNSW
-- [ ] Round-trip test trên **dữ liệu thật**
-- [ ] Chạy loader 2 lần liên tiếp → row count không đổi
-- [ ] Sanity query: concept <5 item · `concept_ids` mồ côi · phân bố `difficulty_prior` (dồn quanh 0.5 → prior vô dụng cho Elo) · 5 truy vấn vector search
-- [ ] `reports/coverage_gaps.md`
-- [ ] Xác định module nào sở hữu bảng content (dùng skill `design-backend-module`; repo chưa có `docs/module-map.md`)
-
-**→ STOP GATE 11**
-
----
-
-## Phase 12 — Final QA Report
-
-- [ ] `reports/FINAL_QA.md`: tổng record theo module × CEFR · ma trận phủ concept (highlight <5) · tỉ lệ reject + top-10 nguyên nhân · danh sách còn `review_status: draft` · `blocked_on` chưa giải quyết · nợ kỹ thuật · ước tính token/call LLM
-
-**→ STOP GATE 12 — kết thúc work order**
-
----
-
-## Luật không được quên
-
-- Validation **reject-only** — cấm auto-repair, bản ghi sai vào `rejects/` kèm lý do
-- Cấm bịa nguồn dữ liệu, bịa IPA, bịa CEFR level, sao chép đề TOEIC thật
-- `total_records` do **pipeline tính**, không phải LLM khai — mismatch = reject
-- Mọi JSON: UTF-8, `ensure_ascii=false`
-- TOEIC® là nhãn hiệu ETS → dùng "TOEIC-format practice" / "Đề luyện theo định dạng TOEIC"
-- `is_ai_generated = true` bắt buộc mọi batch
-- Tỉ lệ reject >15% ở bất kỳ phase nào → **DỪNG, hỏi Owner**
-- Phải sửa schema sau khi đã sinh dữ liệu → **DỪNG, hỏi** (có thể phải regenerate)
-- Cấm gộp phase
+1. **Lưới chắn phải nằm TRƯỚC lệnh ghi.** Đợt 2026-08-06 hỏng vì ghi trước kiểm sau —
+   lúc phát hiện thì file đã nằm trên đĩa và đã được báo cáo "26 300 row, 0 lỗi".
+2. **Đếm chuỗi thô không phát hiện được khuôn mẫu.** Thay một từ vào khuôn cố định
+   vẫn ra chuỗi "duy nhất": dữ liệu hỏng đo được 83.9%. Che token rồi mới đếm → 0.03%.
+3. **Đọc mẫu số, không chỉ đọc tỉ lệ.** "0 URL giả" trên 0 bản ghi khác hẳn trên 220 bản ghi.
+4. **Không audit trong lúc dữ liệu đang được sinh.** Số liệu đã nhảy giữa hai lệnh liên tiếp.
+5. **Commit script, không commit data.** Nhờ vậy khôi phục được 46 câu viết tay sau khi bị ghi đè.
+6. **`git add -A` là cách nhanh nhất commit nhầm secret.** Kiểm `git diff --cached` trước khi commit.
+7. **Validator hình thức không thay được QA nội dung.** Dữ liệu hỏng vượt 100% kiểm tra
+   cấu trúc — phải mở file ra đọc mới thấy nó rỗng.
