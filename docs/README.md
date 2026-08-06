@@ -9,6 +9,7 @@ Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
 | [AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) | **Nguồn chân lý.** Nguyên tắc vận hành, 13 phase, spec schema, danh sách lỗi P0/P1 phải sửa |
 | [TODO.md](TODO.md) | Checklist tiến độ từng phase + bảng blocker cần Owner quyết |
 | [data-pipeline.md](data-pipeline.md) | Layout thư mục `data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
+| [exam-set-structure.md](exam-set-structure.md) | Cấu trúc bộ đề: ngân hàng câu tách khỏi manifest, thành phần 200 câu, cần bao nhiêu bộ |
 | [phase0-recon.md](phase0-recon.md) | Báo cáo Phase 0: hiện trạng repo, migration tool, toolchain, blocker |
 
 ## Trạng thái hiện tại
