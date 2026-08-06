@@ -4,3 +4,5 @@ target/
 .vscode/
 .mvn/wrapper/maven-wrapper.jar
 HELP.md
+.env
+.mcp.json
