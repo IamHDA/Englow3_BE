@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "DimensionScore": {
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "minLength": 2,
+          "title": "Dimension",
+          "type": "string"
+        },
+        "evidence_quote": {
+          "minLength": 1,
+          "title": "Evidence Quote",
+          "type": "string"
+        },
+        "feedback_vi": {
+          "minLength": 10,
+          "title": "Feedback Vi",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 5.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dimension",
+        "score",
+        "evidence_quote",
+        "feedback_vi"
+      ],
+      "title": "DimensionScore",
+      "type": "object"
+    },
+    "ErrorFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_id": {
+          "minLength": 2,
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "correction": {
+          "minLength": 1,
+          "title": "Correction",
+          "type": "string"
+        },
+        "span": {
+          "minLength": 1,
+          "title": "Span",
+          "type": "string"
+        },
+        "type": {
+          "minLength": 2,
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "span",
+        "correction",
+        "concept_id"
+      ],
+      "title": "ErrorFinding",
+      "type": "object"
+    }
+  },
+  "$id": "https://englow3.local/schemas/assessment_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Output bắt buộc của prompt chấm bài — §Phase 10.",
+  "properties": {
+    "dimension_scores": {
+      "items": {
+        "$ref": "#/$defs/DimensionScore"
+      },
+      "minItems": 1,
+      "title": "Dimension Scores",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ErrorFinding"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "next_concepts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Next Concepts",
+      "type": "array"
+    },
+    "overall_band": {
+      "maximum": 5.0,
+      "minimum": 0.0,
+      "title": "Overall Band",
+      "type": "number"
+    }
+  },
+  "required": [
+    "overall_band",
+    "dimension_scores"
+  ],
+  "title": "AssessmentResult",
+  "type": "object"
+}

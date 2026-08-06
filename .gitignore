@@ -22,3 +22,6 @@ data_pipeline/seeds/by_level/
 data_pipeline/rejects/*.json
 data_pipeline/output/_db/*.jsonl
 data_pipeline/output/_db/_manifest.json
+
+# DDL sinh tu dong — sinh lai bang `make schema`
+data_pipeline/migrations/

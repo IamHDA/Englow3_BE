@@ -45,6 +45,7 @@ export-db:
 # Phase 2
 schema:
 	$(PY) schemas/export_json_schema.py
+	@echo
 	$(PY) schemas/export_ddl.py
 
 # Phase 3 — usage: make validate BATCH=output/flashcards/xxx.json
