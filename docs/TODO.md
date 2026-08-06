@@ -17,7 +17,7 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 
 | # | Vấn đề | Chặn phase | Lựa chọn |
 |---|---|---|---|
-| B1 | Không có Postgres nào chạy được. Không có server ở `localhost:5432`, không có `psql`, Docker socket thuộc user `admin` → permission denied. **Không xác định được `vector` extension đã cài chưa** | DoD 2, Phase 11 | (a) Owner chạy Docker `pgvector/pgvector:pg16` · (b) cho phép `sudo chown` Homebrew để cài local · (c) Owner cấp connection string remote |
+| B1 | *(không còn chặn tới Phase 11 — xem D6)* Không có Postgres nào chạy được. Không có server ở `localhost:5432`, không có `psql`, Docker socket thuộc user `admin` → permission denied. **Không xác định được `vector` extension đã cài chưa** | Phase 11 | (a) Owner chạy Docker `pgvector/pgvector:pg16` · (b) cho phép `sudo chown` Homebrew để cài local · (c) Owner cấp connection string remote |
 | B2 | Java 21 + Maven chưa cài (cùng gốc vấn đề quyền Homebrew) | Phase 11 | Cài SDKMAN vào `~/.sdkman` (không cần root), hoặc Owner tự cài |
 | B4 | §2.8 work order bảo xuất DDL ra `data_pipeline/migrations/`, nhưng repo dùng Flyway đọc `classpath:db/migration` và `ddl-auto: validate` | Phase 2 | Đề xuất: xuất vào `src/main/resources/db/migration/V1__content_tables.sql` — chờ xác nhận |
 | B5 | Chưa chốt TTS engine (chi phí + license khác nhau nhiều) | Phase 8 | Owner chốt tại GATE 7 |

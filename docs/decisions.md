@@ -31,6 +31,22 @@ trước khi Phase 5–9 sinh ra khối lượng lớn nội dung tốn tiền L
 
 ---
 
+## D6 — Chưa dùng DB; lưu thẳng ra đĩa theo bố cục map 1-1 với bảng
+
+**Chốt:** hai tầng — `output/<module>/` là batch do generator sinh, `output/_db/`
+là tầng staging phẳng, mỗi file JSONL ứng với một bảng. Chi tiết 21 bảng và thứ tự
+nạp: [storage-layout.md](storage-layout.md).
+
+**Lý do:** Phase 2–10 không cần DB, chỉ Phase 11 mới cần. Tách sẵn tầng staging thì
+lúc nạp vào Postgres chỉ là đọc file và `INSERT`, không phải viết lại logic làm phẳng.
+Ba việc khiến bước đó dễ: `concept_ids` tách thành bảng nối thay vì mảng khoá ngoại;
+khoá chính dùng `stable_id()` có sẵn nên `ON CONFLICT DO UPDATE` idempotent; cột
+`embedding` để `NULL` lúc nạp, sinh vector là bước riêng.
+
+**Hệ quả:** blocker **B1** (không có Postgres) không chặn gì cho tới Phase 11.
+
+---
+
 ## D2 — Embedding: 1024 chiều, `bge-m3`
 
 **Chốt:** [schemas/embedding_config.yaml](../data_pipeline/schemas/embedding_config.yaml) — `dimension: 1024`, `BAAI/bge-m3`, chạy local, normalize L2, index HNSW `vector_cosine_ops`.
