@@ -1,7 +1,7 @@
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: bootstrap venv install taxonomy seed gen-part5 export-db schema validate test clean tree doctor
+.PHONY: bootstrap venv install taxonomy seed gen-part5 gen-part6 export-db schema validate test clean tree doctor
 
 # --- Bootstrap trên máy mới ---------------------------------------------------
 # Chạy `make bootstrap` là đủ: tự cài uv nếu chưa có, tự tải CPython 3.12,
@@ -41,6 +41,9 @@ seed:
 # Phase 7 — sinh de Reading
 gen-part5:
 	$(PY) generators/gen_reading_part5.py
+
+gen-part6:
+	$(PY) generators/gen_reading_part6.py
 
 # Tang staging: output/<module>/ -> output/_db/*.jsonl (1 file = 1 bang)
 export-db:
