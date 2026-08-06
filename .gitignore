@@ -23,3 +23,7 @@ data_pipeline/rejects/*.json
 data_pipeline/output/_db/*.jsonl
 data_pipeline/output/_db/_manifest.json
 
+
+data_pipeline/output/audio/
+data_pipeline/output/*.mp3
+data_pipeline/rejects/*/

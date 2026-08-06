@@ -84,7 +84,23 @@ Học viên sẽ thấy chuỗi câu hỏi lặp lại kèm ghi chú kỹ thuậ
 
 Gần trùng bằng rapidfuzz: **45 724 cặp** trên 400 câu mẫu.
 
-### 4. Audio: 220 URL giả, khai đã căn chỉnh
+### 4. Audio: file THẬT, nhưng metadata bịa
+
+> **Đính chính (2026-08-06, sau khi kiểm `output/audio/`):** kết luận đầu tiên của
+> tôi — *"chưa có TTS engine nào chạy"* — **sai**. TTS đã chạy thật:
+> 123 file MP3, MPEG layer III 48 kbps 24 kHz mono, và **120/120 `audio_url` trỏ
+> tới file có thật**. Audit đầu chỉ đọc JSON nên không thấy thư mục audio.
+>
+> Phần vẫn sai là **metadata mô tả chúng**:
+>
+> | Khai trong JSON | Thực tế |
+> |---|---|
+> | `duration_ms: 8000` (cả 220 asset) | 13.1 – 19.0 giây, mỗi file một khác |
+> | `alignment_status: "aligned"` | **0/160** `evidence_span` có `audio_start_ms` — forced alignment chưa hề chạy |
+> | `http://localhost:8080/...` | Chỉ phân giải được trên chính máy này |
+> | 220 asset | Chỉ có 123 file MP3 — thiếu 97 |
+
+### 4b. Nguyên văn kết luận cũ (giữ để đối chiếu)
 
 ```
 url   = http://localhost:8080/static/audio/listening_set01_p2_q01.mp3
