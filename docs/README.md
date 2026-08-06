@@ -11,6 +11,7 @@ Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
 | [TODO.md](TODO.md) | Checklist tiến độ từng phase + bảng blocker cần Owner quyết |
 | [data-pipeline.md](data-pipeline.md) | Layout thư mục `data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
 | [storage-layout.md](storage-layout.md) | Bố cục trên đĩa: tầng batch vs tầng staging `_db/`, 21 bảng và thứ tự nạp |
+| [exam-quality-bar.md](exam-quality-bar.md) | Chuẩn chất lượng bộ đề: thiết kế distractor, evidence_span, 3 kiểm tra thiên lệch thống kê |
 | [exam-set-structure.md](exam-set-structure.md) | Cấu trúc bộ đề: ngân hàng câu tách khỏi manifest, thành phần 200 câu, cần bao nhiêu bộ |
 | [phase0-recon.md](phase0-recon.md) | Báo cáo Phase 0: hiện trạng repo, migration tool, toolchain, blocker |
 

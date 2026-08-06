@@ -135,7 +135,8 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 
 - [ ] Part 5: 30 câu · Part 6: 16 câu (4 group × 4) · Part 7: 54 câu (single 29, double 10, triple 15)
 - [ ] Quy trình 4 bước: sinh passage → sinh questions (call riêng) → `evidence_span` bằng **string-match trong code** (không để LLM khai offset) → validate group
-- [ ] Distractor phải có lý do sai cụ thể trong `rationale_vi`
+- [ ] Distractor phải có lý do sai cụ thể trong `rationale_vi` — theo [exam-quality-bar.md](exam-quality-bar.md)
+- [ ] **3 kiểm tra thiên lệch thống kê trên cả bộ đề** (ngoài work order): vị trí đáp án A–D 20–30% · đáp án đúng dài nhất ≤35% · đáp án đúng trùng từ nhiều nhất ≤35%
 - [ ] Double/triple: ≥2 câu `rc_cross_reference`
 - [ ] Tên công ty/người **hư cấu**, bối cảnh business trung tính
 - [ ] Độ dài: Part 6 ~120–160 từ · Part 7 single ~150–250 · mỗi passage multi ~100–180
