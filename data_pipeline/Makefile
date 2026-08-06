@@ -48,6 +48,14 @@ gen-part5:
 gen-part6:
 	$(PY) generators/gen_reading_part6.py
 
+# Sua loi may sua duoc trong ngan hang de
+repair:
+	$(PY) generators/repair_exam_bank.py
+
+# CONG CHAT LUONG — chay sau MOI lan sinh du lieu, exit != 0 neu hong
+gate:
+	$(PY) validators/audit_data.py
+
 # Tang staging: output/<module>/ -> output/_db/*.jsonl (1 file = 1 bang)
 export-db:
 	$(PY) generators/export_db_staging.py
