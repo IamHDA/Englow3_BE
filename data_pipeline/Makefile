@@ -1,7 +1,7 @@
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: bootstrap venv install taxonomy schema validate test clean tree doctor
+.PHONY: bootstrap venv install taxonomy seed schema validate test clean tree doctor
 
 # --- Bootstrap trên máy mới ---------------------------------------------------
 # Chạy `make bootstrap` là đủ: tự cài uv nếu chưa có, tự tải CPython 3.12,
@@ -33,6 +33,10 @@ doctor:
 # Phase 1
 taxonomy:
 	$(PY) validators/check_taxonomy.py --report reports/taxonomy_summary.md
+
+# Phase 4 — cần seeds/raw/ (chạy seeds/raw/fetch_wordlists.sh trước)
+seed:
+	$(PY) generators/build_vocab_seed.py
 
 # Phase 2
 schema:
