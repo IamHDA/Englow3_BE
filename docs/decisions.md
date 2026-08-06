@@ -111,13 +111,40 @@ item nào — nên mở ra **A1–C1**.
 
 ---
 
+## D7 — Owner từ chối 3 ràng buộc tôi thêm ngoài spec
+
+**Chốt:** gỡ cả ba khỏi schema và DDL.
+
+| # | Ràng buộc đã gỡ | Hệ quả để lại |
+|---|---|---|
+| R1 | `irt_params` không được khai `calibrated` khi `n_responses` chưa đủ | `calibration_status` **không được cưỡng chế**. Phase 12 phải tính lại độ tin cậy từ `n_responses` thật, đừng đọc cột này |
+| R2 | `ExamSet.title` phải kèm "format"/"định dạng" khi có chữ TOEIC | §0.7 vẫn áp dụng nhưng do con người giữ. Generator Phase 7 phải đặt title đúng ngay từ đầu vì không có lưới chắn |
+| R3 | Nhãn option phải liên tục A,B,C[,D] | Nhãn trùng hoặc nhảy cóc lọt qua schema. Nếu gặp ở Phase 7 thì phải bắt bằng QA thủ công |
+
+Ghi lại để sau này gặp lỗi tương ứng thì biết ngay là do đã cố ý bỏ lưới chắn,
+chứ không phải sót.
+
+---
+
+## D8 — DDL đặt tại `src/main/resources/db/migration/V1__content_tables.sql`
+
+**Chốt:** `make schema` ghi thẳng vào thư mục Flyway của Spring Boot. Gỡ blocker B4.
+
+**Lý do:** Flyway phải là chủ sở hữu schema duy nhất (`ddl-auto: validate`).
+Để DDL ở chỗ khác nghĩa là có hai nguồn schema, sớm muộn cũng lệch.
+
+⚠️ **Flyway không bao giờ được sửa migration đã chạy.** Một khi V1 đã áp lên một
+DB thật, mọi thay đổi schema phải là V2, V3... `make schema` sinh đè lên V1 chỉ
+an toàn **trước** lần chạy đầu tiên.
+
+---
+
 ## Còn treo — chưa quyết được vì phụ thuộc môi trường
 
 | # | Việc | Chặn |
 |---|---|---|
-| B1 | Không có Postgres nào chạy được (không server ở 5432, không psql, docker socket thuộc user `admin`) | DoD Phase 2, Phase 11 |
+| B1 | Không dựng Postgres — Owner chốt **để local trên máy thôi**. DDL đã sinh nhưng **chưa Postgres nào xác nhận cú pháp** | Phase 11 |
 | B2 | Java 21 + Maven chưa cài (quyền Homebrew) | Phase 11 |
-| B4 | Vị trí DDL — đề xuất `src/main/resources/db/migration/V1__content_tables.sql` để Flyway là chủ sở hữu schema duy nhất | Phase 2 |
 | B5 | TTS engine (chi phí + license khác nhau nhiều) | Phase 8 |
 | B6 | Nguồn ảnh Part 1 | Phase 8 |
 

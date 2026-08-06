@@ -3,23 +3,23 @@
 Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
 Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>` mới sang phase kế.
 
-**Cập nhật lần cuối:** 2026-08-06
-**Đang ở:** STOP GATE 1 — chờ `APPROVE PHASE 1`
+**Cập nhật lần cuối:** 2026-08-06 (Phase 2 xong)
+**Đang ở:** STOP GATE 2 — chờ `APPROVE PHASE 2`
 
 ---
 
 > **5 blocker đã được chốt** — xem [decisions.md](decisions.md): dữ liệu chỉ lưu local (D1),
 > embedding 1024 chiều / bge-m3 (D2, gỡ B3), `octanove` vào enum `cefr_source` (D3),
-> ngân hàng câu hỏi tách khỏi bộ đề (D4), 3 bộ đề + quick_exercises 12 câu (D5, gỡ B7).
+> ngân hàng câu hỏi tách khỏi bộ đề (D4), 3 bộ đề + quick_exercises 12 câu (D5, gỡ B7),
+> lưu trên đĩa không cần DB (D6), gỡ 3 ràng buộc ngoài spec (D7), DDL vào Flyway (D8, gỡ B4).
 > Bảng dưới chỉ còn các mục **chưa** quyết được.
 
 ## 🔴 BLOCKER — còn treo
 
 | # | Vấn đề | Chặn phase | Lựa chọn |
 |---|---|---|---|
-| B1 | *(không còn chặn tới Phase 11 — xem D6)* Không có Postgres nào chạy được. Không có server ở `localhost:5432`, không có `psql`, Docker socket thuộc user `admin` → permission denied. **Không xác định được `vector` extension đã cài chưa** | Phase 11 | (a) Owner chạy Docker `pgvector/pgvector:pg16` · (b) cho phép `sudo chown` Homebrew để cài local · (c) Owner cấp connection string remote |
+| B1 | Owner chốt **không dựng Postgres, để local trên máy thôi** (D7/D8). DDL đã sinh nhưng chưa Postgres nào xác nhận cú pháp | Phase 11 | Quyết khi tới Phase 11 |
 | B2 | Java 21 + Maven chưa cài (cùng gốc vấn đề quyền Homebrew) | Phase 11 | Cài SDKMAN vào `~/.sdkman` (không cần root), hoặc Owner tự cài |
-| B4 | §2.8 work order bảo xuất DDL ra `data_pipeline/migrations/`, nhưng repo dùng Flyway đọc `classpath:db/migration` và `ddl-auto: validate` | Phase 2 | Đề xuất: xuất vào `src/main/resources/db/migration/V1__content_tables.sql` — chờ xác nhận |
 | B5 | Chưa chốt TTS engine (chi phí + license khác nhau nhiều) | Phase 8 | Owner chốt tại GATE 7 |
 | B6 | Chưa có nguồn ảnh cho Part 1 Listening | Phase 8 | (a) ảnh CC0 · (b) sinh ảnh · (c) để `audio_url=null` + `blocked_on: "image_asset"` |
 
@@ -57,17 +57,18 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 
 ---
 
-## Phase 2 — Schema
+## Phase 2 — Schema ✅ HOÀN THÀNH (chờ duyệt)
 
-- [ ] `stable_id()` — sha256 16 hex, prefix theo loại
-- [ ] Pydantic models: `BatchMetadata`, `Flashcard`, `ExamItem`, `ExamGroup`, `Passage`, `AudioAsset`, `Option`, `IRTParams`, `EvidenceSpan`, `GrammarPoint`, `SpeakingTask`, `WritingTask`, `Rubric`
-- [ ] Enum `QuestionType` (§3.1), `CEFRLevel` (A1–C1)
-- [ ] `validators/part_rules.py` — bảng ràng buộc part 1–7 (§2.5)
+- [x] `stable_id()` — sha256 16 hex, prefix theo loại
+- [x] Pydantic models (23 model): `BatchMetadata`, `Flashcard`, `ExamItem`, `ExamGroup`, `Passage`, `AudioAsset`, `Option`, `IRTParams`, `EvidenceSpan`, `GrammarPoint`, `SpeakingTask`, `WritingTask`, `Rubric`
+- [x] Enum `QuestionType` (§3.1), `CEFRLevel` (A1–C1)
+- [x] `validators/part_rules.py` — bảng ràng buộc part 1–7 (§2.5)
 - [x] `schemas/embedding_config.yaml` — **đã chốt: 1024 chiều, bge-m3** (D2)
-- [ ] `schemas/export_json_schema.py` → `schemas/json/*.schema.json` cho cả 8 module_type
-- [ ] `schemas/export_ddl.py` → DDL có `vector(1024)`, index HNSW, UNIQUE trên stable id, FK `concept_ids` → `concepts` — **blocked bởi B4** (vị trí file)
-- [ ] Unit test `stable_id` idempotent
-- [ ] Validator từ chối đúng 3 case sai cố ý: Part 2 có 4 đáp án · 2 đáp án đúng · Part 7 có 4 passage
+- [x] `schemas/export_json_schema.py` — 17 file → `schemas/json/*.schema.json` cho cả 8 module_type
+- [x] `schemas/export_ddl.py` → 21 bảng, `vector(1024)`, HNSW, FK → `src/main/resources/db/migration/V1__content_tables.sql` (D8)
+- [ ] ~~Chạy DDL trên DB test~~ → **không làm, Owner chốt không dựng Postgres (B1)**
+- [x] Unit test `stable_id` idempotent — 10 test
+- [x] Validator từ chối đúng 3 case sai cố ý: Part 2 có 4 đáp án · 2 đáp án đúng · Part 7 có 4 passage
 
 **→ STOP GATE 2**
 

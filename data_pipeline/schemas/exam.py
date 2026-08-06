@@ -34,19 +34,9 @@ class IRTParams(StrictModel):
     c: float | None = None   # guessing
     calibration_status: CalibrationStatus = CalibrationStatus.UNCALIBRATED
     n_responses: int = Field(default=0, ge=0)
-
-    @model_validator(mode="after")
-    def status_must_match_evidence(self):
-        """Không được khai đã hiệu chuẩn khi chưa có dữ liệu — xem exam-quality-bar.md §7."""
-        if self.calibration_status is CalibrationStatus.CALIBRATED and self.n_responses < 200:
-            raise ValueError(f"calibrated cần ≥200 lượt trả lời, đang có {self.n_responses}")
-        if self.calibration_status is CalibrationStatus.PROVISIONAL and self.n_responses < 30:
-            raise ValueError(f"provisional cần ≥30 lượt trả lời, đang có {self.n_responses}")
-        if self.calibration_status is CalibrationStatus.UNCALIBRATED and (
-            self.a is not None or self.b is not None or self.c is not None
-        ):
-            raise ValueError("uncalibrated thì không được có tham số a/b/c")
-        return self
+    # Owner từ chối ràng buộc "không được khai calibrated khi chưa đủ lượt trả lời"
+    # (quyết định D7). Giá trị calibration_status hiện KHÔNG được cưỡng chế —
+    # Phase 12 phải báo cáo lại từ n_responses thật, đừng tin cột này.
 
 
 class EvidenceSpan(StrictModel):
@@ -102,17 +92,8 @@ class ExamItem(StrictModel):
             raise ValueError(f"Part {self.part_number} bắt buộc 4 lựa chọn, có {n}")
         return self
 
-    @model_validator(mode="after")
-    def labels_unique_and_contiguous(self):
-        """A,B,C[,D] — không nhảy cóc, không lặp. Bắt lỗi đánh nhãn của LLM."""
-        # str() chứ không .value — nhãn có thể là str thuần nếu bị gán sau khi khởi tạo
-        labels = [str(o.label) for o in self.options]
-        if len(set(labels)) != len(labels):
-            raise ValueError(f"nhãn option trùng: {labels}")
-        expected = ["A", "B", "C", "D"][: len(labels)]
-        if sorted(labels) != expected:
-            raise ValueError(f"nhãn option phải là {expected}, đang là {sorted(labels)}")
-        return self
+    # Owner từ chối ràng buộc nhãn option liên tục A,B,C[,D] (quyết định D7).
+    # Nhãn trùng hoặc nhảy cóc sẽ lọt qua schema.
 
     @model_validator(mode="after")
     def compute_derived_fields(self):
@@ -221,11 +202,6 @@ class ExamSet(StrictModel):
                 raise ValueError(f"{name} có item_id lặp trong cùng một bộ đề")
         return self
 
-    @model_validator(mode="after")
-    def title_respects_trademark(self):
-        low = self.title.lower()
-        if "toeic" in low and "format" not in low and "định dạng" not in low:
-            raise ValueError(
-                'title dùng "TOEIC" trần — §0.7 yêu cầu "TOEIC-format practice" '
-                'hoặc "Đề luyện theo định dạng TOEIC"')
-        return self
+    # Owner từ chối ràng buộc cưỡng chế cách gọi nhãn hiệu trong title
+    # (quyết định D7). §0.7 vẫn áp dụng, nhưng do con người tự giữ chứ schema
+    # không chặn — generator Phase 7 phải đặt title đúng ngay từ đầu.

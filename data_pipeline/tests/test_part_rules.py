@@ -131,11 +131,3 @@ def test_multi_passage_requires_cross_reference_items():
 def test_part_rule_table_matches_spec(part, n_options, q_min, q_max):
     r = PART_RULES[part]
     assert (r.n_options, r.questions_min, r.questions_max) == (n_options, q_min, q_max)
-
-
-def test_option_labels_must_be_contiguous():
-    """A,C,D — nhảy cóc nhãn B là lỗi đánh nhãn của LLM."""
-    opts = make_options(4)
-    opts[1].label = "D"
-    with pytest.raises(ValidationError):
-        make_item(options=opts)

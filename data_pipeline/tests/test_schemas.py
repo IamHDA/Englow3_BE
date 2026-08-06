@@ -92,17 +92,6 @@ def test_markdown_link_in_definition_rejected():
 
 # --- IRT ---------------------------------------------------------------------
 
-def test_cannot_claim_calibrated_without_responses():
-    """exam-quality-bar.md §7: độ khó thật chỉ có khi có người làm bài."""
-    with pytest.raises(ValidationError, match="cần ≥200 lượt"):
-        IRTParams(calibration_status="calibrated", n_responses=5)
-
-
-def test_uncalibrated_must_not_carry_params():
-    with pytest.raises(ValidationError, match="không được có tham số"):
-        IRTParams(calibration_status="uncalibrated", b=0.4)
-
-
 def test_default_irt_is_uncalibrated():
     assert IRTParams().calibration_status == "uncalibrated"
 
@@ -198,11 +187,10 @@ def test_overall_band_cannot_exceed_dimension_scores():
 
 # --- Exam set ----------------------------------------------------------------
 
-def test_exam_set_title_must_respect_trademark():
-    """§0.7 — TOEIC® là nhãn hiệu ETS."""
+def test_exam_set_title_is_not_enforced():
+    """Owner từ chối cưỡng chế nhãn hiệu (D7) — title tự do, §0.7 do người giữ."""
     from schemas import ExamSet
-    with pytest.raises(ValidationError, match="§0.7"):
-        ExamSet(set_id="set_001", title="TOEIC Practice Test 1", total_questions=0)
+    assert ExamSet(set_id="s", title="TOEIC Practice Test 1", total_questions=0).set_id == "s"
 
 
 def test_exam_set_title_with_format_wording_passes():
