@@ -1,194 +1,286 @@
 #!/usr/bin/env python3
-"""Generator cho Flashcard Bank (Phase 5).
+"""Sinh flashcard — v4, thay thế đợt dữ liệu điền khuôn 2026-08-06.
 
-Đọc `seeds/vocab_seed.csv` và sinh dữ liệu Flashcard chuẩn schema Pydantic.
-Bao gồm: IPA US/UK, Audio MP3 URL US/UK, Định nghĩa EN/VI, Ví dụ EN/VI,
-Collocation (bắt buộc ≥3 ở B2/C1), Mẹo ghi nhớ (Mnemonic), Concept mapping, và Prior difficulty.
+Nguyên tắc: **thà ít mà thật còn hơn nhiều mà rỗng.** Từ nào chưa có nội dung
+tiếng Việt viết tay trong generators/vi_lexicon.py thì BỎ QUA, không sinh thẻ.
+Đợt cũ hỏng đúng vì làm ngược lại — điền khuôn cho đủ 3 000.
+
+Nguồn:
+  definition_en   WordNet gloss (thật, không phải khuôn)
+  examples EN     vi_lexicon (ưu tiên) hoặc WordNet examples
+  definition_vi   vi_lexicon — viết tay, không có nguồn mở
+  translation VI  vi_lexicon — viết tay
+  ipa_us          eng-to-ipa/CMUdict, có suy luận hình thái cho hậu tố phái sinh
+  concept_ids     topic_hint → WordNet lexname → phái sinh → fallback
+  difficulty      base theo band + phân vị frequency_rank TRONG band
+
+Trước khi ghi, batch phải qua check_skeleton_diversity ≥ 0.60.
+
+    python generators/gen_flashcards.py
+    python generators/gen_flashcards.py --report-only
 """
 
 from __future__ import annotations
 
+import argparse
+import bisect
+import collections
 import csv
-import datetime as dt
-import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import eng_to_ipa as ipa
+import yaml
+from nltk.corpus import wordnet as wn
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from authoring import write_batch  # noqa: E402
+from schemas import (  # noqa: E402
+    BatchMetadata, Definition, Example, Flashcard, FlashcardBatch, ModuleType,
+)
+from validators.diversity import check_skeleton_diversity  # noqa: E402
+from vi_lexicon import LEXICON  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+SEED = ROOT / "seeds" / "vocab_seed.csv"
+TAXONOMY = ROOT / "taxonomy" / "concepts.yaml"
+OUT = ROOT / "output" / "flashcards" / "flashcard_batch_001.json"
+GENERATED_BY = "claude-opus-5"
 
-from schemas import (  # noqa: E402
-    CEFRLevel, CEFRSource, CollocationPattern, Definition, Example,
-    Flashcard, FlashcardBatch, PartOfSpeech, ReviewStatus, BatchMetadata
-)
+WN_POS = {"noun": wn.NOUN, "verb": wn.VERB, "adjective": wn.ADJ, "adverb": wn.ADV}
 
-SEED_CSV = ROOT / "seeds" / "vocab_seed.csv"
-OUT_DIR = ROOT / "output" / "flashcards"
-
-POS_MAP = {
-    "noun": PartOfSpeech.NOUN,
-    "verb": PartOfSpeech.VERB,
-    "adjective": PartOfSpeech.ADJECTIVE,
-    "adverb": PartOfSpeech.ADVERB,
-    "preposition": PartOfSpeech.PREPOSITION,
-    "conjunction": PartOfSpeech.CONJUNCTION,
-    "pronoun": PartOfSpeech.PRONOUN,
-    "determiner": PartOfSpeech.DETERMINER,
+# --- Ánh xạ lexname → topic --------------------------------------------------
+# v4 gốc chỉ map 16/45 lexname nên chỉ gán đúng ngữ nghĩa được 44.9%. Bảng dưới
+# phủ nốt phần còn lại. Riêng adj.all / adv.all thì WordNet gom TẤT CẢ tính từ
+# và trạng từ vào một nhóm, không phân loại chủ đề — phải đi qua liên kết phái
+# sinh để chạm danh từ/động từ gốc (xem topic_via_derivation).
+LEXNAME_TOPIC = {
+    "noun.food": "dining_entertainment",
+    "noun.artifact": "daily_life",
+    "noun.location": "travel_transport",
+    "noun.time": "daily_life",
+    "noun.communication": "business_office",
+    "noun.act": "business_office",
+    "noun.possession": "shopping_finance",
+    "noun.attribute": "daily_life",
+    "noun.body": "health_wellbeing",
+    "noun.cognition": "education_career",
+    "noun.person": "education_career",
+    "noun.group": "business_office",
+    "noun.state": "health_wellbeing",
+    "noun.event": "dining_entertainment",
+    "noun.quantity": "shopping_finance",
+    "noun.substance": "dining_entertainment",
+    "noun.object": "travel_transport",
+    "noun.animal": "daily_life",
+    "noun.plant": "daily_life",
+    "noun.phenomenon": "daily_life",
+    "noun.feeling": "health_wellbeing",
+    "noun.motive": "education_career",
+    "noun.process": "technology_media",
+    "noun.relation": "business_office",
+    "noun.shape": "daily_life",
+    "noun.Tops": "daily_life",
+    "verb.social": "business_office",
+    "verb.communication": "business_office",
+    "verb.possession": "shopping_finance",
+    "verb.motion": "travel_transport",
+    "verb.consumption": "dining_entertainment",
+    "verb.change": "technology_media",
+    "verb.cognition": "education_career",
+    "verb.contact": "daily_life",
+    "verb.stative": "daily_life",
+    "verb.creation": "technology_media",
+    "verb.perception": "health_wellbeing",
+    "verb.body": "health_wellbeing",
+    "verb.emotion": "health_wellbeing",
+    "verb.competition": "dining_entertainment",
+    "verb.weather": "daily_life",
 }
 
-CEFR_CONCEPT_MAP = {
-    "A1": "vocab_daily_life_a1",
-    "A2": "vocab_daily_life_a2",
-    "B1": "vocab_business_office_b1",
-    "B2": "vocab_business_office_b2",
-    "C1": "vocab_business_office_c1",
-}
+# Hậu tố suy luận IPA được (§ suy luận hình thái, thay cho việc nhét chính tả)
+SUFFIX_RULES = [("ly", "li"), ("ness", "nəs"), ("ment", "mənt"), ("able", "əbəl")]
 
-CEFR_DIFF_MAP = {
-    "A1": 0.20,
-    "A2": 0.35,
-    "B1": 0.50,
-    "B2": 0.68,
-    "C1": 0.82,
-}
+BASE_PRIOR = {"A1": 0.22, "A2": 0.37, "B1": 0.52, "B2": 0.67, "C1": 0.82}
 
-def clean_word(word: str) -> str:
-    word = word.strip().lower()
-    if word == "chauffer":
-        word = "chauffeur"
-    return word
 
-def get_ipa(word: str) -> str:
-    res = ipa.convert(word)
-    if not res or res.endswith("*"):
-        return f"/{word}/"
-    return f"/{res}/"
+def load_valid_concepts() -> set[str]:
+    """concepts.yaml là list phẳng ở top-level — không phải dict có khoá."""
+    return {c["concept_id"] for c in yaml.safe_load(TAXONOMY.read_text(encoding="utf-8"))}
 
-def generate_flashcards() -> list[Flashcard]:
-    if not SEED_CSV.exists():
-        sys.exit(f"Không tìm thấy {SEED_CSV}")
 
-    flashcards: list[Flashcard] = []
-    
-    with SEED_CSV.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            lemma = clean_word(row["lemma"])
-            pos_str = row["pos"].strip().lower()
-            pos_enum = POS_MAP.get(pos_str, PartOfSpeech.NOUN)
-            cefr_str = row["cefr_level"].strip().upper()
-            cefr_enum = CEFRLevel(cefr_str)
-            
-            source_raw = row.get("cefr_source", "").strip().lower()
-            if "octanove" in source_raw:
-                cefr_source = CEFRSource.OCTANOVE
-            elif "evp" in source_raw:
-                cefr_source = CEFRSource.EVP
-            else:
-                cefr_source = CEFRSource.CEFRJ
+def first_synset(lemma: str, pos: str):
+    p = WN_POS.get(pos)
+    if not p:
+        return None
+    ss = wn.synsets(lemma.replace(" ", "_"), pos=p)
+    return ss[0] if ss else None
 
-            freq_rank = int(row["frequency_rank"]) if row.get("frequency_rank") and row["frequency_rank"].isdigit() else None
-            concept_id = CEFR_CONCEPT_MAP.get(cefr_str, "vocab_daily_life_a1")
-            diff_prior = CEFR_DIFF_MAP.get(cefr_str, 0.50)
 
-            ipa_us = get_ipa(lemma)
-            
-            def_en = f"The {pos_str} '{lemma}', used in general and professional English contexts."
-            def_vi = f"{pos_str.capitalize()} '{lemma}' được dùng trong ngữ cảnh giao tiếp và công việc."
-            
-            examples = [
-                Example(
-                    sentence=f"Please review the usage of '{lemma}' before the meeting.",
-                    translation=f"Vui lòng xem lại cách dùng từ '{lemma}' trước buổi họp."
-                ),
-                Example(
-                    sentence=f"She demonstrated a clear understanding of '{lemma}' in her presentation.",
-                    translation=f"Cô ấy đã thể hiện sự hiểu biết rõ ràng về '{lemma}' trong bài thuyết trình."
-                ),
-            ]
+def topic_via_derivation(lemma: str, pos: str) -> str | None:
+    """adj.all / adv.all không có chủ đề — đi qua liên kết phái sinh của WordNet
+    để chạm danh từ hoặc động từ gốc (vd 'financial' → 'finance')."""
+    s = first_synset(lemma, pos)
+    if not s:
+        return None
+    for l in s.lemmas():
+        for rel in l.derivationally_related_forms():
+            t = LEXNAME_TOPIC.get(rel.synset().lexname())
+            if t:
+                return t
+    return None
 
-            collocations = []
-            if cefr_enum in (CEFRLevel.B2, CEFRLevel.C1):
-                collocations = [
-                    {
-                        "pattern": CollocationPattern.ADJ_N,
-                        "text": f"key {lemma}" if pos_enum == PartOfSpeech.NOUN else f"{lemma} strategy",
-                        "cefr": cefr_enum,
-                    },
-                    {
-                        "pattern": CollocationPattern.V_N,
-                        "text": f"implement {lemma}" if pos_enum == PartOfSpeech.NOUN else f"remain {lemma}",
-                        "cefr": cefr_enum,
-                    },
-                    {
-                        "pattern": CollocationPattern.ADV_ADJ,
-                        "text": f"highly {lemma}" if pos_enum == PartOfSpeech.ADJECTIVE else f"effectively {lemma}",
-                        "cefr": cefr_enum,
-                    },
-                ]
 
-            fc = Flashcard(
-                lemma=lemma,
-                pos=pos_enum,
-                sense_index=1,
-                sense_label_en=f"Primary sense of {lemma}",
-                ipa_us=ipa_us,
-                ipa_uk=ipa_us,
-                ipa_verified=True,
-                audio_url_us=f"http://localhost:8080/static/audio/words/{lemma}_us.mp3",
-                audio_url_uk=f"http://localhost:8080/static/audio/words/{lemma}_uk.mp3",
-                definition=Definition(en=def_en, vi=def_vi),
-                examples=examples,
-                collocations=collocations,
-                mnemonic_tip_vi=f"Ghi nhớ '{lemma}': liên tưởng tới bối cảnh làm việc và sử dụng thường xuyên.",
-                cefr_level=cefr_enum,
-                cefr_source=cefr_source,
-                frequency_rank=freq_rank,
-                topics=[concept_id],
-                concept_ids=[concept_id],
-                difficulty_prior=diff_prior,
-                review_status=ReviewStatus.AUTO_VALIDATED,
-            )
-            flashcards.append(fc)
+def resolve_concept(lemma: str, pos: str, level: str, topic_hint: str,
+                    valid: set[str]) -> tuple[str, str]:
+    """Trả về (concept_id, nguồn quyết định). Luôn thuộc `valid`."""
+    lv = level.lower()
+    if topic_hint and f"vocab_{topic_hint}_{lv}" in valid:
+        return f"vocab_{topic_hint}_{lv}", "topic_hint"
+    s = first_synset(lemma, pos)
+    if s:
+        t = LEXNAME_TOPIC.get(s.lexname())
+        if t and f"vocab_{t}_{lv}" in valid:
+            return f"vocab_{t}_{lv}", "lexname"
+    t = topic_via_derivation(lemma, pos)
+    if t and f"vocab_{t}_{lv}" in valid:
+        return f"vocab_{t}_{lv}", "phái sinh"
+    for fb in (f"vocab_daily_life_{lv}", f"vocab_business_office_{lv}"):
+        if fb in valid:
+            return fb, "FALLBACK"
+    return "vocab_daily_life_a1", "FALLBACK"
 
-    return flashcards
 
-def main():
-    print("Đang sinh Flashcards từ vocab_seed.csv...")
-    flashcards = generate_flashcards()
-    print(f"Đã tạo {len(flashcards)} flashcards!")
+def resolve_ipa(lemma: str) -> tuple[str, bool]:
+    """(ipa, verified). KHÔNG BAO GIỜ trả chính tả làm IPA (§0.4 cấm bịa IPA)."""
+    out = ipa.convert(lemma, keep_punct=False)
+    if "*" not in out:
+        return f"/{out}/", True
+    for suf, tail in SUFFIX_RULES:                 # suy luận hình thái
+        if lemma.endswith(suf) and len(lemma) > len(suf) + 2:
+            base = lemma[: -len(suf)]
+            for cand in (base, base + "e"):
+                b = ipa.convert(cand, keep_punct=False)
+                if "*" not in b:
+                    return f"/{b}{tail}/", True
+    return "", False                               # không suy được → bỏ từ này
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    
-    batch_size = 1000
-    for b_idx in range(0, len(flashcards), batch_size):
-        chunk = flashcards[b_idx : b_idx + batch_size]
-        batch_id = f"flashcard_batch_{b_idx // batch_size + 1:03d}"
-        
-        batch = FlashcardBatch(
-            batch_metadata=BatchMetadata(
-                schema_version="1.0.0",
-                batch_id=batch_id,
-                module_type="FLASHCARD",
-                is_ai_generated=True,
-                generated_by="gen_flashcards.py",
-                generated_at=dt.datetime.now(dt.UTC).isoformat(),
-                review_status="auto_validated",
-                total_records=len(chunk),
-            ),
-            flashcards=chunk,
-        )
-        
-        out_file = OUT_DIR / f"{batch_id}.json"
-        out_file.write_text(
-            json.dumps(batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8"
-        )
-        print(f"Đã ghi {out_file.name} ({len(chunk)} bản ghi)")
 
-    print("Hoàn thành sinh Flashcard Dataset!")
+def build_rank_percentiles(rows: list[dict]) -> dict[str, list[int]]:
+    """Phân vị TRONG từng band. v4 gốc chia hằng số 4000 nên spread trong band
+    chỉ 0.02–0.06; chuẩn hoá theo band mới dùng trọn dải ±0.04."""
+    by = collections.defaultdict(list)
+    for r in rows:
+        if r["frequency_rank"]:
+            by[r["cefr_level"]].append(int(r["frequency_rank"]))
+    return {k: sorted(v) for k, v in by.items()}
+
+
+def difficulty(level: str, freq_rank: str, pct: dict[str, list[int]]) -> float:
+    base = BASE_PRIOR.get(level, 0.50)
+    ranks = pct.get(level) or []
+    if freq_rank and ranks:
+        i = bisect.bisect_left(ranks, int(freq_rank))
+        p = i / max(len(ranks) - 1, 1)
+    else:
+        p = 0.5                                    # thiếu rank → giữa band
+    return round(max(0.05, min(0.95, base + p * 0.08 - 0.04)), 3)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--report-only", action="store_true")
+    args = ap.parse_args()
+
+    valid = load_valid_concepts()
+    rows = list(csv.DictReader(SEED.open(encoding="utf-8")))
+    pct = build_rank_percentiles(rows)
+
+    cards: list[Flashcard] = []
+    skip = collections.Counter()
+    src = collections.Counter()
+
+    for r in rows:
+        lemma, pos = r["lemma"], r["pos"]
+        entry = LEXICON.get(lemma)
+        if entry is None:
+            skip["chưa có nội dung tiếng Việt"] += 1
+            continue
+        ipa_us, verified = resolve_ipa(lemma)
+        if not ipa_us:
+            skip["không suy được IPA"] += 1
+            continue
+
+        def_vi, examples = entry
+        syn = first_synset(lemma, pos)
+        def_en = syn.definition() if syn else None
+        if not def_en or len(def_en) < 5:
+            skip["WordNet không có định nghĩa"] += 1
+            continue
+
+        cid, how = resolve_concept(lemma, pos, r["cefr_level"], r["topic_hint"], valid)
+        src[how] += 1
+
+        cards.append(Flashcard(
+            lemma=lemma, pos=pos, sense_index=1,
+            sense_label_en=(syn.lemmas()[0].name().replace("_", " ") if syn else lemma),
+            ipa_us=ipa_us, ipa_verified=verified,
+            definition=Definition(en=def_en[0].upper() + def_en[1:], vi=def_vi),
+            examples=[Example(sentence=en, translation=vi) for en, vi in examples],
+            cefr_level=r["cefr_level"], cefr_source=r["cefr_source"],
+            frequency_rank=int(r["frequency_rank"]) if r["frequency_rank"] else None,
+            topics=[cid.replace("vocab_", "").rsplit("_", 1)[0]],
+            concept_ids=[cid],
+            difficulty_prior=difficulty(r["cefr_level"], r["frequency_rank"], pct),
+        ))
+
+    print(f"Sinh {len(cards)} thẻ từ {len(rows)} từ seed")
+    for k, v in skip.most_common():
+        print(f"  bỏ qua — {k:32} {v}")
+    print(f"\n  nguồn concept: {dict(src.most_common())}")
+
+    # --- Lưới chắn: phải qua trước khi ghi ---
+    gv = lambda c: (c.lemma, c.pos.value, c.sense_label_en)  # noqa: E731
+    print()
+    fail = False
+    for name, get in [("definition.en", lambda c: c.definition.en),
+                      ("definition.vi", lambda c: c.definition.vi),
+                      ("examples[0]", lambda c: c.examples[0].sentence),
+                      ("examples[0].vi", lambda c: c.examples[0].translation)]:
+        ok, ratio, uniq = check_skeleton_diversity(cards, get, gv)
+        print(f"  diversity {name:16} {uniq:4d}/{len(cards)} = {ratio:6.1%}  "
+              f"{'OK' if ok else '✗ REJECT'}")
+        fail |= not ok
+    if fail:
+        print("\nFAIL — batch bị lưới chắn từ chối, không ghi file")
+        return 1
+
+    ver = sum(1 for c in cards if c.ipa_verified)
+    d = [c.difficulty_prior for c in cards]
+    import statistics
+    print(f"\n  ipa_verified: {ver}/{len(cards)} ({ver/len(cards):.0%})")
+    print(f"  difficulty_prior: stdev={statistics.pstdev(d):.3f}")
+    for lv in ["A1", "A2", "B1", "B2", "C1"]:
+        s = [c.difficulty_prior for c in cards if c.cefr_level.value == lv]
+        if s:
+            print(f"    {lv}: {min(s):.3f}–{max(s):.3f}  spread={max(s)-min(s):.3f}  n={len(s)}")
+    print(f"  concept lá dùng: {len({c.concept_ids[0] for c in cards})}")
+
+    if args.report_only:
+        return 0
+
+    batch = FlashcardBatch(
+        batch_metadata=BatchMetadata(
+            batch_id="flashcard_batch_001", module_type=ModuleType.FLASHCARD,
+            generated_by=GENERATED_BY, generated_at=datetime.now(UTC),
+            total_records=len(cards)),
+        flashcards=cards)
+    print()
+    write_batch(batch, OUT, ROOT)
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

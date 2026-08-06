@@ -39,6 +39,9 @@ seed:
 	$(PY) generators/build_vocab_seed.py
 
 # Phase 7 — sinh de Reading
+gen-flashcards:
+	$(PY) generators/gen_flashcards.py
+
 gen-part5:
 	$(PY) generators/gen_reading_part5.py
 
