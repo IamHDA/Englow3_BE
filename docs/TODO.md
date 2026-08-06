@@ -3,22 +3,25 @@
 Bám theo [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
 Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>` mới sang phase kế.
 
-**Cập nhật lần cuối:** 2026-08-04
+**Cập nhật lần cuối:** 2026-08-06
 **Đang ở:** STOP GATE 1 — chờ `APPROVE PHASE 1`
 
 ---
 
-## 🔴 BLOCKER — cần Owner quyết trước
+> **5 blocker đã được chốt** — xem [decisions.md](decisions.md): dữ liệu chỉ lưu local (D1),
+> embedding 1024 chiều / bge-m3 (D2, gỡ B3), `octanove` vào enum `cefr_source` (D3),
+> ngân hàng câu hỏi tách khỏi bộ đề (D4), 3 bộ đề + quick_exercises 12 câu (D5, gỡ B7).
+> Bảng dưới chỉ còn các mục **chưa** quyết được.
+
+## 🔴 BLOCKER — còn treo
 
 | # | Vấn đề | Chặn phase | Lựa chọn |
 |---|---|---|---|
 | B1 | Không có Postgres nào chạy được. Không có server ở `localhost:5432`, không có `psql`, Docker socket thuộc user `admin` → permission denied. **Không xác định được `vector` extension đã cài chưa** | DoD 2, Phase 11 | (a) Owner chạy Docker `pgvector/pgvector:pg16` · (b) cho phép `sudo chown` Homebrew để cài local · (c) Owner cấp connection string remote |
 | B2 | Java 21 + Maven chưa cài (cùng gốc vấn đề quyền Homebrew) | Phase 11 | Cài SDKMAN vào `~/.sdkman` (không cần root), hoặc Owner tự cài |
-| B3 | Chưa chốt embedding model + dimension + normalize. DDL không biết `vector(N)` với N bao nhiêu | DoD 2, Phase 11 | Owner chốt → ghi `schemas/embedding_config.yaml` |
 | B4 | §2.8 work order bảo xuất DDL ra `data_pipeline/migrations/`, nhưng repo dùng Flyway đọc `classpath:db/migration` và `ddl-auto: validate` | Phase 2 | Đề xuất: xuất vào `src/main/resources/db/migration/V1__content_tables.sql` — chờ xác nhận |
 | B5 | Chưa chốt TTS engine (chi phí + license khác nhau nhiều) | Phase 8 | Owner chốt tại GATE 7 |
 | B6 | Chưa có nguồn ảnh cho Part 1 Listening | Phase 8 | (a) ảnh CC0 · (b) sinh ảnh · (c) để `audio_url=null` + `blocked_on: "image_asset"` |
-| B7 | **Sản lượng item theo chỉ tiêu work order không đủ cho BKT hội tụ ở domain grammar.** 90 grammar concept nhưng Phase 6 (5 câu/point, chỉ B1–C1) + Phase 7 (Part 5+6 = 46 câu) chỉ ra ~3.2 item/concept, ngưỡng cần là 10–30 | Phase 4, 6, 7 | (a) nâng `quick_exercises` lên 12–15 câu/point **và** mở syllabus ra A1–C1 → ~12 item/concept · (b) sinh 3–4 bộ đề Reading thay vì 1 · (c) gộp grammar còn ~40 concept |
 
 ---
 
@@ -60,9 +63,9 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 - [ ] Pydantic models: `BatchMetadata`, `Flashcard`, `ExamItem`, `ExamGroup`, `Passage`, `AudioAsset`, `Option`, `IRTParams`, `EvidenceSpan`, `GrammarPoint`, `SpeakingTask`, `WritingTask`, `Rubric`
 - [ ] Enum `QuestionType` (§3.1), `CEFRLevel` (A1–C1)
 - [ ] `validators/part_rules.py` — bảng ràng buộc part 1–7 (§2.5)
-- [ ] `schemas/embedding_config.yaml` — **blocked bởi B3**
+- [x] `schemas/embedding_config.yaml` — **đã chốt: 1024 chiều, bge-m3** (D2)
 - [ ] `schemas/export_json_schema.py` → `schemas/json/*.schema.json` cho cả 8 module_type
-- [ ] `schemas/export_ddl.py` → DDL có `vector(N)`, index HNSW, UNIQUE trên stable id, FK `concept_ids` → `concepts` — **blocked bởi B3, B4**
+- [ ] `schemas/export_ddl.py` → DDL có `vector(1024)`, index HNSW, UNIQUE trên stable id, FK `concept_ids` → `concepts` — **blocked bởi B4** (vị trí file)
 - [ ] Unit test `stable_id` idempotent
 - [ ] Validator từ chối đúng 3 case sai cố ý: Part 2 có 4 đáp án · 2 đáp án đúng · Part 7 có 4 passage
 
@@ -94,7 +97,7 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 - [ ] `seeds/vocab_seed.csv`: `lemma, pos, cefr_level, cefr_source, frequency_rank, topic_hint`
 - [ ] Khử trùng theo `(lemma, pos)`
 - [ ] Chỉ tiêu: A1 400 · A2 500 · B1 700 · B2 800 · C1 600 (B2/C1 bắt buộc collocations)
-- [ ] `seeds/grammar_syllabus.yaml` — map 1-1 với `concept_id` Phase 1
+- [ ] `seeds/grammar_syllabus.yaml` — phủ **A1–C1** (D5, không phải B1–C1), map 1-1 với `concept_id` Phase 1
 - [ ] `seeds/topic_taxonomy.yaml` — 8 topic + subtopic
 
 **→ STOP GATE 4**
@@ -120,7 +123,7 @@ Mỗi phase kết thúc bằng STOP GATE — chờ Owner gõ `APPROVE PHASE <N>`
 
 - [ ] Mỗi grammar point trong syllabus → 1 `GrammarPoint`
 - [ ] `common_mistakes` ≥3, ưu tiên lỗi đặc trưng người Việt (thiếu article, present perfect vs past simple, sai giới từ, thiếu -s ngôi 3, word order tính từ)
-- [ ] `quick_exercises` 5 câu/point, tái dùng `ExamItem` schema (part_number=5)
+- [ ] `quick_exercises` **12 câu/point** (D5, không phải 5), tái dùng `ExamItem` schema (part_number=5)
 - [ ] Collocation bank: gom từ Phase 5, nhóm `pattern` × `topic`, khử trùng
 - [ ] `reports/collocation_coverage.md`
 

@@ -13,3 +13,10 @@ data_pipeline/.pytest_cache/
 
 # Wordlist gốc tải về — bên thứ ba, không commit vào repo
 data_pipeline/seeds/raw/
+
+# --- Dữ liệu học liệu: CHỈ LƯU LOCAL, không đẩy lên git ---
+# Đề thi, flashcard, quiz, seed từ vựng — sinh lại bằng script trong generators/
+data_pipeline/output/**/*.json
+data_pipeline/seeds/vocab_seed.csv
+data_pipeline/seeds/by_level/
+data_pipeline/rejects/*.json

@@ -7,6 +7,7 @@ Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
 | Tài liệu | Nội dung |
 |---|---|
 | [AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) | **Nguồn chân lý.** Nguyên tắc vận hành, 13 phase, spec schema, danh sách lỗi P0/P1 phải sửa |
+| [decisions.md](decisions.md) | **Quyết định đã chốt** — dữ liệu local, embedding 1024 chiều, cấu trúc bộ đề, sản lượng item |
 | [TODO.md](TODO.md) | Checklist tiến độ từng phase + bảng blocker cần Owner quyết |
 | [data-pipeline.md](data-pipeline.md) | Layout thư mục `data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
 | [exam-set-structure.md](exam-set-structure.md) | Cấu trúc bộ đề: ngân hàng câu tách khỏi manifest, thành phần 200 câu, cần bao nhiêu bộ |
@@ -14,7 +15,7 @@ Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
 
 ## Trạng thái hiện tại
 
-**STOP GATE 0** — Phase 0 xong, chờ Owner gõ `APPROVE PHASE 0`.
+**STOP GATE 1** — Phase 0 và 1 xong, chờ Owner gõ `APPROVE PHASE 1`.
 
 Mỗi phase kết thúc bằng một STOP GATE. Không gộp phase, không chạy trước.
 Chi tiết luật: §0 của work order.
