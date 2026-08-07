@@ -42,6 +42,9 @@ seed:
 gen-flashcards:
 	$(PY) generators/gen_flashcards.py
 
+gen-sw:
+	$(PY) generators/gen_speaking_writing.py
+
 gen-part5:
 	$(PY) generators/gen_reading_part5.py
 

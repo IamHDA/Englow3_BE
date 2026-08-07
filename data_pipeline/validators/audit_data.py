@@ -29,7 +29,9 @@ from rapidfuzz import fuzz
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from schemas import ExamBatch, FlashcardBatch, GrammarBatch  # noqa: E402
+from schemas import (  # noqa: E402
+    ExamBatch, FlashcardBatch, GrammarBatch, SpeakingBatch, WritingBatch,
+)
 from validators.part_rules import check_groups  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +81,8 @@ def main() -> int:
     exams, e_err = load_batches("exams", ExamBatch)
     cards, c_err = load_batches("flashcards", FlashcardBatch)
     gram, g_err = load_batches("grammar", GrammarBatch)
+    spk, s_err = load_batches("speaking_writing", SpeakingBatch)
+    wrt, w_err = load_batches("speaking_writing", WritingBatch)
     for name, batches, errs in [("exam", exams, e_err), ("flashcard", cards, c_err),
                                 ("grammar", gram, g_err)]:
         print(f"  {name:10} {len(batches):3d} batch OK, {len(errs)} lỗi")
@@ -90,9 +94,12 @@ def main() -> int:
     items = [q for g in groups for q in g.questions]
     flashcards = [f for _, b in cards for f in b.flashcards]
     gpoints = [p for _, b in gram for p in b.grammar_points]
+    sp_tasks = [t for _, b in spk for t in b.tasks]
+    wr_tasks = [t for _, b in wrt for t in b.tasks]
     sets_ = [s for _, b in exams for s in b.sets]
     print(f"\n  Tổng: {len(groups)} group, {len(items)} câu hỏi, "
-          f"{len(flashcards)} flashcard, {len(gpoints)} grammar point, {len(sets_)} bộ đề")
+          f"{len(flashcards)} flashcard, {len(gpoints)} grammar point, {len(sets_)} bộ đề, "
+          f"{len(sp_tasks)} speaking + {len(wr_tasks)} writing task")
 
     # ---------- B. Part rules ----------
     hdr("B. RÀNG BUỘC PART 1–7")
@@ -158,6 +165,8 @@ def main() -> int:
         used.update(f.concept_ids)
     for p in gpoints:
         used.update(p.concept_ids)
+    for t in sp_tasks + wr_tasks:
+        used.update(t.concept_ids)
     zero = sorted(leaves - set(used))
     thin = sorted([c for c in leaves if 0 < used[c] < MIN_ITEMS_PER_CONCEPT],
                   key=lambda c: used[c])
