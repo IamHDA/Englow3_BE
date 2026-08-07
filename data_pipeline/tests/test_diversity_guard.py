@@ -194,3 +194,29 @@ def test_guarded_write_accepts_varied_content(tmp_path):
     out = tmp_path / "ok.json"
     guarded_write_batch(payload, out, quiet=True)
     assert out.exists()
+
+
+def test_protected_files_cannot_be_overwritten(tmp_path):
+    """46 câu Part 5/6 viết tay từng bị một generator khác ghi đè mất."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generators"))
+    from guarded_write import PROTECTED, ProtectedFile, guarded_write_batch
+    import pytest
+
+    name = sorted(PROTECTED)[0]
+    target = tmp_path / name
+    target.write_text('{"đã có sẵn": true}', encoding="utf-8")
+    before = target.read_text(encoding="utf-8")
+
+    with pytest.raises(ProtectedFile):
+        guarded_write_batch({"groups": []}, target, quiet=True)
+    assert target.read_text(encoding="utf-8") == before, "nội dung cũ phải nguyên vẹn"
+
+
+def test_protected_name_still_writable_when_absent(tmp_path):
+    """Chỉ chặn ghi ĐÈ. Sinh lần đầu thì vẫn phải được."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generators"))
+    from guarded_write import PROTECTED, guarded_write_batch
+
+    target = tmp_path / sorted(PROTECTED)[0]
+    guarded_write_batch({"groups": []}, target, quiet=True)
+    assert target.exists()

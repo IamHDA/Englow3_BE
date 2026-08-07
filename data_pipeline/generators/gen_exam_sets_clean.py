@@ -22,6 +22,8 @@ from mutagen.mp3 import MP3
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     Accent, AlignmentStatus, AudioAsset, BatchMetadata, Definition, ExamBatch, ExamGroup,
     ExamItem, ExamSet, ModuleType, Option, Passage, QuestionType, ReviewStatus,
@@ -274,7 +276,7 @@ def main_impl():
             p5_batch = ExamBatch.model_validate(p5_batch_data)
         else:
             p5_batch = generate_part5_batch(set_idx)
-            p5_file.write_text(json.dumps(p5_batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            guarded_write_batch(p5_batch, p5_file)   # lưới chắn TRƯỚC khi ghi
 
         p6_file = BANK_READING_DIR / f"exam_reading_part6_{set_idx:03d}.json"
         if set_idx == 1 and p6_file.exists():
@@ -282,11 +284,11 @@ def main_impl():
             p6_batch = ExamBatch.model_validate(p6_batch_data)
         else:
             p6_batch = generate_part6_batch(set_idx)
-            p6_file.write_text(json.dumps(p6_batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            guarded_write_batch(p6_batch, p6_file)   # lưới chắn TRƯỚC khi ghi
 
         l2_batch = generate_listening_part2_batch(set_idx)
         l2_file = BANK_LISTENING_DIR / f"exam_listening_part2_{set_idx:03d}.json"
-        l2_file.write_text(json.dumps(l2_batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        guarded_write_batch(l2_batch, l2_file)   # lưới chắn TRƯỚC khi ghi
 
         listening_refs: list[SetItemRef] = []
         reading_refs: list[SetItemRef] = []

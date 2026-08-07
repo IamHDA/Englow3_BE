@@ -18,6 +18,8 @@ import edge_tts
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     Accent, AlignmentStatus, AudioAsset, BatchMetadata, Definition, ExamBatch,
     ExamGroup, ExamItem, ModuleType, Option, Passage, QuestionType, ReviewStatus
@@ -193,7 +195,7 @@ def main():
     for s_idx in range(1, 11):
         lb = generate_listening_batch(s_idx)
         lb_path = BANK_LISTENING_DIR / f"exam_listening_batch_{s_idx:03d}.json"
-        lb_path.write_text(json.dumps(lb.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        guarded_write_batch(lb, lb_path)   # lưới chắn TRƯỚC khi ghi
         print(f"  + Bộ Listening {s_idx:02d}: Đã ghi {lb_path.name} ({len(lb.groups)} nhóm bài nghe Part 2/3 kèm tệp MP3)")
 
     print("Hoàn thành sinh Ngân hàng Listening Bank chuẩn 100%!")

@@ -22,6 +22,8 @@ import edge_tts
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     Accent, AlignmentStatus, AudioAsset, BatchMetadata, Definition, ExamBatch,
     ExamGroup, ExamItem, ExamSet, ModuleType, Option, Passage, QuestionType,
@@ -274,10 +276,7 @@ def main():
     )
 
     out_file = SETS_DIR / "exam_sets_batch_001.json"
-    out_file.write_text(
-        json.dumps(batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8"
-    )
+    guarded_write_batch(batch, out_file)   # lưới chắn TRƯỚC khi ghi
     print(f"\nĐã xuất thành công {len(all_sets)} BỘ ĐỀ THI FULL LISTENING & READING CHI TIẾT!")
 
 if __name__ == "__main__":

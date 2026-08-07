@@ -22,6 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from guarded_write import guarded_write_batch  # noqa: E402
+
 from schemas import (  # noqa: E402
     BatchMetadata, Definition, ExamBatch, ExamGroup, ExamItem, ModuleType,
     Option, Passage, QuestionType, ReviewStatus
@@ -180,11 +182,11 @@ def main():
     for s_idx in range(1, 11):
         b5 = generate_part5_batch(s_idx)
         b5_path = BANK_READING_DIR / f"exam_reading_part5_{s_idx:03d}.json"
-        b5_path.write_text(json.dumps(b5.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        guarded_write_batch(b5, b5_path)   # lưới chắn TRƯỚC khi ghi
         
         b6 = generate_part6_batch(s_idx)
         b6_path = BANK_READING_DIR / f"exam_reading_part6_{s_idx:03d}.json"
-        b6_path.write_text(json.dumps(b6.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        guarded_write_batch(b6, b6_path)   # lưới chắn TRƯỚC khi ghi
         
         print(f"  + Bộ {s_idx:02d}: Đã ghi {b5_path.name} (30 câu Part 5) & {b6_path.name} (4 bài đọc Part 6)")
 

@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from validators.diversity import DIVERSITY_THRESHOLD, check_skeleton_diversity  # noqa: E402
 
-__all__ = ["guarded_write_batch", "DiversityRejected"]
+__all__ = ["guarded_write_batch", "DiversityRejected", "ProtectedFile", "PROTECTED"]
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,6 +54,18 @@ CHECKS = {
 }
 
 
+# File viết tay đã qua audit — generator KHÔNG được ghi đè.
+# Đã mất 30 câu Part 5 một lần vì một generator khác ghi trùng tên.
+PROTECTED = {
+    "exam_reading_part5_001.json",
+    "exam_reading_part6_001.json",
+}
+
+
+class ProtectedFile(RuntimeError):
+    """Cố ghi đè file viết tay đã qua audit."""
+
+
 class DiversityRejected(RuntimeError):
     """Batch không đạt ngưỡng đa dạng — KHÔNG được ghi ra đĩa."""
 
@@ -61,6 +73,12 @@ class DiversityRejected(RuntimeError):
 def guarded_write_batch(batch, out_path: Path, threshold: float = DIVERSITY_THRESHOLD,
                         quiet: bool = False) -> None:
     """Kiểm đa dạng rồi mới ghi. Không đạt thì raise, file không được tạo."""
+    if out_path.name in PROTECTED and out_path.exists():
+        raise ProtectedFile(
+            f"{out_path.name} là file viết tay đã qua audit, không được ghi đè.\n"
+            f"Muốn sinh lại thì chạy đúng generator của nó "
+            f"(generators/gen_reading_part5.py hoặc gen_reading_part6.py).")
+
     payload = batch.model_dump(mode="json") if hasattr(batch, "model_dump") else batch
 
     failures: list[str] = []
