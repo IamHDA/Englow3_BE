@@ -1,195 +1,189 @@
 #!/usr/bin/env python3
-"""Generator cho Grammar & Quiz Bank (Phase 6).
+"""Grammar bank — thay đợt 106 point điền khuôn.
 
-Dựa vào `taxonomy/concepts.yaml`, sinh toàn bộ 90 Grammar Points thuộc domain 'grammar'.
-Mỗi Grammar Point chứa: Lý thuyết tiếng Việt, Tóm tắt tiếng Anh, Mẫu câu (Form patterns),
-Ví dụ minh họa Anh-Việt, 3 Lỗi phổ biến người Việt hay gặp, và 12 câu trắc nghiệm (Quick Exercises / Quiz)
-định dạng TOEIC Part 5.
+Đợt cũ sinh `theory_vi` bằng cách bọc mô tả taxonomy vào khuôn
+"Chủ điểm ngữ pháp 'X' (X) chi tiết: ..." và `common_mistakes` bằng khuôn
+"Wrong usage of X without proper agreement." → "Correct usage of X with full
+agreement." — đúng dạng lỗi đã sửa ở flashcard, và không phải lỗi người Việt.
+
+Ở đây: concept nào chưa có phân tích lỗi viết tay trong vi_grammar_errors.py thì
+BỎ QUA, không sinh point rỗng.
+
+`quick_exercises` dựng từ chính cặp (sai, đúng) — mỗi lỗi thành một câu Part 5
+với distractor là chính lỗi mà người Việt hay mắc, nên distractor có lý do sai
+cụ thể chứ không bịa.
+
+    python generators/gen_grammar.py
 """
 
 from __future__ import annotations
 
-import datetime as dt
-import json
+import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from authoring import LABELS, place_options  # noqa: E402
+from guarded_write import guarded_write_batch  # noqa: E402
 from schemas import (  # noqa: E402
-    CEFRLevel, CommonMistake, Definition, Example, ExamItem, GrammarBatch,
-    GrammarPoint, Option, OptionLabel, QuestionType, ReviewStatus, BatchMetadata
+    BatchMetadata, Definition, Example, ExamItem, GrammarBatch, GrammarPoint,
+    ModuleType, Option, QuestionType,
 )
-from generators.authoring import place_options  # noqa: E402
+from vi_grammar_errors import GRAMMAR_CONTENT  # noqa: E402
 
-TAXONOMY_YAML = ROOT / "taxonomy" / "concepts.yaml"
-OUT_DIR = ROOT / "output" / "grammar"
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "output" / "grammar" / "grammar_batch_001.json"
+GENERATED_BY = "claude-opus-5"
 
-# Map dạng câu hỏi từ concept_id
-def map_question_type(concept_id: str) -> QuestionType:
-    if "prep" in concept_id:
-        return QuestionType.GR_PREPOSITION
-    elif "tense" in concept_id or "present" in concept_id or "past" in concept_id or "future" in concept_id:
-        return QuestionType.GR_TENSE
-    elif "voice" in concept_id or "passive" in concept_id:
-        return QuestionType.GR_VOICE
-    elif "word_form" in concept_id or "adj" in concept_id or "adverb" in concept_id or "noun" in concept_id:
-        return QuestionType.GR_WORD_FORM
-    elif "conjunction" in concept_id or "linking" in concept_id:
-        return QuestionType.GR_CONJUNCTION
-    elif "pronoun" in concept_id:
-        return QuestionType.GR_PRONOUN
-    elif "comparative" in concept_id or "superlative" in concept_id or "comparison" in concept_id:
-        return QuestionType.GR_COMPARISON
-    elif "relative" in concept_id:
-        return QuestionType.GR_RELATIVE_CLAUSE
-    elif "participle" in concept_id:
-        return QuestionType.GR_PARTICIPLE
-    elif "article" in concept_id:
-        return QuestionType.GR_ARTICLE
+# Dạng câu hỏi hợp với từng nhóm concept (part_rules cưỡng chế Part 5)
+QTYPE = {
+    "article": QuestionType.GR_ARTICLE, "plural": QuestionType.GR_WORD_FORM,
+    "countab": QuestionType.GR_ARTICLE, "agreement": QuestionType.GR_TENSE,
+    "perfect": QuestionType.GR_TENSE, "conditional": QuestionType.GR_TENSE,
+    "preposition": QuestionType.GR_PREPOSITION, "passive": QuestionType.GR_VOICE,
+    "gerund": QuestionType.GR_PARTICIPLE, "relative": QuestionType.GR_RELATIVE_CLAUSE,
+    "comparative": QuestionType.GR_COMPARISON, "word_form": QuestionType.GR_WORD_FORM,
+    "modal": QuestionType.GR_TENSE, "question": QuestionType.GR_PRONOUN,
+    "adj_order": QuestionType.GR_WORD_FORM,
+}
+
+
+def question_type_for(cid: str) -> QuestionType:
+    for k, v in QTYPE.items():
+        if k in cid:
+            return v
     return QuestionType.GR_WORD_FORM
 
-def generate_quick_exercises(concept_id: str, title_en: str, cefr_level: CEFRLevel, count: int = 12) -> list[ExamItem]:
-    exercises: list[ExamItem] = []
-    qtype = map_question_type(concept_id)
-    
-    for i in range(1, count + 1):
-        q_text = f"The management team decided to ____ the new policy regarding '{title_en}' starting next month (Item #{i})."
-        
-        # 4 options với đáp án đúng ở vị trí 0, sau đó dùng place_options xoay vòng A-D
-        raw_options = [
-            ("implement", True, f"Đáp án đúng: 'implement' phù hợp ngữ cảnh vế câu của {title_en}."),
-            ("implementation", False, "Lỗi từ loại: vị trí sau 'to' cần động từ nguyên mẫu, không dùng danh từ."),
-            ("implementing", False, "Lỗi thì: sau 'decided to' dùng động từ nguyên mẫu V-bare."),
-            ("implemented", False, "Lỗi thể: không chọn quá khứ phân từ trong cấu trúc to + V-bare."),
-        ]
-        
-        placed = place_options(i, f"{concept_id}_{i}", raw_options)
-        options = [
-            Option(label=OptionLabel(label), text=text, is_correct=is_correct, rationale_vi=rationale)
-            for label, (text, is_correct, rationale) in zip(["A", "B", "C", "D"], placed)
-        ]
-        
-        ex = ExamItem(
-            part_number=5,
-            question_text=q_text,
-            question_type=qtype,
-            options=options,
-            concept_ids=[concept_id],
-            difficulty_prior=0.50,
-            explanation=Definition(
-                en=f"The correct choice is 'implement' for testing {title_en}.",
-                vi=f"Đáp án đúng là phương án chứa 'implement' đúng ngữ pháp và cấu trúc của {title_en}."
-            ),
-            review_status=ReviewStatus.AUTO_VALIDATED,
-        )
-        exercises.append(ex)
-        
-    return exercises
 
-def generate_grammar_points() -> list[GrammarPoint]:
-    if not TAXONOMY_YAML.exists():
-        sys.exit(f"Không tìm thấy {TAXONOMY_YAML}")
-        
-    tax = yaml.safe_load(TAXONOMY_YAML.read_text(encoding="utf-8"))
-    grammar_concepts = [c for c in tax if c.get("domain") == "grammar" and c.get("parent_id") is not None]
-    
-    grammar_points: list[GrammarPoint] = []
-    
-    for c in grammar_concepts:
-        cid = c["concept_id"]
-        title_en = c["name_en"]
-        title_vi = c["name_vi"]
-        bands = c.get("cefr_band", ["B1"])
-        cefr_enum = CEFRLevel(bands[0])
-        desc_vi = c.get("description_vi", "Lý thuyết ngữ pháp cơ bản và nâng cao.")
-        
-        theory_vi = f"Chủ điểm ngữ pháp '{title_vi}' ({title_en}) chi tiết: {desc_vi}. Đây là phần kiến thức quan trọng trong kỳ thi TOEIC và giao tiếp chuyên nghiệp."
-        summary_en = f"Grammar theory guide on {title_en} including structures, usages, and common pattern rules."
-        
-        patterns = [
-            f"Subject + Verb + {title_en} + Object",
-            f"Key Pattern: {title_en} + Complement",
-        ]
-        
-        examples = [
-            Example(
-                sentence=f"She applied {title_en} accurately in her business correspondence.",
-                translation=f"Cô ấy đã áp dụng {title_vi} một cách chính xác trong thư từ kinh doanh."
-            ),
-            Example(
-                sentence=f"Understanding {title_en} helps improve writing fluency significantly.",
-                translation=f"Việc hiểu rõ {title_vi} giúp cải thiện độ trôi chảy khi viết đáng kể."
-            ),
-        ]
-        
-        common_mistakes = [
-            CommonMistake(
-                wrong=f"Wrong usage of {title_en} without proper agreement.",
-                right=f"Correct usage of {title_en} with full agreement.",
-                why_vi=f"Lỗi phổ biến người Việt: hay nhầm lẫn cấu trúc {title_vi} do ảnh hưởng bởi ngữ pháp tiếng Việt."
-            ),
-            CommonMistake(
-                wrong=f"Omitting key components in {title_en}.",
-                right=f"Including all required components in {title_en}.",
-                why_vi=f"Thiếu các thành phần bắt buộc hoặc sai giới từ/mạo từ đi kèm trong {title_vi}."
-            ),
-            CommonMistake(
-                wrong=f"Using incorrect word order with {title_en}.",
-                right=f"Applying correct standard word order for {title_en}.",
-                why_vi=f"Sai trật tự từ khi kết hợp {title_vi} trong câu phức hoặc câu ghép."
-            ),
-        ]
-        
-        quick_ex = generate_quick_exercises(cid, title_en, cefr_enum, count=12)
-        
-        gp = GrammarPoint(
-            title_en=title_en,
-            title_vi=title_vi,
-            cefr_level=cefr_enum,
-            concept_ids=[cid],
-            theory_vi=theory_vi,
-            theory_en_summary=summary_en,
-            form_patterns=patterns,
-            examples=examples,
-            common_mistakes=common_mistakes,
-            quick_exercises=quick_ex,
-            review_status=ReviewStatus.AUTO_VALIDATED,
-        )
-        grammar_points.append(gp)
-        
-    return grammar_points
+def diff_token(wrong: str, right: str) -> tuple[str, str] | None:
+    """Tìm token khác nhau giữa câu sai và câu đúng, để khoét thành chỗ trống."""
+    w, r = wrong.rstrip(".").split(), right.rstrip(".").split()
+    i = 0
+    while i < min(len(w), len(r)) and w[i].lower() == r[i].lower():
+        i += 1
+    j = 0
+    while j < min(len(w), len(r)) - i and w[-1 - j].lower() == r[-1 - j].lower():
+        j += 1
+    wt, rt = " ".join(w[i:len(w) - j]), " ".join(r[i:len(r) - j])
+    if not rt or len(rt.split()) > 3:
+        return None
+    return wt, rt
 
-def main():
-    print("Đang sinh Grammar Points & Quiz Exercises từ taxonomy/concepts.yaml...")
-    gps = generate_grammar_points()
-    print(f"Đã sinh {len(gps)} Grammar Points (tổng {len(gps)*12} câu hỏi quiz Part 5)!")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    
-    batch = GrammarBatch(
+def build_exercise(idx: int, cid: str, wrong: str, right: str, why: str,
+                   distractors: list[str]) -> ExamItem | None:
+    """Một câu Part 5 khoét đúng chỗ người Việt hay sai."""
+    d = diff_token(wrong, right)
+    if not d:
+        return None
+    wrong_tok, right_tok = d
+    stem = right.replace(right_tok, "____", 1)
+    if "____" not in stem:
+        return None
+
+    opts_raw = [(right_tok, True, why)]
+    seen = {right_tok.lower()}
+    for cand in ([wrong_tok] if wrong_tok else []) + distractors:
+        c = cand.strip()
+        if c and c.lower() not in seen:
+            seen.add(c.lower())
+            opts_raw.append((c, False, f"Dạng '{c}' không đúng ở vị trí này — "
+                                       f"đây là lỗi người Việt hay mắc."))
+        if len(opts_raw) == 4:
+            break
+    if len(opts_raw) < 4:
+        return None
+
+    placed = place_options(idx, stem, opts_raw)
+    return ExamItem(
+        part_number=5, question_text=stem, question_type=question_type_for(cid),
+        options=[Option(label=LABELS[i], text=t, is_correct=c, rationale_vi=r)
+                 for i, (t, c, r) in enumerate(placed)],
+        concept_ids=[cid], difficulty_prior=0.45,
+        explanation=Definition(en=f'The correct form here is "{right_tok}".', vi=why))
+
+
+# Distractor phụ theo nhóm — dạng sai thật sự tồn tại, không phải chữ ngẫu nhiên
+EXTRA = {
+    "article": ["the", "a", "an", "some"],
+    "plural": ["books", "book's", "bookes"],
+    "agreement": ["work", "working", "worked", "works"],
+    "perfect": ["have seen", "had seen", "see", "seeing"],
+    "preposition": ["for", "on", "at", "with", "about", "of"],
+    "passive": ["write", "writing", "wrote", "written"],
+    "gerund": ["to work", "working", "work", "worked"],
+    "relative": ["which", "who", "that", "whose"],
+    "comparative": ["more easy", "easiest", "easy", "more easier"],
+    "word_form": ["expand", "expanded", "expansive", "expansion"],
+    "modal": ["must", "have to", "should", "had to"],
+    "question": ["do you", "you do", "are you", "you are"],
+}
+
+
+def extras_for(cid: str) -> list[str]:
+    for k, v in EXTRA.items():
+        if k in cid:
+            return v
+    return ["is", "are", "was", "be"]
+
+
+def main() -> int:
+    taxonomy = {c["concept_id"]: c
+                for c in yaml.safe_load((ROOT / "taxonomy" / "concepts.yaml")
+                                        .read_text(encoding="utf-8"))}
+
+    points: list[GrammarPoint] = []
+    skipped, no_ex = [], 0
+    idx = 0
+
+    for cid, (theory_vi, theory_en, mistakes) in GRAMMAR_CONTENT.items():
+        node = taxonomy.get(cid)
+        if node is None:
+            skipped.append(f"{cid} (không có trong taxonomy)")
+            continue
+
+        exercises = []
+        for wrong, right, why in mistakes:
+            ex = build_exercise(idx, cid, wrong, right, why, extras_for(cid))
+            idx += 1
+            if ex:
+                exercises.append(ex)
+            else:
+                no_ex += 1
+
+        points.append(GrammarPoint(
+            title_en=node["name_en"], title_vi=node["name_vi"],
+            cefr_level=node["cefr_band"][0], concept_ids=[cid],
+            theory_vi=theory_vi, theory_en_summary=theory_en,
+            form_patterns=[right for _, right, _ in mistakes[:3]],
+            examples=[Example(sentence=right, translation=why[:120])
+                      for _, right, why in mistakes[:2]],
+            common_mistakes=[{"wrong": w, "right": r, "why_vi": y}
+                             for w, r, y in mistakes],
+            quick_exercises=exercises))
+
+    n_mist = sum(len(p.common_mistakes) for p in points)
+    n_ex = sum(len(p.quick_exercises) for p in points)
+    print(f"Sinh {len(points)} grammar point từ {len(GRAMMAR_CONTENT)} mục viết tay")
+    print(f"  concept grammar lá phủ: {len(points)}/90")
+    print(f"  phân tích lỗi người Việt: {n_mist}")
+    print(f"  quick_exercises: {n_ex}  (bỏ {no_ex} lỗi không khoét được chỗ trống)")
+    if skipped:
+        print(f"  bỏ qua: {skipped}")
+    print()
+
+    guarded_write_batch(GrammarBatch(
         batch_metadata=BatchMetadata(
-            schema_version="1.0.0",
-            batch_id="grammar_batch_001",
-            module_type="GRAMMAR",
-            is_ai_generated=True,
-            generated_by="gen_grammar.py",
-            generated_at=dt.datetime.now(dt.UTC).isoformat(),
-            review_status="auto_validated",
-            total_records=len(gps),
-        ),
-        grammar_points=gps,
-    )
-    
-    out_file = OUT_DIR / "grammar_batch_001.json"
-    out_file.write_text(
-        json.dumps(batch.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8"
-    )
-    print(f"Đã ghi {out_file.name} ({len(gps)} bản ghi, {out_file.stat() // 1024 if hasattr(out_file.stat(), '__floordiv__') else out_file.stat().st_size // 1024} KB)")
+            batch_id="grammar_batch_001", module_type=ModuleType.GRAMMAR,
+            generated_by=GENERATED_BY, generated_at=datetime.now(UTC),
+            total_records=len(points)),
+        grammar_points=points), OUT)
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
