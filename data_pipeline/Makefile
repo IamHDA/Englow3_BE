@@ -48,6 +48,9 @@ gen-sw:
 gen-part5:
 	$(PY) generators/gen_reading_part5.py
 
+gen-part7:
+	$(PY) generators/gen_reading_part7.py
+
 gen-part6:
 	$(PY) generators/gen_reading_part6.py
 

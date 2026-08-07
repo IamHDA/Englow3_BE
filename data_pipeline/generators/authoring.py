@@ -10,6 +10,7 @@ import collections
 import hashlib
 import json
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -52,15 +53,27 @@ def place_options(idx: int, seed_text: str, options: list[tuple[str, bool, str]]
 def find_span(passage_text: str, quote: str, passage_order: int = 1) -> dict:
     """Tính offset bằng string-match trong CODE, không để LLM tự khai (§Phase 7).
 
+    Khớp linh hoạt khoảng trắng: passage có xuống dòng giữa câu, nên
+    "by the lifts" trong bài thật là "by the\nlifts". Vẫn trả offset trong văn
+    bản GỐC — nếu chuẩn hoá rồi trả offset của bản chuẩn hoá thì span sẽ trỏ
+    lệch khi ứng dụng cắt chuỗi.
+
     Không tìm thấy nghĩa là câu hỏi không định vị được bằng chứng → item không
     hợp lệ, phải sửa nội dung chứ không phải bịa offset.
     """
     start = passage_text.find(quote)
-    if start < 0:
-        raise ValueError(
-            f"Không tìm thấy trong passage {passage_order}: {quote[:60]!r}")
-    return {"passage_order": passage_order,
-            "char_start": start, "char_end": start + len(quote)}
+    if start >= 0:
+        return {"passage_order": passage_order,
+                "char_start": start, "char_end": start + len(quote)}
+
+    pattern = r"\s+".join(re.escape(tok) for tok in quote.split())
+    m = re.search(pattern, passage_text)
+    if m:
+        return {"passage_order": passage_order,
+                "char_start": m.start(), "char_end": m.end()}
+
+    raise ValueError(
+        f"Không tìm thấy trong passage {passage_order}: {quote[:60]!r}")
 
 
 def report_bias(groups: list[ExamGroup]) -> list[str]:
