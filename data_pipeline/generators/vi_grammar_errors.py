@@ -271,4 +271,289 @@ GRAMMAR_CONTENT: dict[str, tuple[str, str, list[tuple[str, str, str]]]] = {
    "'money' không đếm được nên dùng 'much'."),
   ("There were less people than expected.", "There were fewer people than expected.",
    "'people' đếm được nên dùng 'fewer'.")]),
+
+"gram_be_present": (
+ "Tiếng Việt dùng 'là' chỉ để nối hai danh từ ('Tôi là sinh viên'), còn với tính "
+ "từ thì không cần từ nối ('Tôi mệt'). Tiếng Anh thì 'be' bắt buộc trong CẢ HAI "
+ "trường hợp, và còn phải chia theo ngôi: am / is / are.",
+ "English 'be' is required before adjectives as well as nouns, and inflects for person.",
+ [("I tired today.", "I am tired today.",
+   "Tiếng Việt 'Tôi mệt' không có từ nối nên người học thấy 'am' là thừa. "
+   "Đây là lỗi A1 dai dẳng nhất."),
+  ("She a doctor at the hospital.", "She is a doctor at the hospital.",
+   "Có 'là' trong tiếng Việt thì người học nhớ, nhưng khi nói nhanh vẫn hay rơi."),
+  ("They is my colleagues.", "They are my colleagues.",
+   "Tiếng Việt không chia động từ theo ngôi nên 'is/are' là khái niệm hoàn toàn mới."),
+  ("Are you a student? — Yes, I am student.", "Are you a student? — Yes, I am.",
+   "Trả lời ngắn tiếng Anh dừng ở trợ động từ. Người Việt lặp lại cả danh từ vì "
+   "tiếng Việt trả lời 'Vâng, tôi là sinh viên'.")]),
+
+"gram_present_simple": (
+ "Hiện tại đơn diễn tả thói quen và sự thật hiển nhiên. Cái bẫy với người Việt là "
+ "đuôi -s ở ngôi thứ ba số ít: tiếng Việt không chia động từ theo ngôi bao giờ, "
+ "nên chỗ này không có gì để 'chuyển' sang — phải học thuộc.",
+ "Third-person singular takes -s; Vietnamese verbs never inflect for person.",
+ [("He work at a bank in the city.", "He works at a bank in the city.",
+   "Ngôi thứ ba số ít bắt buộc -s. Không có tương ứng nào trong tiếng Việt."),
+  ("She don't like coffee.", "She doesn't like coffee.",
+   "Đã dùng trợ động từ thì -s chuyển sang trợ động từ: does. Người học nhớ quy "
+   "tắc -s ở câu khẳng định nhưng quên ở câu phủ định."),
+  ("Does he works here?", "Does he work here?",
+   "Sửa quá tay: đã có 'does' thì động từ chính về nguyên thể. Chỉ một chỗ mang -s."),
+  ("My parents lives in Hue.", "My parents live in Hue.",
+   "Chủ ngữ số nhiều thì KHÔNG thêm -s. Người học nhìn 'parents' có -s rồi thêm "
+   "-s cho cả động từ.")]),
+
+"gram_present_continuous": (
+ "Tiếng Việt dùng 'đang' đứng trước động từ, và 'đang' là một từ riêng không dính "
+ "vào động từ. Tiếng Anh phải dùng be + V-ing — hai thành phần, và người học "
+ "thường chỉ nhớ một.",
+ "Present continuous needs both 'be' and '-ing'; Vietnamese marks it with a separate word.",
+ [("I working on the report now.", "I am working on the report now.",
+   "Thiếu 'be'. Người học coi -ing là bản dịch của 'đang' và cho là đủ."),
+  ("She is work in the garden.", "She is working in the garden.",
+   "Thiếu -ing. Lỗi đối xứng với lỗi trên."),
+  ("I am knowing the answer.", "I know the answer.",
+   "Động từ chỉ trạng thái ('know', 'like', 'want') không dùng tiếp diễn. Tiếng "
+   "Việt nói 'tôi đang biết' vẫn được nên người học không thấy vướng."),
+  ("He is go to the airport tomorrow.", "He is going to the airport tomorrow.",
+   "Hiện tại tiếp diễn còn dùng cho kế hoạch đã sắp xếp, nhưng vẫn phải đủ -ing.")]),
+
+"gram_present_simple_vs_continuous": (
+ "Chọn giữa hai thì này là chọn giữa 'nói chung' và 'ngay lúc này'. Tiếng Việt "
+ "phân biệt bằng có hay không có 'đang', nhưng 'đang' của tiếng Việt rộng hơn "
+ "-ing của tiếng Anh, nên người học dùng tiếp diễn nhiều quá mức.",
+ "Simple present for habits and states; continuous for actions in progress.",
+ [("I am going to the gym every Tuesday.", "I go to the gym every Tuesday.",
+   "'every Tuesday' là thói quen nên phải hiện tại đơn."),
+  ("Look — it rains!", "Look — it is raining!",
+   "'Look' báo hiệu việc đang diễn ra trước mắt, phải dùng tiếp diễn."),
+  ("She is having three brothers.", "She has three brothers.",
+   "'have' nghĩa sở hữu là trạng thái, không dùng tiếp diễn."),
+  ("What do you do? — I am working for Kelbrook.",
+   "What do you do? — I work for Kelbrook.",
+   "Hỏi về nghề nghiệp nói chung thì trả lời bằng hiện tại đơn.")]),
+
+"gram_past_simple": (
+ "Tiếng Việt đánh dấu quá khứ bằng 'đã' hoặc bằng trạng ngữ thời gian, và động từ "
+ "không đổi. Tiếng Anh bắt buộc đổi dạng động từ, kể cả khi câu đã có 'yesterday'.",
+ "English marks past on the verb itself, even when a time adverb is present.",
+ [("I go to Da Nang last summer.", "I went to Da Nang last summer.",
+   "Đã có 'last summer' nhưng động từ vẫn phải đổi. Tiếng Việt 'Tôi đi Đà Nẵng "
+   "hè năm ngoái' không đổi gì cả."),
+  ("She buyed a new phone.", "She bought a new phone.",
+   "Động từ bất quy tắc. Người học áp -ed đều vì tiếng Việt không có bất quy tắc."),
+  ("Did you went to the meeting?", "Did you go to the meeting?",
+   "Đã có 'did' thì động từ chính về nguyên thể — chỉ một chỗ mang dấu quá khứ."),
+  ("He didn't came yesterday.", "He didn't come yesterday.",
+   "Cùng quy tắc, ở câu phủ định.")]),
+
+"gram_past_continuous": (
+ "Quá khứ tiếp diễn dựng nền cho một việc khác xen vào. Người Việt thường dùng "
+ "quá khứ đơn cho cả hai vế vì tiếng Việt chỉ cần 'đang' ở vế nền.",
+ "Past continuous sets the background; past simple marks the interrupting event.",
+ [("I watched TV when the phone rang.", "I was watching TV when the phone rang.",
+   "Việc kéo dài làm nền phải là tiếp diễn; việc xen vào mới là quá khứ đơn."),
+  ("While she was cook, the alarm went off.", "While she was cooking, the alarm went off.",
+   "Thiếu -ing sau 'was'."),
+  ("They were knowing about the change.", "They knew about the change.",
+   "Động từ trạng thái không dùng tiếp diễn, kể cả ở quá khứ."),
+  ("When I arrived, he was leaving already.", "When I arrived, he had already left.",
+   "Việc xảy ra XONG trước mốc quá khứ thì dùng quá khứ hoàn thành, không phải "
+   "tiếp diễn.")]),
+
+"gram_past_perfect": (
+ "Quá khứ hoàn thành đánh dấu 'việc xảy ra trước một mốc quá khứ khác'. Tiếng "
+ "Việt diễn đạt thứ tự bằng trật tự kể chuyện và bằng 'trước đó', không bằng dạng "
+ "động từ — nên người Việt hầu như không tự dùng thì này.",
+ "Past perfect marks the earlier of two past events.",
+ [("When I arrived, the train already left.", "When I arrived, the train had already left.",
+   "Tàu đi TRƯỚC lúc tôi đến, nên vế đó phải là quá khứ hoàn thành."),
+  ("She told me she has finished the report.", "She told me she had finished the report.",
+   "Trong câu tường thuật ở quá khứ, hiện tại hoàn thành lùi thành quá khứ hoàn thành."),
+  ("After he had left, she had called him.", "After he had left, she called him.",
+   "Sửa quá tay: chỉ vế XẢY RA TRƯỚC mới dùng quá khứ hoàn thành."),
+  ("I never saw such a thing before that day.", "I had never seen such a thing before that day.",
+   "'before that day' đặt mốc quá khứ, nên việc trước đó phải là quá khứ hoàn thành.")]),
+
+"gram_future_will": (
+ "'will' dùng cho quyết định ngay lúc nói, lời hứa và dự đoán. Người Việt hay "
+ "dùng 'will' cho mọi thứ tương lai vì tiếng Việt chỉ có một từ 'sẽ'.",
+ "'will' expresses decisions made at the moment of speaking, promises and predictions.",
+ [("I will go to Hanoi next week, I bought the ticket yesterday.",
+   "I am going to Hanoi next week, I bought the ticket yesterday.",
+   "Đã mua vé tức là kế hoạch có sẵn — dùng 'be going to' hoặc hiện tại tiếp diễn."),
+  ("If it will rain, we will cancel.", "If it rains, we will cancel.",
+   "Mệnh đề 'if' không dùng 'will'. Tiếng Việt nói 'nếu trời sẽ mưa' vẫn xuôi tai."),
+  ("I will to call you tonight.", "I will call you tonight.",
+   "Sau 'will' là động từ nguyên thể không 'to'."),
+  ("She will finishes the work by Friday.", "She will finish the work by Friday.",
+   "Sau 'will' động từ không chia.")]),
+
+"gram_future_going_to": (
+ "'be going to' dùng cho kế hoạch đã định và cho dự đoán có bằng chứng trước mắt. "
+ "Ranh giới với 'will' không tồn tại trong tiếng Việt — cả hai đều là 'sẽ'.",
+ "'be going to' for prior plans and evidence-based predictions.",
+ [("Look at those clouds — it will rain.", "Look at those clouds — it is going to rain.",
+   "Có bằng chứng trước mắt (mây đen) thì dùng 'be going to'."),
+  ("I going to meet her tomorrow.", "I am going to meet her tomorrow.",
+   "Thiếu 'be'. Cùng gốc lỗi với hiện tại tiếp diễn."),
+  ("We are going to visiting the factory.", "We are going to visit the factory.",
+   "Sau 'going to' là động từ nguyên thể, không phải V-ing."),
+  ("The phone is ringing — I am going to answer it.",
+   "The phone is ringing — I will answer it.",
+   "Quyết định ngay lúc nói thì dùng 'will', không phải 'be going to'.")]),
+
+"gram_pronoun_subject_object": (
+ "Tiếng Việt dùng cùng một từ cho chủ ngữ và tân ngữ ('tôi' ở cả hai vị trí). "
+ "Tiếng Anh đổi dạng: I/me, he/him, she/her, we/us, they/them.",
+ "English pronouns change form between subject and object position.",
+ [("Give the file to I.", "Give the file to me.",
+   "Sau giới từ phải dùng dạng tân ngữ. Tiếng Việt 'đưa cho tôi' không đổi gì."),
+  ("Him and I went to the meeting.", "He and I went to the meeting.",
+   "Vị trí chủ ngữ dùng 'he'. Thử bỏ 'and I' đi sẽ thấy ngay: 'Him went' sai."),
+  ("She invited my colleague and I.", "She invited my colleague and me.",
+   "Sửa quá tay: nhiều người học được dạy 'and I' nghe lịch sự hơn nên dùng cả ở "
+   "vị trí tân ngữ."),
+  ("Between you and I, the plan will not work.",
+   "Between you and me, the plan will not work.",
+   "Sau giới từ 'between' bắt buộc dạng tân ngữ.")]),
+
+"gram_pronoun_possessive": (
+ "Tiếng Anh phân biệt tính từ sở hữu (my, your, his) đứng trước danh từ, và đại từ "
+ "sở hữu (mine, yours, his) đứng một mình. Tiếng Việt dùng 'của tôi' cho cả hai.",
+ "Possessive adjectives precede a noun; possessive pronouns stand alone.",
+ [("This book is my.", "This book is mine.",
+   "Đứng một mình phải dùng đại từ sở hữu 'mine'."),
+  ("Mine car is in the car park.", "My car is in the car park.",
+   "Đứng trước danh từ phải dùng tính từ sở hữu 'my'."),
+  ("Is this your's?", "Is this yours?",
+   "Đại từ sở hữu không có dấu nháy. Người học nhầm với sở hữu cách của danh từ."),
+  ("The company changed it's policy.", "The company changed its policy.",
+   "'its' sở hữu không có nháy; \"it's\" là 'it is'. Lỗi này người bản ngữ cũng mắc.")]),
+
+"gram_possessive_s": (
+ "Tiếng Việt diễn đạt sở hữu bằng 'của' đặt SAU vật sở hữu: 'cái cặp của Lan'. "
+ "Tiếng Anh đảo ngược thứ tự và dùng 's: 'Lan's bag'. Trật tự ngược nhau là gốc "
+ "của phần lớn lỗi ở mục này.",
+ "English marks possession with 's on the possessor, which precedes the thing possessed.",
+ [("The bag of Lan is on the table.", "Lan's bag is on the table.",
+   "Với người thì dùng 's, không dùng 'of'. Cấu trúc 'of' là dịch thẳng từ 'của'."),
+  ("This is my parent's house, both of them live here.",
+   "This is my parents' house, both of them live here.",
+   "Số nhiều đã có -s thì dấu nháy đặt SAU -s."),
+  ("The childrens' toys are here.", "The children's toys are here.",
+   "'children' đã là số nhiều bất quy tắc nên thêm 's bình thường."),
+  ("It is the roof's of the building.", "It is the roof of the building.",
+   "Vật vô tri thường dùng 'of', và không dùng cả hai cùng lúc.")]),
+
+"gram_quantifier_basic": (
+ "'some' và 'any' phân bố theo loại câu, còn 'a few / a little' phân bố theo tính "
+ "đếm được. Tiếng Việt dùng 'một ít', 'vài' không phân biệt như vậy.",
+ "'some' in affirmatives and offers, 'any' in negatives and questions.",
+ [("I don't have some money.", "I don't have any money.",
+   "Câu phủ định dùng 'any'."),
+  ("Would you like any tea?", "Would you like some tea?",
+   "Câu mời dùng 'some' dù có dạng câu hỏi."),
+  ("There are a little chairs left.", "There are a few chairs left.",
+   "'chairs' đếm được nên dùng 'a few'."),
+  ("She has few free time this week.", "She has little free time this week.",
+   "'time' không đếm được nên dùng 'little'.")]),
+
+"gram_article_zero": (
+ "Có những chỗ tiếng Anh KHÔNG dùng mạo từ: danh từ số nhiều nói chung, danh từ "
+ "không đếm được nói chung, tên riêng, bữa ăn, môn học. Người Việt sau khi học "
+ "a/an/the thường sửa quá tay và thêm mạo từ vào cả những chỗ này.",
+ "No article with generic plurals, uncountables, most proper nouns, meals and subjects.",
+ [("The dogs are loyal animals.", "Dogs are loyal animals.",
+   "Nói về loài nói chung thì không dùng 'the'."),
+  ("She studies the economics at university.", "She studies economics at university.",
+   "Tên môn học không dùng mạo từ."),
+  ("We had the lunch at noon.", "We had lunch at noon.",
+   "Tên bữa ăn không dùng mạo từ."),
+  ("The happiness is not something you can buy.",
+   "Happiness is not something you can buy.",
+   "Danh từ trừu tượng nói chung không dùng mạo từ.")]),
+
+"gram_there_is_are": (
+ "Tiếng Việt dùng 'có' cho mọi trường hợp tồn tại. Tiếng Anh phải chọn there is / "
+ "there are theo danh từ ĐỨNG SAU, và tuyệt đối không dùng 'have'.",
+ "'There is/are' expresses existence; the verb agrees with the following noun.",
+ [("Have three people in the room.", "There are three people in the room.",
+   "Dịch thẳng 'có' thành 'have'. Đây là lỗi nhận ra ngay người học là người Việt."),
+  ("There is many problems with this plan.", "There are many problems with this plan.",
+   "Động từ hoà hợp với danh từ đứng sau: 'problems' số nhiều."),
+  ("There are a lot of information on the site.",
+   "There is a lot of information on the site.",
+   "'information' không đếm được nên dùng số ít."),
+  ("In the box there have two keys.", "In the box there are two keys.",
+   "Cùng lỗi 'have', xuất hiện cả khi đảo trật tự.")]),
+
+"gram_adverb_frequency": (
+ "Trạng từ tần suất trong tiếng Anh đứng TRƯỚC động từ thường nhưng SAU động từ "
+ "'be'. Tiếng Việt đặt 'thường', 'luôn luôn' khá tự do nên người học hay đặt sai chỗ.",
+ "Frequency adverbs go before the main verb but after 'be'.",
+ [("I go always to work by bus.", "I always go to work by bus.",
+   "Trạng từ tần suất đứng trước động từ thường."),
+  ("She always is late for meetings.", "She is always late for meetings.",
+   "Với 'be' thì trạng từ đứng SAU."),
+  ("He never has finished a project early.", "He has never finished a project early.",
+   "Có trợ động từ thì trạng từ đứng giữa trợ động từ và động từ chính."),
+  ("Sometimes I am not understanding him.", "Sometimes I do not understand him.",
+   "'understand' là động từ trạng thái, không dùng tiếp diễn.")]),
+
+"gram_superlative_adj": (
+ "So sánh nhất theo độ dài tính từ: -est cho tính từ ngắn, 'the most' cho tính từ "
+ "dài. Tiếng Việt chỉ có một khuôn 'nhất' nên người học hay ghép cả hai.",
+ "Short adjectives take -est; longer adjectives take 'the most'.",
+ [("She is the most tallest in the class.", "She is the tallest in the class.",
+   "Ghép cả hai cách. Lỗi rất phổ biến vì tiếng Việt chỉ có một khuôn."),
+  ("This is the most easy question.", "This is the easiest question.",
+   "Tính từ hai âm tiết kết thúc bằng -y dùng -est."),
+  ("He is best student in the department.", "He is the best student in the department.",
+   "So sánh nhất bắt buộc có 'the'."),
+  ("It was the most bad experience of my life.",
+   "It was the worst experience of my life.",
+   "'bad' bất quy tắc: bad – worse – worst.")]),
+
+"gram_as_as_comparison": (
+ "So sánh bằng dùng as + tính từ NGUYÊN DẠNG + as. Người học hay chèn dạng so "
+ "sánh hơn vào giữa vì trong tiếng Việt 'bằng' và 'hơn' cùng là so sánh.",
+ "'as ... as' takes the base form of the adjective.",
+ [("She is as taller as her brother.", "She is as tall as her brother.",
+   "Giữa hai 'as' là tính từ nguyên dạng."),
+  ("This model is not as expensive than that one.",
+   "This model is not as expensive as that one.",
+   "Cấu trúc là as ... as, không phải as ... than."),
+  ("He works as harder as anyone here.", "He works as hard as anyone here.",
+   "Trạng từ cũng giữ nguyên dạng."),
+  ("The new office is twice as big than the old one.",
+   "The new office is twice as big as the old one.",
+   "Thêm bội số vẫn giữ cấu trúc as ... as.")]),
+
+"gram_preposition_basic": (
+ "in / on / at cho thời gian và nơi chốn không ánh xạ 1-1 sang tiếng Việt — tiếng "
+ "Việt dùng 'ở', 'vào', 'trên' theo logic khác. Phải học theo cụm, không dịch từng từ.",
+ "in for enclosed spaces and long periods, on for surfaces and days, at for points.",
+ [("I will meet you in Monday.", "I will meet you on Monday.",
+   "Thứ trong tuần dùng 'on'."),
+  ("She arrives at March.", "She arrives in March.",
+   "Tháng dùng 'in'."),
+  ("The keys are on the drawer.", "The keys are in the drawer.",
+   "Bên trong vật chứa dùng 'in'; 'on' là trên mặt."),
+  ("We live at Ho Chi Minh City.", "We live in Ho Chi Minh City.",
+   "Thành phố dùng 'in'; 'at' dành cho một điểm cụ thể như địa chỉ.")]),
+
+"gram_modal_ability": (
+ "'can' và 'could' không chia và không đi với 'to'. Tiếng Việt 'có thể' đứng "
+ "trước động từ giống hệt, nên lỗi ở đây chủ yếu là chia động từ theo thói quen.",
+ "Modals take the bare infinitive and never inflect.",
+ [("She cans speak three languages.", "She can speak three languages.",
+   "Khuyết thiếu không chia theo ngôi."),
+  ("He can to drive a lorry.", "He can drive a lorry.",
+   "Sau khuyết thiếu là động từ nguyên thể không 'to'."),
+  ("I will can help you tomorrow.", "I will be able to help you tomorrow.",
+   "Không dùng hai khuyết thiếu liền nhau; tương lai của 'can' là 'be able to'."),
+  ("Do you can swim?", "Can you swim?",
+   "Khuyết thiếu tự đảo lên để hỏi, không cần 'do'.")]),
 }
