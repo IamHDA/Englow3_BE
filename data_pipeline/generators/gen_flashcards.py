@@ -38,10 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from authoring import write_batch  # noqa: E402
 from schemas import (  # noqa: E402
+    Collocation,  # noqa: E402
     BatchMetadata, Definition, Example, Flashcard, FlashcardBatch, ModuleType,
 )
 from validators.diversity import check_skeleton_diversity  # noqa: E402
-from vi_lexicon import LEXICON  # noqa: E402
+from vi_lexicon import COLLOCATIONS, LEXICON, TOPIC_OVERRIDE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SEED = ROOT / "seeds" / "vocab_seed.csv"
@@ -137,6 +138,10 @@ def resolve_concept(lemma: str, pos: str, level: str, topic_hint: str,
                     valid: set[str]) -> tuple[str, str]:
     """Trả về (concept_id, nguồn quyết định). Luôn thuộc `valid`."""
     lv = level.lower()
+    # Gán tay thắng mọi suy đoán: những từ này được CHỌN cho đúng chủ đề đó.
+    cid = TOPIC_OVERRIDE.get(lemma)
+    if cid and cid in valid:
+        return cid, "gán tay"
     if topic_hint and f"vocab_{topic_hint}_{lv}" in valid:
         return f"vocab_{topic_hint}_{lv}", "topic_hint"
     s = first_synset(lemma, pos)
@@ -220,12 +225,27 @@ def main() -> int:
             skip["WordNet không có định nghĩa"] += 1
             continue
 
+        # Nhãn nghĩa lấy từ WordNet. Có synset trả về lemma quá ngắn ("go") mà
+        # schema đòi tối thiểu 3 ký tự — bỏ qua từ đó thay vì độn thêm chữ.
+        sense_label = syn.lemmas()[0].name().replace("_", " ") if syn else lemma
+        if len(sense_label) < 3:
+            skip["nhãn nghĩa WordNet ngắn hơn 3 ký tự"] += 1
+            continue
+
+        # B2/C1 bắt buộc ≥3 collocation. Không có thì BỎ QUA từ đó, không sinh
+        # cụm bịa để lách schema.
+        cols = [Collocation(pattern=pt, text=tx, cefr=lv)
+                for pt, tx, lv in COLLOCATIONS.get(lemma, [])]
+        if r["cefr_level"] in ("B2", "C1") and len(cols) < 3:
+            skip["B2/C1 chưa có collocation viết tay"] += 1
+            continue
+
         cid, how = resolve_concept(lemma, pos, r["cefr_level"], r["topic_hint"], valid)
         src[how] += 1
 
         cards.append(Flashcard(
             lemma=lemma, pos=pos, sense_index=1,
-            sense_label_en=(syn.lemmas()[0].name().replace("_", " ") if syn else lemma),
+            sense_label_en=sense_label, collocations=cols,
             ipa_us=ipa_us, ipa_verified=verified,
             definition=Definition(en=def_en[0].upper() + def_en[1:], vi=def_vi),
             examples=[Example(sentence=en, translation=vi) for en, vi in examples],
