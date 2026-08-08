@@ -63,7 +63,8 @@ tiếp mà không bịa `image_url`.
 | # | Việc | Còn thiếu | Ghi chú |
 |---|---|---:|---|
 | 1 | **Part 1** mô tả ảnh | 6 câu | ⛔ B6 — chỉ cần Owner chốt nguồn ảnh là làm được ngay |
-| 2 | Xử lý 123 MP3 mồ côi | — | Chúng là TTS của data đã bị loại; hoặc xoá hoặc TTS lại theo kịch bản mới |
+| 2 | ~~Xử lý 123 MP3 mồ côi~~ | — | ✅ đã cách ly vào `rejects/audio_orphan/` |
+| 2b | Host file audio | — | `audio_url` là `HttpUrl` nên không trỏ được file local. 683 MP3 đang nằm trên máy mà 0/195 flashcard dùng được |
 | 3 | `duration_ms` từ file MP3 thật | — | Hiện null; §Phase 8 cấm khai cứng |
 | 4 | Forced alignment | — | `alignment_status` giữ `pending` cho tới khi có timestamp thật |
 | 5 | Flashcard 195 → 800 | ~600 thẻ | ⛔ B10 — mỗi thẻ cần 1 định nghĩa + 2 ví dụ + 2 bản dịch viết tay |
@@ -101,6 +102,8 @@ Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-par
 | B10 | Giữ chỉ tiêu 3 000 flashcard, hay 800–1 000 chất lượng cao? | Khối lượng toàn bộ |
 | B1 | Postgres — Owner chốt để local, chưa dựng | Phase 11 |
 | B2 | Java 21 + Maven chưa cài | Phase 11 |
+| B11 | Lịch sử git cũ còn 20 MB MP3 (đã gỡ khỏi tracking nhưng commit cũ vẫn giữ). Xoá hẳn phải `git filter-repo`, đổi mọi hash đã push | Dung lượng repo |
+| B12 | Nơi host audio để `audio_url` trỏ tới được | Phát âm flashcard, audio đề nghe |
 
 ---
 
@@ -130,3 +133,10 @@ Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-par
 12. **Gán chủ đề bằng tay thắng mọi suy đoán.** Suy chủ đề từ WordNet lexname chỉ
     đúng ~45% vì WordNet gộp mọi tính từ vào `adj.all`. `TOPIC_OVERRIDE` gán tay
     cho 126 từ, kèm khoá kiểm cấp độ — khoá này bắt được 3 thẻ bị dán nhãn sai.
+13. **`.gitignore` không gỡ được thứ đã track.** 684 file MP3 (20 MB) vẫn nằm trong
+    git và đã lên remote dù `.gitignore` có luật — vì chúng được commit TRƯỚC khi
+    luật ra đời. Chỉ phát hiện ra khi tự đếm `git ls-files`, không phải khi đọc
+    `.gitignore`. Đã `git rm --cached`, file vẫn nguyên trên đĩa.
+14. **Chú thích trạng thái cũng hỏng theo thời gian.** Exporter in "(chờ Phase 8–10)"
+    cho speaking/writing/rubric suốt nhiều đợt, trong khi dữ liệu đã có sẵn trên đĩa —
+    nó in như vậy đơn giản vì chưa ai viết hàm đọc. 5 bảng rỗng vì code, không vì data.
