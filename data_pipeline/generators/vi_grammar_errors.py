@@ -857,4 +857,295 @@ GRAMMAR_CONTENT: dict[str, tuple[str, str, list[tuple[str, str, str]]]] = {
   ("Under no circumstances you should open the door.",
    "Under no circumstances should you open the door.",
    "Cụm giới từ mang nghĩa phủ định cũng gây đảo ngữ.")]),
+
+"gram_present_perfect_continuous": (
+ "Hiện tại hoàn thành tiếp diễn nhấn mạnh QUÁ TRÌNH kéo dài tới hiện tại, khác với "
+ "hiện tại hoàn thành nhấn mạnh KẾT QUẢ. Tiếng Việt dùng chung 'đã ... được' nên "
+ "ranh giới này gần như vô hình với người học.",
+ "Present perfect continuous stresses duration; present perfect stresses result.",
+ [("I am working here for five years.", "I have been working here for five years.",
+   "Việc bắt đầu trong quá khứ và còn tiếp diễn thì không dùng hiện tại tiếp diễn."),
+  ("She has been finishing the report.", "She has finished the report.",
+   "Việc đã xong hẳn thì dùng hiện tại hoàn thành, không phải tiếp diễn."),
+  ("How long are you waiting?", "How long have you been waiting?",
+   "Hỏi về khoảng thời gian tính tới hiện tại."),
+  ("He has been knowing her since 2019.", "He has known her since 2019.",
+   "Động từ trạng thái không dùng dạng tiếp diễn.")]),
+
+"gram_future_perfect_continuous": (
+ "Tương lai hoàn thành đặt mốc 'xong TRƯỚC một thời điểm tương lai'; tương lai tiếp "
+ "diễn đặt mốc 'đang diễn ra VÀO một thời điểm tương lai'. Tiếng Việt không có "
+ "phương tiện ngữ pháp nào cho hai sắc thái này.",
+ "Future perfect: completed before a future point. Future continuous: in progress at it.",
+ [("By next June I will work here for ten years.",
+   "By next June I will have been working here for ten years.",
+   "'By next June' đặt mốc tương lai nên phải dùng dạng hoàn thành."),
+  ("This time tomorrow I will fly to Singapore.",
+   "This time tomorrow I will be flying to Singapore.",
+   "Đang diễn ra tại một thời điểm tương lai thì dùng tương lai tiếp diễn."),
+  ("She will have finish the course by December.",
+   "She will have finished the course by December.",
+   "Sau 'will have' là phân từ hai."),
+  ("They will have been arrived by six.", "They will have arrived by six.",
+   "'arrive' là việc tức thời, không dùng dạng tiếp diễn ở đây.")]),
+
+"gram_modal_permission_request": (
+ "Xin phép và nhờ vả có thang độ lịch sự: can < could < may < would you mind. "
+ "Tiếng Việt điều chỉnh lịch sự bằng tiểu từ cuối câu ('ạ', 'nhé') chứ không bằng "
+ "động từ, nên người học hay dùng 'can' ở cả tình huống trang trọng.",
+ "Politeness in English is carried by the modal itself, not by sentence-final particles.",
+ [("Can I to leave early today?", "Can I leave early today?",
+   "Sau khuyết thiếu là động từ nguyên thể không 'to'."),
+  ("Do you mind to open the window?", "Do you mind opening the window?",
+   "Sau 'mind' là V-ing."),
+  ("Would you mind if I will use your phone?",
+   "Would you mind if I used your phone?",
+   "Sau 'Would you mind if' dùng quá khứ đơn cho lịch sự."),
+  ("May you pass me the salt?", "Could you pass me the salt?",
+   "'may' dùng để XIN phép cho bản thân, không dùng để nhờ người khác.")]),
+
+"gram_modal_deduction": (
+ "must / might / can't dùng để suy đoán theo mức độ chắc chắn. Tiếng Việt dùng "
+ "'chắc là', 'có lẽ', 'không thể nào' — là trạng từ chứ không phải khuyết thiếu, "
+ "nên người học ít khi tự nghĩ tới cấu trúc này.",
+ "must = near certainty, might = possibility, can't = impossibility.",
+ [("He must to be at home now.", "He must be at home now.",
+   "Sau khuyết thiếu là nguyên thể không 'to'."),
+  ("She mustn't be the manager, she is far too young.",
+   "She can't be the manager, she is far too young.",
+   "Suy đoán phủ định dùng 'can't'; 'mustn't' nghĩa là cấm."),
+  ("It maybe rains later.", "It might rain later.",
+   "'maybe' là trạng từ, 'may be' mới là khuyết thiếu + be."),
+  ("They must knowing about the change.", "They must know about the change.",
+   "Sau khuyết thiếu không dùng V-ing.")]),
+
+"gram_modal_perfect": (
+ "Khuyết thiếu hoàn thành (must have, should have, could have) suy đoán hoặc tiếc "
+ "nuối về QUÁ KHỨ. Tiếng Việt gói trọn trong 'lẽ ra' và 'chắc là đã'.",
+ "Modal + have + past participle refers to the past.",
+ [("You should have told me earlier, but you didn't tell.",
+   "You should have told me earlier.",
+   "Cấu trúc đã hàm ý việc không xảy ra, không cần nói thêm."),
+  ("He must has forgotten the meeting.", "He must have forgotten the meeting.",
+   "Sau khuyết thiếu luôn là 'have', không chia."),
+  ("She could have came if she wanted.", "She could have come if she wanted.",
+   "Sau 'have' là phân từ hai, không phải quá khứ đơn."),
+  ("I shouldn't have went there.", "I shouldn't have gone there.",
+   "Cùng lỗi phân từ hai với động từ bất quy tắc.")]),
+
+"gram_passive_perfect_modal": (
+ "Bị động ghép với hoàn thành hoặc khuyết thiếu tạo chuỗi ba bốn thành phần. Người "
+ "học thường rơi mất một mắt xích giữa chừng.",
+ "Perfect and modal passives stack: have been + participle, modal + be + participle.",
+ [("The decision has already made.", "The decision has already been made.",
+   "Thiếu 'been' — quyết định không tự đưa ra được."),
+  ("The form must completed before Friday.",
+   "The form must be completed before Friday.",
+   "Sau khuyết thiếu bị động phải có 'be'."),
+  ("The building had been destroy in the fire.",
+   "The building had been destroyed in the fire.",
+   "Thiếu phân từ hai ở cuối chuỗi."),
+  ("It should have been sent last week, but nobody sent.",
+   "It should have been sent last week.",
+   "Chuỗi 'should have been + phân từ hai' đã đủ nghĩa.")]),
+
+"gram_reported_backshift": (
+ "Lùi thì là bắt buộc khi động từ tường thuật ở quá khứ, NHƯNG không lùi khi nội "
+ "dung vẫn đúng ở hiện tại. Người học được dạy quy tắc lùi thì rồi áp máy móc cho "
+ "mọi trường hợp.",
+ "Backshift is required after a past reporting verb, but optional for still-true facts.",
+ [('He said "Water boils at 100 degrees".',
+   "He said water boils at 100 degrees.",
+   "Sự thật vẫn đúng thì không cần lùi thì."),
+  ('She says "I am busy".', "She says she is busy.",
+   "Động từ tường thuật ở hiện tại thì không lùi thì."),
+  ('He said "I saw her yesterday".', "He said he had seen her the day before.",
+   "Quá khứ đơn lùi thành quá khứ hoàn thành, và 'yesterday' đổi theo."),
+  ('She said "I must go now".', "She said she had to go then.",
+   "'must' lùi thành 'had to'; 'now' đổi thành 'then'.")]),
+
+"gram_relative_preposition": (
+ "Trong văn phong trang trọng, giới từ đứng TRƯỚC đại từ quan hệ và bắt buộc dùng "
+ "whom / which. Tiếng Việt không có đại từ quan hệ nên toàn bộ cấu trúc này là mới.",
+ "In formal style the preposition precedes whom/which; 'that' is then impossible.",
+ [("The colleague who I spoke to is on leave.",
+   "The colleague to whom I spoke is on leave.",
+   "Giới từ lên trước thì bắt buộc dùng 'whom'."),
+  ("The report in that we found the error is here.",
+   "The report in which we found the error is here.",
+   "Sau giới từ không dùng 'that'."),
+  ("The company for which he works for is Kelbrook.",
+   "The company for which he works is Kelbrook.",
+   "Không lặp giới từ ở cả hai vị trí."),
+  ("The reason for who she resigned is unclear.",
+   "The reason for which she resigned is unclear.",
+   "'reason' là vật nên dùng 'which'.")]),
+
+"gram_participle_clause": (
+ "Mệnh đề phân từ rút gọn hai câu thành một, nhưng chủ ngữ của phân từ phải TRÙNG "
+ "với chủ ngữ mệnh đề chính. Không trùng thì thành 'dangling participle' — lỗi khiến "
+ "câu buồn cười.",
+ "The participle's implied subject must match the subject of the main clause.",
+ [("Walking to the office, the rain started.",
+   "While I was walking to the office, the rain started.",
+   "Như đang viết là 'cơn mưa đi bộ tới văn phòng'."),
+  ("Having finished the report, the printer broke.",
+   "Having finished the report, I found that the printer had broken.",
+   "Chủ ngữ phải là người hoàn thành báo cáo."),
+  ("Being late, the meeting had started.", "Being late, I found the meeting had started.",
+   "Cùng lỗi chủ ngữ treo."),
+  ("Written in 1890, we still read the book today.",
+   "Written in 1890, the book is still read today.",
+   "Cuốn sách mới là thứ được viết năm 1890, không phải 'chúng ta'.")]),
+
+"gram_noun_clause": (
+ "Mệnh đề danh từ đóng vai chủ ngữ hoặc tân ngữ và giữ TRẬT TỰ CÂU KỂ. Người Việt "
+ "hay giữ dạng câu hỏi khi mệnh đề bắt đầu bằng từ để hỏi.",
+ "Noun clauses keep statement word order even when they begin with a wh-word.",
+ [("I don't know where is the station.", "I don't know where the station is.",
+   "Mệnh đề danh từ không đảo ngữ."),
+  ("Can you tell me what time does the shop open?",
+   "Can you tell me what time the shop opens?",
+   "Bỏ 'does' và đưa về trật tự câu kể."),
+  ("That he was late it surprised everyone.",
+   "That he was late surprised everyone.",
+   "Mệnh đề đã làm chủ ngữ thì không thêm 'it'."),
+  ("I wonder if will she come.", "I wonder if she will come.",
+   "Sau 'if' cũng giữ trật tự câu kể.")]),
+
+"gram_comparative_adv": (
+ "So sánh của trạng từ theo cùng quy tắc độ dài như tính từ, nhưng trạng từ -ly luôn "
+ "dùng 'more'. Người học hay gắn -er vào cả trạng từ dài.",
+ "Adverbs ending in -ly always take 'more' in the comparative.",
+ [("She speaks more clear than her colleague.",
+   "She speaks more clearly than her colleague.",
+   "Bổ nghĩa động từ thì phải là trạng từ."),
+  ("He runs more fast than me.", "He runs faster than me.",
+   "'fast' là trạng từ ngắn nên dùng -er."),
+  ("They finished the work quicklier than expected.",
+   "They finished the work more quickly than expected.",
+   "Trạng từ -ly luôn dùng 'more'."),
+  ("She works more hard than anyone.", "She works harder than anyone.",
+   "'hard' là trạng từ ngắn, dùng -er.")]),
+
+"gram_double_comparative": (
+ "So sánh kép có hai khuôn: 'the + so sánh hơn, the + so sánh hơn' và 'so sánh hơn "
+ "and so sánh hơn'. Tiếng Việt nói 'càng ... càng ...' rất tự nhiên nên người học "
+ "hiểu nghĩa nhưng hay quên 'the'.",
+ "'The + comparative, the + comparative' and 'comparative and comparative'.",
+ [("More you practise, better you get.", "The more you practise, the better you get.",
+   "Cả hai vế đều bắt buộc có 'the'."),
+  ("The weather is getting cold and cold.",
+   "The weather is getting colder and colder.",
+   "Khuôn lặp phải dùng dạng so sánh hơn."),
+  ("The more expensive, the more good the quality.",
+   "The more expensive it is, the better the quality.",
+   "'good' bất quy tắc thành 'better'."),
+  ("The harder he tried, the more he failed more.",
+   "The harder he tried, the more he failed.",
+   "Không lặp 'more' hai lần trong một vế.")]),
+
+"gram_adverb_formation": (
+ "Không phải trạng từ nào cũng thêm -ly: có từ giữ nguyên dạng (fast, hard), có từ "
+ "đổi chính tả (-y thành -ily), và có từ thêm -ly thì đổi nghĩa hẳn.",
+ "Adverb formation is irregular: some keep the base form, some change spelling.",
+ [("He did the job good.", "He did the job well.",
+   "Trạng từ của 'good' là 'well', bất quy tắc hoàn toàn."),
+  ("She reacted angryly.", "She reacted angrily.",
+   "Tính từ kết thúc -y thì đổi thành -ily."),
+  ("The train arrived fastly.", "The train arrived fast.",
+   "'fast' giữ nguyên dạng khi làm trạng từ."),
+  ("He works very hardly every day.", "He works very hard every day.",
+   "'hardly' nghĩa 'hầu như không', dùng vào đây là nói ngược ý mình.")]),
+
+"gram_adverb_degree": (
+ "Trạng từ chỉ mức độ chia hai nhóm: nhóm đi với tính từ thường (very, quite) và "
+ "nhóm đi với tính từ tuyệt đối (absolutely, completely). Ghép nhầm nhóm nghe rất "
+ "sai với người bản ngữ dù ngữ pháp không hỏng.",
+ "Gradable adjectives take 'very'; non-gradable ones take 'absolutely'.",
+ [("The film was very excellent.", "The film was absolutely excellent.",
+   "'excellent' đã là mức tuyệt đối nên không dùng 'very'."),
+  ("I am absolutely tired after the trip.", "I am absolutely exhausted after the trip.",
+   "'tired' là tính từ thường; muốn dùng 'absolutely' thì đổi sang từ tuyệt đối."),
+  ("It was very impossible to finish in time.",
+   "It was completely impossible to finish in time.",
+   "'impossible' là tuyệt đối."),
+  ("She was quite delighted, almost a little.", "She was quite delighted.",
+   "'quite' với tính từ tuyệt đối nghĩa là 'hoàn toàn', không phải 'khá'.")]),
+
+"gram_preposition_movement": (
+ "Giới từ chuyển động (into, onto, through, across, along) khác với giới từ vị trí. "
+ "Tiếng Việt dùng 'vào', 'qua' cho cả hai nên người học hay dùng 'in' thay 'into'.",
+ "Movement prepositions differ from static ones: into vs in, onto vs on.",
+ [("She walked in the room and sat down.", "She walked into the room and sat down.",
+   "Có chuyển động từ ngoài vào trong thì dùng 'into'."),
+  ("He put the box on the shelf carefully, lifting it up.",
+   "He lifted the box onto the shelf carefully.",
+   "Chuyển động lên bề mặt dùng 'onto'."),
+  ("We drove trough the tunnel.", "We drove through the tunnel.",
+   "Lỗi chính tả rất phổ biến: 'trough' là cái máng."),
+  ("They swam cross the river.", "They swam across the river.",
+   "Giới từ là 'across'; 'cross' là động từ.")]),
+
+"gram_phrasal_verb_three_part": (
+ "Cụm động từ ba thành phần (look forward to, put up with, get on with) là khối cố "
+ "định — không tách, không đổi giới từ. Đặc biệt 'to' trong 'look forward to' là "
+ "giới từ nên theo sau là V-ing.",
+ "Three-part phrasal verbs are fixed; the final 'to' is a preposition, not an infinitive marker.",
+ [("I look forward to hear from you.", "I look forward to hearing from you.",
+   "'to' ở đây là giới từ nên theo sau là V-ing. Lỗi kinh điển trong thư công việc."),
+  ("She can't put with his attitude up.", "She can't put up with his attitude.",
+   "Cụm ba thành phần không tách được."),
+  ("We need to catch on up the schedule.", "We need to catch up on the schedule.",
+   "Trật tự cố định là catch up on."),
+  ("He gets on well to his colleagues.", "He gets on well with his colleagues.",
+   "Giới từ cuối là 'with', không thể thay.")]),
+
+"gram_word_form_verb": (
+ "Hậu tố tạo động từ (-ise/-ize, -en, -ify, en-) không suy ra được từ danh từ gốc. "
+ "Tiếng Việt dùng cùng một từ cho cả danh từ và động từ nên không có manh mối nào.",
+ "Verb-forming suffixes (-ise, -en, -ify) must be learned per word.",
+ [("The company will modern its systems.", "The company will modernise its systems.",
+   "'modern' là tính từ; động từ là 'modernise'."),
+  ("We need to strong the security policy.", "We need to strengthen the security policy.",
+   "Động từ của 'strong' là 'strengthen'."),
+  ("Please clarity the second paragraph.", "Please clarify the second paragraph.",
+   "'clarity' là danh từ; động từ là 'clarify'."),
+  ("They will able the new feature next week.",
+   "They will enable the new feature next week.",
+   "Động từ là 'enable' với tiền tố en-.")]),
+
+"gram_cleft_sentence": (
+ "Câu chẻ ('It is X that ...', 'What ... is ...') dùng để nhấn mạnh một thành phần. "
+ "Tiếng Việt nhấn mạnh bằng 'chính là', 'mới là' — đơn giản hơn nhiều nên người học "
+ "hiếm khi tự dựng câu chẻ.",
+ "Cleft sentences front the emphasised element: 'It is X that ...'.",
+ [("It was John who did break the window.", "It was John who broke the window.",
+   "Trong câu chẻ, động từ ở mệnh đề sau chia bình thường."),
+  ("What I need is to have more time.", "What I need is more time.",
+   "Sau 'What ... is' dùng thẳng danh ngữ."),
+  ("It is on Monday when the meeting starts.",
+   "It is on Monday that the meeting starts.",
+   "Câu chẻ dùng 'that' kể cả với thời gian."),
+  ("It was the report which caused the delay it.",
+   "It was the report that caused the delay.",
+   "Không lặp lại tân ngữ ở cuối.")]),
+
+"gram_subjunctive_mandative": (
+ "Sau các động từ chỉ yêu cầu, đề nghị (suggest, insist, demand, recommend), mệnh "
+ "đề 'that' dùng động từ NGUYÊN THỂ cho mọi ngôi, kể cả ngôi thứ ba số ít. Đây là "
+ "chỗ duy nhất trong tiếng Anh hiện đại bỏ -s một cách hệ thống.",
+ "Mandative subjunctive: bare infinitive in the that-clause, regardless of person.",
+ [("She suggested that he goes to the doctor.",
+   "She suggested that he go to the doctor.",
+   "Thức giả định dùng nguyên thể, không thêm -s."),
+  ("They insisted that the report is submitted today.",
+   "They insisted that the report be submitted today.",
+   "Bị động ở thức giả định là 'be + phân từ hai'."),
+  ("I recommend that she will take the earlier train.",
+   "I recommend that she take the earlier train.",
+   "Không dùng 'will' trong mệnh đề giả định."),
+  ("The rule demands that everyone wears a badge.",
+   "The rule demands that everyone wear a badge.",
+   "'everyone' vẫn dùng nguyên thể trong thức giả định.")]),
 }
