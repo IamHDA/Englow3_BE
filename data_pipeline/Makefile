@@ -50,6 +50,7 @@ gen-part5:
 
 gen-part7:
 	$(PY) generators/gen_reading_part7.py
+	$(PY) generators/gen_reading_part7_002.py
 
 gen-part6:
 	$(PY) generators/gen_reading_part6.py
