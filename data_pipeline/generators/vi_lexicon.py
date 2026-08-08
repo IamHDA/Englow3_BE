@@ -799,6 +799,385 @@ LEXICON: dict[str, tuple[str, list[tuple[str, str]]]] = {
         ("He took a nap on the coach and missed the view.",
          "Anh ấy ngủ một giấc trên xe khách và bỏ lỡ cảnh đẹp."),
     ]),
+
+    # ---- Phúc lợi nơi làm việc — B2 ----
+    "overtime": ("thời gian làm thêm ngoài giờ quy định", [
+        ("Overtime must be approved before it is worked.",
+         "Làm thêm giờ phải được duyệt trước khi làm."),
+        ("She refused the overtime because of childcare.",
+         "Cô ấy từ chối làm thêm giờ vì phải trông con."),
+    ]),
+    "eligible": ("đủ điều kiện để được hưởng hoặc tham gia điều gì đó", [
+        ("Staff become eligible after six months' service.",
+         "Nhân viên đủ điều kiện sau sáu tháng làm việc."),
+        ("Only full-time employees are eligible for the scheme.",
+         "Chỉ nhân viên toàn thời gian mới đủ điều kiện tham gia chương trình."),
+    ]),
+    "availability": ("mức độ sẵn có, khả năng có mặt hoặc dùng được", [
+        ("Please confirm your availability for Thursday.",
+         "Vui lòng xác nhận bạn có mặt được vào thứ Năm không."),
+        ("Availability of the training room is limited in December.",
+         "Phòng đào tạo rất hạn chế chỗ trống trong tháng Mười Hai."),
+    ]),
+    "optional": ("không bắt buộc, tuỳ chọn", [
+        ("Attendance at the briefing is optional.",
+         "Dự buổi phổ biến thông tin là không bắt buộc."),
+        ("The insurance is optional but strongly recommended.",
+         "Bảo hiểm là tuỳ chọn nhưng rất nên mua."),
+    ]),
+    "temporarily": ("tạm thời, trong một khoảng thời gian ngắn", [
+        ("The service is temporarily unavailable.",
+         "Dịch vụ tạm thời không hoạt động."),
+        ("He is temporarily covering the Leeds office.",
+         "Anh ấy đang tạm thời phụ trách văn phòng Leeds."),
+    ]),
+    "hourly": ("theo giờ, tính hoặc lặp lại mỗi giờ", [
+        ("The hourly rate rises after eight in the evening.",
+         "Mức lương theo giờ tăng sau tám giờ tối."),
+        ("Buses run hourly outside peak times.",
+         "Ngoài giờ cao điểm, xe buýt chạy mỗi giờ một chuyến."),
+    ]),
+
+    # ---- Học tập — A2 ----
+    "textbook": ("sách giáo khoa dùng để học một môn", [
+        ("The textbook costs more than the course itself.",
+         "Cuốn sách giáo khoa đắt hơn cả khoá học."),
+        ("She annotated every page of her textbook.",
+         "Cô ấy ghi chú kín từng trang sách giáo khoa."),
+    ]),
+    "semester": ("học kỳ, một trong hai kỳ của năm học", [
+        ("The second semester begins in February.",
+         "Học kỳ hai bắt đầu vào tháng Hai."),
+        ("He took four modules in one semester.",
+         "Anh ấy học bốn học phần trong một kỳ."),
+    ]),
+    "campus": ("khuôn viên trường học hoặc cơ sở làm việc", [
+        ("The library is at the far end of the campus.",
+         "Thư viện nằm ở cuối khuôn viên trường."),
+        ("Most first-year students live on campus.",
+         "Phần lớn sinh viên năm nhất ở trong khuôn viên trường."),
+    ]),
+    "occupation": ("nghề nghiệp, công việc một người làm để kiếm sống", [
+        ("Please state your occupation on the form.",
+         "Vui lòng ghi nghề nghiệp của bạn vào mẫu đơn."),
+        ("Her previous occupation was completely unrelated.",
+         "Nghề trước đây của cô ấy hoàn toàn không liên quan."),
+    ]),
+    "clerk": ("nhân viên văn phòng làm công việc giấy tờ hoặc quầy", [
+        ("The clerk stamped the form and handed it back.",
+         "Nhân viên đóng dấu vào tờ đơn rồi trả lại."),
+        ("Ask the clerk at the counter for a reference number.",
+         "Hỏi nhân viên ở quầy để lấy số hồ sơ."),
+    ]),
+    "receptionist": ("lễ tân, người đón khách và trực điện thoại", [
+        ("The receptionist will sign you in.",
+         "Lễ tân sẽ ghi tên bạn vào sổ."),
+        ("She worked as a receptionist while studying.",
+         "Cô ấy làm lễ tân trong lúc đi học."),
+    ]),
+
+    # ---- Đào tạo, nghề nghiệp — B1 ----
+    "workshop": ("buổi tập huấn thực hành; cũng là xưởng làm việc", [
+        ("The workshop runs from ten until half past three.",
+         "Buổi tập huấn kéo dài từ mười giờ tới ba rưỡi."),
+        ("Places on the workshop are limited to twelve.",
+         "Buổi tập huấn giới hạn mười hai chỗ."),
+    ]),
+    "assignment": ("bài tập được giao; cũng là nhiệm vụ công tác", [
+        ("The assignment is due before the holiday.",
+         "Bài tập phải nộp trước kỳ nghỉ."),
+        ("He was given an assignment in the Manchester office.",
+         "Anh ấy được giao nhiệm vụ tại văn phòng Manchester."),
+    ]),
+    "instructor": ("người hướng dẫn, giảng viên thực hành", [
+        ("The instructor asked us to work in pairs.",
+         "Người hướng dẫn yêu cầu chúng tôi làm theo cặp."),
+        ("She qualified as a driving instructor last spring.",
+         "Mùa xuân năm ngoái cô ấy lấy được chứng chỉ dạy lái xe."),
+    ]),
+    "scholarship": ("học bổng, khoản tiền hỗ trợ việc học", [
+        ("The scholarship covers fees but not accommodation.",
+         "Học bổng chi trả học phí nhưng không bao gồm chỗ ở."),
+        ("Only twelve scholarships are awarded each year.",
+         "Mỗi năm chỉ có mười hai suất học bổng."),
+    ]),
+    "deadline": ("hạn chót phải hoàn thành một việc", [
+        ("The deadline was moved forward by a week.",
+         "Hạn chót được đẩy lên sớm một tuần."),
+        ("Nobody missed the deadline this time.",
+         "Lần này không ai trễ hạn."),
+    ]),
+    "workplace": ("nơi làm việc", [
+        ("Safety in the workplace is everyone's responsibility.",
+         "An toàn nơi làm việc là trách nhiệm của tất cả mọi người."),
+        ("The survey asked about noise in the workplace.",
+         "Cuộc khảo sát hỏi về tiếng ồn tại nơi làm việc."),
+    ]),
+
+    # ---- Nhân sự — B2 ----
+    "applicant": ("người nộp đơn xin việc hoặc xin cấp phép", [
+        ("Every applicant is asked the same four questions.",
+         "Mọi ứng viên đều được hỏi bốn câu giống nhau."),
+        ("The successful applicant will start in March.",
+         "Ứng viên trúng tuyển sẽ bắt đầu làm từ tháng Ba."),
+    ]),
+    "supervisor": ("người giám sát, quản lý trực tiếp", [
+        ("Speak to your supervisor before changing the rota.",
+         "Hãy báo quản lý trực tiếp trước khi đổi lịch trực."),
+        ("Her supervisor signed the form without reading it.",
+         "Quản lý của cô ấy ký vào đơn mà không đọc."),
+    ]),
+    "trainee": ("người đang trong thời gian học việc", [
+        ("Each trainee is paired with an experienced colleague.",
+         "Mỗi người học việc được ghép với một đồng nghiệp có kinh nghiệm."),
+        ("Trainees are not expected to work unsupervised.",
+         "Người học việc không được phép làm một mình.")]),
+    "trainer": ("người đào tạo, huấn luyện viên", [
+        ("The trainer stayed behind to answer questions.",
+         "Người đào tạo ở lại để trả lời câu hỏi."),
+        ("We need an external trainer for the safety course.",
+         "Chúng tôi cần người đào tạo bên ngoài cho khoá an toàn."),
+    ]),
+    "enroll": ("ghi danh, đăng ký tham gia một khoá học hoặc chương trình", [
+        ("Staff may enroll on any two courses each year.",
+         "Nhân viên có thể ghi danh hai khoá học mỗi năm."),
+        ("She enrolled in the evening class in September.",
+         "Cô ấy ghi danh lớp buổi tối vào tháng Chín."),
+    ]),
+    "seminar": ("buổi hội thảo chuyên đề, thường có thảo luận", [
+        ("The seminar was better attended than expected.",
+         "Buổi hội thảo có nhiều người dự hơn dự kiến."),
+        ("He presented his findings at a seminar in Ardleigh.",
+         "Anh ấy trình bày kết quả tại một hội thảo ở Ardleigh."),
+    ]),
+
+    # ---- Phát triển chuyên môn — C1 ----
+    "apprentice": ("người học nghề theo hợp đồng, vừa làm vừa học", [
+        ("The firm takes on four apprentices every autumn.",
+         "Mỗi mùa thu công ty nhận bốn người học nghề."),
+        ("As an apprentice she spent one day a week at college.",
+         "Khi học nghề, cô ấy dành một ngày mỗi tuần ở trường."),
+    ]),
+    "consultation": ("việc tham vấn, hỏi ý kiến trước khi quyết định", [
+        ("The change was made without consultation.",
+         "Thay đổi được đưa ra mà không tham vấn ai."),
+        ("A six-week consultation begins on Monday.",
+         "Đợt tham vấn sáu tuần bắt đầu từ thứ Hai."),
+    ]),
+    "oversee": ("giám sát, trông coi việc thực hiện", [
+        ("She oversees three sites in the north.",
+         "Bà ấy giám sát ba cơ sở ở phía bắc."),
+        ("A senior engineer will oversee the installation.",
+         "Một kỹ sư cấp cao sẽ giám sát việc lắp đặt."),
+    ]),
+    "collaboration": ("sự hợp tác, cùng nhau làm một việc", [
+        ("The report was written in collaboration with the university.",
+         "Báo cáo được viết với sự hợp tác của trường đại học."),
+        ("Collaboration across departments has improved this year.",
+         "Sự phối hợp giữa các phòng ban năm nay đã tốt lên."),
+    ]),
+    "induction": ("buổi định hướng cho người mới vào làm", [
+        ("Induction takes place on the first Monday of the month.",
+         "Buổi định hướng diễn ra vào thứ Hai đầu tiên của tháng."),
+        ("Nobody may enter the yard before completing induction.",
+         "Không ai được vào bãi trước khi hoàn thành buổi định hướng."),
+    ]),
+    "knowledgeable": ("hiểu biết sâu, nắm vững một lĩnh vực", [
+        ("The assistant was unusually knowledgeable about materials.",
+         "Người trợ lý hiểu biết về vật liệu một cách đáng ngạc nhiên."),
+        ("We need someone knowledgeable enough to challenge the supplier.",
+         "Chúng tôi cần một người đủ hiểu biết để chất vấn nhà cung cấp."),
+    ]),
+
+    # ---- Công nghệ — A2 ----
+    "download": ("tải tệp từ mạng về máy", [
+        ("The download stopped halfway through.",
+         "Việc tải xuống dừng lại giữa chừng."),
+        ("You can download the form from the front page.",
+         "Bạn có thể tải mẫu đơn từ trang chủ."),
+    ]),
+    "battery": ("pin, nguồn điện cho thiết bị di động", [
+        ("The battery lasts about six hours.",
+         "Pin dùng được khoảng sáu tiếng."),
+        ("His phone battery died during the call.",
+         "Điện thoại anh ấy hết pin giữa cuộc gọi."),
+    ]),
+    "folder": ("thư mục trên máy tính; cũng là bìa hồ sơ", [
+        ("Save the file in the shared folder.",
+         "Lưu tệp vào thư mục dùng chung."),
+        ("Everything for the audit is in the blue folder.",
+         "Mọi thứ cho đợt kiểm toán nằm trong bìa hồ sơ màu xanh."),
+    ]),
+    "photography": ("nhiếp ảnh, việc chụp ảnh", [
+        ("Photography is not permitted inside the gallery.",
+         "Không được chụp ảnh bên trong phòng trưng bày."),
+        ("She took up photography after she retired.",
+         "Bà ấy bắt đầu chơi nhiếp ảnh sau khi nghỉ hưu."),
+    ]),
+    "recycle": ("tái chế, xử lý để dùng lại nguyên liệu", [
+        ("Cardboard and glass are recycled separately.",
+         "Bìa giấy và thuỷ tinh được tái chế riêng."),
+        ("The council will not recycle plastic film.",
+         "Hội đồng thành phố không tái chế màng nhựa."),
+    ]),
+    "calendar": ("lịch, bảng ngày tháng để theo dõi thời gian", [
+        ("Put the deadline in the shared calendar.",
+         "Ghi hạn chót vào lịch dùng chung."),
+        ("The wall calendar still shows last month.",
+         "Tờ lịch treo tường vẫn đang ở tháng trước."),
+    ]),
+
+    # ---- Công nghệ văn phòng — B1 ----
+    "keyboard": ("bàn phím dùng để nhập dữ liệu", [
+        ("The keyboard stopped working after the spill.",
+         "Bàn phím hỏng sau khi bị đổ nước."),
+        ("He types without looking at the keyboard.",
+         "Anh ấy gõ mà không nhìn bàn phím."),
+    ]),
+    "password": ("mật khẩu dùng để đăng nhập", [
+        ("Your password expires every ninety days.",
+         "Mật khẩu của bạn hết hạn sau mỗi chín mươi ngày."),
+        ("Never write your password on a note by the screen.",
+         "Đừng bao giờ viết mật khẩu lên giấy dán cạnh màn hình."),
+    ]),
+    "delete": ("xoá, gỡ bỏ dữ liệu hoặc tệp", [
+        ("Do not delete the file until the audit is over.",
+         "Đừng xoá tệp cho tới khi đợt kiểm toán kết thúc."),
+        ("She deleted the message by mistake.",
+         "Cô ấy xoá nhầm tin nhắn."),
+    ]),
+    "calculator": ("máy tính bỏ túi dùng để tính toán", [
+        ("Calculators are not allowed in the first paper.",
+         "Không được dùng máy tính trong bài thi thứ nhất."),
+        ("He reached for the calculator rather than trust the figure.",
+         "Anh ấy với lấy máy tính thay vì tin vào con số đó."),
+    ]),
+    "photocopy": ("bản sao chụp; cũng là hành động sao chụp tài liệu", [
+        ("Bring a photocopy of your identification.",
+         "Mang theo một bản sao giấy tờ tuỳ thân."),
+        ("The photocopy came out too dark to read.",
+         "Bản sao in ra tối quá không đọc được."),
+    ]),
+    "electrical": ("thuộc về điện, dùng điện", [
+        ("An electrical fault caused the shutdown.",
+         "Một sự cố điện gây ra việc ngừng hoạt động."),
+        ("All electrical equipment is tested annually.",
+         "Toàn bộ thiết bị điện được kiểm tra hằng năm."),
+    ]),
+
+    # ---- Số và truyền thông — B2 ----
+    "laptop": ("máy tính xách tay", [
+        ("Her laptop is slower than the desktop she replaced.",
+         "Máy tính xách tay của cô ấy chậm hơn cái để bàn đã thay."),
+        ("Do not leave a laptop visible in a parked car.",
+         "Đừng để máy tính xách tay lộ ra trong xe đang đỗ."),
+    ]),
+    "upgrade": ("nâng cấp lên phiên bản hoặc mức tốt hơn", [
+        ("The upgrade takes about two hours to install.",
+         "Bản nâng cấp mất khoảng hai tiếng để cài đặt."),
+        ("They upgraded the whole floor over one weekend.",
+         "Họ nâng cấp cả tầng chỉ trong một cuối tuần."),
+    ]),
+    "desktop": ("máy tính để bàn; cũng là màn hình nền", [
+        ("The desktop machines are due for replacement.",
+         "Các máy tính để bàn đã tới hạn thay mới."),
+        ("He keeps every file on the desktop, which is the problem.",
+         "Anh ấy để mọi tệp ngoài màn hình nền — và đó chính là vấn đề."),
+    ]),
+    "hardware": ("phần cứng, thiết bị vật lý của hệ thống máy tính", [
+        ("The fault is in the hardware, not the software.",
+         "Lỗi nằm ở phần cứng chứ không phải phần mềm."),
+        ("Hardware costs fell but support costs did not.",
+         "Chi phí phần cứng giảm nhưng chi phí hỗ trợ thì không."),
+    ]),
+    "media": ("phương tiện truyền thông; cũng là các dạng lưu trữ", [
+        ("The story reached the media before the staff.",
+         "Câu chuyện đến tay báo chí trước cả nhân viên."),
+        ("Removable media must be encrypted.",
+         "Thiết bị lưu trữ rời phải được mã hoá."),
+    ]),
+    "microphone": ("micrô, thiết bị thu âm thanh", [
+        ("The microphone picked up the noise from the corridor.",
+         "Micrô thu cả tiếng ồn từ hành lang."),
+        ("Please speak into the microphone so the room can hear.",
+         "Xin nói vào micrô để cả phòng nghe được."),
+    ]),
+
+    # ---- Chiến lược công nghệ — C1 ----
+    "specification": ("bản đặc tả, mô tả chi tiết yêu cầu kỹ thuật", [
+        ("The specification was agreed before tendering began.",
+         "Bản đặc tả được chốt trước khi mở thầu."),
+        ("Two suppliers quoted against a different specification.",
+         "Hai nhà cung cấp báo giá theo hai bản đặc tả khác nhau."),
+    ]),
+    "malfunction": ("sự trục trặc, hoạt động sai chức năng", [
+        ("A malfunction in the sensor stopped the line.",
+         "Một trục trặc ở cảm biến làm dừng cả dây chuyền."),
+        ("The unit malfunctioned twice in the same week.",
+         "Thiết bị trục trặc hai lần trong cùng một tuần."),
+    ]),
+    "portable": ("xách tay, dễ mang đi", [
+        ("A portable heater is not a substitute for the system.",
+         "Máy sưởi xách tay không thay thế được hệ thống."),
+        ("The equipment is portable but needs two people to lift.",
+         "Thiết bị này xách tay được nhưng cần hai người mới nhấc nổi."),
+    ]),
+    "unplug": ("rút phích cắm, ngắt khỏi nguồn điện", [
+        ("Unplug the machine before opening the panel.",
+         "Rút điện trước khi mở nắp máy."),
+        ("Someone unplugged the router to charge a phone.",
+         "Có người rút điện bộ định tuyến để sạc điện thoại."),
+    ]),
+    "appliance": ("thiết bị gia dụng dùng điện", [
+        ("Every appliance in the kitchen is tested each year.",
+         "Mọi thiết bị trong bếp đều được kiểm tra hằng năm."),
+        ("The appliance draws more power than the label suggests.",
+         "Thiết bị này tiêu thụ điện nhiều hơn mức ghi trên nhãn."),
+    ]),
+    "fixture": ("vật cố định gắn liền với công trình", [
+        ("The lighting fixtures were left in place after the move.",
+         "Các bộ đèn cố định được giữ nguyên sau khi chuyển đi."),
+        ("Whether the shelves count as fixtures is disputed.",
+         "Việc giá kệ có tính là vật cố định hay không vẫn đang tranh cãi."),
+    ]),
+
+    # ---- Chiến lược doanh nghiệp — C1 ----
+    "invoice": ("hoá đơn yêu cầu thanh toán", [
+        ("The invoice is payable within thirty days.",
+         "Hoá đơn phải thanh toán trong vòng ba mươi ngày."),
+        ("They queried the invoice because of a duplicate line.",
+         "Họ thắc mắc về hoá đơn vì có một dòng bị lặp."),
+    ]),
+    "contractor": ("nhà thầu, đơn vị nhận làm việc theo hợp đồng", [
+        ("The contractor was asked to work Saturdays.",
+         "Nhà thầu được yêu cầu làm cả thứ Bảy."),
+        ("No contractor may enter the site without induction.",
+         "Không nhà thầu nào được vào công trường khi chưa qua buổi định hướng."),
+    ]),
+    "itinerary": ("lịch trình chuyến đi", [
+        ("The itinerary leaves no time between meetings.",
+         "Lịch trình không chừa chút thời gian nào giữa các cuộc họp."),
+        ("She emailed a revised itinerary at midnight.",
+         "Cô ấy gửi lịch trình sửa đổi lúc nửa đêm."),
+    ]),
+    "comply": ("tuân thủ, làm theo quy định hoặc yêu cầu", [
+        ("All sites must comply with the new standard by June.",
+         "Mọi cơ sở phải tuân thủ tiêu chuẩn mới trước tháng Sáu."),
+        ("They complied with the request but recorded an objection.",
+         "Họ tuân thủ yêu cầu nhưng ghi nhận một ý kiến phản đối."),
+    ]),
+    "compliance": ("sự tuân thủ quy định", [
+        ("Compliance is checked twice a year.",
+         "Việc tuân thủ được kiểm tra hai lần một năm."),
+        ("The compliance team has no authority to stop work.",
+         "Bộ phận tuân thủ không có quyền đình chỉ công việc."),
+    ]),
+    "expedite": ("đẩy nhanh tiến độ của một việc", [
+        ("We asked the supplier to expedite the order.",
+         "Chúng tôi đề nghị nhà cung cấp đẩy nhanh đơn hàng."),
+        ("Nothing will expedite a decision that nobody wants to make.",
+         "Không gì đẩy nhanh được một quyết định mà không ai muốn đưa ra."),
+    ]),
 }
 
 
@@ -806,6 +1185,76 @@ LEXICON: dict[str, tuple[str, list[tuple[str, str]]]] = {
 # của WordNet chỉ đúng khoảng 45% (đã đo) vì WordNet gộp toàn bộ tính từ vào
 # adj.all, nên với các từ dưới đây thì gán tay là cách duy nhất chính xác.
 TOPIC_OVERRIDE: dict[str, str] = {
+    # vocab_health_wellbeing_b2
+    "overtime": "vocab_health_wellbeing_b2",
+    "eligible": "vocab_health_wellbeing_b2",
+    "availability": "vocab_health_wellbeing_b2",
+    "optional": "vocab_health_wellbeing_b2",
+    "temporarily": "vocab_health_wellbeing_b2",
+    "hourly": "vocab_health_wellbeing_b2",
+    # vocab_education_career_a2
+    "textbook": "vocab_education_career_a2",
+    "semester": "vocab_education_career_a2",
+    "campus": "vocab_education_career_a2",
+    "occupation": "vocab_education_career_a2",
+    "clerk": "vocab_education_career_a2",
+    "receptionist": "vocab_education_career_a2",
+    # vocab_education_career_b1
+    "workshop": "vocab_education_career_b1",
+    "assignment": "vocab_education_career_b1",
+    "instructor": "vocab_education_career_b1",
+    "scholarship": "vocab_education_career_b1",
+    "deadline": "vocab_education_career_b1",
+    "workplace": "vocab_education_career_b1",
+    # vocab_education_career_b2
+    "applicant": "vocab_education_career_b2",
+    "supervisor": "vocab_education_career_b2",
+    "trainee": "vocab_education_career_b2",
+    "trainer": "vocab_education_career_b2",
+    "enroll": "vocab_education_career_b2",
+    "seminar": "vocab_education_career_b2",
+    # vocab_education_career_c1
+    "apprentice": "vocab_education_career_c1",
+    "consultation": "vocab_education_career_c1",
+    "oversee": "vocab_education_career_c1",
+    "collaboration": "vocab_education_career_c1",
+    "induction": "vocab_education_career_c1",
+    "knowledgeable": "vocab_education_career_c1",
+    # vocab_technology_media_a2
+    "download": "vocab_technology_media_a2",
+    "battery": "vocab_technology_media_a2",
+    "folder": "vocab_technology_media_a2",
+    "photography": "vocab_technology_media_a2",
+    "recycle": "vocab_technology_media_a2",
+    "calendar": "vocab_technology_media_a2",
+    # vocab_technology_media_b1
+    "keyboard": "vocab_technology_media_b1",
+    "password": "vocab_technology_media_b1",
+    "delete": "vocab_technology_media_b1",
+    "calculator": "vocab_technology_media_b1",
+    "photocopy": "vocab_technology_media_b1",
+    "electrical": "vocab_technology_media_b1",
+    # vocab_technology_media_b2
+    "laptop": "vocab_technology_media_b2",
+    "upgrade": "vocab_technology_media_b2",
+    "desktop": "vocab_technology_media_b2",
+    "hardware": "vocab_technology_media_b2",
+    "media": "vocab_technology_media_b2",
+    "microphone": "vocab_technology_media_b2",
+    # vocab_technology_media_c1
+    "specification": "vocab_technology_media_c1",
+    "malfunction": "vocab_technology_media_c1",
+    "portable": "vocab_technology_media_c1",
+    "unplug": "vocab_technology_media_c1",
+    "appliance": "vocab_technology_media_c1",
+    "fixture": "vocab_technology_media_c1",
+    # vocab_business_office_c1
+    "invoice": "vocab_business_office_c1",
+    "contractor": "vocab_business_office_c1",
+    "itinerary": "vocab_business_office_c1",
+    "comply": "vocab_business_office_c1",
+    "compliance": "vocab_business_office_c1",
+    "expedite": "vocab_business_office_c1",
     # vocab_daily_life_a2
     "lamp": "vocab_daily_life_a2",
     "drawer": "vocab_daily_life_a2",
@@ -892,6 +1341,42 @@ TOPIC_OVERRIDE: dict[str, str] = {
 #
 #   lemma -> [(pattern, text, cefr)]
 COLLOCATIONS: dict[str, list[tuple[str, str, str]]] = {
+    "overtime": [("ADJ+N", "unpaid overtime", "B2"), ("V+N", "work overtime", "B2"), ("N+N", "overtime rate", "B2")],
+    "eligible": [("V+N", "be eligible for", "B2"), ("ADJ+N", "eligible candidate", "B2"), ("ADV+ADJ", "fully eligible", "B2")],
+    "availability": [("ADJ+N", "limited availability", "B2"), ("V+N", "confirm availability", "B2"), ("N+PREP", "availability of staff", "B2")],
+    "optional": [("ADJ+N", "optional extra", "B2"), ("ADJ+N", "optional module", "B2"), ("ADV+ADJ", "entirely optional", "B2")],
+    "temporarily": [("ADV+ADJ", "temporarily unavailable", "B2"), ("ADV+ADJ", "temporarily closed", "B2"), ("ADV+ADJ", "temporarily suspended", "B2")],
+    "hourly": [("ADJ+N", "hourly rate", "B2"), ("ADJ+N", "hourly service", "B2"), ("ADJ+N", "hourly wage", "B2")],
+    "applicant": [("ADJ+N", "successful applicant", "B2"), ("ADJ+N", "suitable applicant", "B2"), ("N+N", "applicant pool", "C1")],
+    "supervisor": [("ADJ+N", "line supervisor", "B2"), ("ADJ+N", "immediate supervisor", "B2"), ("N+N", "shift supervisor", "B2")],
+    "trainee": [("ADJ+N", "graduate trainee", "B2"), ("N+N", "trainee scheme", "B2"), ("ADJ+N", "new trainee", "B2")],
+    "trainer": [("ADJ+N", "external trainer", "B2"), ("ADJ+N", "qualified trainer", "B2"), ("N+N", "trainer feedback", "B2")],
+    "enroll": [("V+PREP", "enroll on a course", "B2"), ("V+PREP", "enroll in a programme", "B2"), ("V+N", "enroll students", "B2")],
+    "seminar": [("V+N", "attend a seminar", "B2"), ("ADJ+N", "research seminar", "B2"), ("N+N", "seminar room", "B2")],
+    "apprentice": [("V+N", "take on an apprentice", "C1"), ("ADJ+N", "first-year apprentice", "C1"), ("N+N", "apprentice scheme", "C1")],
+    "consultation": [("ADJ+N", "public consultation", "C1"), ("PREP+N", "in consultation with", "C1"), ("N+N", "consultation period", "C1")],
+    "oversee": [("V+N", "oversee a project", "C1"), ("V+N", "oversee operations", "C1"), ("V+N", "oversee the transition", "C1")],
+    "collaboration": [("ADJ+N", "close collaboration", "C1"), ("PREP+N", "in collaboration with", "C1"), ("ADJ+N", "cross-departmental collaboration", "C1")],
+    "induction": [("N+N", "induction training", "C1"), ("V+N", "complete induction", "C1"), ("N+N", "induction pack", "C1")],
+    "knowledgeable": [("ADV+ADJ", "highly knowledgeable", "C1"), ("ADJ+N", "knowledgeable staff", "C1"), ("V+PREP", "knowledgeable about", "C1")],
+    "laptop": [("ADJ+N", "company laptop", "B2"), ("N+N", "laptop bag", "B2"), ("ADJ+N", "spare laptop", "B2")],
+    "upgrade": [("ADJ+N", "major upgrade", "B2"), ("V+N", "install an upgrade", "B2"), ("N+N", "upgrade path", "C1")],
+    "desktop": [("ADJ+N", "desktop computer", "B2"), ("N+N", "desktop machine", "B2"), ("N+N", "desktop support", "B2")],
+    "hardware": [("N+N", "hardware failure", "B2"), ("ADJ+N", "legacy hardware", "C1"), ("N+N", "hardware refresh", "C1")],
+    "media": [("ADJ+N", "social media", "B2"), ("ADJ+N", "removable media", "B2"), ("N+N", "media coverage", "B2")],
+    "microphone": [("V+N", "use a microphone", "B2"), ("ADJ+N", "wireless microphone", "B2"), ("V+PREP", "speak into the microphone", "B2")],
+    "specification": [("ADJ+N", "technical specification", "C1"), ("V+N", "meet the specification", "C1"), ("V+N", "agree a specification", "C1")],
+    "malfunction": [("ADJ+N", "mechanical malfunction", "C1"), ("N+N", "system malfunction", "C1"), ("ADJ+N", "intermittent malfunction", "C1")],
+    "portable": [("ADJ+N", "portable device", "C1"), ("ADJ+N", "portable heater", "C1"), ("ADJ+N", "portable equipment", "C1")],
+    "unplug": [("V+N", "unplug the device", "C1"), ("V+N", "unplug the cable", "C1"), ("V+PREP", "unplug it from the mains", "C1")],
+    "appliance": [("ADJ+N", "electrical appliance", "C1"), ("ADJ+N", "domestic appliance", "C1"), ("N+N", "appliance testing", "C1")],
+    "fixture": [("N+N", "lighting fixture", "C1"), ("N+N", "fixtures and fittings", "C1"), ("ADJ+N", "permanent fixture", "C1")],
+    "invoice": [("V+N", "settle an invoice", "C1"), ("ADJ+N", "outstanding invoice", "C1"), ("N+N", "invoice number", "C1")],
+    "contractor": [("ADJ+N", "principal contractor", "C1"), ("ADJ+N", "approved contractor", "C1"), ("N+N", "contractor induction", "C1")],
+    "itinerary": [("ADJ+N", "detailed itinerary", "C1"), ("V+N", "confirm the itinerary", "C1"), ("ADJ+N", "revised itinerary", "C1")],
+    "comply": [("V+PREP", "comply with regulations", "C1"), ("V+PREP", "comply with a request", "C1"), ("V+PREP", "fail to comply with", "C1")],
+    "compliance": [("PREP+N", "in compliance with", "C1"), ("ADJ+N", "regulatory compliance", "C1"), ("N+N", "compliance team", "C1")],
+    "expedite": [("V+N", "expedite an order", "C1"), ("V+N", "expedite the process", "C1"), ("V+N", "expedite delivery", "C1")],
     "audit": [("ADJ+N", "internal audit", "B2"),
               ("V+N", "carry out an audit", "B2"),
               ("N+N", "audit trail", "C1")],

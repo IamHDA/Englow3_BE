@@ -139,8 +139,11 @@ def resolve_concept(lemma: str, pos: str, level: str, topic_hint: str,
     """Trả về (concept_id, nguồn quyết định). Luôn thuộc `valid`."""
     lv = level.lower()
     # Gán tay thắng mọi suy đoán: những từ này được CHỌN cho đúng chủ đề đó.
+    # Chỉ nhận gán tay khi ĐÚNG cấp độ của dòng seed. Có lemma xuất hiện ở hai
+    # cấp độ khác nhau trong seed ("jog" ở cả B1 và B2); gán tay theo lemma mà
+    # không kiểm cấp độ sẽ dán nhãn concept _b1 lên một thẻ B2.
     cid = TOPIC_OVERRIDE.get(lemma)
-    if cid and cid in valid:
+    if cid and cid in valid and cid.endswith(f"_{lv}"):
         return cid, "gán tay"
     if topic_hint and f"vocab_{topic_hint}_{lv}" in valid:
         return f"vocab_{topic_hint}_{lv}", "topic_hint"
