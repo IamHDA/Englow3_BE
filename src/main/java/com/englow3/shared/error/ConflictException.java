@@ -1,15 +1,9 @@
 package com.englow3.shared.error;
 
-import org.springframework.http.HttpStatus;
-
+/** The request is well formed but the current state forbids it. */
 public class ConflictException extends DomainException {
 
     public ConflictException(String code, String message) {
         super(code, message);
-    }
-
-    @Override
-    public HttpStatus getStatus() {
-        return HttpStatus.CONFLICT;
     }
 }
