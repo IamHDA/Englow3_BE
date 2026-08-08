@@ -37,6 +37,12 @@ public class OnboardingService {
     private final CurrentUser currentUser;
 
     @Transactional(readOnly = true)
+    public OnboardingStateResponse currentState() {
+        User user = requireCurrentUser();
+        return state(user, profileOf(user));
+    }
+
+    @Transactional(readOnly = true)
     public List<LearningPurposeResponse> listLearningPurposes() {
         return learningPurposes.findAll().stream().map(LearningPurposeResponse::from).toList();
     }
