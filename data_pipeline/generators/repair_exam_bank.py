@@ -68,15 +68,20 @@ def main() -> int:
         for g in batch.groups:
             data = g.model_dump(mode="python")
 
-            # --- 1. Loại câu hỏi trùng nguyên văn ---
+            # --- 1. Loại câu hỏi trùng ---
+            # So theo (stem + passage), KHÔNG theo stem trần. Part 6 dùng chung
+            # stem "Chỗ trống (1)" ở nhiều đoạn khác nhau — đó là câu khác nhau,
+            # không phải bản sao. Dedup theo stem trần đã xoá nhầm 12 câu Part 6.
+            passage_key = "|".join(p.get("text", "")[:200] for p in data["passages"])
             kept_q = []
             for q in data["questions"]:
                 t = (q.get("question_text") or "").strip()
-                if t and t in seen_text:
-                    fixed["câu trùng nguyên văn bị loại"] += 1
+                key = f"{t}##{passage_key}" if t else ""
+                if key and key in seen_text:
+                    fixed["câu trùng (cùng stem VÀ cùng passage) bị loại"] += 1
                     continue
-                if t:
-                    seen_text.add(t)
+                if key:
+                    seen_text.add(key)
                 kept_q.append(q)
             if not kept_q:
                 fixed["group rỗng sau khi loại trùng"] += 1

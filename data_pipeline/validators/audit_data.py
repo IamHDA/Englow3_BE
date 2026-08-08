@@ -120,16 +120,19 @@ def main() -> int:
     if dup_id:
         flag("LỖI", f"{len(dup_id)} item_id trùng — cùng nội dung bị sinh nhiều lần")
 
-    texts = [q.question_text or "" for q in items if q.question_text]
+    # So theo (stem + passage), không theo stem trần: Part 6 dùng chung
+    # "Chỗ trống (1)" ở nhiều đoạn khác nhau — câu khác nhau, không phải bản sao.
+    texts = [f"{q.question_text}##{'|'.join(p.text[:200] for p in g.passages)}"
+             for g in groups for q in g.questions if q.question_text]
     exact = [k for k, v in collections.Counter(texts).items() if v > 1]
     print(f"  question_text trùng nguyên văn: {len(exact)} chuỗi "
           f"(chiếm {sum(collections.Counter(texts)[k] for k in exact)} câu)")
     if exact:
         flag("LỖI", f"{len(exact)} câu hỏi trùng nguyên văn")
         for t in exact[:3]:
-            print(f"      ×{collections.Counter(texts)[t]}  {t[:70]}")
+            print(f"      ×{collections.Counter(texts)[t]}  {t.split('##')[0][:70]}")
 
-    uniq = list(dict.fromkeys(texts))
+    uniq = list(dict.fromkeys(t.split("##")[0] for t in texts))
     sample = uniq[:400]
     near = 0
     for i in range(len(sample)):

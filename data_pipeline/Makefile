@@ -58,6 +58,9 @@ gen-part6:
 fix-audio:
 	$(PY) generators/fix_audio_metadata.py
 
+build-set:
+	$(PY) generators/build_exam_set.py
+
 repair:
 	$(PY) generators/repair_exam_bank.py
 
