@@ -305,9 +305,15 @@ def build_group(idx: int, prompt: str, qtype: QuestionType, concept: str,
     script = f"{prompt}\n" + "\n".join(
         f"({LABELS[i]}) {t}" for i, (t, _, _) in enumerate(options))
 
+    # Các dạng nhờ vả / đề nghị / đáp trần thuật đều là bài tập đáp GIÁN TIẾP.
+    # Gắn thêm concept cha để BKT cập nhật cả kỹ năng chung, không chỉ dạng câu.
+    concepts = [concept]
+    if qtype is Q.LC_INDIRECT_RESPONSE and concept != "lc_indirect_response":
+        concepts.append("lc_indirect_response")
+
     item = ExamItem(
         part_number=2, question_text=prompt, question_type=qtype, options=opts,
-        concept_ids=[concept], difficulty_prior=difficulty,
+        concept_ids=concepts, difficulty_prior=difficulty,
         explanation=Definition(en=f'The correct response is "{correct_text}".',
                                vi=correct_vi))
     return ExamGroup(

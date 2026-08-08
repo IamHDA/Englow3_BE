@@ -45,19 +45,37 @@ def main() -> int:
                 bucket.append((g.part_number, g.group_id, q.item_id))
 
     reading.sort(key=lambda r: (PART_ORDER.index(r[0]) if r[0] in PART_ORDER else 9))
-    by_part = collections.Counter(p for p, _, _ in reading)
+    listening.sort(key=lambda r: r[0])
 
-    print(f"Ngân hàng: {len(reading)} câu Reading, {len(listening)} câu Listening")
-    for part in PART_ORDER:
-        want = {5: 30, 6: 16, 7: 54}[part]
-        got = by_part.get(part, 0)
-        mark = "✅" if got >= want else f"thiếu {want - got}"
-        print(f"  Part {part}: {got:3d}/{want}  {mark}")
+    def take(pool, quota: dict[int, int]) -> list[tuple[int, str, str]]:
+        """Lấy đúng chỉ tiêu mỗi part. Bank là KHO, bộ đề chỉ là một lát cắt —
+        gom hết vào set_001 thì thêm câu nào là đề phình ra câu đó, và đề
+        101 câu thì không còn là đề nữa."""
+        left = dict(quota)
+        out = []
+        for row in pool:
+            if left.get(row[0], 0) > 0:
+                out.append(row)
+                left[row[0]] -= 1
+        return out
+
+    R_QUOTA = {5: 30, 6: 16, 7: 54}
+    L_QUOTA = {1: 6, 2: 25, 3: 39, 4: 30}
+
+    for label, pool, quota in (("Reading", reading, R_QUOTA),
+                               ("Listening", listening, L_QUOTA)):
+        by_part = collections.Counter(p for p, _, _ in pool)
+        print(f"Ngân hàng {label}: {len(pool)} câu")
+        for part, want in quota.items():
+            got = by_part.get(part, 0)
+            mark = "✅" if got >= want else f"thiếu {want - got}"
+            spare = f"  (dôi {got - want})" if got > want else ""
+            print(f"  Part {part}: {got:3d}/{want}  {mark}{spare}")
 
     refs_r = [SetItemRef(group_id=g, item_id=i, position=n + 1)
-              for n, (_, g, i) in enumerate(reading)]
+              for n, (_, g, i) in enumerate(take(reading, R_QUOTA))]
     refs_l = [SetItemRef(group_id=g, item_id=i, position=n + 1)
-              for n, (_, g, i) in enumerate(listening)]
+              for n, (_, g, i) in enumerate(take(listening, L_QUOTA))]
 
     complete = len(refs_r) >= TARGET_R and len(refs_l) >= TARGET_L
     title = ("Đề luyện theo định dạng TOEIC số 1" if complete else
