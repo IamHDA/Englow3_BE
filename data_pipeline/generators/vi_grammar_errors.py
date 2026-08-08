@@ -556,4 +556,305 @@ GRAMMAR_CONTENT: dict[str, tuple[str, str, list[tuple[str, str, str]]]] = {
    "Không dùng hai khuyết thiếu liền nhau; tương lai của 'can' là 'be able to'."),
   ("Do you can swim?", "Can you swim?",
    "Khuyết thiếu tự đảo lên để hỏi, không cần 'do'.")]),
+
+"gram_conditional_zero": (
+ "Điều kiện loại 0 nói về sự thật luôn đúng: cả hai vế đều hiện tại đơn. Người "
+ "Việt hay chèn 'will' vào vế sau vì 'thì' trong tiếng Việt nghe như hệ quả tương lai.",
+ "Zero conditional: present simple in both clauses, for general truths.",
+ [("If you heat water to 100 degrees, it will boil.",
+   "If you heat water to 100 degrees, it boils.",
+   "Sự thật khoa học luôn đúng thì cả hai vế hiện tại đơn."),
+  ("If the light is red, you will stop.", "If the light is red, you stop.",
+   "Quy tắc chung, không phải dự đoán một lần."),
+  ("When the machine will overheat, it shuts down.",
+   "When the machine overheats, it shuts down.",
+   "Mệnh đề 'when' chỉ điều kiện cũng không dùng 'will'."),
+  ("If ice melts, it became water.", "If ice melts, it becomes water.",
+   "Không trộn thì quá khứ vào điều kiện loại 0.")]),
+
+"gram_conditional_second": (
+ "Điều kiện loại 2 nói về tình huống KHÔNG có thật ở hiện tại: if + quá khứ đơn, "
+ "vế chính would + nguyên thể. Tiếng Việt không đổi dạng động từ để đánh dấu 'giả "
+ "định', chỉ dùng 'nếu ... thì', nên người học dùng hiện tại và mất hẳn sắc thái.",
+ "Second conditional: past simple in the if-clause, would + infinitive in the main clause.",
+ [("If I have more time, I would learn Japanese.",
+   "If I had more time, I would learn Japanese.",
+   "Vế 'if' phải là quá khứ đơn để đánh dấu điều không có thật."),
+  ("If I would be you, I would accept the offer.",
+   "If I were you, I would accept the offer.",
+   "Không dùng 'would' trong vế 'if'; và 'were' là dạng giả định chuẩn."),
+  ("If she studied harder, she will pass.", "If she studied harder, she would pass.",
+   "Trộn loại 2 với loại 1. Vế chính phải là 'would'."),
+  ("If he was here, he would know what to do.",
+   "If he were here, he would know what to do.",
+   "Trong văn phong trang trọng dùng 'were' cho mọi ngôi.")]),
+
+"gram_conditional_third": (
+ "Điều kiện loại 3 nói về việc ĐÃ KHÔNG xảy ra trong quá khứ: if + quá khứ hoàn "
+ "thành, vế chính would have + phân từ hai. Đây là cấu trúc ba tầng, và tiếng Việt "
+ "diễn đạt trọn vẹn chỉ bằng 'giá mà ... thì đã ...'.",
+ "Third conditional: past perfect in the if-clause, would have + past participle.",
+ [("If I knew about the meeting, I would have come.",
+   "If I had known about the meeting, I would have come.",
+   "Vế 'if' phải là quá khứ hoàn thành, không phải quá khứ đơn."),
+  ("If she had left earlier, she would catch the train.",
+   "If she had left earlier, she would have caught the train.",
+   "Vế chính thiếu 'have' — nửa loại 3 nửa loại 2."),
+  ("If they would have asked, we would have helped.",
+   "If they had asked, we would have helped.",
+   "Không dùng 'would have' trong vế 'if'."),
+  ("If he had studied, he would has passed.", "If he had studied, he would have passed.",
+   "Sau 'would' luôn là 'have', không chia.")]),
+
+"gram_conditional_mixed": (
+ "Điều kiện hỗn hợp ghép hai mốc thời gian: nguyên nhân quá khứ, hệ quả hiện tại "
+ "(hoặc ngược lại). Người học nắm được loại 2 và loại 3 riêng lẻ vẫn thường không "
+ "nghĩ tới việc trộn.",
+ "Mixed conditionals combine a past condition with a present result, or the reverse.",
+ [("If I had taken that job, I would have been happier now.",
+   "If I had taken that job, I would be happier now.",
+   "Hệ quả ở HIỆN TẠI ('now') nên vế chính bỏ 'have'."),
+  ("If she was more careful, she would not have lost the file.",
+   "If she were more careful, she would not have lost the file.",
+   "Điều kiện là đặc điểm hiện tại nên dùng 'were', hệ quả ở quá khứ giữ 'would have'."),
+  ("If I would have studied medicine, I would be a doctor.",
+   "If I had studied medicine, I would be a doctor.",
+   "Vế 'if' không dùng 'would have'."),
+  ("If he had not missed the flight, he is here now.",
+   "If he had not missed the flight, he would be here now.",
+   "Hệ quả giả định vẫn cần 'would', không dùng hiện tại đơn.")]),
+
+"gram_wish_regret": (
+ "Sau 'wish' phải lùi một bậc thời gian: tiếc hiện tại thì dùng quá khứ, tiếc quá "
+ "khứ thì dùng quá khứ hoàn thành. Tiếng Việt chỉ có 'ước gì' và không lùi thì.",
+ "'wish' backshifts one step: past for present regrets, past perfect for past regrets.",
+ [("I wish I have more free time.", "I wish I had more free time.",
+   "Tiếc về hiện tại thì lùi về quá khứ đơn."),
+  ("She wishes she didn't say that yesterday.",
+   "She wishes she hadn't said that yesterday.",
+   "Tiếc về quá khứ thì lùi về quá khứ hoàn thành."),
+  ("I wish I can speak French.", "I wish I could speak French.",
+   "Khuyết thiếu cũng lùi: can thành could."),
+  ("I wish you will stop interrupting.", "I wish you would stop interrupting.",
+   "Phàn nàn về thói quen người khác dùng 'would'.")]),
+
+"gram_passive_past": (
+ "Bị động quá khứ và tương lai chỉ đổi phần 'be', phân từ hai giữ nguyên. Người "
+ "Việt hay quên 'be' hoàn toàn vì tiếng Việt đánh dấu bị động bằng 'được/bị' đứng "
+ "trước động từ mà không đổi dạng động từ.",
+ "Passive changes only the form of 'be'; the past participle stays constant.",
+ [("The report finished yesterday.", "The report was finished yesterday.",
+   "Thiếu 'be'. Báo cáo không tự hoàn thành được."),
+  ("The parcel will delivered on Monday.", "The parcel will be delivered on Monday.",
+   "Sau 'will' phải có 'be'."),
+  ("The road was repair last month.", "The road was repaired last month.",
+   "Thiếu phân từ hai."),
+  ("The results were announce by the committee.",
+   "The results were announced by the committee.",
+   "Cùng lỗi, kèm 'by' chỉ tác nhân.")]),
+
+"gram_passive_causative": (
+ "Thể sai khiến 'have/get something done' nghĩa là nhờ người khác làm. Tiếng Việt "
+ "nói 'tôi đi cắt tóc' — chủ ngữ vẫn là tôi — nên người học dịch thẳng thành 'I cut "
+ "my hair', mang nghĩa tự cắt.",
+ "'have/get + object + past participle' means arranging for someone else to do it.",
+ [("I cut my hair last week at the salon.",
+   "I had my hair cut last week at the salon.",
+   "Dịch thẳng từ 'tôi đi cắt tóc' thành ra nghĩa tự cầm kéo cắt."),
+  ("We repaired the roof by a contractor.",
+   "We had the roof repaired by a contractor.",
+   "Nhờ người khác làm thì dùng thể sai khiến."),
+  ("She got repaired her laptop.", "She got her laptop repaired.",
+   "Trật tự là have/get + TÂN NGỮ + phân từ hai."),
+  ("He had his car to be washed.", "He had his car washed.",
+   "Không dùng 'to be' trong cấu trúc này.")]),
+
+"gram_reported_statement": (
+ "Tường thuật câu kể phải đổi đại từ, trạng ngữ thời gian và thường lùi thì. Tiếng "
+ "Việt gần như chỉ đổi đại từ, giữ nguyên mọi thứ còn lại.",
+ "Reported statements shift pronouns, time expressions and usually the tense.",
+ [('He said "I am tired".', "He said he was tired.",
+   "Lùi thì từ hiện tại về quá khứ và đổi đại từ."),
+  ('She said "I will call you tomorrow".',
+   "She said she would call me the next day.",
+   "Đổi cả 'will' thành 'would' và 'tomorrow' thành 'the next day'."),
+  ("He told that he was busy.", "He told me he was busy.",
+   "'tell' bắt buộc có tân ngữ người; 'say' thì không."),
+  ("She said me she had finished.", "She said she had finished.",
+   "Lỗi đối xứng: 'say' không đi trực tiếp với tân ngữ người.")]),
+
+"gram_reported_question": (
+ "Câu hỏi tường thuật trở lại TRẬT TỰ CÂU KỂ — không đảo chủ ngữ, không dùng 'do'. "
+ "Đây là chỗ người Việt sai nhiều nhất vì vẫn giữ dạng câu hỏi.",
+ "Reported questions use statement word order, with no auxiliary 'do'.",
+ [('She asked "Where do you live?"', "She asked where I lived.",
+   "Bỏ 'do', đưa về trật tự câu kể."),
+  ("He asked me what did I want.", "He asked me what I wanted.",
+   "Giữ nguyên đảo ngữ là lỗi phổ biến nhất ở mục này."),
+  ('They asked "Are you ready?"', "They asked if I was ready.",
+   "Câu hỏi yes/no tường thuật bằng 'if' hoặc 'whether'."),
+  ("I asked her that where she was going.", "I asked her where she was going.",
+   "Không dùng 'that' khi đã có từ để hỏi.")]),
+
+"gram_relative_nondefining": (
+ "Mệnh đề quan hệ không xác định chỉ bổ sung thông tin phụ, luôn có dấu phẩy và "
+ "KHÔNG dùng 'that'. Tiếng Việt không phân biệt hai loại mệnh đề này bằng dấu câu.",
+ "Non-defining relative clauses take commas and never use 'that'.",
+ [("My brother that lives in Hue is a teacher, he is my only brother.",
+   "My brother, who lives in Hue, is a teacher.",
+   "Chỉ có một người anh nên thông tin là phụ — phải có phẩy và dùng 'who'."),
+  ("The Hoan Kiem Lake which is in Hanoi attracts many visitors.",
+   "Hoan Kiem Lake, which is in Hanoi, attracts many visitors.",
+   "Tên riêng đã xác định nên mệnh đề phải không xác định."),
+  ("Our manager, that joined last year, is leaving.",
+   "Our manager, who joined last year, is leaving.",
+   "Mệnh đề không xác định không dùng 'that'."),
+  ("She passed the exam which surprised everyone.",
+   "She passed the exam, which surprised everyone.",
+   "Thiếu phẩy làm đổi nghĩa: thành ra 'kỳ thi khiến mọi người ngạc nhiên'.")]),
+
+"gram_relative_reduced": (
+ "Mệnh đề quan hệ rút gọn bỏ đại từ quan hệ và 'be', giữ lại V-ing (chủ động) hoặc "
+ "phân từ hai (bị động). Người học thường rút sai vế hoặc rút cả khi không được.",
+ "Reduced relatives keep a participle: -ing for active, -ed for passive.",
+ [("The man who is standing there is our client.",
+   "The man standing there is our client.",
+   "Rút gọn chủ động giữ V-ing."),
+  ("The report which was written by Ha is ready.",
+   "The report written by Ha is ready.",
+   "Rút gọn bị động giữ phân từ hai."),
+  ("The people waited outside were angry.", "The people waiting outside were angry.",
+   "Rút sai vế: 'waited' làm câu thành ra hai động từ chính."),
+  ("The letter sending yesterday has arrived.",
+   "The letter sent yesterday has arrived.",
+   "Thư ĐƯỢC gửi nên phải phân từ hai.")]),
+
+"gram_infinitive_purpose": (
+ "Chỉ mục đích dùng 'to + động từ'. Người Việt hay dùng 'for + V-ing' vì tiếng "
+ "Việt nói 'để làm gì' và 'cho việc gì' gần như nhau.",
+ "Purpose is expressed with 'to + infinitive', not 'for + -ing'.",
+ [("I came here for learning English.", "I came here to learn English.",
+   "Mục đích của hành động dùng 'to + V'."),
+  ("She went to the shop for buy some milk.",
+   "She went to the shop to buy some milk.",
+   "Sau 'for' không thể là động từ nguyên thể."),
+  ("This tool is used to cutting metal.", "This tool is used to cut metal.",
+   "Sau 'to' chỉ mục đích là nguyên thể."),
+  ("He works hard for to support his family.",
+   "He works hard to support his family.",
+   "Không dùng cả 'for' lẫn 'to'.")]),
+
+"gram_gerund_as_subject": (
+ "Động từ làm chủ ngữ phải chuyển sang V-ing. Tiếng Việt để động từ nguyên dạng ở "
+ "vị trí chủ ngữ ('Đọc sách rất tốt') nên người học viết thẳng động từ nguyên thể.",
+ "A verb used as subject takes the -ing form.",
+ [("Read books is good for you.", "Reading books is good for you.",
+   "Chủ ngữ là hành động thì dùng V-ing."),
+  ("Swimming are my favourite sport.", "Swimming is my favourite sport.",
+   "Danh động từ làm chủ ngữ luôn là số ít."),
+  ("To smoke is banned in this building.", "Smoking is banned in this building.",
+   "Cả hai đều đúng ngữ pháp nhưng V-ing tự nhiên hơn hẳn ở vị trí chủ ngữ."),
+  ("I enjoy to read in the evening.", "I enjoy reading in the evening.",
+   "'enjoy' luôn đi với V-ing.")]),
+
+"gram_adj_ed_ing": (
+ "-ed mô tả CẢM GIÁC của người, -ing mô tả TÍNH CHẤT của vật gây ra cảm giác đó. "
+ "Tiếng Việt dùng một từ 'chán' cho cả hai nên đây là lỗi kinh điển.",
+ "-ed adjectives describe how someone feels; -ing adjectives describe what causes it.",
+ [("I am very boring in this class.", "I am very bored in this class.",
+   "'boring' nghĩa là bản thân người nói nhạt nhẽo — nghĩa hoàn toàn khác ý định."),
+  ("The film was very interested.", "The film was very interesting.",
+   "Phim là thứ GÂY hứng thú nên dùng -ing."),
+  ("She was surprising by the news.", "She was surprised by the news.",
+   "Người nhận cảm giác dùng -ed."),
+  ("The results were disappointed.", "The results were disappointing.",
+   "Kết quả gây thất vọng nên dùng -ing.")]),
+
+"gram_phrasal_verb_inseparable": (
+ "Cụm động từ không tách được thì tân ngữ luôn đứng SAU giới từ, kể cả khi tân ngữ "
+ "là đại từ. Tiếng Việt không có loại cấu trúc này nên phải học thuộc từng cụm.",
+ "Inseparable phrasal verbs keep the object after the particle.",
+ [("I ran my old teacher into at the station.",
+   "I ran into my old teacher at the station.",
+   "'run into' không tách được."),
+  ("She looks her younger sister after every day.",
+   "She looks after her younger sister every day.",
+   "'look after' không tách được."),
+  ("We need to deal it with immediately.", "We need to deal with it immediately.",
+   "Kể cả đại từ cũng đứng sau giới từ."),
+  ("He got the flu over quickly.", "He got over the flu quickly.",
+   "'get over' không tách được.")]),
+
+"gram_conjunction_coordinating": (
+ "Tiếng Việt cho phép 'Tuy ... nhưng ...' và 'Vì ... nên ...' đi thành cặp. Tiếng "
+ "Anh chỉ dùng MỘT liên từ cho một quan hệ — dùng cả cặp là lỗi rất dễ nhận ra.",
+ "English uses one conjunction per relationship, never a pair.",
+ [("Although it was raining, but we went out.",
+   "Although it was raining, we went out.",
+   "Dịch thẳng cặp 'Tuy ... nhưng ...'. Bỏ 'but'."),
+  ("Because he was late, so the meeting started without him.",
+   "Because he was late, the meeting started without him.",
+   "Dịch thẳng cặp 'Vì ... nên ...'. Bỏ 'so'."),
+  ("She is tired, she keeps working.", "She is tired, but she keeps working.",
+   "Ngược lại: quan hệ tương phản thì bắt buộc có liên từ."),
+  ("I like tea and I don't like coffee.", "I like tea but I don't like coffee.",
+   "Quan hệ tương phản dùng 'but', không dùng 'and'.")]),
+
+"gram_word_form_adverb": (
+ "Trạng từ tiếng Anh thường có đuôi -ly. Tiếng Việt dùng cùng một từ cho tính từ "
+ "và trạng từ ('nhanh') nên người học hay để nguyên dạng tính từ.",
+ "Most English adverbs are formed by adding -ly to the adjective.",
+ [("He drives very careful.", "He drives very carefully.",
+   "Bổ nghĩa cho động từ thì phải là trạng từ."),
+  ("She speaks English fluent.", "She speaks English fluently.",
+   "Cùng lỗi: tính từ đứng nguyên ở vị trí cần trạng từ."),
+  ("The team worked hardly all week.", "The team worked hard all week.",
+   "'hardly' nghĩa là 'hầu như không' — nghĩa ngược hẳn. Bẫy nguy hiểm nhất mục này."),
+  ("He arrived lately for the third time.", "He arrived late for the third time.",
+   "'lately' nghĩa là 'dạo gần đây', không phải 'muộn'.")]),
+
+"gram_prefix_negative": (
+ "Tiền tố phủ định (un-, in-, im-, ir-, dis-) không chọn tự do — mỗi từ gốc đi với "
+ "một tiền tố cố định. Tiếng Việt chỉ có 'không' và 'bất' nên không có gì để đối chiếu.",
+ "Negative prefixes are fixed per word and cannot be chosen freely.",
+ [("The instructions were unclear and unpossible to follow.",
+   "The instructions were unclear and impossible to follow.",
+   "'possible' đi với 'im-', không phải 'un-'."),
+  ("His answer was inpolite.", "His answer was impolite.",
+   "Trước 'p' thì 'in-' biến thành 'im-'."),
+  ("The data seems unrelevant to the question.",
+   "The data seems irrelevant to the question.",
+   "Trước 'r' thì dùng 'ir-'."),
+  ("I unagree with that conclusion.", "I disagree with that conclusion.",
+   "Động từ 'agree' đi với 'dis-'.")]),
+
+"gram_question_tag": (
+ "Câu hỏi đuôi đảo dấu so với mệnh đề chính và lặp lại đúng trợ động từ. Tiếng "
+ "Việt chỉ cần thêm 'phải không' cho mọi câu, nên người học không quen phải tính toán.",
+ "Tags reverse the polarity of the main clause and repeat its auxiliary.",
+ [("You are coming tonight, aren't you coming?",
+   "You are coming tonight, aren't you?",
+   "Đuôi chỉ gồm trợ động từ và đại từ."),
+  ("She works here, doesn't it?", "She works here, doesn't she?",
+   "Đại từ trong đuôi phải khớp chủ ngữ."),
+  ("He can't drive, can't he?", "He can't drive, can he?",
+   "Mệnh đề phủ định thì đuôi khẳng định."),
+  ("Let's start now, shall we not?", "Let's start now, shall we?",
+   "'Let's' luôn đi với 'shall we'.")]),
+
+"gram_inversion_negative": (
+ "Khi trạng từ phủ định đứng đầu câu, tiếng Anh đảo trợ động từ lên trước chủ ngữ. "
+ "Tiếng Việt đưa 'Không bao giờ' lên đầu mà trật tự phần còn lại giữ nguyên.",
+ "A fronted negative adverbial triggers subject-auxiliary inversion.",
+ [("Never I have seen such a mistake.", "Never have I seen such a mistake.",
+   "Trạng từ phủ định đứng đầu thì đảo trợ động từ."),
+  ("Rarely the company changes its policy.",
+   "Rarely does the company change its policy.",
+   "Không có trợ động từ sẵn thì mượn 'do/does/did'."),
+  ("Not only she speaks French, but also German.",
+   "Not only does she speak French, but also German.",
+   "'Not only' đầu câu cũng gây đảo ngữ."),
+  ("Under no circumstances you should open the door.",
+   "Under no circumstances should you open the door.",
+   "Cụm giới từ mang nghĩa phủ định cũng gây đảo ngữ.")]),
 }
