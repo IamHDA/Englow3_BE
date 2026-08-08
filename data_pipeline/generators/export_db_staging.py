@@ -201,6 +201,66 @@ def export_grammar() -> tuple[list[dict], list[dict], list[dict], list[dict], li
     return gps, gp_concepts, items, options, item_concepts
 
 
+def export_speaking_writing() -> tuple[list[dict], list[dict], list[dict],
+                                       list[dict], list[dict]]:
+    """Rubric, speaking task, writing task và bảng nối concept.
+
+    Rubric nằm TRONG cả hai batch nên phải khử trùng theo rubric_id — nạp hai
+    lần vào Postgres là vi phạm khoá chính ngay lệnh COPY thứ hai.
+    """
+    d = ROOT / "output" / "speaking_writing"
+    rubrics, dims, sp_tasks, wr_tasks, task_concepts = [], [], [], [], []
+    seen_rubrics: set[str] = set()
+
+    if not d.exists():
+        return rubrics, dims, sp_tasks, wr_tasks, task_concepts
+
+    for p in sorted(d.glob("*.json")):
+        if p.name.startswith("."):
+            continue
+        data = json.loads(p.read_text(encoding="utf-8"))
+
+        for r in data.get("rubrics", []):
+            rid = r["rubric_id"]
+            if rid in seen_rubrics:
+                continue
+            seen_rubrics.add(rid)
+            rubrics.append({"rubric_id": rid, "name": r["name"],
+                            "version": r["version"]})
+            for dim in r["dimensions"]:
+                dims.append({
+                    "rubric_id": rid,
+                    "name": dim["name"],
+                    "weight": dim["weight"],
+                    "concept_id": dim["concept_id"],
+                    "band_descriptors": dim["band_descriptors"],
+                })
+
+        kind = "speaking" if "part_number" in (data.get("tasks") or [{}])[0] else "writing"
+        for t in data.get("tasks", []):
+            base = {
+                "task_id": t["task_id"], "prompt": t["prompt"],
+                "sample_answer_c1": t["sample_answer_c1"],
+                "rubric_ref": t["rubric_ref"],
+                "difficulty_prior": t["difficulty_prior"],
+                "review_status": t["review_status"],
+            }
+            if kind == "speaking":
+                sp_tasks.append({**base, "part_number": t["part_number"],
+                                 "prep_time_sec": t["prep_time_sec"],
+                                 "response_time_sec": t["response_time_sec"]})
+            else:
+                wr_tasks.append({**base, "task_type": t["task_type"],
+                                 "min_words": t.get("min_words"),
+                                 "max_words": t.get("max_words"),
+                                 "high_scoring_vocab": t.get("high_scoring_vocab", [])})
+            for cid in t["concept_ids"]:
+                task_concepts.append({"task_id": t["task_id"],
+                                      "task_kind": kind, "concept_id": cid})
+
+    return rubrics, dims, sp_tasks, wr_tasks, task_concepts
+
+
 def export_exams() -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
     bank_dir = ROOT / "output" / "exams" / "bank"
     sets_dir = ROOT / "output" / "exams" / "sets"
@@ -331,6 +391,13 @@ def main() -> int:
     tables["audio_assets"] = audio_assets
     tables["exam_sets"] = sets
     tables["exam_set_items"] = set_items
+
+    rubrics, rdims, sp_tasks, wr_tasks, task_concepts = export_speaking_writing()
+    tables["rubrics"] = rubrics
+    tables["rubric_dimensions"] = rdims
+    tables["speaking_tasks"] = sp_tasks
+    tables["writing_tasks"] = wr_tasks
+    tables["task_concepts"] = task_concepts
 
     tables["exam_items"] = g_items + e_items
     tables["options"] = g_options + e_options
