@@ -16,9 +16,20 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /** The only place that decides which HTTP status a broken business rule deserves. */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiErrorResponse> onDomainException(DomainException ex) {
-        return ResponseEntity.status(ex.getStatus()).body(ApiErrorResponse.of(ex.getCode(), ex.getMessage()));
+        HttpStatus status = switch (ex) {
+            case NotFoundException ignored -> HttpStatus.NOT_FOUND;
+            case ConflictException ignored -> HttpStatus.CONFLICT;
+            case BadRequestException ignored -> HttpStatus.BAD_REQUEST;
+            case ForbiddenException ignored -> HttpStatus.FORBIDDEN;
+            default -> {
+                log.error("No HTTP status mapped for {}", ex.getClass().getName());
+                yield HttpStatus.INTERNAL_SERVER_ERROR;
+            }
+        };
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
