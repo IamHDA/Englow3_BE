@@ -43,6 +43,16 @@ ACCENT_TARGET = {"US": 0.50, "UK": 0.17, "AU": 0.17, "CA": 0.17}
 findings: list[tuple[str, str]] = []      # (mức, mô tả)
 
 
+def dedup_context(g) -> str:
+    """Ngữ cảnh dùng để so trùng câu hỏi: passage với phần đọc, kịch bản audio
+    với phần nghe. Ở mức module để test chặn được hồi quy — luật này đã sai
+    hai lần (Part 6 mất 12 câu, Part 3 bị báo trùng oan)."""
+    if g.passages:
+        return "|".join(p.text[:200] for p in g.passages)
+    return g.audio.script[:200] if g.audio else ""
+
+
+
 def flag(level: str, msg: str) -> None:
     findings.append((level, msg))
 
@@ -120,9 +130,14 @@ def main() -> int:
     if dup_id:
         flag("LỖI", f"{len(dup_id)} item_id trùng — cùng nội dung bị sinh nhiều lần")
 
-    # So theo (stem + passage), không theo stem trần: Part 6 dùng chung
-    # "Chỗ trống (1)" ở nhiều đoạn khác nhau — câu khác nhau, không phải bản sao.
-    texts = [f"{q.question_text}##{'|'.join(p.text[:200] for p in g.passages)}"
+    # So theo (stem + NGỮ CẢNH), không theo stem trần. Ngữ cảnh là passage với
+    # phần đọc, và là kịch bản audio với phần nghe:
+    #   - Part 6 dùng chung "Chỗ trống (1)" ở nhiều đoạn khác nhau
+    #   - Part 3/4 dùng chung "What are the speakers discussing?" ở nhiều
+    #     hội thoại khác nhau — đúng như đề thật
+    # Cả hai đều là câu khác nhau, không phải bản sao. Lần trước đã sửa cho
+    # passage nhưng bỏ sót audio, nên Part 3 vừa bị báo trùng oan.
+    texts = [f"{q.question_text}##{dedup_context(g)}"
              for g in groups for q in g.questions if q.question_text]
     exact = [k for k, v in collections.Counter(texts).items() if v > 1]
     print(f"  question_text trùng nguyên văn: {len(exact)} chuỗi "

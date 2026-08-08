@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Part 3 batch 002 — 6 hội thoại còn lại, khép Part 3 ở 39 câu.
 
-Batch này có một hội thoại 3 người kèm bảng giá, để phủ concept
-`lc_graphic_reference` (Part 3 đề thật có 2–3 câu dạng nhìn bảng/biểu đồ).
+Đề thật có 2–3 câu Part 3 dạng "nhìn bảng/biểu đồ". Ở đây chưa làm được:
+PART_RULES cho Part 3 là 0 passage, còn hình thì phải qua `image_url` mà chưa có
+nguồn ảnh hợp pháp (blocker B6). Hội thoại cuối vì vậy đọc bảng giá thành lời —
+vẫn là câu hỏi chi tiết có thật, chỉ không phải dạng đồ hoạ.
 
     python generators/gen_listening_part3_002.py
 """
@@ -20,8 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from authoring import report_bias  # noqa: E402
 from gen_listening_part3 import build_group  # noqa: E402
 from guarded_write import guarded_write_batch  # noqa: E402
-from schemas import BatchMetadata, ExamBatch, ModuleType, Passage, QuestionType  # noqa: E402
-from schemas.enums import PassageType  # noqa: E402
+from schemas import BatchMetadata, ExamBatch, ModuleType, QuestionType  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "output" / "exams" / "bank" / "listening" / "exam_listening_part3_002.json"
@@ -244,22 +245,26 @@ M: That's more useful than a guarantee I don't believe.""", 2, [
 
 ("""W1: Before we book, I want to be clear which tier we're on. The pricing page
     charges by seat, but there's a floor.
-M:  There is. Anything under twenty seats is billed as twenty.
+M:  There is. One to nineteen seats is twenty-four pounds each, but anything
+    under twenty is billed as twenty anyway.
 W1: We're at fourteen.
-W2: Which means going up to twenty costs us nothing extra.
-M:  Correct. And it's worth knowing the next break is at fifty, where the rate
-    per seat drops again.
+W2: Which means going up to twenty costs us nothing extra — and twenty to
+    forty-nine is only eighteen a seat.
+M:  Correct. The next break is at fifty, where it drops to fifteen, and again
+    at a hundred.
 W1: We won't see fifty this year. Let's take twenty and stop worrying about
     who has an account.""", 3, [
 
- ("Look at the table. Which rate will the speakers pay per seat?",
-  Q.LC_GRAPHIC_REFERENCE, "lc_graphic_reference", 0.70, [
-  ("£18", True,
-   "Họ chốt lấy 20 chỗ, rơi vào bậc 20–49 chỗ — £18 mỗi chỗ."),
-  ("£24", False,
-   "£24 là bậc 1–19 chỗ, nhưng dưới 20 vẫn bị tính thành 20 nên bậc này không áp dụng."),
-  ("£15", False, "£15 là bậc 50–99 chỗ; họ nói năm nay không đạt tới 50."),
-  ("£12", False, "£12 là bậc từ 100 chỗ trở lên, xa hơn nữa.")]),
+ ("What rate per seat will the speakers pay?", Q.LC_DETAIL, "lc_detail",
+  0.70, [
+  ("Eighteen pounds", True,
+   "Họ chốt lấy 20 chỗ, rơi vào bậc 20–49 chỗ — mười tám bảng mỗi chỗ."),
+  ("Twenty-four pounds for each of the seats", False,
+   "Đó là bậc 1–19 chỗ, nhưng dưới 20 vẫn bị tính thành 20 nên bậc này không áp dụng."),
+  ("Fifteen pounds for each of the seats", False,
+   "Mười lăm bảng là bậc từ 50 chỗ; họ nói năm nay không đạt tới 50."),
+  ("Twelve pounds for each of the seats", False,
+   "Mười hai bảng là bậc từ 100 chỗ trở lên, còn xa hơn nữa.")]),
 
  ("What does the second woman point out?", Q.LC_DETAIL, "lc_detail", 0.60, [
   ("Taking more seats than they need costs nothing", True,
@@ -282,29 +287,11 @@ W1: We won't see fifty this year. Let's take twenty and stop worrying about
    "Không ai đề nghị thương lượng giá.")])]),
 ]
 
-# Bảng giá cho hội thoại cuối — Part 3 dạng nhìn bảng.
-PRICE_TABLE = Passage(
-    order=1, passage_type=PassageType.CHART,
-    text=("Kestrelbridge Software — annual price per seat\n"
-          "  1–19 seats      £24\n"
-          "  20–49 seats     £18\n"
-          "  50–99 seats     £15\n"
-          "  100+ seats      £12\n"
-          "Accounts below twenty seats are billed at the twenty-seat minimum."))
-
-
 def main() -> int:
     groups, idx = [], 100
     for script, spk, rows in CONVERSATIONS:
         g, idx = build_group(idx, script, spk, rows)
         groups.append(g)
-
-    # Gắn bảng giá vào hội thoại cuối, rồi dựng lại để group_id tính theo
-    # cả passage — group_id là dẫn xuất, không được sửa tay.
-    last = groups[-1].model_dump(mode="python")
-    last["passages"] = [PRICE_TABLE.model_dump(mode="python")]
-    last["group_id"] = ""
-    groups[-1] = type(groups[-1]).model_validate(last)
 
     n_q = sum(len(g.questions) for g in groups)
     print(f"Part 3 batch 002: {len(groups)} hội thoại, {n_q} câu")
@@ -312,7 +299,6 @@ def main() -> int:
         w = len(g.audio.script.split())
         if not (80 <= w <= 170):
             print(f"  ⚠ kịch bản {w} từ, ngoài 80–170")
-    print(f"  có bảng/biểu đồ: {sum(1 for g in groups if g.passages)}/{len(groups)}")
     for w in report_bias(groups):
         print(f"  ⚠ {w}")
     acc = collections.Counter(g.audio.accent.value for g in groups)
