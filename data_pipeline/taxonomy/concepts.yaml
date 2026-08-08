@@ -1318,6 +1318,66 @@
   bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.33}
   description_vi: "Câu hỏi trợ động từ và đáp án hợp lý, kể cả khi không mở đầu bằng yes/no. Part 2, 3 lựa chọn."
 
+- concept_id: lc_negative_question
+  name_en: "Responding to negative questions"
+  name_vi: "Đáp câu hỏi phủ định"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.20, p_learn: 0.15, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Haven't they arrived yet?\" — trả lời theo sự thật, không theo dấu phủ định. Part 2, 3 lựa chọn."
+
+- concept_id: lc_tag_question
+  name_en: "Responding to tag questions"
+  name_vi: "Đáp câu hỏi đuôi"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"You've met her, haven't you?\" — đuôi câu chỉ để xác nhận. Part 2, 3 lựa chọn."
+
+- concept_id: lc_alternative_question
+  name_en: "Responding to alternative questions"
+  name_vi: "Đáp câu hỏi lựa chọn"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.20, p_learn: 0.15, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"A hay B?\" — không đáp bằng yes/no. Part 2, 3 lựa chọn."
+
+- concept_id: lc_request_offer
+  name_en: "Responding to requests and offers"
+  name_vi: "Đáp lời nhờ và lời mời"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.28, p_learn: 0.18, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Could you...?\", \"Would you mind...?\" — nhận, từ chối hoặc nêu điều kiện. Part 2, 3 lựa chọn."
+
+- concept_id: lc_suggestion
+  name_en: "Responding to suggestions"
+  name_vi: "Đáp lời đề nghị"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_request_offer]
+  bkt_priors: {p_init: 0.24, p_learn: 0.17, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Why don't we...?\", \"How about...?\" — là đề nghị, không phải câu hỏi lý do. Part 2, 3 lựa chọn."
+
+- concept_id: lc_statement_response
+  name_en: "Responding to statements"
+  name_vi: "Đáp lời trần thuật"
+  domain: listening
+  cefr_band: [B2, C1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_indirect_response]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "Không có câu hỏi nào cả — chỉ một nhận xét cần phản hồi hợp lý. Dạng khó nhất Part 2."
+
 - concept_id: lc_indirect_response
   name_en: "Indirect responses"
   name_vi: "Đáp gián tiếp"

@@ -146,13 +146,24 @@ def main() -> int:
     # ---------- D. Thiên lệch ----------
     hdr("D. THIÊN LỆCH THỐNG KÊ")
     n = len(items)
-    pos = collections.Counter(next(o.label for o in q.options if o.is_correct) for q in items)
-    print("  B-1 vị trí đáp án đúng: " +
-          "  ".join(f"{k}={pos[k]} ({pos[k]/n*100:.0f}%)" for k in "ABCD"))
-    for k in "ABCD":
-        share = pos[k] / n
-        if share and not (0.20 <= share <= 0.30):
-            flag("CẢNH BÁO", f"B-1: nhãn {k} chiếm {share*100:.0f}%, ngoài 20–30%")
+    # Tách theo SỐ LỰA CHỌN. Part 2 chỉ có 3 phương án nên không bao giờ có D;
+    # gộp chung với câu 4 lựa chọn thì D luôn bị kéo xuống dưới 20% một cách
+    # giả tạo và audit sẽ báo động nhầm. Ngưỡng cũng khác nhau: đều tay là 25%
+    # với 4 lựa chọn nhưng 33% với 3 lựa chọn.
+    for k_opt, labels, lo, hi in ((3, "ABC", 0.27, 0.40), (4, "ABCD", 0.20, 0.30)):
+        subset = [q for q in items if len(q.options) == k_opt]
+        if not subset:
+            continue
+        m = len(subset)
+        pos = collections.Counter(
+            next(o.label for o in q.options if o.is_correct) for q in subset)
+        print(f"  B-1 vị trí đáp án đúng ({k_opt} lựa chọn, {m} câu): " +
+              "  ".join(f"{k}={pos[k]} ({pos[k]/m*100:.0f}%)" for k in labels))
+        for k in labels:
+            share = pos[k] / m
+            if not (lo <= share <= hi):
+                flag("CẢNH BÁO", f"B-1 ({k_opt} lựa chọn): nhãn {k} chiếm "
+                                 f"{share*100:.0f}%, ngoài {lo*100:.0f}–{hi*100:.0f}%")
 
     longest = sum(1 for q in items if max(q.options, key=lambda o: len(o.text)).is_correct)
     print(f"  B-2 đáp án đúng dài nhất: {longest}/{n} ({longest/n*100:.0f}%)")
