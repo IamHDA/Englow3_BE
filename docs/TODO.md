@@ -1,13 +1,13 @@
 # TODO — Englow3 Data Pipeline
 
-**Cập nhật:** 2026-08-06 22:00 · **Nhánh:** `feat/english-data-pipeline-phase1`
+**Cập nhật:** 2026-08-08 · **Nhánh:** `feat/english-data-pipeline-phase1`
 Nguồn chân lý: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) · Quyết định đã chốt: [decisions.md](decisions.md) (D1–D8)
 
 ---
 
-## 🔴 LÀM NGAY
+## 🔴 LÀM NGAY — việc của Owner
 
-### 1. Xoay vòng khoá Groq
+### Xoay vòng khoá Groq
 
 ```
 gsk_en1Zoa…ExFRz   (khoá đầy đủ nằm trong lịch sử shell, không chép lại ở đây)
@@ -19,34 +19,58 @@ remote** (kiểm bằng `git log --all -S`). Code đã sửa đọc từ `os.env
 Vẫn phải vô hiệu hoá khoá này và tạo khoá mới: nó đã nằm plaintext trên đĩa, có thể
 đã vào shell history hoặc backup. Tốn 2 phút, rủi ro thì không đo được.
 
-### 2. Sinh lại câu ví dụ flashcard
-
-```
-diversity definition.en    88.4%  OK
-diversity examples[0].en   14.0%  ← REJECT (ngưỡng 60%)
-```
-
-3 000 thẻ có định nghĩa tốt nhưng **câu ví dụ vẫn điền khuôn** — 1 000 thẻ chỉ có
-~70 mẫu câu, mỗi mẫu dùng lại ~14 lần. Cổng `guarded_write` sẽ chặn nếu ghi lại.
-
-Sửa prompt để câu ví dụ thật sự khác nhau. **Đừng hạ ngưỡng.**
-
 ---
 
 ## Hiện trạng dữ liệu
 
+Toàn bộ đây là nội dung **viết tay, không gọi API**. Data cũ do LLM sinh hàng loạt đã
+bị loại vào `rejects/` vì rỗng nội dung (xem "Bài học" ở cuối).
+
 | Hạng mục | Số lượng | Trạng thái |
 |---|---:|---|
-| Concept taxonomy | 171 (150 lá) | ✅ |
-| Seed từ vựng | 3 000 | ✅ |
-| Flashcard | 3 000 | 🟡 định nghĩa OK, **ví dụ điền khuôn** |
-| Câu hỏi thi | 376 | ✅ 0 trùng, 0 vi phạm part rules |
-| Bộ đề | 10 | 🔴 L=10 R=46, chuẩn 100+100 |
-| Grammar point | 106 | 🟡 chưa kiểm chất lượng nội dung |
-| File MP3 | 123 | ✅ audio thật |
-| Concept lá có ≥10 item | 25/150 | 🔴 14 concept 0 item, 111 concept có 1–9 |
+| **Reading** | **100/100** | ✅ **đủ một phần thi hoàn chỉnh** |
+| — Part 5 hoàn thành câu | 30/30 | ✅ |
+| — Part 6 điền đoạn văn | 16/16 | ✅ 4 đoạn, mỗi đoạn 1 câu chèn câu |
+| — Part 7 đọc hiểu | 54/54 | ✅ 13 single, 2 double, 3 triple |
+| **Listening** | **46/100** | 🟡 đang viết |
+| — Part 1 mô tả ảnh | 0/6 | 🔴 chặn bởi B6 (nguồn ảnh) |
+| — Part 2 hỏi–đáp | 25/25 | ✅ |
+| — Part 3 hội thoại | 21/39 | 🟡 còn 6 hội thoại |
+| — Part 4 bài nói | 0/30 | 🔴 chưa bắt đầu |
+| Flashcard | 60 | 🟡 thật 100%, nhưng ít (mục tiêu 800–1 000) |
+| Grammar point | 16 | 🟡 64 lỗi L1 người Việt, 53 bài tập |
+| Speaking / Writing | 11 + 8 | ✅ kèm 2 rubric 12 chiều × 6 band |
+| Concept taxonomy | 177 (156 lá) | ✅ +6 concept lá nghe |
+| File MP3 | 123 | 🔴 **mồ côi** — TTS của data đã bị loại |
 
-**Audit: 0 LỖI, 14 CẢNH BÁO** — chạy `make gate`.
+**Audit: 0 LỖI, 3 CẢNH BÁO** — chạy `make gate`. Test: **66 xanh**.
+
+Chỉ số thiên lệch trên toàn bộ 125 câu hiện có:
+
+```
+B-1 (4 lựa chọn, 100 câu)  A=26% B=25% C=25% D=24%   ✅
+B-1 (3 lựa chọn,  25 câu)  A=36% B=32% C=32%         ✅
+B-2 đáp án đúng dài nhất   15/125 = 12%              ✅ (ngưỡng 35%)
+```
+
+---
+
+## Việc tiếp theo, theo thứ tự
+
+| # | Việc | Còn thiếu | Ghi chú |
+|---|---|---:|---|
+| 1 | **Part 3** hội thoại | 18 câu (6 hội thoại) | Đang làm dở, batch 002 |
+| 2 | **Part 4** bài nói | 30 câu (10 bài) | Thông báo, tin nhắn thoại, quảng cáo, hướng dẫn tham quan |
+| 3 | **Part 1** mô tả ảnh | 6 câu | ⛔ chặn bởi B6 |
+| 4 | Nối 123 MP3 mồ côi | — | Hoặc xoá, hoặc TTS lại theo kịch bản mới |
+| 5 | `duration_ms` từ file MP3 thật | — | Hiện null; §Phase 8 cấm khai cứng |
+| 6 | Forced alignment | — | `alignment_status` giữ `pending` cho tới khi có timestamp thật |
+| 7 | Flashcard 60 → 800 | ~740 thẻ | ⛔ chặn bởi B10 |
+| 8 | Grammar 16 → 90 concept lá | 74 | |
+| 9 | Collocation | 4 200 | ⛔ chặn bởi B9 |
+
+**91 concept lá vẫn 0 item** — BKT không cập nhật được cho những concept đó. Đây là
+cảnh báo lớn nhất còn lại và nó sẽ tự giảm khi Part 3/4 và flashcard xong.
 
 ---
 
@@ -54,49 +78,16 @@ Sửa prompt để câu ví dụ thật sự khác nhau. **Đừng hạ ngưỡn
 
 | | |
 |---|---|
-| Taxonomy + validator | 171 concept, DAG không cycle |
+| Taxonomy + validator | 177 concept, DAG không cycle |
 | Schema | 23 Pydantic model, 17 JSON Schema, DDL 21 bảng |
 | Lưới chắn đa dạng | `validators/diversity.py` — che token rồi mới đếm |
 | **Cổng ghi** | `generators/guarded_write.py` — chặn **TRƯỚC** khi ghi |
-| Sửa lỗi hàng loạt | `generators/repair_exam_bank.py` |
+| Kiểm thiên lệch | `authoring.report_bias` — B-1/B-2 in ra ngay lúc sinh |
 | Cổng chất lượng | `make gate` → `validators/audit_data.py`, exit ≠ 0 khi có LỖI |
-| Test | **64 xanh** |
 | Tầng staging | `output/_db/` — 21 file JSONL = 21 bảng |
 
 Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-part5`
-· `gen-part6` · `repair` · `gate` · `export-db` · `test`
-
----
-
-## Còn phải làm
-
-### Nội dung — nút thắt chính
-
-| Việc | Còn thiếu | Ghi chú |
-|---|---:|---|
-| Câu ví dụ flashcard | ~3 000 cặp EN/VI | Đang điền khuôn, phải sinh lại |
-| Collocation | 4 200 | Chưa chốt nguồn hợp pháp (B9) |
-| Câu Listening | ~1 400 | Để bộ đề đủ 100+100 |
-| Speaking task | 11 | Concept `sp_*` đang 0 item |
-| Writing task | 8 | Concept `wr_*` đang 0 item |
-| Rubric | 2 | Band 0–5 đủ mọi dimension |
-| Assessment prompt | 2 | Phase 10 |
-
-Khối lượng tiếng Việt không có nguồn mở — WordNet chỉ phủ ~22% tổng nội dung
-(2 796 định nghĩa EN + 2 126 ví dụ EN trên tổng 22 200 đơn vị).
-
-### Kỹ thuật
-
-- [ ] Nối `guarded_write` vào generator còn lại: `gen_toeic_reading_bank`,
-      `gen_toeic_listening_bank`, `gen_full_exam_sets`, `gen_exam_sets_clean`
-- [ ] Bảo vệ file `_001` khỏi bị ghi đè — đã mất 30 câu Part 5 viết tay một lần
-      (khôi phục được vì generator nằm trong git)
-- [ ] `duration_ms` đọc từ file MP3 thật thay vì khai cứng 8000
-- [ ] Chạy forced alignment để `alignment_status: "aligned"` là sự thật
-      (hiện 0/160 evidence_span có mốc thời gian)
-- [ ] Dọn `.flashcards_groq.checkpoint.json` khỏi `output/flashcards/` — không phải
-      batch, làm loader vấp
-- [ ] Mở rộng `LEXNAME_TOPIC` để nâng tỉ lệ gán concept ngữ nghĩa (hiện 75%)
+· `gen-part6` · `gen-part7` · `build-set` · `repair` · `gate` · `export-db` · `test`
 
 ---
 
@@ -104,11 +95,10 @@ Khối lượng tiếng Việt không có nguồn mở — WordNet chỉ phủ ~
 
 | # | Việc | Chặn |
 |---|---|---|
-| ~~B5~~ | ~~TTS engine~~ → **đã giải: Groq**, 123 MP3 thật | — |
-| B6 | Nguồn ảnh Part 1 (6 câu cần `image_url`) | Phase 8 |
+| B6 | Nguồn ảnh Part 1 (6 câu cần `image_url` hợp pháp) | Part 1, tức 6 câu cuối của Listening |
 | B9 | Nguồn collocation hợp pháp — Oxford/Macmillan có bản quyền; NLTK cần corpus phù hợp (Reuters là tin tài chính 1980s, lệch văn phong) | 4 200 cụm |
-| B10 | Giữ chỉ tiêu 3 000 từ, hay giảm còn 800–1 000 chất lượng cao? | Khối lượng toàn bộ |
-| B1 | Postgres — Owner chốt để local, chưa dựng. DDL chưa được DB nào xác nhận cú pháp | Phase 11 |
+| B10 | Giữ chỉ tiêu 3 000 flashcard, hay 800–1 000 chất lượng cao? | Khối lượng toàn bộ |
+| B1 | Postgres — Owner chốt để local, chưa dựng | Phase 11 |
 | B2 | Java 21 + Maven chưa cài | Phase 11 |
 
 ---
@@ -125,3 +115,11 @@ Khối lượng tiếng Việt không có nguồn mở — WordNet chỉ phủ ~
 6. **`git add -A` là cách nhanh nhất commit nhầm secret.** Kiểm `git diff --cached` trước khi commit.
 7. **Validator hình thức không thay được QA nội dung.** Dữ liệu hỏng vượt 100% kiểm tra
    cấu trúc — phải mở file ra đọc mới thấy nó rỗng.
+8. **Kiểm B-1/B-2 bắt được lỗi thật ở MỌI đợt nội dung, không sót đợt nào** — Part 5 dồn
+   100% đáp án ở A, Part 6 50% đáp án đúng là câu dài nhất, Part 7 44% rồi 55% rồi 41%,
+   Part 2 44%, Part 3 52%. Không có lỗi nào nhìn bằng mắt mà thấy.
+9. **Audit cũng có lỗi của nó.** B-1 từng gộp câu 3 lựa chọn (Part 2, không có nhãn D)
+   với câu 4 lựa chọn, làm D luôn tụt dưới 20% một cách giả tạo. Đã tách theo số lựa chọn.
+10. **Tự kiểm số học trong chính nội dung mình viết.** Hai lỗi lọt qua schema vì schema
+    không biết đếm: "vào làm 2/1, nộp đơn 26/5" bị tôi kết luận là đủ 6 tháng, và
+    £470 × 12 bị viết thành £8,040.
