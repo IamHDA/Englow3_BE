@@ -15,9 +15,8 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 /**
- * A single S3-compatible client/presigner shared by every module. Object key
- * naming and bucket choice per file type belong to the module that owns the
- * file, not here.
+ * A single S3-compatible client/presigner shared by every module. Object key naming and bucket choice per file type
+ * belong to the module that owns the file, not here.
  */
 @Configuration
 @EnableConfigurationProperties(S3Properties.class)
@@ -26,9 +25,7 @@ public class StorageConfig {
     @Bean
     S3Client s3Client(S3Properties properties) {
         StaticCredentialsProvider credentials = credentials(properties);
-        var builder = S3Client.builder()
-                .region(Region.of(properties.region()))
-                .credentialsProvider(credentials);
+        var builder = S3Client.builder().region(Region.of(properties.region())).credentialsProvider(credentials);
         if (StringUtils.hasText(properties.endpoint())) {
             builder.endpointOverride(URI.create(properties.endpoint()))
                     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
@@ -39,9 +36,7 @@ public class StorageConfig {
     @Bean
     S3Presigner s3Presigner(S3Properties properties) {
         StaticCredentialsProvider credentials = credentials(properties);
-        var builder = S3Presigner.builder()
-                .region(Region.of(properties.region()))
-                .credentialsProvider(credentials);
+        var builder = S3Presigner.builder().region(Region.of(properties.region())).credentialsProvider(credentials);
         if (StringUtils.hasText(properties.endpoint())) {
             builder.endpointOverride(URI.create(properties.endpoint()));
         }
@@ -49,7 +44,7 @@ public class StorageConfig {
     }
 
     private StaticCredentialsProvider credentials(S3Properties properties) {
-        return StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(properties.accessKey(), properties.secretKey()));
+        return StaticCredentialsProvider
+                .create(AwsBasicCredentials.create(properties.accessKey(), properties.secretKey()));
     }
 }

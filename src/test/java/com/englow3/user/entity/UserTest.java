@@ -16,8 +16,7 @@ class UserTest {
         User user = new User();
 
         assertThatThrownBy(() -> user.completeOnboarding(CertificateLevel.B1, false, null))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode())
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                 .isEqualTo("ONBOARDING_PURPOSE_REQUIRED");
         assertThat(user.isOnboardingCompleted()).isFalse();
     }
@@ -27,10 +26,8 @@ class UserTest {
         User user = new User();
         user.selectLearningPurposes(Set.of(1));
 
-        assertThatThrownBy(() -> user.completeOnboarding(null, false, null))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode())
-                .isEqualTo("ONBOARDING_LEVEL_REQUIRED");
+        assertThatThrownBy(() -> user.completeOnboarding(null, false, null)).isInstanceOf(ConflictException.class)
+                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ONBOARDING_LEVEL_REQUIRED");
         assertThat(user.isOnboardingCompleted()).isFalse();
     }
 
@@ -40,8 +37,7 @@ class UserTest {
         user.selectLearningPurposes(Set.of(1));
 
         assertThatThrownBy(() -> user.completeOnboarding(CertificateLevel.B1, true, null))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode())
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                 .isEqualTo("ONBOARDING_CERTIFICATE_TARGET_REQUIRED");
         assertThat(user.isOnboardingCompleted()).isFalse();
     }
@@ -61,10 +57,8 @@ class UserTest {
     void rejectsAnEmptyLearningPurposeSelection() {
         User user = new User();
 
-        assertThatThrownBy(() -> user.selectLearningPurposes(Set.of()))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode())
-                .isEqualTo("ONBOARDING_PURPOSE_REQUIRED");
+        assertThatThrownBy(() -> user.selectLearningPurposes(Set.of())).isInstanceOf(ConflictException.class)
+                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ONBOARDING_PURPOSE_REQUIRED");
     }
 
     @Test

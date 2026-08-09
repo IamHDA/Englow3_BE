@@ -1,5 +1,6 @@
 package com.englow3.user.entity;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -18,8 +19,8 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 
 /**
- * Rows are created by the Supabase trigger on auth.users, never by this
- * application - so there is no factory here, only reads and updates.
+ * Rows are created by the Supabase trigger on auth.users, never by this application - so there is no factory here, only
+ * reads and updates.
  */
 @Entity
 @Table(name = "users")
@@ -54,6 +55,13 @@ public class User {
     private boolean onboardingCompleted;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "gender")
+    private Gender gender;
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "onboarding_step", nullable = false)
     private OnboardingStep onboardingStep;
 
@@ -71,6 +79,30 @@ public class User {
     protected User() {
     }
 
+    public void changeFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public void rename(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public void changeAvatar(String objectKey) {
+        this.avatarObjectKey = objectKey;
+    }
+
+    public void changeBanner(String objectKey) {
+        this.bannerObjectKey = objectKey;
+    }
+
+    public void changeGender(Gender gender) {
+        this.gender = gender;
+    }
+
+    public void changeBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
     public void selectLearningPurposes(Set<Integer> purposeIds) {
         if (purposeIds.isEmpty()) {
             throw new ConflictException("ONBOARDING_PURPOSE_REQUIRED", "At least one learning purpose is required");
@@ -85,17 +117,21 @@ public class User {
         targetSkills.addAll(skills);
     }
 
-    /** The step is a resume pointer, not a state machine - the flow branches, so the service decides what comes next. */
+    /**
+     * The step is a resume pointer, not a state machine - the flow branches, so the service decides what comes next.
+     */
     public void moveTo(OnboardingStep step) {
         this.onboardingStep = step;
     }
 
-    public void completeOnboarding(CertificateLevel currentLevel, boolean certificatePurposeSelected, String certificateType) {
+    public void completeOnboarding(CertificateLevel currentLevel, boolean certificatePurposeSelected,
+            String certificateType) {
         if (learningPurposeIds.isEmpty()) {
             throw new ConflictException("ONBOARDING_PURPOSE_REQUIRED", "At least one learning purpose is required");
         }
         if (currentLevel == null) {
-            throw new ConflictException("ONBOARDING_LEVEL_REQUIRED", "Current level must be known before finishing onboarding");
+            throw new ConflictException("ONBOARDING_LEVEL_REQUIRED",
+                    "Current level must be known before finishing onboarding");
         }
         if (certificatePurposeSelected && certificateType == null) {
             throw new ConflictException("ONBOARDING_CERTIFICATE_TARGET_REQUIRED",

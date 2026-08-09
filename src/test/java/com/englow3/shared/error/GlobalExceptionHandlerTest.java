@@ -24,8 +24,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void mapsOptimisticLockingFailureTo409() {
-        ResponseEntity<ApiErrorResponse> response =
-                handler.onConcurrentUpdate(new OptimisticLockingFailureException("stale"));
+        ResponseEntity<ApiErrorResponse> response = handler
+                .onConcurrentUpdate(new OptimisticLockingFailureException("stale"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().code()).isEqualTo("CONCURRENT_UPDATE");

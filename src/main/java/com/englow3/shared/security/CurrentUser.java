@@ -8,11 +8,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
-/**
- * Exposes only what Supabase's JWT itself carries. The internal user id and
- * business role live in the users table, owned by the user module - resolving
- * them is that module's job, not shared's.
- */
 @Component
 public class CurrentUser {
 

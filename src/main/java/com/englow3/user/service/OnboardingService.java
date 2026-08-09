@@ -13,8 +13,8 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.dto.LearningPurposeResponse;
-import com.englow3.user.dto.OnboardingStateResponse;
+import com.englow3.user.dto.response.LearningPurposeResponse;
+import com.englow3.user.dto.response.OnboardingStateResponse;
 import com.englow3.user.entity.CertificateLevel;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.LearningPurpose;
@@ -31,9 +31,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OnboardingService {
 
-    private final UserRepository users;
-    private final LearnerProfileRepository profiles;
-    private final LearningPurposeRepository learningPurposes;
+    private final UserRepository userRepo;
+    private final LearnerProfileRepository learnerProfileRepo;
+    private final LearningPurposeRepository learningPurposeRepo;
     private final CurrentUser currentUser;
 
     @Transactional(readOnly = true)
@@ -44,13 +44,13 @@ public class OnboardingService {
 
     @Transactional(readOnly = true)
     public List<LearningPurposeResponse> listLearningPurposes() {
-        return learningPurposes.findAll().stream().map(LearningPurposeResponse::from).toList();
+        return learningPurposeRepo.findAll().stream().map(LearningPurposeResponse::from).toList();
     }
 
     @Transactional
     public OnboardingStateResponse selectLearningPurposes(Set<Integer> purposeIds) {
         User user = requireCurrentUser();
-        if (learningPurposes.findAllById(purposeIds).size() != purposeIds.size()) {
+        if (learningPurposeRepo.findAllById(purposeIds).size() != purposeIds.size()) {
             throw new NotFoundException("LEARNING_PURPOSE_NOT_FOUND", "One or more learning purposes do not exist");
         }
 
@@ -94,7 +94,8 @@ public class OnboardingService {
         User user = requireCurrentUser();
         LearnerProfile profile = profileOf(user);
         if (profile.getCurrentLevel() == null) {
-            throw new ConflictException("ONBOARDING_LEVEL_REQUIRED", "The goal step opens only once the level is known");
+            throw new ConflictException("ONBOARDING_LEVEL_REQUIRED",
+                    "The goal step opens only once the level is known");
         }
         if (targetScore != null && !isCertificateLearner(user)) {
             throw new BadRequestException("TARGET_SCORE_NOT_APPLICABLE",
@@ -127,21 +128,19 @@ public class OnboardingService {
 
     private User requireCurrentUser() {
         UUID authProviderId = currentUser.authProviderId();
-        return users.findByAuthProviderId(authProviderId)
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND",
-                        "No user is linked to auth provider id %s".formatted(authProviderId)));
+        return userRepo.findByAuthProviderId(authProviderId).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND",
+                "No user is linked to auth provider id %s".formatted(authProviderId)));
     }
 
     /** The profile row is not created at signup - the first onboarding write creates it. */
     private LearnerProfile profileOf(User user) {
-        return profiles.findByUserId(user.getId())
-                .orElseGet(() -> profiles.save(LearnerProfile.forUser(user.getId())));
+        return learnerProfileRepo.findByUserId(user.getId())
+                .orElseGet(() -> learnerProfileRepo.save(LearnerProfile.forUser(user.getId())));
     }
 
     private boolean isCertificateLearner(User user) {
-        return learningPurposes.findByPurposeCode(LearningPurpose.CERTIFICATE_CODE)
-                .map(purpose -> user.getLearningPurposeIds().contains(purpose.getId()))
-                .orElse(false);
+        return learningPurposeRepo.findByPurposeCode(LearningPurpose.CERTIFICATE_CODE)
+                .map(purpose -> user.getLearningPurposeIds().contains(purpose.getId())).orElse(false);
     }
 
     private ConflictException levelAssessmentUnavailable(boolean certificateLearner) {
