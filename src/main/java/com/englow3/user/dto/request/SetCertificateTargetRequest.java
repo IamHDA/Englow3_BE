@@ -1,4 +1,4 @@
-package com.englow3.user.dto;
+package com.englow3.user.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

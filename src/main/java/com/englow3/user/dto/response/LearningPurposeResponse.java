@@ -1,4 +1,4 @@
-package com.englow3.user.dto;
+package com.englow3.user.dto.response;
 
 import com.englow3.user.entity.LearningPurpose;
 

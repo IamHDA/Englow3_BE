@@ -1,4 +1,4 @@
-package com.englow3.user.dto;
+package com.englow3.user.dto.request;
 
 import com.englow3.user.entity.CertificateLevel;
 

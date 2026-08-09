@@ -36,13 +36,8 @@ class CurrentUserTest {
     }
 
     private void authenticateAs(UUID authProviderId, String email) {
-        Jwt jwt = Jwt.withTokenValue("token")
-                .header("alg", "RS256")
-                .subject(authProviderId.toString())
-                .claim("email", email)
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(60))
-                .build();
+        Jwt jwt = Jwt.withTokenValue("token").header("alg", "RS256").subject(authProviderId.toString())
+                .claim("email", email).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 }

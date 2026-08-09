@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.englow3.user.dto.LearningPurposeResponse;
-import com.englow3.user.dto.OnboardingStateResponse;
-import com.englow3.user.dto.SelectLearningPurposesRequest;
-import com.englow3.user.dto.SelectTargetSkillsRequest;
-import com.englow3.user.dto.SetCertificateTargetRequest;
-import com.englow3.user.dto.SetCurrentLevelRequest;
-import com.englow3.user.dto.SetLearningGoalRequest;
+import com.englow3.user.dto.response.LearningPurposeResponse;
+import com.englow3.user.dto.response.OnboardingStateResponse;
+import com.englow3.user.dto.request.SelectLearningPurposesRequest;
+import com.englow3.user.dto.request.SelectTargetSkillsRequest;
+import com.englow3.user.dto.request.SetCertificateTargetRequest;
+import com.englow3.user.dto.request.SetCurrentLevelRequest;
+import com.englow3.user.dto.request.SetLearningGoalRequest;
 import com.englow3.user.service.OnboardingService;
 
 import jakarta.validation.Valid;
@@ -32,6 +32,11 @@ class OnboardingController {
     @GetMapping("/learning-purposes")
     ResponseEntity<List<LearningPurposeResponse>> learningPurposes() {
         return ResponseEntity.ok(onboardingService.listLearningPurposes());
+    }
+
+    @GetMapping("/current-state")
+    ResponseEntity<OnboardingStateResponse> currentState() {
+        return ResponseEntity.ok(onboardingService.currentState());
     }
 
     @PutMapping("/learning-purposes")

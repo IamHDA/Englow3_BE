@@ -1,5 +1,11 @@
 # Englow3 backend
 
+## Naming
+
+An injected repository is named after the repository type with a `Repo` suffix:
+`UserRepository userRepo`, `LearnerProfileRepository learnerProfileRepo` - not
+`users` or `profiles`.
+
 ## Controllers
 
 Every controller method returns `ResponseEntity<T>`, including the plain 200 cases
