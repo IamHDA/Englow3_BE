@@ -1,7 +1,9 @@
 package com.englow3.shared.error;
 
-import org.springframework.http.HttpStatus;
-
+/**
+ * A broken business rule. Carries a code and a message - never an HTTP status: turning this into a response is the web
+ * layer's job, in GlobalExceptionHandler.
+ */
 public abstract class DomainException extends RuntimeException {
 
     private final String code;
@@ -14,6 +16,4 @@ public abstract class DomainException extends RuntimeException {
     public String getCode() {
         return code;
     }
-
-    public abstract HttpStatus getStatus();
 }

@@ -8,7 +8,7 @@ create table users (
     avatar_object_key varchar(500),
     banner_object_key varchar(500),
     is_onboarding_completed boolean not null default false,
-    onboarding_step smallint not null default 0,
+    onboarding_step varchar(30) not null default 'LEARNING_PURPOSES',
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
