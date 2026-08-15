@@ -18,7 +18,7 @@ class UserTest {
         assertThatThrownBy(() -> user.completeOnboarding(CertificateLevel.B1, false, null))
                 .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                 .isEqualTo("ONBOARDING_PURPOSE_REQUIRED");
-        assertThat(user.isOnboardingCompleted()).isFalse();
+        assertThat(user.getOnboardingStep()).isNotEqualTo(OnboardingStep.COMPLETED);
     }
 
     @Test
@@ -28,7 +28,7 @@ class UserTest {
 
         assertThatThrownBy(() -> user.completeOnboarding(null, false, null)).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ONBOARDING_LEVEL_REQUIRED");
-        assertThat(user.isOnboardingCompleted()).isFalse();
+        assertThat(user.getOnboardingStep()).isNotEqualTo(OnboardingStep.COMPLETED);
     }
 
     @Test
@@ -39,7 +39,7 @@ class UserTest {
         assertThatThrownBy(() -> user.completeOnboarding(CertificateLevel.B1, true, null))
                 .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                 .isEqualTo("ONBOARDING_CERTIFICATE_TARGET_REQUIRED");
-        assertThat(user.isOnboardingCompleted()).isFalse();
+        assertThat(user.getOnboardingStep()).isNotEqualTo(OnboardingStep.COMPLETED);
     }
 
     @Test
@@ -49,7 +49,6 @@ class UserTest {
 
         user.completeOnboarding(CertificateLevel.B2, true, "IELTS");
 
-        assertThat(user.isOnboardingCompleted()).isTrue();
         assertThat(user.getOnboardingStep()).isEqualTo(OnboardingStep.COMPLETED);
     }
 

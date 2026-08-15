@@ -51,9 +51,6 @@ public class User {
     @Column(name = "banner_object_key")
     private String bannerObjectKey;
 
-    @Column(name = "is_onboarding_completed", nullable = false)
-    private boolean onboardingCompleted;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "gender")
     private Gender gender;
@@ -137,7 +134,6 @@ public class User {
             throw new ConflictException("ONBOARDING_CERTIFICATE_TARGET_REQUIRED",
                     "A certificate learner must pick which certificate to aim for");
         }
-        this.onboardingCompleted = true;
         this.onboardingStep = OnboardingStep.COMPLETED;
     }
 }

@@ -62,18 +62,17 @@ set of use cases inside this module, not a module of its own.
   3. `CURRENT_LEVEL` - self-declared, or "don't know" -> certificate branch takes the placement test (exactly once); non-certificate branch is meant to take a quiz, which does not exist yet, so it returns `QUIZ_NOT_AVAILABLE` and the learner must self-declare
   4. `LEARNING_GOAL` - only reachable once `current_level` is known. Certificate branch sets `target_score` + `target_date`; other branches set `target_date` only (no score to aim at). **Skippable** - the learner can set it later in the profile.
   5. `TARGET_SKILLS` - pick skills to improve, with a "don't know" option; after a test, recommendations are derived from the per-skill result
-  6. `COMPLETED` -> `is_onboarding_completed = true`
+  6. `COMPLETED` - the step is the only completion flag; there is no separate boolean column
 - **Why:** onboarding owns no table of its own; it only fills tables that this module must own anyway, because the same rows are edited outside onboarding (profile screen). A separate onboarding module would mean two writers on `learner_profiles` and `user_learning_purposes`. Role is not a boundary either, so admin catalog management is a controller here, not a module.
 - **Revisit if:** onboarding grows tables of its own (persisted recommendations, complex wizard state, flow variants for A/B) - that is the signal to split it out.
 
 ### Schema changes for this module (written, not yet applied)
 
-Migrations V001-V025 have run; never edit them. V026-V029 and the repeatable seed exist as files and apply on the next application start:
+Migrations V001-V027 have run; never edit them. The `target_skills` drop, the `onboarding_step varchar(30)` type and the `learning_purposes.purpose_code` unique constraint were folded back into V007 / V002 / V004 before those ran, so they have no migration of their own.
 
-- **V026** - drop `target_skills`; `user_target_skills.target_skill_id` becomes `skill varchar(20)` fed by the `TargetSkill` enum in `user/entity/`, primary key `(user_id, skill)`. Trade-off accepted: a new skill needs a deploy and there is no admin UI for the list; in exchange one table and one CRUD layer disappear.
-- **V027** - `learner_profiles.placement_attempt_id uuid references exam_attempts (id)`. One row per learner already, so one column means at most one placement attempt - no partial index, and the constraint sits in a table this module owns.
-- **V028** - `users.onboarding_step` from `smallint` to `varchar(30)`, default `LEARNING_PURPOSES`, existing `0` rows mapped to the same value. Values: `LEARNING_PURPOSES`, `CERTIFICATE_TARGET`, `CURRENT_LEVEL`, `LEARNING_GOAL`, `TARGET_SKILLS`, `COMPLETED`.
-- **V029** - unique constraint on `learning_purposes.purpose_code`, so the catalog can be seeded idempotently and `CERTIFICATE` resolves to exactly one row.
+- **V026** - `learner_profiles.placement_attempt_id uuid references exam_attempts (id)`. One row per learner already, so one column means at most one placement attempt - no partial index, and the constraint sits in a table this module owns.
+- **V027** - `users.gender` and `users.birth_date`.
+- **V028** - drop `users.is_onboarding_completed`; `onboarding_step = COMPLETED` is the single source of truth, a boolean beside it could disagree with it.
 - **R__seed_learning_purposes.sql** - repeatable seed for the catalog (`CERTIFICATE`, `COMMUNICATION`, `WORK`, `STUDY_ABROAD`, `SCHOOL`). Only `CERTIFICATE` is load-bearing (it drives the branch); the rest is placeholder content, edit the file and it re-applies.
 
 ## exam (not built yet)
