@@ -4,15 +4,16 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import com.englow3.user.entity.Gender;
+import com.englow3.user.entity.OnboardingStep;
 import com.englow3.user.entity.User;
 
 public record UserInformationResponse(UUID id, String email, String fullName, String displayName, Gender gender,
-        LocalDate birthDate, String avatarUrl, String bannerUrl) {
+        LocalDate birthDate, String avatarUrl, String bannerUrl, OnboardingStep onboardingStep) {
 
     public static UserInformationResponse of(User user, String publicBaseUrl) {
         return new UserInformationResponse(user.getId(), user.getEmail(), user.getFullName(), user.getDisplayName(),
                 user.getGender(), user.getBirthDate(), publicUrl(publicBaseUrl, user.getAvatarObjectKey()),
-                publicUrl(publicBaseUrl, user.getBannerObjectKey()));
+                publicUrl(publicBaseUrl, user.getBannerObjectKey()), user.getOnboardingStep());
     }
 
     /** The stored key is the whole path, so the URL is one concatenation - nothing is rebuilt from parts. */
