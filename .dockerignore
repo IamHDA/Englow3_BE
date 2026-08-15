@@ -1,0 +1,12 @@
+.git
+.gitignore
+.github
+.claude
+.idea
+*.iml
+target
+data_pipeline
+docs
+CLAUDE.md
+README.md
+docker-compose.yml
