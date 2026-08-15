@@ -5,4 +5,14 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 HELP.md
 .env
+.env.*
+env
+env.local
 .mcp.json
+
+# Python & Data Pipeline cache
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.checkpoints/
+data_pipeline/output/audio/
