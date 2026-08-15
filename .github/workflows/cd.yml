@@ -47,20 +47,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Option: Auto-deploy to VPS via SSH (uncomment and configure secrets on GitHub when VPS is ready)
-  # deploy:
-  #   name: Deploy to Server
-  #   needs: build-and-push
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Deploy via SSH
-  #       uses: appleboy/ssh-action@v1.0.3
-  #       with:
-  #         host: ${{ secrets.SERVER_HOST }}
-  #         username: ${{ secrets.SERVER_USER }}
-  #         key: ${{ secrets.SERVER_SSH_KEY }}
-  #         script: |
-  #           docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-  #           docker stop englow3-be || true
-  #           docker rm englow3-be || true
-  #           docker run -d --name englow3-be --restart always -p 8080:8080 --env-file /etc/englow3/.env ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+  deploy-render:
+    name: Trigger Render Deploy Hook
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ vars.RENDER_DEPLOY_HOOK_URL != '' || secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+    steps:
+      - name: Call Render Deploy Hook
+        run: |
+          DEPLOY_HOOK="${{ secrets.RENDER_DEPLOY_HOOK_URL || vars.RENDER_DEPLOY_HOOK_URL }}"
+          if [ -n "$DEPLOY_HOOK" ]; then
+            echo "Triggering Render deployment..."
+            curl -s -X POST "$DEPLOY_HOOK"
+            echo "Render deploy triggered successfully."
+          else
+            echo "No Render Deploy Hook URL provided, skipping."
+          fi
+
+  deploy-vps:
+    name: Deploy to VPS via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SERVER_HOST != '' }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            docker stop englow3-be || true
+            docker rm englow3-be || true
+            docker run -d --name englow3-be --restart always -p 8080:8080 --env-file /etc/englow3/.env ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
