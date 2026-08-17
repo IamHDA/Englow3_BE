@@ -1,7 +1,5 @@
 package com.englow3.user.service;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -13,13 +11,16 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.dto.response.LearningPurposeResponse;
-import com.englow3.user.dto.response.OnboardingStateResponse;
-import com.englow3.user.entity.CertificateLevel;
+import com.englow3.user.dto.command.SelectLearningPurposesCommand;
+import com.englow3.user.dto.command.SelectTargetSkillsCommand;
+import com.englow3.user.dto.command.SetCertificateTargetCommand;
+import com.englow3.user.dto.command.SetCurrentLevelCommand;
+import com.englow3.user.dto.command.SetLearningGoalCommand;
+import com.englow3.user.dto.result.LearningPurposeResult;
+import com.englow3.user.dto.result.OnboardingStateResult;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.LearningPurpose;
 import com.englow3.user.entity.OnboardingStep;
-import com.englow3.user.entity.TargetSkill;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.LearnerProfileRepository;
 import com.englow3.user.repository.LearningPurposeRepository;
@@ -37,31 +38,31 @@ public class OnboardingService {
     private final CurrentUser currentUser;
 
     @Transactional(readOnly = true)
-    public OnboardingStateResponse currentState() {
+    public OnboardingStateResult currentState() {
         User user = requireCurrentUser();
         return state(user, profileOf(user));
     }
 
     @Transactional(readOnly = true)
-    public List<LearningPurposeResponse> listLearningPurposes() {
-        return learningPurposeRepo.findAll().stream().map(LearningPurposeResponse::from).toList();
+    public List<LearningPurposeResult> listLearningPurposes() {
+        return learningPurposeRepo.findAll().stream().map(LearningPurposeResult::from).toList();
     }
 
     @Transactional
-    public OnboardingStateResponse selectLearningPurposes(Set<Integer> purposeIds) {
+    public OnboardingStateResult selectLearningPurposes(SelectLearningPurposesCommand command) {
         User user = requireCurrentUser();
-        if (learningPurposeRepo.findAllById(purposeIds).size() != purposeIds.size()) {
+        if (learningPurposeRepo.findAllById(command.purposeIds()).size() != command.purposeIds().size()) {
             throw new NotFoundException("LEARNING_PURPOSE_NOT_FOUND", "One or more learning purposes do not exist");
         }
 
-        user.selectLearningPurposes(purposeIds);
+        user.selectLearningPurposes(command.purposeIds());
         user.moveTo(isCertificateLearner(user) ? OnboardingStep.CERTIFICATE_TARGET : OnboardingStep.CURRENT_LEVEL);
 
         return state(user, profileOf(user));
     }
 
     @Transactional
-    public OnboardingStateResponse setCertificateTarget(String certificateType) {
+    public OnboardingStateResult setCertificateTarget(SetCertificateTargetCommand command) {
         User user = requireCurrentUser();
         if (!isCertificateLearner(user)) {
             throw new BadRequestException("CERTIFICATE_TARGET_NOT_APPLICABLE",
@@ -69,54 +70,54 @@ public class OnboardingService {
         }
 
         LearnerProfile profile = profileOf(user);
-        profile.aimAtCertificate(certificateType);
+        profile.aimAtCertificate(command.certificateType());
         user.moveTo(OnboardingStep.CURRENT_LEVEL);
 
         return state(user, profile);
     }
 
     @Transactional
-    public OnboardingStateResponse setCurrentLevel(CertificateLevel level) {
+    public OnboardingStateResult setCurrentLevel(SetCurrentLevelCommand command) {
         User user = requireCurrentUser();
-        if (level == null) {
+        if (command.level() == null) {
             throw levelAssessmentUnavailable(isCertificateLearner(user));
         }
 
         LearnerProfile profile = profileOf(user);
-        profile.declareCurrentLevel(level);
+        profile.declareCurrentLevel(command.level());
         user.moveTo(OnboardingStep.LEARNING_GOAL);
 
         return state(user, profile);
     }
 
     @Transactional
-    public OnboardingStateResponse setLearningGoal(BigDecimal targetScore, LocalDate targetDate) {
+    public OnboardingStateResult setLearningGoal(SetLearningGoalCommand command) {
         User user = requireCurrentUser();
         LearnerProfile profile = profileOf(user);
         if (profile.getCurrentLevel() == null) {
             throw new ConflictException("ONBOARDING_LEVEL_REQUIRED",
                     "The goal step opens only once the level is known");
         }
-        if (targetScore != null && !isCertificateLearner(user)) {
+        if (command.targetScore() != null && !isCertificateLearner(user)) {
             throw new BadRequestException("TARGET_SCORE_NOT_APPLICABLE",
                     "Only a certificate learner has a score to aim at");
         }
 
-        profile.setGoal(targetScore, targetDate);
+        profile.setGoal(command.certificateType(), command.targetScore(), command.targetDate());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
 
         return state(user, profile);
     }
 
     @Transactional
-    public OnboardingStateResponse selectTargetSkills(Set<TargetSkill> skills) {
+    public OnboardingStateResult selectTargetSkills(SelectTargetSkillsCommand command) {
         User user = requireCurrentUser();
-        user.selectTargetSkills(skills == null ? Set.of() : skills);
+        user.selectTargetSkills(command.skills() == null ? Set.of() : command.skills());
         return state(user, profileOf(user));
     }
 
     @Transactional
-    public OnboardingStateResponse complete() {
+    public OnboardingStateResult complete() {
         User user = requireCurrentUser();
         LearnerProfile profile = profileOf(user);
 
@@ -151,7 +152,7 @@ public class OnboardingService {
                         "The levelling quiz is not implemented yet - declare a level for now");
     }
 
-    private OnboardingStateResponse state(User user, LearnerProfile profile) {
-        return OnboardingStateResponse.of(user, profile, isCertificateLearner(user));
+    private OnboardingStateResult state(User user, LearnerProfile profile) {
+        return OnboardingStateResult.of(user, profile, isCertificateLearner(user));
     }
 }

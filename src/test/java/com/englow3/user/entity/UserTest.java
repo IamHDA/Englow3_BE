@@ -47,7 +47,7 @@ class UserTest {
         User user = new User();
         user.selectLearningPurposes(Set.of(1, 2));
 
-        user.completeOnboarding(CertificateLevel.B2, true, "IELTS");
+        user.completeOnboarding(CertificateLevel.B2, true, CertificateType.IELTS_GENERAL);
 
         assertThat(user.getOnboardingStep()).isEqualTo(OnboardingStep.COMPLETED);
     }
