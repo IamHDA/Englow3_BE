@@ -122,7 +122,7 @@ public class User {
     }
 
     public void completeOnboarding(CertificateLevel currentLevel, boolean certificatePurposeSelected,
-            String certificateType) {
+            CertificateType certificateType) {
         if (learningPurposeIds.isEmpty()) {
             throw new ConflictException("ONBOARDING_PURPOSE_REQUIRED", "At least one learning purpose is required");
         }

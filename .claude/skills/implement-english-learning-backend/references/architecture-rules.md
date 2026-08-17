@@ -18,12 +18,18 @@
 
 `controller -> service -> repository`. Dependencies point one way only.
 
-- **Controller** - HTTP only. Parse the request, call one service method, map to a response record. No business logic, no transaction, no repository access.
-- **Service** - orchestration and the transaction boundary. Loads entities, calls their methods, coordinates with other modules' services, maps to records.
+- **Controller** - HTTP only. Maps the request DTO to a command, calls one service method, maps the returned result to a response record. No business logic, no transaction, no repository access.
+- **Service** - orchestration and the transaction boundary. Takes a command (or nothing, when the use case has no input), loads entities, calls their methods, coordinates with other modules' services, and returns a result. Never takes a request DTO or returns a response record directly.
 - **Repository** - Spring Data interfaces and projections. Nothing else.
 - **Entity** - state plus the rules that protect it.
 
-There is intentionally no separate domain model and no port/adapter tier. The entity is the model. Persistence ignorance is a Clean Architecture goal, not a requirement here, and the mapping layer it demands is a common source of subtle bugs around versions, detached instances, and child collections.
+`command` and `result` are plain records owned by the module (`dto/command`, `dto/result`), distinct from the web-facing `dto/request` / `dto/response`:
+
+- A **command** carries no validation annotations - those belong on the request record, and are already enforced by `@Valid` before the controller builds the command.
+- A **result** carries raw data, not display-ready values - building a URL from an object key, for instance, is the response's job, not the result's.
+- Skip the command when a use case takes no input (`complete()`, `me()`); skip introducing a new command/result pair for a one-off method that already takes two or three plain values - destructuring in the controller is enough until the list grows unwieldy.
+
+This is not a move to full hexagonal architecture: there is still no separate domain model, no repository ports/interfaces beyond Spring Data, and the entity is still the JPA-mapped model directly. The only boundary this draws is between "what HTTP sends and receives" and "what the service takes and returns", so a service is callable and testable without constructing a validated web request, and the JSON contract can change without touching a service signature.
 
 State this as a decision if asked, not as something unfinished.
 

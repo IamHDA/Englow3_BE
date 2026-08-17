@@ -67,7 +67,7 @@ public class Exam {
 }
 ```
 
-**Service** - transaction, orchestration, mapping:
+**Service** - transaction, orchestration, mapping to a result:
 
 ```java
 @Service
@@ -78,20 +78,20 @@ public class ExamService {
     private final CurrentUser currentUser;
 
     @Transactional
-    public ExamResponse publish(UUID examId) {
-        Exam exam = exams.findById(examId)
-                .orElseThrow(() -> new ExamNotFoundException(examId));
+    public ExamResult publish(PublishExamCommand command) {
+        Exam exam = exams.findById(command.examId())
+                .orElseThrow(() -> new ExamNotFoundException(command.examId()));
 
         exam.publish(currentUser.requireId(), Instant.now());
 
-        return ExamResponse.from(exam);   // still inside the transaction
+        return ExamResult.from(exam);   // still inside the transaction
     }
 }
 ```
 
 No `save()` call: the entity is managed, so the change flushes at commit. Calling `save()` on an already-managed entity is harmless but adds nothing.
 
-**Controller** - HTTP only:
+**Controller** - HTTP only, maps request to command and result to response:
 
 ```java
 @RestController
@@ -102,19 +102,26 @@ class AdminExamController {
     private final ExamService examService;
 
     @PostMapping("/{id}/publish")
-    ExamResponse publish(@PathVariable UUID id) {
-        return examService.publish(id);
+    ResponseEntity<ExamResponse> publish(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamResponse.from(examService.publish(new PublishExamCommand(id))));
     }
 }
 ```
 
-**Response record** - mapping as a static factory, no mapper class:
+A command with a single field that already comes from a `@PathVariable` (nothing to destructure from a request body) is still worth it once the service needs to stay decoupled from `@PathVariable`/`@RequestBody` - skip it only for use cases with no input at all.
+
+**Result and response records** - mapping as static factories, no mapper class. The result carries raw entity data; the response is what the client actually sees:
 
 ```java
+public record ExamResult(UUID id, String title, ExamStatus status, Instant publishedAt) {
+    public static ExamResult from(Exam exam) {
+        return new ExamResult(exam.getId(), exam.getTitle(), exam.getStatus(), exam.getPublishedAt());
+    }
+}
+
 public record ExamResponse(UUID id, String title, String status, Instant publishedAt) {
-    public static ExamResponse from(Exam exam) {
-        return new ExamResponse(exam.getId(), exam.getTitle(),
-                                exam.getStatus().name(), exam.getPublishedAt());
+    public static ExamResponse from(ExamResult result) {
+        return new ExamResponse(result.id(), result.title(), result.status().name(), result.publishedAt());
     }
 }
 ```
@@ -131,11 +138,11 @@ public class ExamCategoryService {
     private final ExamCategoryRepository categories;
 
     @Transactional
-    public CategoryResponse rename(UUID id, String name) {
-        ExamCategory category = categories.findById(id)
-                .orElseThrow(() -> new CategoryNotFoundException(id));
-        category.setName(name);           // setters are fine here
-        return CategoryResponse.from(category);
+    public CategoryResult rename(RenameCategoryCommand command) {
+        ExamCategory category = categories.findById(command.id())
+                .orElseThrow(() -> new CategoryNotFoundException(command.id()));
+        category.setName(command.name());   // setters are fine here
+        return CategoryResult.from(category);
     }
 }
 ```
@@ -194,7 +201,7 @@ Ask the owning module; never touch its tables.
 
 ```java
 @Transactional(readOnly = true)
-public List<AttemptResponse> listAttempts(UUID examId) {
+public List<AttemptResult> listAttempts(UUID examId) {
     List<ExamAttempt> attempts = attempts.findByExamId(examId);
 
     Set<UUID> learnerIds = attempts.stream()
@@ -204,7 +211,7 @@ public List<AttemptResponse> listAttempts(UUID examId) {
     Map<UUID, LearnerSummary> learners = learnerService.findSummaries(learnerIds);  // one call
 
     return attempts.stream()
-            .map(a -> AttemptResponse.from(a, learners.get(a.getLearnerId())))
+            .map(a -> AttemptResult.from(a, learners.get(a.getLearnerId())))
             .toList();
 }
 ```

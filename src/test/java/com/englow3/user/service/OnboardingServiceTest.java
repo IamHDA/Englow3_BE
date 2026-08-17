@@ -22,7 +22,12 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.user.dto.command.SelectLearningPurposesCommand;
+import com.englow3.user.dto.command.SetCertificateTargetCommand;
+import com.englow3.user.dto.command.SetCurrentLevelCommand;
+import com.englow3.user.dto.command.SetLearningGoalCommand;
 import com.englow3.user.entity.CertificateLevel;
+import com.englow3.user.entity.CertificateType;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.LearningPurpose;
 import com.englow3.user.entity.OnboardingStep;
@@ -90,7 +95,7 @@ class OnboardingServiceTest {
         when(learningPurposeRepo.findAllById(purposeIds)).thenReturn(List.of(mock(LearningPurpose.class)));
         when(user.getLearningPurposeIds()).thenReturn(purposeIds);
 
-        service.selectLearningPurposes(purposeIds);
+        service.selectLearningPurposes(new SelectLearningPurposesCommand(purposeIds));
 
         verify(user).selectLearningPurposes(purposeIds);
         verify(user).moveTo(OnboardingStep.CERTIFICATE_TARGET);
@@ -102,7 +107,7 @@ class OnboardingServiceTest {
         when(learningPurposeRepo.findAllById(purposeIds)).thenReturn(List.of(mock(LearningPurpose.class)));
         when(user.getLearningPurposeIds()).thenReturn(purposeIds);
 
-        service.selectLearningPurposes(purposeIds);
+        service.selectLearningPurposes(new SelectLearningPurposesCommand(purposeIds));
 
         verify(user).moveTo(OnboardingStep.CURRENT_LEVEL);
     }
@@ -112,7 +117,8 @@ class OnboardingServiceTest {
         Set<Integer> purposeIds = Set.of(404);
         when(learningPurposeRepo.findAllById(purposeIds)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.selectLearningPurposes(purposeIds)).isInstanceOf(NotFoundException.class)
+        assertThatThrownBy(() -> service.selectLearningPurposes(new SelectLearningPurposesCommand(purposeIds)))
+                .isInstanceOf(NotFoundException.class)
                 .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("LEARNING_PURPOSE_NOT_FOUND");
         verify(user, never()).selectLearningPurposes(anySet());
     }
@@ -121,7 +127,8 @@ class OnboardingServiceTest {
     void refusesACertificateTargetFromALearnerNotOnThatBranch() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        assertThatThrownBy(() -> service.setCertificateTarget("IELTS")).isInstanceOf(BadRequestException.class)
+        assertThatThrownBy(() -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS_GENERAL)))
+                .isInstanceOf(BadRequestException.class)
                 .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
     }
 
@@ -129,7 +136,8 @@ class OnboardingServiceTest {
     void reportsThatTheQuizIsNotAvailableWhenANonCertificateLearnerDoesNotKnowTheirLevel() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        assertThatThrownBy(() -> service.setCurrentLevel(null)).isInstanceOf(ConflictException.class)
+        assertThatThrownBy(() -> service.setCurrentLevel(new SetCurrentLevelCommand(null)))
+                .isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("QUIZ_NOT_AVAILABLE");
     }
 
@@ -137,7 +145,8 @@ class OnboardingServiceTest {
     void reportsThatThePlacementTestIsNotAvailableWhenACertificateLearnerDoesNotKnowTheirLevel() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
 
-        assertThatThrownBy(() -> service.setCurrentLevel(null)).isInstanceOf(ConflictException.class)
+        assertThatThrownBy(() -> service.setCurrentLevel(new SetCurrentLevelCommand(null)))
+                .isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("PLACEMENT_NOT_AVAILABLE");
     }
 
@@ -145,7 +154,7 @@ class OnboardingServiceTest {
     void movesToTheGoalStepOnceALevelIsDeclared() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        service.setCurrentLevel(CertificateLevel.B1);
+        service.setCurrentLevel(new SetCurrentLevelCommand(CertificateLevel.B1));
 
         verify(user).moveTo(OnboardingStep.LEARNING_GOAL);
     }
@@ -154,7 +163,8 @@ class OnboardingServiceTest {
     void refusesTheGoalStepBeforeTheLevelIsKnown() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        assertThatThrownBy(() -> service.setLearningGoal(null, null)).isInstanceOf(ConflictException.class)
+        assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(null, null, null)))
+                .isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ONBOARDING_LEVEL_REQUIRED");
     }
 
@@ -163,7 +173,8 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
         profile.declareCurrentLevel(CertificateLevel.B1);
 
-        assertThatThrownBy(() -> service.setLearningGoal(new BigDecimal("7.0"), LocalDate.now().plusMonths(6)))
+        assertThatThrownBy(() -> service
+                .setLearningGoal(new SetLearningGoalCommand(null, new BigDecimal("7.0"), LocalDate.now().plusMonths(6))))
                 .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                 .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
     }
@@ -172,10 +183,10 @@ class OnboardingServiceTest {
     void handsTheCompletionRuleTheLevelAndCertificateItMustJudge() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
         profile.declareCurrentLevel(CertificateLevel.B2);
-        profile.aimAtCertificate("IELTS");
+        profile.aimAtCertificate(CertificateType.IELTS_GENERAL);
 
         service.complete();
 
-        verify(user).completeOnboarding(CertificateLevel.B2, true, "IELTS");
+        verify(user).completeOnboarding(CertificateLevel.B2, true, CertificateType.IELTS_GENERAL);
     }
 }
