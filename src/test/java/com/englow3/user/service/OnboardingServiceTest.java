@@ -118,8 +118,8 @@ class OnboardingServiceTest {
         when(learningPurposeRepo.findAllById(purposeIds)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.selectLearningPurposes(new SelectLearningPurposesCommand(purposeIds)))
-                .isInstanceOf(NotFoundException.class)
-                .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("LEARNING_PURPOSE_NOT_FOUND");
+                .isInstanceOf(NotFoundException.class).extracting(e -> ((NotFoundException) e).getCode())
+                .isEqualTo("LEARNING_PURPOSE_NOT_FOUND");
         verify(user, never()).selectLearningPurposes(anySet());
     }
 
@@ -127,9 +127,10 @@ class OnboardingServiceTest {
     void refusesACertificateTargetFromALearnerNotOnThatBranch() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        assertThatThrownBy(() -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS_GENERAL)))
-                .isInstanceOf(BadRequestException.class)
-                .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
+        assertThatThrownBy(
+                () -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS_GENERAL)))
+                        .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                        .isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
     }
 
     @Test
@@ -137,8 +138,8 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
         assertThatThrownBy(() -> service.setCurrentLevel(new SetCurrentLevelCommand(null)))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("QUIZ_NOT_AVAILABLE");
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("QUIZ_NOT_AVAILABLE");
     }
 
     @Test
@@ -146,8 +147,8 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
 
         assertThatThrownBy(() -> service.setCurrentLevel(new SetCurrentLevelCommand(null)))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("PLACEMENT_NOT_AVAILABLE");
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("PLACEMENT_NOT_AVAILABLE");
     }
 
     @Test
@@ -164,8 +165,8 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
         assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(null, null, null)))
-                .isInstanceOf(ConflictException.class)
-                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ONBOARDING_LEVEL_REQUIRED");
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("ONBOARDING_LEVEL_REQUIRED");
     }
 
     @Test
@@ -173,10 +174,10 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
         profile.declareCurrentLevel(CertificateLevel.B1);
 
-        assertThatThrownBy(() -> service
-                .setLearningGoal(new SetLearningGoalCommand(null, new BigDecimal("7.0"), LocalDate.now().plusMonths(6))))
-                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
-                .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
+        assertThatThrownBy(() -> service.setLearningGoal(
+                new SetLearningGoalCommand(null, new BigDecimal("7.0"), LocalDate.now().plusMonths(6))))
+                        .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                        .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
     }
 
     @Test
