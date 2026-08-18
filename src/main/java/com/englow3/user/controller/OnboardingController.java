@@ -48,21 +48,21 @@ class OnboardingController {
     @PutMapping("/learning-purposes")
     ResponseEntity<OnboardingStateResponse> selectLearningPurposes(
             @Valid @RequestBody SelectLearningPurposesRequest request) {
-        return ResponseEntity.ok(OnboardingStateResponse
-                .from(onboardingService.selectLearningPurposes(new SelectLearningPurposesCommand(request.purposeIds()))));
+        return ResponseEntity.ok(OnboardingStateResponse.from(
+                onboardingService.selectLearningPurposes(new SelectLearningPurposesCommand(request.purposeIds()))));
     }
 
     @PutMapping("/certificate-target")
     ResponseEntity<OnboardingStateResponse> setCertificateTarget(
             @Valid @RequestBody SetCertificateTargetRequest request) {
-        return ResponseEntity.ok(OnboardingStateResponse
-                .from(onboardingService.setCertificateTarget(new SetCertificateTargetCommand(request.certificateType()))));
+        return ResponseEntity.ok(OnboardingStateResponse.from(
+                onboardingService.setCertificateTarget(new SetCertificateTargetCommand(request.certificateType()))));
     }
 
     @PutMapping("/current-level")
     ResponseEntity<OnboardingStateResponse> setCurrentLevel(@Valid @RequestBody SetCurrentLevelRequest request) {
-        return ResponseEntity
-                .ok(OnboardingStateResponse.from(onboardingService.setCurrentLevel(new SetCurrentLevelCommand(request.level()))));
+        return ResponseEntity.ok(OnboardingStateResponse
+                .from(onboardingService.setCurrentLevel(new SetCurrentLevelCommand(request.level()))));
     }
 
     @PutMapping("/learning-goal")
