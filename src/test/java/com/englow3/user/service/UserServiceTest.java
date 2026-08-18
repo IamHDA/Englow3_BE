@@ -25,23 +25,21 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.englow3.user.dto.request.UpdateUserBasicInfoRequest;
-import com.englow3.user.dto.response.UserInformationResponse;
+import com.englow3.user.dto.command.UpdateUserBasicInfoCommand;
+import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.Gender;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
 
 class UserServiceTest {
 
-    private static final String PUBLIC_BASE_URL = "http://localhost:9000/images";
     private static final String BUCKET = "images";
 
     private final UserRepository userRepo = mock(UserRepository.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
     private final ObjectStorageClient objectStorageClient = mock(ObjectStorageClient.class);
 
-    private final UserService service = new UserService(userRepo, currentUser, objectStorageClient, BUCKET,
-            PUBLIC_BASE_URL);
+    private final UserService service = new UserService(userRepo, currentUser, objectStorageClient, BUCKET);
 
     private final UUID userId = UUID.randomUUID();
     private final User user = mock(User.class);
@@ -68,28 +66,17 @@ class UserServiceTest {
         when(user.getGender()).thenReturn(null);
         when(user.getBirthDate()).thenReturn(null);
 
-        UserInformationResponse response = service.me();
+        UserInformationResult result = service.me();
 
-        assertThat(response.gender()).isNull();
-        assertThat(response.birthDate()).isNull();
-    }
-
-    @Test
-    void buildsImageUrlsByAppendingTheStoredKeyToTheBase() {
-        when(user.getAvatarObjectKey()).thenReturn("users/" + userId + "/avatar/abc.png");
-        when(user.getBannerObjectKey()).thenReturn(null);
-
-        UserInformationResponse response = service.me();
-
-        assertThat(response.avatarUrl()).isEqualTo(PUBLIC_BASE_URL + "/users/" + userId + "/avatar/abc.png");
-        assertThat(response.bannerUrl()).isNull();
+        assertThat(result.gender()).isNull();
+        assertThat(result.birthDate()).isNull();
     }
 
     @Test
     void handsEveryBasicFieldToTheEntityWithoutGuessingWhatChanged() {
         LocalDate birthDate = LocalDate.of(2001, 3, 15);
 
-        service.updateBasicInfo(new UpdateUserBasicInfoRequest("Nguyen Van A", "A", Gender.MALE, birthDate));
+        service.updateBasicInfo(new UpdateUserBasicInfoCommand("Nguyen Van A", "A", Gender.MALE, birthDate));
 
         verify(user).changeFullName("Nguyen Van A");
         verify(user).rename("A");

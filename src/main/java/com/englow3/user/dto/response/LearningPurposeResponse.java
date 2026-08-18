@@ -1,10 +1,10 @@
 package com.englow3.user.dto.response;
 
-import com.englow3.user.entity.LearningPurpose;
+import com.englow3.user.dto.result.LearningPurposeResult;
 
 public record LearningPurposeResponse(Integer id, String purposeCode, String displayName) {
 
-    public static LearningPurposeResponse from(LearningPurpose purpose) {
-        return new LearningPurposeResponse(purpose.getId(), purpose.getPurposeCode(), purpose.getDisplayName());
+    public static LearningPurposeResponse from(LearningPurposeResult result) {
+        return new LearningPurposeResponse(result.id(), result.purposeCode(), result.displayName());
     }
 }

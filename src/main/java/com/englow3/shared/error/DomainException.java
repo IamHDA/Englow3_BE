@@ -4,7 +4,8 @@ package com.englow3.shared.error;
  * A broken business rule. Carries a code and a message - never an HTTP status: turning this into a response is the web
  * layer's job, in GlobalExceptionHandler.
  */
-public abstract class DomainException extends RuntimeException {
+public abstract sealed class DomainException extends RuntimeException
+        permits NotFoundException, ConflictException, BadRequestException, ForbiddenException {
 
     private final String code;
 

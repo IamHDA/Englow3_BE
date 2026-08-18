@@ -1,7 +1,7 @@
 package com.englow3.user.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import com.englow3.user.entity.CertificateType;
+import jakarta.validation.constraints.NotNull;
 
-public record SetCertificateTargetRequest(@NotBlank @Size(max = 20) String certificateType) {
+public record SetCertificateTargetRequest(@NotNull CertificateType certificateType) {
 }
