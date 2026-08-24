@@ -36,8 +36,10 @@ class AiJobStateService {
     }
 
     @Transactional
-    public void fail(UUID jobId, String code, String safeMessage, boolean retryable) {
-        require(jobId).fail(code, safeMessage, retryable, Instant.now());
+    public AiJobStatus fail(UUID jobId, String code, String safeMessage, boolean retryable) {
+        AiJob job = require(jobId);
+        job.fail(code, safeMessage, retryable, Instant.now());
+        return job.getStatus();
     }
 
     private AiJob require(UUID jobId) {

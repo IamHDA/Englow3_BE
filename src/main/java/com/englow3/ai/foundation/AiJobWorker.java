@@ -54,10 +54,14 @@ class AiJobWorker {
             stateService.succeed(job.getId(), handler.execute(job));
         } catch (AiProviderException ex) {
             log.warn("AI provider failed for job {} with code {}", job.getId(), ex.code());
-            stateService.fail(job.getId(), ex.code(), "The AI provider could not complete this job", ex.retryable());
+            AiJobStatus status = stateService.fail(job.getId(), ex.code(),
+                    "The AI provider could not complete this job", ex.retryable());
+            handler.onFailure(job, status == AiJobStatus.RETRY_SCHEDULED);
         } catch (RuntimeException ex) {
             log.error("AI job {} failed unexpectedly", job.getId(), ex);
-            stateService.fail(job.getId(), "AI_JOB_EXECUTION_FAILED", "The AI job could not be completed", true);
+            AiJobStatus status = stateService.fail(job.getId(), "AI_JOB_EXECUTION_FAILED",
+                    "The AI job could not be completed", true);
+            handler.onFailure(job, status == AiJobStatus.RETRY_SCHEDULED);
         }
     }
 }
