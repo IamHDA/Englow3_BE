@@ -30,8 +30,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          issuer-uri: ${SUPABASE_ISSUER_URI}
           jwk-set-uri: ${SUPABASE_JWKS_URI}
           jws-algorithms: ES256
+          audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
 
   data:
     redis:
@@ -56,6 +58,32 @@ app:
       secret-key: ${S3_SECRET_KEY:}
       bucket: ${S3_BUCKET:englow3}
 
+  ai:
+    enabled: ${AI_ENABLED:false}
+    provider: ${AI_PROVIDER:openai-compatible}
+    base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1}
+    api-key: ${AI_API_KEY:}
+    default-model: ${AI_DEFAULT_MODEL:llama-3.3-70b-versatile}
+    connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
+    read-timeout: ${AI_READ_TIMEOUT:45s}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
+    daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    worker:
+      fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
+      batch-size: ${AI_WORKER_BATCH_SIZE:5}
+      lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:5m}
+      reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:1m}
+
+  speech:
+    enabled: ${SPEECH_ENABLED:false}
+    base-url: ${AZURE_SPEECH_BASE_URL:https://example.cognitiveservices.azure.com}
+    api-key: ${AZURE_SPEECH_API_KEY:}
+    locale: ${SPEECH_LOCALE:en-US}
+    read-timeout: ${SPEECH_READ_TIMEOUT:45s}
+    max-audio-bytes: ${SPEECH_MAX_AUDIO_BYTES:10485760}
+    upload-url-ttl: ${SPEECH_UPLOAD_URL_TTL:10m}
+    retention: ${SPEECH_AUDIO_RETENTION:30d}
+
 server:
   port: ${PORT:${SERVER_PORT:8080}}
 
@@ -64,6 +92,11 @@ logging:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
 
 management:
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
   endpoints:
     web:
       exposure:

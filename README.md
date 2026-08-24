@@ -25,6 +25,7 @@ Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipelin
 * **Cơ sở dữ liệu (Database):** PostgreSQL (Supabase) + Schema Migration với **Flyway**.
 * **Cache & Memory Store:** Redis (Upstash Cloud / Local Redis).
 * **Lưu trữ tệp (Object Storage):** S3-compatible Storage (MinIO / Supabase Storage).
+* **Học liệu:** Python data pipeline sinh và kiểm định flashcard, grammar, exam, speaking và writing.
 * **Tài liệu API:** OpenAPI 3 / Swagger UI (`springdoc-openapi`).
 * **Đóng gói & CI/CD:** Docker (Multi-stage build), GitHub Actions, GitHub Packages (`ghcr.io`), Render Deploy Hooks.
 
@@ -66,6 +67,7 @@ mvn spring-boot:run
 Ứng dụng sẽ khởi chạy tại: `http://localhost:8080`
 * **Swagger UI Local**: `http://localhost:8080/swagger-ui/index.html`
 * **Actuator Health**: `http://localhost:8080/actuator/health`
+* **AI production runbook**: [`docs/ai-production.md`](docs/ai-production.md)
 
 ---
 
@@ -99,6 +101,8 @@ Englow3_BE/
 │   │       ├── application.yml # Cấu hình Spring Boot
 │   │       └── db/migration/   # Script migration Flyway
 │   └── test/                   # Unit & Integration Tests
+├── data_pipeline/              # Pipeline Python sinh và kiểm định học liệu
+├── docs/                       # Tài liệu kiến trúc và pipeline
 ├── Dockerfile                  # Cấu hình Docker multi-stage build Java 21
 ├── docker-compose.yml          # Môi trường chạy Redis & MinIO local
 ├── .env.example                # Template cấu hình biến môi trường
