@@ -62,6 +62,7 @@ class SpeakingAssessmentJobHandler implements AiJobHandler {
 
         ObjectNode output = objectMapper.createObjectNode().put("sessionId", sessionId.toString()).put("recognizedText",
                 speech.recognizedText());
+        output.put("speechProvider", speech.provider());
         putNullable(output, "accuracy", speech.accuracy());
         putNullable(output, "fluency", speech.fluency());
         putNullable(output, "completeness", speech.completeness());
@@ -89,13 +90,22 @@ class SpeakingAssessmentJobHandler implements AiJobHandler {
             AiTextResult result = aiGateway.generate(userId, AiCapability.SPEAKING,
                     payload.path("systemPrompt").asText(), prompt, true);
             JsonNode structured = objectMapper.readTree(result.content());
-            return new LanguageFeedback(structured.path("grammarFeedback").asText("No grammar feedback available"),
-                    structured.path("vocabularyFeedback").asText("No vocabulary feedback available"),
-                    result.inputTokens(), result.outputTokens(), result.estimatedCost());
+            return new LanguageFeedback(requiredFeedback(structured, "grammarFeedback"),
+                    requiredFeedback(structured, "vocabularyFeedback"), result.inputTokens(), result.outputTokens(),
+                    result.estimatedCost());
         } catch (JsonProcessingException | RuntimeException ex) {
             return new LanguageFeedback("Language feedback is temporarily unavailable",
                     "Vocabulary feedback is temporarily unavailable", 0, 0, BigDecimal.ZERO);
         }
+    }
+
+    static String requiredFeedback(JsonNode structured, String field) {
+        String value = structured.path(field).asText().strip();
+        if (value.isBlank() || value.length() > 4_000) {
+            throw new AiProviderException("AI_SPEAKING_FEEDBACK_SCHEMA_INVALID",
+                    "Speaking language feedback has an invalid " + field, true);
+        }
+        return value;
     }
 
     private SessionInput load(UUID sessionId) {
