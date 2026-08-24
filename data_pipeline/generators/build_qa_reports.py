@@ -225,7 +225,7 @@ not-true, and cross-reference items.
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / "FINAL_QA.md").write_text(report, encoding="utf-8")
     (REPORTS / "human_review_packet.md").write_text(
-        "\n".join(packet_lines) + "\n", encoding="utf-8")
+        "\n".join(packet_lines).rstrip() + "\n", encoding="utf-8")
 
     support_lines = [
         "# Human review packet — supporting learning data", "",
@@ -265,7 +265,7 @@ not-true, and cross-reference items.
             "**Decision:** __________  **Reason:** ________________________________________", "",
         ])
     (REPORTS / "human_review_packet_supporting.md").write_text(
-        "\n".join(support_lines) + "\n", encoding="utf-8")
+        "\n".join(support_lines).rstrip() + "\n", encoding="utf-8")
     print(f"Wrote QA reports, two human-review packets, and {media['file_count']}-file media manifest")
     return 0
 
