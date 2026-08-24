@@ -1,4 +1,33 @@
 services:
+  ai-service:
+    build:
+      context: ./ai_service
+    container_name: englow-ai-service
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      AI_SERVICE_ENVIRONMENT: ${AI_SERVICE_ENVIRONMENT:-development}
+      AI_SERVICE_INTERNAL_API_KEY: ${AI_SERVICE_INTERNAL_API_KEY}
+      AI_SERVICE_LLM_ENABLED: ${AI_SERVICE_LLM_ENABLED:-false}
+      AI_SERVICE_LLM_BASE_URL: ${AI_SERVICE_LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      AI_SERVICE_LLM_API_KEY: ${AI_SERVICE_LLM_API_KEY:-}
+      AI_SERVICE_SPEECH_ENABLED: ${AI_SERVICE_SPEECH_ENABLED:-false}
+      AI_SERVICE_AZURE_SPEECH_BASE_URL: ${AI_SERVICE_AZURE_SPEECH_BASE_URL:-https://example.cognitiveservices.azure.com}
+      AI_SERVICE_AZURE_SPEECH_API_KEY: ${AI_SERVICE_AZURE_SPEECH_API_KEY:-}
+      AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
+      AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-45}
+      AI_SERVICE_MAX_AUDIO_BYTES: ${AI_SERVICE_MAX_AUDIO_BYTES:-10485760}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   postgres:
     image: pgvector/pgvector:pg17
     container_name: local-postgres

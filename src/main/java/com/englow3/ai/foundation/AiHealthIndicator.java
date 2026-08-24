@@ -22,11 +22,8 @@ class AiHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        if (aiProperties.enabled() && aiProperties.apiKey().isBlank()) {
-            return Health.down().withDetail("reason", "AI API key is missing").build();
-        }
-        if (speechProperties.enabled() && speechProperties.apiKey().isBlank()) {
-            return Health.down().withDetail("reason", "Speech API key is missing").build();
+        if ((aiProperties.enabled() || speechProperties.enabled()) && aiProperties.internalApiKey().isBlank()) {
+            return Health.down().withDetail("reason", "AI service internal API key is missing").build();
         }
         if (!aiProperties.enabled() && !speechProperties.enabled()) {
             return Health.up().withDetail("mode", "disabled").build();
