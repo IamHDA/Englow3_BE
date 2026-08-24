@@ -14,6 +14,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -62,6 +63,15 @@ public class ObjectStorageClient {
 
     public void delete(String bucket, String key) {
         s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+    }
+
+    public boolean isReachable() {
+        try {
+            s3Client.headBucket(HeadBucketRequest.builder().bucket(properties.bucket()).build());
+            return true;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     public record StoredObjectMetadata(long contentLength, String contentType) {

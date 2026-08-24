@@ -3,6 +3,7 @@ package com.englow3.ai.foundation;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -22,6 +23,13 @@ interface AiJobRepository extends JpaRepository<AiJob, UUID> {
             limit 1
             """, nativeQuery = true)
     Optional<AiJob> findNextReady(Instant now);
+
+    @Query(value = """
+            select * from ai_jobs
+            where status = 'PROCESSING' and locked_at < :staleBefore
+            order by locked_at for update skip locked limit 100
+            """, nativeQuery = true)
+    List<AiJob> findStaleProcessing(Instant staleBefore);
 
     @Modifying
     @Query(value = """
