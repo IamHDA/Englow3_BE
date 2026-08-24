@@ -30,8 +30,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          issuer-uri: ${SUPABASE_ISSUER_URI}
           jwk-set-uri: ${SUPABASE_JWKS_URI}
           jws-algorithms: ES256
+          audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
 
   data:
     redis:
@@ -55,6 +57,21 @@ app:
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
       bucket: ${S3_BUCKET:englow3}
+
+  ai:
+    enabled: ${AI_ENABLED:false}
+    provider: ${AI_PROVIDER:openai-compatible}
+    base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1}
+    api-key: ${AI_API_KEY:}
+    default-model: ${AI_DEFAULT_MODEL:llama-3.3-70b-versatile}
+    connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
+    read-timeout: ${AI_READ_TIMEOUT:45s}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
+    daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    worker:
+      fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
+      batch-size: ${AI_WORKER_BATCH_SIZE:5}
+      lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:5m}
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}
