@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -40,20 +41,25 @@ final class AiServiceTextClient implements AiTextClient {
             if (response == null || response.content() == null || response.content().isBlank()) {
                 throw new AiProviderException("AI_EMPTY_RESPONSE", "The AI service returned no completion", true);
             }
-            return new AiTextResult(response.content(), response.model(), response.inputTokens(),
-                    response.outputTokens());
+            if (response.inputTokens() < 0 || response.outputTokens() < 0) {
+                throw invalidResponse(null);
+            }
+            String model = response.model() == null || response.model().isBlank() ? request.model() : response.model();
+            return new AiTextResult(response.content(), model, response.inputTokens(), response.outputTokens());
         } catch (RestClientResponseException ex) {
             throw serviceError(ex, "AI_SERVICE_HTTP_" + ex.getStatusCode().value(),
                     "The AI service rejected the request");
         } catch (ResourceAccessException ex) {
             throw new AiProviderException("AI_SERVICE_UNAVAILABLE", "The AI service is unavailable", true, ex);
+        } catch (RestClientException ex) {
+            throw invalidResponse(ex);
         }
     }
 
     private AiProviderException serviceError(RestClientResponseException ex, String fallbackCode,
             String fallbackMessage) {
         HttpStatusCode status = ex.getStatusCode();
-        boolean fallbackRetryable = status.value() == 429 || status.is5xxServerError();
+        boolean fallbackRetryable = isRetryableStatus(status.value());
         try {
             ErrorResponse error = objectMapper.readValue(ex.getResponseBodyAsString(), ErrorResponse.class);
             if (error.code() != null && error.message() != null) {
@@ -63,6 +69,15 @@ final class AiServiceTextClient implements AiTextClient {
             // Provider response bodies are intentionally not propagated to public clients.
         }
         return new AiProviderException(fallbackCode, fallbackMessage, fallbackRetryable, ex);
+    }
+
+    private AiProviderException invalidResponse(Throwable cause) {
+        return new AiProviderException("AI_SERVICE_INVALID_RESPONSE", "The AI service returned an invalid response",
+                true, cause);
+    }
+
+    private boolean isRetryableStatus(int statusCode) {
+        return statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode >= 500;
     }
 
     private record GenerateRequest(String model, @JsonProperty("system_prompt") String systemPrompt,

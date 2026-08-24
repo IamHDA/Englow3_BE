@@ -79,6 +79,61 @@ def test_llm_rate_limit_is_reported_as_retryable_without_leaking_body():
     assert "quota-account" not in captured.value.message
 
 
+@pytest.mark.parametrize(
+    ("status", "retryable"),
+    [(400, False), (408, True), (425, True), (500, True)],
+)
+def test_llm_provider_classifies_http_failures(status, retryable):
+    async def run():
+        transport = httpx.MockTransport(lambda _: httpx.Response(status))
+        async with httpx.AsyncClient(transport=transport) as client:
+            await OpenAiCompatibleProvider(client, configured()).generate(llm_request())
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == f"AI_PROVIDER_HTTP_{status}"
+    assert captured.value.retryable is retryable
+
+
+def test_llm_transport_failure_is_retryable():
+    async def run():
+        def handler(request: httpx.Request):
+            raise httpx.ReadTimeout("provider timeout", request=request)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await OpenAiCompatibleProvider(client, configured()).generate(llm_request())
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == "AI_PROVIDER_UNAVAILABLE"
+    assert captured.value.retryable is True
+    assert "provider timeout" not in captured.value.message
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"choices": []},
+        {"choices": [{"message": "not-an-object"}]},
+        {
+            "choices": [{"message": {"content": "answer"}}],
+            "usage": {"prompt_tokens": -1},
+        },
+    ],
+)
+def test_llm_malformed_responses_use_a_stable_error(payload):
+    async def run():
+        transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+        async with httpx.AsyncClient(transport=transport) as client:
+            await OpenAiCompatibleProvider(client, configured()).generate(llm_request())
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == "AI_PROVIDER_INVALID_RESPONSE"
+    assert captured.value.retryable is True
+
+
 def test_speech_provider_builds_assessment_and_normalizes_scores():
     async def run():
         def handler(request: httpx.Request) -> httpx.Response:
@@ -129,3 +184,61 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
     assert result.pronunciation == 88
     assert result.request_id == "speech-request"
     assert result.words[0].offset_ms == 1
+
+
+def test_speech_recognition_failure_is_not_retryable():
+    async def run():
+        transport = httpx.MockTransport(
+            lambda _: httpx.Response(200, json={"RecognitionStatus": "NoMatch"})
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
+            await AzureSpeechProvider(client, configured()).assess(
+                b"RIFF-audio", "audio/wav", "en-US", None
+            )
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == "SPEECH_RECOGNITION_FAILED"
+    assert captured.value.retryable is False
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"RecognitionStatus": "Success", "NBest": []},
+        {"RecognitionStatus": "Success", "NBest": ["not-an-object"]},
+        {
+            "RecognitionStatus": "Success",
+            "NBest": [{"Display": "Hello", "Words": ["not-an-object"]}],
+        },
+        {
+            "RecognitionStatus": "Success",
+            "NBest": [
+                {
+                    "Display": "Hello",
+                    "PronunciationAssessment": {"AccuracyScore": 101},
+                }
+            ],
+        },
+    ],
+)
+def test_speech_malformed_responses_use_a_stable_error(payload):
+    async def run():
+        transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+        async with httpx.AsyncClient(transport=transport) as client:
+            await AzureSpeechProvider(client, configured()).assess(
+                b"RIFF-audio", "audio/wav", "en-US", None
+            )
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == "SPEECH_PROVIDER_INVALID_RESPONSE"
+    assert captured.value.retryable is True
+
+
+def test_invalid_runtime_limits_are_rejected_at_startup():
+    with pytest.raises(ValueError):
+        configured(connect_timeout_seconds=0)
+    with pytest.raises(ValueError):
+        configured(max_audio_bytes=0)

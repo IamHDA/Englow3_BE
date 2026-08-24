@@ -1,9 +1,11 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.config import Settings, get_settings
@@ -17,6 +19,8 @@ from app.schemas import (
     SpeechAssessmentResponse,
 )
 from app.security import require_internal_api_key
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -53,6 +57,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        _: Request, __: RequestValidationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "REQUEST_VALIDATION_FAILED",
+                "message": "Request validation failed",
+                "retryable": False,
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unexpected_error_handler(_: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled AI service error", exc_info=exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": "AI_SERVICE_INTERNAL_ERROR",
+                "message": "The AI service could not complete the request",
+                "retryable": True,
+            },
+        )
+
     @app.get("/health/live", include_in_schema=False)
     async def live() -> dict[str, str]:
         return {"status": "up"}
@@ -86,7 +115,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def assess_speech(
         request: Request,
         audio: Annotated[UploadFile, File()],
-        locale: Annotated[str, Form(min_length=2, max_length=20)] = "en-US",
+        locale: Annotated[
+            str,
+            Form(min_length=2, max_length=20, pattern=r"^[A-Za-z]{2,3}-[A-Za-z]{2,4}$"),
+        ] = "en-US",
         reference_text: Annotated[str | None, Form(max_length=20_000)] = None,
     ) -> SpeechAssessmentResponse:
         content_type = audio.content_type or "application/octet-stream"

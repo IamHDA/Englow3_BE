@@ -16,6 +16,11 @@ class FakeLlmProvider:
         )
 
 
+class ExplodingLlmProvider:
+    async def generate(self, _request):
+        raise RuntimeError("provider-secret-must-not-leak")
+
+
 def settings(**overrides) -> Settings:
     values = {
         "internal_api_key": SecretStr("test-internal-key"),
@@ -51,12 +56,36 @@ def test_readiness_fails_without_internal_key():
         assert response.json()["checks"]["internal_auth"] is False
 
 
+def test_readiness_fails_when_enabled_provider_has_no_key():
+    with TestClient(
+        create_app(settings(llm_api_key=SecretStr("")))
+    ) as client:
+        response = client.get("/health/ready")
+        assert response.status_code == 503
+        assert response.json()["checks"]["llm"] is False
+
+
 def test_internal_endpoint_rejects_missing_key():
     app = create_app(settings())
     with TestClient(app) as client:
         response = client.post("/internal/v1/llm/generate", json=request_body())
         assert response.status_code == 401
         assert response.json()["code"] == "UNAUTHORIZED_SERVICE"
+
+
+def test_internal_endpoint_rejects_an_invalid_key():
+    with TestClient(create_app(settings())) as client:
+        response = client.post(
+            "/internal/v1/llm/generate",
+            headers={"X-Internal-API-Key": "wrong-key"},
+            json=request_body(),
+        )
+        assert response.status_code == 401
+        assert response.json() == {
+            "code": "UNAUTHORIZED_SERVICE",
+            "message": "Invalid internal service credential",
+            "retryable": False,
+        }
 
 
 def test_llm_endpoint_returns_stable_contract():
@@ -87,6 +116,23 @@ def test_llm_endpoint_forbids_unknown_fields():
             json=body,
         )
         assert response.status_code == 422
+        assert response.json() == {
+            "code": "REQUEST_VALIDATION_FAILED",
+            "message": "Request validation failed",
+            "retryable": False,
+        }
+
+
+def test_invalid_speech_locale_has_a_stable_validation_error():
+    with TestClient(create_app(settings())) as client:
+        response = client.post(
+            "/internal/v1/speech/assess",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            files={"audio": ("audio.wav", b"RIFF", "audio/wav")},
+            data={"locale": "../../etc/passwd"},
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "REQUEST_VALIDATION_FAILED"
 
 
 def test_speech_endpoint_rejects_unsupported_media_before_provider_call():
@@ -98,3 +144,38 @@ def test_speech_endpoint_rejects_unsupported_media_before_provider_call():
         )
         assert response.status_code == 415
         assert response.json()["code"] == "UNSUPPORTED_AUDIO_TYPE"
+
+
+def test_speech_endpoint_rejects_empty_and_oversized_audio():
+    with TestClient(create_app(settings(max_audio_bytes=3))) as client:
+        empty = client.post(
+            "/internal/v1/speech/assess",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            files={"audio": ("audio.wav", b"", "audio/wav")},
+        )
+        oversized = client.post(
+            "/internal/v1/speech/assess",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            files={"audio": ("audio.wav", b"RIFF", "audio/wav")},
+        )
+
+        assert empty.status_code == 422
+        assert empty.json()["code"] == "EMPTY_AUDIO"
+        assert oversized.status_code == 413
+        assert oversized.json()["code"] == "AUDIO_TOO_LARGE"
+
+
+def test_unexpected_errors_are_sanitized():
+    app = create_app(settings())
+    with TestClient(app, raise_server_exceptions=False) as client:
+        app.state.llm_provider = ExplodingLlmProvider()
+        response = client.post(
+            "/internal/v1/llm/generate",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            json=request_body(),
+        )
+
+        assert response.status_code == 500
+        assert response.json()["code"] == "AI_SERVICE_INTERNAL_ERROR"
+        assert response.json()["retryable"] is True
+        assert "provider-secret" not in response.text
