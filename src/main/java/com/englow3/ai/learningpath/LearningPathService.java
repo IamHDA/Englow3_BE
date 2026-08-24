@@ -87,6 +87,10 @@ class LearningPathService {
                     """, UUID.randomUUID(), pathId, position++, concept.conceptId(), reason);
         }
 
+        if (!jobService.isEnabled(AiCapability.LEARNING_PATH)) {
+            return load(pathId, user.getId());
+        }
+
         String conceptText = candidates.stream()
                 .map(concept -> "%s (%s/%s, mastery %.2f)".formatted(concept.conceptId(), concept.nameEn(),
                         concept.domain(), concept.mastery()))

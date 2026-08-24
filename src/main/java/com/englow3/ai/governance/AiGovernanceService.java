@@ -54,9 +54,9 @@ class AiGovernanceService {
         if (existing != null) {
             return existing;
         }
-        RenderedPrompt prompt = promptService.render("CONTENT_DRAFT_GENERATION", Map.of(
-                "contentType", request.contentType().name(), "title", request.title(), "level", request.level(),
-                "itemCount", request.itemCount(), "instructions", request.instructions()));
+        RenderedPrompt prompt = promptService.render("CONTENT_DRAFT_GENERATION",
+                Map.of("contentType", request.contentType().name(), "title", request.title(), "level", request.level(),
+                        "itemCount", request.itemCount(), "instructions", request.instructions()));
         UUID draftId = UUID.randomUUID();
         ObjectNode generationRequest = objectMapper.createObjectNode().put("itemCount", request.itemCount())
                 .put("instructions", request.instructions());
@@ -79,8 +79,9 @@ class AiGovernanceService {
 
     @Transactional(readOnly = true)
     List<AiGovernanceDtos.DraftResponse> drafts(String status) {
-        if (status != null && !List.of("GENERATING", "DRAFT", "PENDING_REVIEW", "PUBLISHED", "REJECTED",
-                "ARCHIVED", "FAILED").contains(status)) {
+        if (status != null
+                && !List.of("GENERATING", "DRAFT", "PENDING_REVIEW", "PUBLISHED", "REJECTED", "ARCHIVED", "FAILED")
+                        .contains(status)) {
             throw new BadRequestException("AI_CONTENT_STATUS_INVALID", "Unknown AI content status");
         }
         String sql = """
@@ -237,13 +238,11 @@ class AiGovernanceService {
         return response;
     }
 
-    private AiGovernanceDtos.FeedbackResponse mapFeedback(java.sql.ResultSet rs, int row)
-            throws java.sql.SQLException {
+    private AiGovernanceDtos.FeedbackResponse mapFeedback(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         Timestamp resolvedAt = rs.getTimestamp("resolved_at");
         return new AiGovernanceDtos.FeedbackResponse(rs.getObject("id", UUID.class), rs.getString("capability"),
-                rs.getString("category"), rs.getString("status"), rs.getString("details"),
-                rs.getString("resolution"), rs.getTimestamp("created_at").toInstant(),
-                resolvedAt == null ? null : resolvedAt.toInstant());
+                rs.getString("category"), rs.getString("status"), rs.getString("details"), rs.getString("resolution"),
+                rs.getTimestamp("created_at").toInstant(), resolvedAt == null ? null : resolvedAt.toInstant());
     }
 
     private JsonNode parse(String value) {

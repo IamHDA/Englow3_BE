@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.logging.TraceIdFilter;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.entity.User;
@@ -52,9 +53,17 @@ public class AiJobService {
         return job;
     }
 
+    @Transactional(readOnly = true)
+    public boolean isEnabled(AiCapability capability) {
+        return policyService.resolve(capability).enabled();
+    }
+
     private AiJob create(UUID userId, AiCapability capability, String jobType, String targetType, UUID targetId,
             String promptVersion, JsonNode inputPayload, String idempotencyKey) {
         ResolvedAiPolicy policy = policyService.resolve(capability);
+        if (!policy.enabled()) {
+            throw new ConflictException("AI_CAPABILITY_DISABLED", "This AI capability is currently disabled");
+        }
         return repository.save(AiJob.pending(userId, capability, jobType, targetType, targetId, policy.provider(),
                 policy.model(), promptVersion, inputPayload, idempotencyKey, TraceIdFilter.current()));
     }

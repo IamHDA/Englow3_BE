@@ -34,6 +34,12 @@ public class AiModelPolicy {
     @Column(nullable = false)
     private boolean enabled;
 
+    @Column(name = "input_cost_per_million", nullable = false)
+    private BigDecimal inputCostPerMillion;
+
+    @Column(name = "output_cost_per_million", nullable = false)
+    private BigDecimal outputCostPerMillion;
+
     protected AiModelPolicy() {
     }
 }

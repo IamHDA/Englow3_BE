@@ -31,9 +31,6 @@ class AiJobWorker {
 
     @Scheduled(fixedDelayString = "${app.ai.worker.fixed-delay:2s}")
     void poll() {
-        if (!properties.enabled()) {
-            return;
-        }
         stateService.recoverStale(Instant.now().minus(properties.worker().lockTimeout()));
         for (int i = 0; i < properties.worker().batchSize(); i++) {
             AiJob job = stateService.claimNext(workerId);

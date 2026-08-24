@@ -51,7 +51,7 @@ class LearningPathExplanationJobHandler implements AiJobHandler {
         ObjectNode output = objectMapper.createObjectNode().put("pathId", pathId.toString()).put("explanation",
                 explanation);
         output.set("weeklyAdvice", structured.path("weeklyAdvice"));
-        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens());
+        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens(), result.estimatedCost());
     }
 
     private JsonNode parse(String content) {

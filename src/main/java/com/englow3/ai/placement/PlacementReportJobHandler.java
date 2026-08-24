@@ -61,7 +61,7 @@ class PlacementReportJobHandler implements AiJobHandler {
                 summary);
         output.set("strengths", structured.path("strengths"));
         output.set("learningGaps", structured.path("learningGaps"));
-        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens());
+        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens(), result.estimatedCost());
     }
 
     private JsonNode parse(String content) {

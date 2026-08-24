@@ -16,14 +16,11 @@ final class SpeakingDtos {
     }
 
     enum Mode {
-        READ_ALOUD,
-        FREE_SPEAKING
+        READ_ALOUD, FREE_SPEAKING
     }
 
-    record CreateSessionRequest(@NotNull Mode mode,
-            @Size(max = 1000) String referenceText,
-            @NotBlank String contentType,
-            @NotNull @AssertTrue Boolean consent) {
+    record CreateSessionRequest(@NotNull Mode mode, @Size(max = 1000) String referenceText,
+            @NotBlank String contentType, @NotNull @AssertTrue Boolean consent) {
     }
 
     record SubmitSessionRequest(@NotBlank @Size(max = 200) String idempotencyKey) {

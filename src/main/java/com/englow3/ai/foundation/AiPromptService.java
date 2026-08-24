@@ -1,7 +1,6 @@
 package com.englow3.ai.foundation;
 
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
@@ -33,8 +32,7 @@ public class AiPromptService {
     static String renderText(String template, Map<String, ?> variables) {
         String rendered = template;
         for (Map.Entry<String, ?> entry : variables.entrySet()) {
-            rendered = rendered.replace("{{" + entry.getKey() + "}}",
-                    Matcher.quoteReplacement(String.valueOf(entry.getValue())));
+            rendered = rendered.replace("{{" + entry.getKey() + "}}", String.valueOf(entry.getValue()));
         }
         if (UNRESOLVED_VARIABLE.matcher(rendered).find()) {
             throw new ConflictException("AI_PROMPT_VARIABLE_MISSING", "The prompt is missing a required variable");

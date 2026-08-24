@@ -222,6 +222,10 @@ class PlacementService {
                     current_level = excluded.current_level
                 """, UUID.randomUUID(), user.getId(), attemptId, level);
 
+        if (!jobService.isEnabled(AiCapability.PLACEMENT)) {
+            return new PlacementDtos.SubmitAttemptResponse(result(attemptId), null, null);
+        }
+
         String skills = skillSummary(attemptId);
         RenderedPrompt prompt = promptService.render("PLACEMENT_REPORT", Map.of("level", level, "score",
                 score.rawScore(), "maxScore", score.maxScore(), "percentage", percentage, "skills", skills));

@@ -32,12 +32,9 @@ final class AiGovernanceDtos {
         OPEN, INVESTIGATING, RESOLVED, DISMISSED
     }
 
-    record GenerateDraftRequest(@NotNull ContentType contentType,
-            @NotBlank @Size(max = 200) String title,
-            @NotBlank @Size(max = 10) String level,
-            @Min(1) @Max(50) int itemCount,
-            @NotBlank @Size(max = 2000) String instructions,
-            @NotBlank @Size(max = 200) String idempotencyKey) {
+    record GenerateDraftRequest(@NotNull ContentType contentType, @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 10) String level, @Min(1) @Max(50) int itemCount,
+            @NotBlank @Size(max = 2000) String instructions, @NotBlank @Size(max = 200) String idempotencyKey) {
     }
 
     record DraftResponse(UUID id, String contentType, String title, String level, String status, UUID jobId,
@@ -73,18 +70,18 @@ final class AiGovernanceDtos {
             Instant updatedAt) {
     }
 
-    record ModelPolicyRequest(@NotBlank @Size(max = 50) String provider,
-            @NotBlank @Size(max = 100) String model,
+    record ModelPolicyRequest(@NotBlank @Size(max = 50) String provider, @NotBlank @Size(max = 100) String model,
             @NotNull @DecimalMin("0.0") @DecimalMax("2.0") BigDecimal temperature,
-            @Min(1) @Max(32768) int maxOutputTokens,
-            boolean enabled) {
+            @Min(1) @Max(32768) int maxOutputTokens, @NotNull @DecimalMin("0.0") BigDecimal inputCostPerMillion,
+            @NotNull @DecimalMin("0.0") BigDecimal outputCostPerMillion, boolean enabled) {
     }
 
     record ModelPolicyResponse(String capability, String provider, String model, BigDecimal temperature,
-            int maxOutputTokens, boolean enabled, Instant updatedAt) {
+            int maxOutputTokens, BigDecimal inputCostPerMillion, BigDecimal outputCostPerMillion, boolean enabled,
+            Instant updatedAt) {
     }
 
-    record AiOperationsMetrics(long totalJobs, long successfulJobs, long failedJobs, long pendingJobs,
-            long inputTokens, long outputTokens, BigDecimal estimatedCost, long openReports) {
+    record AiOperationsMetrics(long totalJobs, long successfulJobs, long failedJobs, long pendingJobs, long inputTokens,
+            long outputTokens, BigDecimal estimatedCost, long openReports) {
     }
 }

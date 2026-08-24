@@ -65,6 +65,7 @@ mvn spring-boot:run
 Ứng dụng sẽ khởi chạy tại: `http://localhost:8080`
 * **Swagger UI Local**: `http://localhost:8080/swagger-ui/index.html`
 * **Actuator Health**: `http://localhost:8080/actuator/health`
+* **AI production runbook**: [`docs/ai-production.md`](docs/ai-production.md)
 
 ---
 

@@ -30,8 +30,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Service
 class SpeakingSessionService {
 
-    private static final Map<String, String> CONTENT_TYPES = Map.of(
-            "audio/wav; codecs=audio/pcm; samplerate=16000", "wav", "audio/ogg; codecs=opus", "ogg");
+    private static final Map<String, String> CONTENT_TYPES = Map.of("audio/wav; codecs=audio/pcm; samplerate=16000",
+            "wav", "audio/ogg; codecs=opus", "ogg");
 
     private final JdbcTemplate jdbcTemplate;
     private final UserRepository userRepository;
@@ -60,8 +60,7 @@ class SpeakingSessionService {
         User user = requireUser();
         String extension = CONTENT_TYPES.get(request.contentType());
         if (extension == null) {
-            throw new BadRequestException("SPEAKING_AUDIO_TYPE_UNSUPPORTED",
-                    "Use WAV PCM 16 kHz or OGG Opus audio");
+            throw new BadRequestException("SPEAKING_AUDIO_TYPE_UNSUPPORTED", "Use WAV PCM 16 kHz or OGG Opus audio");
         }
         String reference = request.referenceText() == null ? null : request.referenceText().strip();
         if (request.mode() == SpeakingDtos.Mode.READ_ALOUD && (reference == null || reference.isBlank())) {
@@ -98,7 +97,8 @@ class SpeakingSessionService {
             throw new BadRequestException("SPEAKING_AUDIO_NOT_UPLOADED", "Audio has not been uploaded yet");
         }
         if (metadata.contentLength() <= 0 || metadata.contentLength() > properties.maxAudioBytes()) {
-            throw new BadRequestException("SPEAKING_AUDIO_SIZE_INVALID", "Audio file size is outside the allowed limit");
+            throw new BadRequestException("SPEAKING_AUDIO_SIZE_INVALID",
+                    "Audio file size is outside the allowed limit");
         }
         if (!upload.contentType().equals(metadata.contentType())) {
             throw new BadRequestException("SPEAKING_AUDIO_TYPE_MISMATCH",
@@ -130,18 +130,16 @@ class SpeakingSessionService {
                 left join speaking_assessments a on a.session_id = s.id
                 where s.id = ? and s.user_id = ?
                 """, rs -> {
-                    if (!rs.next()) {
-                        return null;
-                    }
-                    return new SessionResultRow(rs.getObject("id", UUID.class), rs.getString("mode"),
-                            rs.getString("status"), rs.getString("recognized_text"),
-                            decimal(rs.getBigDecimal("accuracy_score")), decimal(rs.getBigDecimal("fluency_score")),
-                            decimal(rs.getBigDecimal("completeness_score")),
-                            decimal(rs.getBigDecimal("prosody_score")),
-                            decimal(rs.getBigDecimal("pronunciation_score")), rs.getString("grammar_feedback"),
-                            rs.getString("vocabulary_feedback"),
-                            rs.getTimestamp("retention_until").toInstant());
-                }, sessionId, user.getId());
+            if (!rs.next()) {
+                return null;
+            }
+            return new SessionResultRow(rs.getObject("id", UUID.class), rs.getString("mode"), rs.getString("status"),
+                    rs.getString("recognized_text"), decimal(rs.getBigDecimal("accuracy_score")),
+                    decimal(rs.getBigDecimal("fluency_score")), decimal(rs.getBigDecimal("completeness_score")),
+                    decimal(rs.getBigDecimal("prosody_score")), decimal(rs.getBigDecimal("pronunciation_score")),
+                    rs.getString("grammar_feedback"), rs.getString("vocabulary_feedback"),
+                    rs.getTimestamp("retention_until").toInstant());
+        }, sessionId, user.getId());
         if (row == null) {
             throw new NotFoundException("SPEAKING_SESSION_NOT_FOUND", "Speaking session was not found");
         }
@@ -161,8 +159,9 @@ class SpeakingSessionService {
                 where s.user_id = ?
                 order by s.created_at desc
                 limit 100
-                """, (rs, row) -> new SpeakingDtos.SessionSummary(rs.getObject("id", UUID.class),
-                        rs.getString("mode"), rs.getString("status"), rs.getString("recognized_text"),
+                """,
+                (rs, row) -> new SpeakingDtos.SessionSummary(rs.getObject("id", UUID.class), rs.getString("mode"),
+                        rs.getString("status"), rs.getString("recognized_text"),
                         decimal(rs.getBigDecimal("pronunciation_score")), rs.getTimestamp("created_at").toInstant(),
                         instant(rs.getTimestamp("completed_at")), rs.getTimestamp("retention_until").toInstant()),
                 user.getId());
@@ -174,9 +173,9 @@ class SpeakingSessionService {
         SessionUpload upload = jdbcTemplate.query("""
                 select audio_bucket, audio_object_key, audio_content_type, status, ai_job_id
                 from speaking_sessions where id = ? and user_id = ? for update
-                """, rs -> rs.next() ? new SessionUpload(rs.getString("audio_bucket"),
-                        rs.getString("audio_object_key"), rs.getString("audio_content_type"), rs.getString("status"),
-                        rs.getObject("ai_job_id", UUID.class)) : null, sessionId, user.getId());
+                """, rs -> rs.next() ? new SessionUpload(rs.getString("audio_bucket"), rs.getString("audio_object_key"),
+                rs.getString("audio_content_type"), rs.getString("status"), rs.getObject("ai_job_id", UUID.class))
+                : null, sessionId, user.getId());
         if (upload == null) {
             throw new NotFoundException("SPEAKING_SESSION_NOT_FOUND", "Speaking session was not found");
         }
@@ -193,9 +192,9 @@ class SpeakingSessionService {
         SessionUpload upload = jdbcTemplate.query("""
                 select audio_bucket, audio_object_key, audio_content_type, status, ai_job_id
                 from speaking_sessions where id = ? and user_id = ? for update
-                """, rs -> rs.next() ? new SessionUpload(rs.getString("audio_bucket"),
-                        rs.getString("audio_object_key"), rs.getString("audio_content_type"), rs.getString("status"),
-                        rs.getObject("ai_job_id", UUID.class)) : null, sessionId, userId);
+                """, rs -> rs.next() ? new SessionUpload(rs.getString("audio_bucket"), rs.getString("audio_object_key"),
+                rs.getString("audio_content_type"), rs.getString("status"), rs.getObject("ai_job_id", UUID.class))
+                : null, sessionId, userId);
         if (upload == null) {
             throw new NotFoundException("SPEAKING_SESSION_NOT_FOUND", "Speaking session was not found");
         }
@@ -213,7 +212,8 @@ class SpeakingSessionService {
         return jdbcTemplate.query("""
                 select position, word, accuracy_score, error_type, offset_ms, duration_ms
                 from speaking_word_scores where session_id = ? order by position
-                """, (rs, row) -> new SpeakingDtos.WordScore(rs.getInt("position"), rs.getString("word"),
+                """,
+                (rs, row) -> new SpeakingDtos.WordScore(rs.getInt("position"), rs.getString("word"),
                         decimal(rs.getBigDecimal("accuracy_score")), rs.getString("error_type"),
                         rs.getObject("offset_ms", Integer.class), rs.getObject("duration_ms", Integer.class)),
                 sessionId);

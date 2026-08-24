@@ -62,7 +62,15 @@ class TutorReplyJobHandler implements AiJobHandler {
         output.put("answer", answer);
         output.put("language", structured.path("language").asText("en"));
         output.set("citations", payload.path("citations"));
-        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens());
+        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens(), result.estimatedCost());
+    }
+
+    @Override
+    public void onFailure(AiJob job, boolean willRetry) {
+        if (!willRetry) {
+            jdbcTemplate.update("update ai_tutor_messages set status = 'FAILED' where id = ? and status = 'PENDING'",
+                    job.getTargetId());
+        }
     }
 
     private JsonNode parse(String content) {

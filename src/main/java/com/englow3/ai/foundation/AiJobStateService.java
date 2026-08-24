@@ -32,7 +32,8 @@ class AiJobStateService {
 
     @Transactional
     public void succeed(UUID jobId, AiJobExecutionResult result) {
-        require(jobId).succeed(result.output(), result.inputTokens(), result.outputTokens(), Instant.now());
+        require(jobId).succeed(result.output(), result.inputTokens(), result.outputTokens(), result.estimatedCost(),
+                Instant.now());
     }
 
     @Transactional

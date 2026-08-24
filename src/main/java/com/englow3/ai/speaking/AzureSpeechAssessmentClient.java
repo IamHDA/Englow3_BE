@@ -54,8 +54,8 @@ class AzureSpeechAssessmentClient implements SpeechAssessmentClient {
             JsonNode scores = best.path("PronunciationAssessment");
             return new SpeechAssessmentResult(best.path("Display").asText(body.path("DisplayText").asText()),
                     number(scores, "AccuracyScore"), number(scores, "FluencyScore"),
-                    number(scores, "CompletenessScore"), number(scores, "ProsodyScore"),
-                    number(scores, "PronScore"), response.getHeaders().getFirst("X-RequestId"), words(best), body);
+                    number(scores, "CompletenessScore"), number(scores, "ProsodyScore"), number(scores, "PronScore"),
+                    response.getHeaders().getFirst("X-RequestId"), words(best), body);
         } catch (RestClientResponseException ex) {
             boolean retryable = ex.getStatusCode().value() == 429 || ex.getStatusCode().is5xxServerError();
             throw new AiProviderException("SPEECH_PROVIDER_HTTP_" + ex.getStatusCode().value(),

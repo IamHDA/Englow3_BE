@@ -40,8 +40,7 @@ class AiAdminController {
 
     @PostMapping("/prompts")
     @ResponseStatus(HttpStatus.CREATED)
-    AiGovernanceDtos.PromptSummary createPrompt(
-            @Valid @RequestBody AiGovernanceDtos.PromptTemplateRequest request) {
+    AiGovernanceDtos.PromptSummary createPrompt(@Valid @RequestBody AiGovernanceDtos.PromptTemplateRequest request) {
         return adminService.createPrompt(request);
     }
 

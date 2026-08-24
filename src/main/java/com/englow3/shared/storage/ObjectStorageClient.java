@@ -46,8 +46,8 @@ public class ObjectStorageClient {
         PutObjectRequest putRequest = PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType)
                 .build();
         return s3Presigner
-                .presignPutObject(PutObjectPresignRequest.builder().signatureDuration(ttl).putObjectRequest(putRequest)
-                        .build())
+                .presignPutObject(
+                        PutObjectPresignRequest.builder().signatureDuration(ttl).putObjectRequest(putRequest).build())
                 .url();
     }
 

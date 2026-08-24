@@ -18,8 +18,10 @@ public class AiModelPolicyService {
     public ResolvedAiPolicy resolve(AiCapability capability) {
         return repository.findById(capability)
                 .map(policy -> new ResolvedAiPolicy(policy.getProviderName(), policy.getModelName(),
-                        policy.getTemperature().doubleValue(), policy.getMaxOutputTokens(), policy.isEnabled()))
+                        policy.getTemperature().doubleValue(), policy.getMaxOutputTokens(), policy.isEnabled(),
+                        policy.getInputCostPerMillion(), policy.getOutputCostPerMillion()))
                 .orElseGet(() -> new ResolvedAiPolicy(properties.provider(), properties.defaultModel(), 0.2,
-                        properties.maxOutputTokens(), properties.enabled()));
+                        properties.maxOutputTokens(), properties.enabled(), java.math.BigDecimal.ZERO,
+                        java.math.BigDecimal.ZERO));
     }
 }

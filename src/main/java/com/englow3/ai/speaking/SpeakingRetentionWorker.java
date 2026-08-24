@@ -30,8 +30,8 @@ class SpeakingRetentionWorker {
                 select id, audio_bucket, audio_object_key from speaking_sessions
                 where retention_until < now() and status not in ('PROCESSING', 'DELETED')
                 order by retention_until limit 100
-                """, (rs, row) -> new ExpiredRecording(rs.getObject("id", UUID.class),
-                        rs.getString("audio_bucket"), rs.getString("audio_object_key")));
+                """, (rs, row) -> new ExpiredRecording(rs.getObject("id", UUID.class), rs.getString("audio_bucket"),
+                rs.getString("audio_object_key")));
         for (ExpiredRecording recording : recordings) {
             try {
                 storage.delete(recording.bucket(), recording.objectKey());

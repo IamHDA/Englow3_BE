@@ -45,8 +45,8 @@ class ContentDraftJobHandler implements AiJobHandler {
         try {
             generated = objectMapper.readTree(result.content());
         } catch (JsonProcessingException ex) {
-            throw new AiProviderException("AI_CONTENT_RESPONSE_INVALID", "AI content response was not valid JSON",
-                    true, ex);
+            throw new AiProviderException("AI_CONTENT_RESPONSE_INVALID", "AI content response was not valid JSON", true,
+                    ex);
         }
         if (!generated.isObject() || !generated.path("items").isArray() || generated.path("items").isEmpty()) {
             throw new AiProviderException("AI_CONTENT_SCHEMA_INVALID", "AI content response failed validation", true);
@@ -55,9 +55,8 @@ class ContentDraftJobHandler implements AiJobHandler {
                 update ai_content_drafts set generated_content = ?::jsonb, status = 'DRAFT'
                 where id = ? and status in ('GENERATING', 'FAILED')
                 """, json(generated), draftId);
-        ObjectNode output = objectMapper.createObjectNode().put("draftId", draftId.toString())
-                .put("status", "DRAFT");
-        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens());
+        ObjectNode output = objectMapper.createObjectNode().put("draftId", draftId.toString()).put("status", "DRAFT");
+        return new AiJobExecutionResult(output, result.inputTokens(), result.outputTokens(), result.estimatedCost());
     }
 
     @Override

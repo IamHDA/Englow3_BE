@@ -48,10 +48,12 @@ public class AiGateway {
         try {
             AiTextResult result = client.generate(new AiTextRequest(policy.model(), systemPrompt, userPrompt,
                     policy.temperature(), policy.maxOutputTokens(), jsonOutput));
-            usageService.recordUsage(userId, result.inputTokens(), result.outputTokens(), BigDecimal.ZERO);
+            BigDecimal estimatedCost = estimateCost(result, policy);
+            usageService.recordUsage(userId, result.inputTokens(), result.outputTokens(), estimatedCost);
             Counter.builder("englow3.ai.requests").tag("capability", capability.name())
                     .tag("provider", policy.provider()).tag("outcome", "success").register(meterRegistry).increment();
-            return result;
+            return new AiTextResult(result.content(), result.model(), result.inputTokens(), result.outputTokens(),
+                    estimatedCost);
         } catch (RuntimeException ex) {
             Counter.builder("englow3.ai.requests").tag("capability", capability.name())
                     .tag("provider", policy.provider()).tag("outcome", "failure").register(meterRegistry).increment();
@@ -60,5 +62,11 @@ public class AiGateway {
             sample.stop(Timer.builder("englow3.ai.latency").tag("capability", capability.name())
                     .tag("provider", policy.provider()).register(meterRegistry));
         }
+    }
+
+    private BigDecimal estimateCost(AiTextResult result, ResolvedAiPolicy policy) {
+        BigDecimal input = policy.inputCostPerMillion().multiply(BigDecimal.valueOf(result.inputTokens()));
+        BigDecimal output = policy.outputCostPerMillion().multiply(BigDecimal.valueOf(result.outputTokens()));
+        return input.add(output).divide(BigDecimal.valueOf(1_000_000), 6, java.math.RoundingMode.HALF_UP);
     }
 }

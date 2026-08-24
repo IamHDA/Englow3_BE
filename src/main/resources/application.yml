@@ -72,6 +72,7 @@ app:
       fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
       batch-size: ${AI_WORKER_BATCH_SIZE:5}
       lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:5m}
+      reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:1m}
 
   speech:
     enabled: ${SPEECH_ENABLED:false}
@@ -91,6 +92,11 @@ logging:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
 
 management:
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
   endpoints:
     web:
       exposure:

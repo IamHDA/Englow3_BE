@@ -148,13 +148,18 @@ public class AiJob {
         errorMessage = null;
     }
 
-    void succeed(JsonNode output, int inputTokens, int outputTokens, Instant now) {
+    void succeed(JsonNode output, int inputTokens, int outputTokens, BigDecimal estimatedCost, Instant now) {
         status = AiJobStatus.SUCCEEDED;
         outputPayload = output;
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
+        this.estimatedCost = estimatedCost;
         completedAt = now;
         clearLock();
+    }
+
+    void succeed(JsonNode output, int inputTokens, int outputTokens, Instant now) {
+        succeed(output, inputTokens, outputTokens, BigDecimal.ZERO, now);
     }
 
     void fail(String code, String safeMessage, boolean retryable, Instant now) {
