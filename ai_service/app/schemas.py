@@ -21,6 +21,18 @@ class LlmGenerateResponse(BaseModel):
     output_tokens: int = Field(default=0, ge=0)
 
 
+class EmbeddingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class EmbeddingResponse(BaseModel):
+    embedding: list[float] = Field(min_length=64, max_length=4_096)
+    model: str = Field(min_length=1, max_length=200)
+    input_tokens: int = Field(default=0, ge=0)
+
+
 class WordAssessment(BaseModel):
     word: str = Field(min_length=1)
     accuracy: float | None = Field(default=None, ge=0, le=100)

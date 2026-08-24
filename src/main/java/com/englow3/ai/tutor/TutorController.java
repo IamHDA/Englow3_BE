@@ -44,6 +44,11 @@ class TutorController {
         return service.get(conversationId);
     }
 
+    @GetMapping("/{conversationId}/messages/{messageId}/citations")
+    List<TutorDtos.CitationResponse> citations(@PathVariable UUID conversationId, @PathVariable UUID messageId) {
+        return service.citations(conversationId, messageId);
+    }
+
     @DeleteMapping("/{conversationId}")
     ResponseEntity<Void> archive(@PathVariable UUID conversationId) {
         service.archive(conversationId);

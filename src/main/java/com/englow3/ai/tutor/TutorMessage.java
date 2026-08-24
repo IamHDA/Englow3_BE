@@ -51,18 +51,42 @@ class TutorMessage {
     @Column(name = "output_tokens", nullable = false)
     private int outputTokens;
 
+    @Enumerated(EnumType.STRING)
+    private TutorMode mode;
+
+    @Column(name = "grounding_required", nullable = false)
+    private boolean groundingRequired;
+
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
+    @Column(name = "safety_category", nullable = false)
+    private String safetyCategory;
+
+    @Column(name = "refusal_reason")
+    private String refusalReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     protected TutorMessage() {
     }
 
-    static TutorMessage user(UUID conversationId, String content) {
-        return create(conversationId, TutorMessageRole.USER, TutorMessageStatus.COMPLETED, content, null);
+    static TutorMessage user(UUID conversationId, String content, String idempotencyKey, TutorMode mode) {
+        TutorMessage message = create(conversationId, TutorMessageRole.USER, TutorMessageStatus.COMPLETED, content,
+                null);
+        message.idempotencyKey = idempotencyKey;
+        message.mode = mode;
+        return message;
     }
 
-    static TutorMessage pendingAssistant(UUID conversationId, UUID replyToMessageId) {
-        return create(conversationId, TutorMessageRole.ASSISTANT, TutorMessageStatus.PENDING, "", replyToMessageId);
+    static TutorMessage pendingAssistant(UUID conversationId, UUID replyToMessageId, TutorMode mode,
+            boolean groundingRequired) {
+        TutorMessage message = create(conversationId, TutorMessageRole.ASSISTANT, TutorMessageStatus.PENDING, "",
+                replyToMessageId);
+        message.mode = mode;
+        message.groundingRequired = groundingRequired;
+        return message;
     }
 
     private static TutorMessage create(UUID conversationId, TutorMessageRole role, TutorMessageStatus status,
@@ -74,6 +98,7 @@ class TutorMessage {
         message.status = status;
         message.content = content;
         message.replyToMessageId = replyToMessageId;
+        message.safetyCategory = "SAFE";
         message.createdAt = Instant.now();
         return message;
     }
@@ -89,5 +114,15 @@ class TutorMessage {
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
         status = TutorMessageStatus.COMPLETED;
+    }
+
+    void refuse(String content, String reason, String safetyCategory) {
+        complete(content, "deterministic-guardrail", 0, 0);
+        refusalReason = reason;
+        this.safetyCategory = safetyCategory;
+    }
+
+    void classifySafety(String safetyCategory) {
+        this.safetyCategory = safetyCategory;
     }
 }

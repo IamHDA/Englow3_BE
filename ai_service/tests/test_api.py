@@ -3,7 +3,7 @@ from pydantic import SecretStr
 
 from app.config import Settings
 from app.main import create_app
-from app.schemas import LlmGenerateResponse
+from app.schemas import EmbeddingResponse, LlmGenerateResponse
 
 
 class FakeLlmProvider:
@@ -19,6 +19,15 @@ class FakeLlmProvider:
 class ExplodingLlmProvider:
     async def generate(self, _request):
         raise RuntimeError("provider-secret-must-not-leak")
+
+
+class FakeEmbeddingProvider:
+    async def embed(self, _request):
+        return EmbeddingResponse(
+            embedding=[0.25] * 1024,
+            model="test-embedding-model",
+            input_tokens=3,
+        )
 
 
 def settings(**overrides) -> Settings:
@@ -48,18 +57,14 @@ def test_liveness_does_not_require_authentication():
 
 
 def test_readiness_fails_without_internal_key():
-    with TestClient(
-        create_app(settings(internal_api_key=SecretStr("")))
-    ) as client:
+    with TestClient(create_app(settings(internal_api_key=SecretStr("")))) as client:
         response = client.get("/health/ready")
         assert response.status_code == 503
         assert response.json()["checks"]["internal_auth"] is False
 
 
 def test_readiness_fails_when_enabled_provider_has_no_key():
-    with TestClient(
-        create_app(settings(llm_api_key=SecretStr("")))
-    ) as client:
+    with TestClient(create_app(settings(llm_api_key=SecretStr("")))) as client:
         response = client.get("/health/ready")
         assert response.status_code == 503
         assert response.json()["checks"]["llm"] is False
@@ -121,6 +126,31 @@ def test_llm_endpoint_forbids_unknown_fields():
             "message": "Request validation failed",
             "retryable": False,
         }
+
+
+def test_embedding_endpoint_returns_a_fixed_dimension_vector():
+    app = create_app(settings())
+    with TestClient(app) as client:
+        app.state.embedding_provider = FakeEmbeddingProvider()
+        response = client.post(
+            "/internal/v1/embeddings",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            json={"text": "present perfect"},
+        )
+        assert response.status_code == 200
+        assert response.json()["model"] == "test-embedding-model"
+        assert len(response.json()["embedding"]) == 1024
+
+
+def test_embedding_endpoint_rejects_unknown_fields():
+    with TestClient(create_app(settings())) as client:
+        response = client.post(
+            "/internal/v1/embeddings",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+            json={"text": "present perfect", "api_key": "must-not-pass"},
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "REQUEST_VALIDATION_FAILED"
 
 
 def test_invalid_speech_locale_has_a_stable_validation_error():
