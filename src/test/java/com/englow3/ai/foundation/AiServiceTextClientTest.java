@@ -69,6 +69,6 @@ class AiServiceTextClientTest {
     private AiProperties properties(boolean enabled) {
         return new AiProperties(enabled, "ai-service", "http://localhost", "internal-key", "model",
                 Duration.ofSeconds(1), Duration.ofSeconds(1), 100, 10,
-                new AiProperties.Worker(Duration.ofSeconds(1), 1, Duration.ofMinutes(1)));
+                new AiProperties.Worker(1, Duration.ofMinutes(1)));
     }
 }

@@ -24,7 +24,7 @@ in the same module and differ only by controller (`/api/admin/**` with
 - **Owns writes to:** none
 - **Reads from:** none
 - **Contains:**
-  - `config`: `SecurityConfig` (SecurityFilterChain, Supabase JWT via `jwk-set-uri` + `jws-algorithms: ES256`, method security), `StorageConfig` (S3 client/presigner beans + nested `S3Properties`). Redis needs no config class - Spring Boot autoconfigures the connection factory and `StringRedisTemplate` from `spring.data.redis.*`.
+  - `config`: `SecurityConfig` (SecurityFilterChain, Supabase JWT via `jwk-set-uri` + `jws-algorithms: ES256`, method security), `StorageConfig` (S3 client/presigner beans + nested `S3Properties`).
   - `shared/security`: `CurrentUser` - exposes only what the Supabase JWT carries (`authProviderId` = `sub`, `email`). Internal user id and business role live in the `users` table and are resolved by the `user` module, not here.
   - `shared/error`: `DomainException` (code + `HttpStatus`), typed bases `NotFoundException` / `ConflictException` / `BadRequestException` / `ForbiddenException`, `ApiErrorResponse`, `GlobalExceptionHandler` (also maps `OptimisticLockingFailureException` -> 409 `CONCURRENT_UPDATE`).
   - `shared/storage`: `ObjectStorageClient` - generic `upload(bucket, key, stream)` / `presignGet(bucket, key, ttl)` / `delete`, no knowledge of what a key means.
@@ -32,7 +32,6 @@ in the same module and differ only by controller (`/api/admin/**` with
   - business error codes (e.g. `ATTEMPT_ALREADY_SUBMITTED`) - live in the owning module, exception extends `DomainException`
   - `@PreAuthorize` / "who can do what" rules - declared per module at the controller/service that owns the action
   - business enums (e.g. `TargetSkill`) - they belong to the owning module
-  - Redis lock key naming, TTL, and lock semantics - owned by the module that needs the lock
   - S3 object key/path conventions and bucket choice per file type - owned by the module that owns the file: `user` (avatar/banner), `exam` (question audio/image, speaking recordings)
 - **Why:** security/error/storage config are pure infrastructure - no business vocabulary, no business reason to change, and adding a field to them forces no module to change. Auth is delegated to Supabase (JWT issuance, no self-managed sessions), so this layer only verifies tokens.
 - **Revisit if:** any business-specific rule (lock semantics, key naming, authorization logic) starts leaking in - that is domain logic misplaced, move it into the owning module. Also revisit if the project stops relying on Supabase for auth.
@@ -120,7 +119,7 @@ migration that created the column rather than becoming a chain of `alter table`.
 
 - **Quiz** - tables not designed. It gets its own module when built (own tables, own admin CRUD); the `user` module calls into it. Not folded into `user`, not folded into `exam`.
 - **Exam authoring endpoints, and the authorization they need.** Content is seeded by SQL in this phase. Nothing enforces roles today: there is no `@PreAuthorize` anywhere, JWT claims are never mapped to authorities, and `users.role` is a `String` no code reads - `@EnableMethodSecurity` and the `AccessDeniedException` handler are pre-wired hooks waiting for it. Exam authoring is the first feature that needs a real role check, so it will need a `Role` enum plus a `JwtAuthenticationConverter` (or a service-level check against `User.role`) before it works.
-- **AI grading**, and with it `ai_jobs`, `grading_criteria`, `attempt_answer_criterion_scores`, `exam_sections.is_scored_by_criteria` and Redis - all owned by `exam`, none used. Only TOEIC 2-skills papers exist, so every answer is objective-key gradable. `ai_jobs` stays a one-consumer table until a second consumer justifies pulling it out.
+- **AI grading**, and with it `grading_criteria`, `attempt_answer_criterion_scores` and `exam_sections.is_scored_by_criteria` - all owned by `exam`, none used. Only TOEIC 2-skills papers exist, so every answer is objective-key gradable.
 - **`question_sets.is_single_use`** - the column implies a question-bank / reuse concept that no decision covers. Decide what it means before anything reads it.
 - **`spring.servlet.multipart.max-file-size: 2MB`** - too small for speaking recordings. Irrelevant until a 4-skills paper exists; the choice then is raising the limit or presigned direct-to-S3 upload.
 - **`@Version` columns** - the design calls for them on `LearnerProfile` and `ExamAttempt`; neither exists in a migration or an entity yet.

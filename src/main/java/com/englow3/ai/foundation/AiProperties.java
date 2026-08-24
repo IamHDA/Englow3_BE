@@ -10,7 +10,6 @@ public record AiProperties(@DefaultValue("false") boolean enabled, @DefaultValue
         @DefaultValue("45s") Duration readTimeout, @DefaultValue("2048") int maxOutputTokens,
         @DefaultValue("100") int dailyRequestLimit, @DefaultValue Worker worker) {
 
-    public record Worker(@DefaultValue("2s") Duration fixedDelay, @DefaultValue("5") int batchSize,
-            @DefaultValue("5m") Duration lockTimeout) {
+    public record Worker(@DefaultValue("5") int batchSize, @DefaultValue("5m") Duration lockTimeout) {
     }
 }

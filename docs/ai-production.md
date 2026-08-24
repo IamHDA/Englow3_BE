@@ -56,7 +56,7 @@ Copy `.env.example` and replace all local defaults. At minimum:
 - For speaking: set `SPEECH_ENABLED=true` in Spring and
   `AI_SERVICE_SPEECH_ENABLED=true`, `AI_SERVICE_AZURE_SPEECH_BASE_URL`,
   `AI_SERVICE_AZURE_SPEECH_API_KEY` for FastAPI.
-- Restrictive `CORS_ALLOWED_ORIGINS` and a non-empty `REDIS_PASSWORD`.
+- Restrictive `CORS_ALLOWED_ORIGINS`.
 
 Set cost rates for every active model through `PUT /api/admin/ai/model-policies/{capability}`. Rates are expressed per one million tokens and feed both per-job and aggregate cost metrics.
 
