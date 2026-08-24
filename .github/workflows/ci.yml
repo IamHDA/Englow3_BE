@@ -12,7 +12,7 @@ on:
       - dev
 
 jobs:
-  build:
+  java:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,3 +31,53 @@ jobs:
 
       - name: Build and test
         run: mvn --batch-mode clean verify
+
+  ai-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: ai_service/requirements-dev.txt
+
+      - name: Install AI service dependencies
+        run: python -m pip install -r ai_service/requirements-dev.txt
+
+      - name: Lint AI service
+        working-directory: ai_service
+        run: python -m ruff check app tests
+
+      - name: Check AI service formatting
+        working-directory: ai_service
+        run: python -m ruff format --check app tests
+
+      - name: Test AI service
+        working-directory: ai_service
+        run: python -m pytest
+
+  data-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: data_pipeline/requirements.txt
+
+      - name: Install data-pipeline dependencies
+        run: python -m pip install -r data_pipeline/requirements.txt
+
+      - name: Test data pipeline
+        working-directory: data_pipeline
+        run: python -m pytest -q
