@@ -45,7 +45,8 @@ class LearningPathServiceTest {
         });
         LearningPathService service = new LearningPathService(jdbcTemplate, userRepository,
                 mock(LearnerProfileRepository.class), currentUser, mock(AiPromptService.class),
-                mock(AiJobService.class), new ObjectMapper());
+                mock(AiJobService.class), new ObjectMapper(), mock(LearningContentResolver.class),
+                new BktMasteryCalculator());
 
         assertThatThrownBy(service::current).isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("No active learning path");

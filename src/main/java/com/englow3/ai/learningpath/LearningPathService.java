@@ -1,7 +1,11 @@
 package com.englow3.ai.learningpath;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +22,8 @@ import com.englow3.ai.foundation.AiJob;
 import com.englow3.ai.foundation.AiJobService;
 import com.englow3.ai.foundation.AiPromptService;
 import com.englow3.ai.foundation.RenderedPrompt;
+import com.englow3.ai.learningpath.LearningContentResolver.ContentRef;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
@@ -37,10 +43,13 @@ class LearningPathService {
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
+    private final LearningContentResolver contentResolver;
+    private final BktMasteryCalculator masteryCalculator;
 
     LearningPathService(JdbcTemplate jdbcTemplate, UserRepository userRepository,
             LearnerProfileRepository profileRepository, CurrentUser currentUser, AiPromptService promptService,
-            AiJobService jobService, ObjectMapper objectMapper) {
+            AiJobService jobService, ObjectMapper objectMapper, LearningContentResolver contentResolver,
+            BktMasteryCalculator masteryCalculator) {
         this.jdbcTemplate = jdbcTemplate;
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
@@ -48,6 +57,8 @@ class LearningPathService {
         this.promptService = promptService;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
+        this.contentResolver = contentResolver;
+        this.masteryCalculator = masteryCalculator;
     }
 
     @Transactional
@@ -63,10 +74,20 @@ class LearningPathService {
         savePreferences(user.getId(), request.dailyMinutes(), request.items());
         String level = currentLevel(user.getId());
         Set<String> focusDomains = focusDomains(user.getId());
-        List<ConceptCandidate> candidates = eligibleConcepts(user.getId(), level).stream()
+        List<ConceptCandidate> rankedConcepts = eligibleConcepts(user.getId(), level).stream()
                 .sorted(Comparator.comparing((ConceptCandidate concept) -> !focusDomains.contains(concept.domain()))
                         .thenComparingDouble(ConceptCandidate::mastery).thenComparing(ConceptCandidate::conceptId))
-                .limit(request.items()).toList();
+                .toList();
+        List<PathCandidate> candidates = new ArrayList<>();
+        for (ConceptCandidate concept : rankedConcepts) {
+            ContentRef content = contentResolver.resolve(user.getId(), concept.conceptId(), concept.mastery());
+            if (content != null) {
+                candidates.add(new PathCandidate(concept, content));
+            }
+            if (candidates.size() == request.items()) {
+                break;
+            }
+        }
         if (candidates.isEmpty()) {
             throw new ConflictException("LEARNING_PATH_NO_ELIGIBLE_CONCEPTS",
                     "No prerequisite-ready concepts are available for this learner");
@@ -77,21 +98,24 @@ class LearningPathService {
                 insert into learning_paths (id, user_id, status) values (?, ?, 'ACTIVE')
                 """, pathId, user.getId());
         int position = 1;
-        for (ConceptCandidate concept : candidates) {
+        for (PathCandidate candidate : candidates) {
+            ConceptCandidate concept = candidate.concept();
             String reason = concept.mastery() < 0.5 ? "Build an important weak concept"
                     : "Continue the prerequisite-ready progression";
             jdbcTemplate.update("""
                     insert into learning_path_items
-                        (id, learning_path_id, position, concept_id, reason)
-                    values (?, ?, ?, ?, ?)
-                    """, UUID.randomUUID(), pathId, position++, concept.conceptId(), reason);
+                        (id, learning_path_id, position, concept_id, content_type, content_id,
+                         content_difficulty, reason)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, UUID.randomUUID(), pathId, position++, concept.conceptId(), candidate.content().type(),
+                    candidate.content().id(), candidate.content().difficulty(), reason);
         }
 
         if (!jobService.isEnabled(AiCapability.LEARNING_PATH)) {
             return load(pathId, user.getId());
         }
 
-        String conceptText = candidates.stream()
+        String conceptText = candidates.stream().map(PathCandidate::concept)
                 .map(concept -> "%s (%s/%s, mastery %.2f)".formatted(concept.conceptId(), concept.nameEn(),
                         concept.domain(), concept.mastery()))
                 .reduce((left, right) -> left + "\n" + right).orElseThrow();
@@ -100,7 +124,7 @@ class LearningPathService {
         ObjectNode payload = objectMapper.createObjectNode().put("pathId", pathId.toString())
                 .put("systemPrompt", prompt.systemPrompt()).put("userPrompt", prompt.userPrompt());
         AiJob job = jobService.submitForCurrentUser(AiCapability.LEARNING_PATH, "LEARNING_PATH_EXPLANATION",
-                "LEARNING_PATH", pathId, prompt.version(), payload, request.idempotencyKey());
+                "LEARNING_PATH", pathId, prompt.version(), payload, "LEARNING_PATH:" + request.idempotencyKey());
         jdbcTemplate.update("update learning_paths set ai_job_id = ? where id = ?", job.getId(), pathId);
         return load(pathId, user.getId());
     }
@@ -123,38 +147,122 @@ class LearningPathService {
     @Transactional
     LearningPathDtos.PathItem complete(UUID itemId, LearningPathDtos.CompleteItemRequest request) {
         User user = requireUser();
-        ItemState item = jdbcTemplate.query("""
-                select i.concept_id, i.status
-                from learning_path_items i join learning_paths p on p.id = i.learning_path_id
-                where i.id = ? and p.user_id = ? and p.status = 'ACTIVE' for update
-                """, rs -> rs.next() ? new ItemState(rs.getString("concept_id"), rs.getString("status")) : null, itemId,
-                user.getId());
-        if (item == null) {
-            throw new NotFoundException("LEARNING_PATH_ITEM_NOT_FOUND", "Learning path item was not found");
+        if (isIdempotentReplay(user.getId(), itemId, request.idempotencyKey(), "PATH_ITEM_COMPLETED",
+                request.successful())) {
+            return findItem(itemId, user.getId());
         }
-        if (!"PENDING".equals(item.status())) {
+        ItemState item = lockItem(itemId, user.getId());
+        if (!List.of("PENDING", "POSTPONED").contains(item.status())) {
             throw new ConflictException("LEARNING_PATH_ITEM_ALREADY_HANDLED",
                     "Learning path item is already completed or skipped");
         }
         jdbcTemplate.update("""
                 update learning_path_items set status = 'COMPLETED', completed_at = now() where id = ?
                 """, itemId);
-        updateMastery(user.getId(), item.conceptId(), request.successful());
+        UUID eventId = UUID.randomUUID();
         jdbcTemplate.update("""
                 insert into learning_events
-                    (id, user_id, concept_id, learning_path_item_id, event_type, successful, source_type, source_id)
-                values (?, ?, ?, ?, 'PATH_ITEM_COMPLETED', ?, 'LEARNING_PATH', ?)
-                """, UUID.randomUUID(), user.getId(), item.conceptId(), itemId, request.successful(),
-                request.sourceId());
+                    (id, user_id, concept_id, learning_path_item_id, event_type, successful,
+                     source_type, source_id, idempotency_key, duration_seconds, difficulty)
+                values (?, ?, ?, ?, 'PATH_ITEM_COMPLETED', ?, ?, ?, ?, ?, ?)
+                """, eventId, user.getId(), item.conceptId(), itemId, request.successful(), sourceType(item),
+                sourceId(item, itemId), request.idempotencyKey(), request.durationSeconds(), item.difficulty());
+        updateMastery(eventId, user.getId(), item.conceptId(), request.successful());
+        completePathWhenDone(item.pathId());
         return findItem(itemId, user.getId());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    LearningPathDtos.PathItem skip(UUID itemId, LearningPathDtos.SkipItemRequest request) {
+        User user = requireUser();
+        if (isIdempotentReplay(user.getId(), itemId, request.idempotencyKey(), "PATH_ITEM_SKIPPED", null)) {
+            return findItem(itemId, user.getId());
+        }
+        ItemState item = lockItem(itemId, user.getId());
+        if (!List.of("PENDING", "POSTPONED").contains(item.status())) {
+            throw new ConflictException("LEARNING_PATH_ITEM_ALREADY_HANDLED", "Learning path item is already handled");
+        }
+        jdbcTemplate.update("""
+                update learning_path_items
+                set status = 'SKIPPED', skip_reason = ?, postponed_until = null where id = ?
+                """, request.reason().strip(), itemId);
+        recordEvent(UUID.randomUUID(), user.getId(), item, itemId, "PATH_ITEM_SKIPPED", null, request.idempotencyKey());
+        completePathWhenDone(item.pathId());
+        return findItem(itemId, user.getId());
+    }
+
+    @Transactional
+    LearningPathDtos.PathItem postpone(UUID itemId, LearningPathDtos.PostponeItemRequest request) {
+        User user = requireUser();
+        if (!request.until().isAfter(Instant.now())
+                || request.until().isAfter(Instant.now().plusSeconds(30L * 86400))) {
+            throw new BadRequestException("LEARNING_PATH_POSTPONE_INVALID",
+                    "Postponement must be in the future and no more than 30 days");
+        }
+        if (isIdempotentReplay(user.getId(), itemId, request.idempotencyKey(), "PATH_ITEM_POSTPONED", null)) {
+            return findItem(itemId, user.getId());
+        }
+        ItemState item = lockItem(itemId, user.getId());
+        if (!List.of("PENDING", "POSTPONED").contains(item.status())) {
+            throw new ConflictException("LEARNING_PATH_ITEM_ALREADY_HANDLED", "Learning path item is already handled");
+        }
+        jdbcTemplate.update("""
+                update learning_path_items set status = 'POSTPONED', postponed_until = ? where id = ?
+                """, Timestamp.from(request.until()), itemId);
+        recordEvent(UUID.randomUUID(), user.getId(), item, itemId, "PATH_ITEM_POSTPONED", null,
+                request.idempotencyKey());
+        return findItem(itemId, user.getId());
+    }
+
+    @Transactional
+    LearningPathDtos.PathItem replace(UUID itemId, LearningPathDtos.ReplaceItemRequest request) {
+        User user = requireUser();
+        if (isIdempotentReplay(user.getId(), itemId, request.idempotencyKey(), "PATH_ITEM_REPLACED", null)) {
+            return findItem(itemId, user.getId());
+        }
+        ItemState item = lockItem(itemId, user.getId());
+        if (!List.of("PENDING", "POSTPONED").contains(item.status())) {
+            throw new ConflictException("LEARNING_PATH_ITEM_ALREADY_HANDLED", "Learning path item is already handled");
+        }
+        ContentRef replacement = contentResolver.resolve(user.getId(), item.conceptId(), item.mastery(),
+                item.contentType(), item.contentId());
+        if (replacement == null) {
+            throw new ConflictException("LEARNING_PATH_REPLACEMENT_NOT_FOUND",
+                    "No alternative approved content is available for this concept");
+        }
+        jdbcTemplate.update("""
+                insert into learning_path_item_replacements
+                    (id, learning_path_item_id, old_content_type, old_content_id,
+                     new_content_type, new_content_id, reason)
+                values (?, ?, ?, ?, ?, ?, ?)
+                """, UUID.randomUUID(), itemId, sourceType(item), sourceId(item, itemId), replacement.type(),
+                replacement.id(), request.reason().strip());
+        jdbcTemplate.update(
+                """
+                        update learning_path_items
+                        set content_type = ?, content_id = ?, content_difficulty = ?, status = 'PENDING', postponed_until = null,
+                            reason = ? where id = ?
+                        """,
+                replacement.type(), replacement.id(), replacement.difficulty(),
+                "Replacement: " + request.reason().strip(), itemId);
+        recordEvent(UUID.randomUUID(), user.getId(), item, itemId, "PATH_ITEM_REPLACED", null,
+                request.idempotencyKey());
+        return findItem(itemId, user.getId());
+    }
+
+    @Transactional
     LearningPathDtos.PathItem next() {
         User user = requireUser();
+        jdbcTemplate.update("""
+                update learning_path_items i set status = 'PENDING', postponed_until = null
+                from learning_paths p
+                where i.learning_path_id = p.id and p.user_id = ? and p.status = 'ACTIVE'
+                  and i.status = 'POSTPONED' and i.postponed_until <= now()
+                """, user.getId());
         LearningPathDtos.PathItem item = jdbcTemplate.query("""
                 select i.id, i.position, i.concept_id, c.name_en, c.name_vi, c.domain,
-                       coalesce(m.probability_known, c.p_init) mastery, i.reason, i.status
+                       coalesce(m.probability_known, c.p_init) mastery, i.content_type, i.content_id,
+                       i.reason, i.status, i.postponed_until
                 from learning_paths p
                 join learning_path_items i on i.learning_path_id = p.id
                 join concepts c on c.concept_id = i.concept_id
@@ -194,31 +302,42 @@ class LearningPathService {
                 userId, level, userId);
     }
 
-    private void updateMastery(UUID userId, String conceptId, boolean successful) {
+    private void updateMastery(UUID eventId, UUID userId, String conceptId, boolean successful) {
+        jdbcTemplate.queryForObject("select pg_advisory_xact_lock(hashtextextended(?, 0))::text", String.class,
+                userId + ":" + conceptId);
+        MasteryParameters parameters = jdbcTemplate.query("""
+                select coalesce(m.probability_known, c.p_init) prior,
+                       c.p_learn, c.p_slip, c.p_guess
+                from concepts c
+                left join learner_concept_mastery m on m.user_id = ? and m.concept_id = c.concept_id
+                where c.concept_id = ?
+                """,
+                rs -> rs.next()
+                        ? new MasteryParameters(rs.getDouble("prior"), rs.getDouble("p_learn"), rs.getDouble("p_slip"),
+                                rs.getDouble("p_guess"))
+                        : null,
+                userId, conceptId);
+        if (parameters == null) {
+            throw new NotFoundException("LEARNING_CONCEPT_NOT_FOUND", "Learning concept was not found");
+        }
+        BktMasteryCalculator.Update update = masteryCalculator.calculate(parameters.prior(), parameters.learn(),
+                parameters.slip(), parameters.guess(), successful);
         jdbcTemplate.update("""
-                with parameters as (
-                    select c.concept_id, c.p_init, c.p_learn, c.p_slip, c.p_guess,
-                           coalesce(m.probability_known, c.p_init) prior
-                    from concepts c
-                    left join learner_concept_mastery m on m.user_id = ? and m.concept_id = c.concept_id
-                    where c.concept_id = ?
-                ), posterior as (
-                    select *, case when ? then
-                        (prior * (1 - p_slip)) / nullif(prior * (1 - p_slip) + (1 - prior) * p_guess, 0)
-                    else
-                        (prior * p_slip) / nullif(prior * p_slip + (1 - prior) * (1 - p_guess), 0)
-                    end observed
-                    from parameters
-                )
                 insert into learner_concept_mastery
                     (user_id, concept_id, probability_known, evidence_count, last_practiced_at)
-                select ?, concept_id, least(0.99, observed + (1 - observed) * p_learn), 1, now()
-                from posterior
+                values (?, ?, ?, 1, now())
                 on conflict (user_id, concept_id) do update
                 set probability_known = excluded.probability_known,
                     evidence_count = learner_concept_mastery.evidence_count + 1,
                     last_practiced_at = now(), updated_at = now()
-                """, userId, conceptId, successful, userId);
+                """, userId, conceptId, update.posterior());
+        jdbcTemplate.update("""
+                insert into learner_mastery_events
+                    (event_id, user_id, concept_id, successful, prior_probability, observed_probability,
+                     posterior_probability, p_learn, p_slip, p_guess, algorithm_version)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, eventId, userId, conceptId, successful, update.prior(), update.observed(), update.posterior(),
+                parameters.learn(), parameters.slip(), parameters.guess(), BktMasteryCalculator.ALGORITHM_VERSION);
     }
 
     private LearningPathDtos.PathResponse load(UUID pathId, UUID userId) {
@@ -237,7 +356,8 @@ class LearningPathService {
         }
         List<LearningPathDtos.PathItem> items = jdbcTemplate.query("""
                 select i.id, i.position, i.concept_id, c.name_en, c.name_vi, c.domain,
-                       coalesce(m.probability_known, c.p_init) mastery, i.reason, i.status
+                       coalesce(m.probability_known, c.p_init) mastery, i.content_type, i.content_id,
+                       i.reason, i.status, i.postponed_until
                 from learning_path_items i
                 join learning_paths p on p.id = i.learning_path_id
                 join concepts c on c.concept_id = i.concept_id
@@ -251,7 +371,8 @@ class LearningPathService {
     private LearningPathDtos.PathItem findItem(UUID itemId, UUID userId) {
         return jdbcTemplate.query("""
                 select i.id, i.position, i.concept_id, c.name_en, c.name_vi, c.domain,
-                       coalesce(m.probability_known, c.p_init) mastery, i.reason, i.status
+                       coalesce(m.probability_known, c.p_init) mastery, i.content_type, i.content_id,
+                       i.reason, i.status, i.postponed_until
                 from learning_path_items i
                 join learning_paths p on p.id = i.learning_path_id
                 join concepts c on c.concept_id = i.concept_id
@@ -263,7 +384,84 @@ class LearningPathService {
     private LearningPathDtos.PathItem mapItem(ResultSet rs) throws SQLException {
         return new LearningPathDtos.PathItem(rs.getObject("id", UUID.class), rs.getInt("position"),
                 rs.getString("concept_id"), rs.getString("name_en"), rs.getString("name_vi"), rs.getString("domain"),
-                rs.getDouble("mastery"), rs.getString("reason"), rs.getString("status"));
+                rs.getDouble("mastery"), rs.getString("content_type"), rs.getString("content_id"),
+                rs.getString("reason"), rs.getString("status"), instant(rs.getTimestamp("postponed_until")));
+    }
+
+    private ItemState lockItem(UUID itemId, UUID userId) {
+        ItemState item = jdbcTemplate.query("""
+                select i.learning_path_id, i.concept_id, i.status, i.content_type, i.content_id,
+                       i.content_difficulty, coalesce(m.probability_known, c.p_init) mastery
+                from learning_path_items i
+                join learning_paths p on p.id = i.learning_path_id
+                join concepts c on c.concept_id = i.concept_id
+                left join learner_concept_mastery m on m.user_id = p.user_id and m.concept_id = i.concept_id
+                where i.id = ? and p.user_id = ? and p.status = 'ACTIVE' for update of i
+                """,
+                rs -> rs.next()
+                        ? new ItemState(rs.getObject("learning_path_id", UUID.class), rs.getString("concept_id"),
+                                rs.getString("status"), rs.getString("content_type"), rs.getString("content_id"),
+                                rs.getBigDecimal("content_difficulty"), rs.getDouble("mastery"))
+                        : null,
+                itemId, userId);
+        if (item == null) {
+            throw new NotFoundException("LEARNING_PATH_ITEM_NOT_FOUND", "Learning path item was not found");
+        }
+        return item;
+    }
+
+    private boolean isIdempotentReplay(UUID userId, UUID itemId, String idempotencyKey, String eventType,
+            Boolean successful) {
+        ReplayEvent existing = jdbcTemplate.query("""
+                select learning_path_item_id, event_type, successful from learning_events
+                where user_id = ? and idempotency_key = ?
+                """,
+                rs -> rs.next()
+                        ? new ReplayEvent(rs.getObject("learning_path_item_id", UUID.class), rs.getString("event_type"),
+                                rs.getObject("successful", Boolean.class))
+                        : null,
+                userId, idempotencyKey);
+        if (existing == null) {
+            return false;
+        }
+        if (!existing.itemId().equals(itemId) || !existing.eventType().equals(eventType)
+                || !java.util.Objects.equals(existing.successful(), successful)) {
+            throw new ConflictException("LEARNING_EVENT_IDEMPOTENCY_CONFLICT",
+                    "The idempotency key was already used for a different learning event");
+        }
+        return true;
+    }
+
+    private void recordEvent(UUID eventId, UUID userId, ItemState item, UUID itemId, String eventType,
+            Boolean successful, String idempotencyKey) {
+        jdbcTemplate.update("""
+                insert into learning_events
+                    (id, user_id, concept_id, learning_path_item_id, event_type, successful,
+                     source_type, source_id, idempotency_key, difficulty)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, eventId, userId, item.conceptId(), itemId, eventType, successful, sourceType(item),
+                sourceId(item, itemId), idempotencyKey, item.difficulty());
+    }
+
+    private String sourceType(ItemState item) {
+        return item.contentType() == null ? "LEARNING_PATH" : item.contentType();
+    }
+
+    private String sourceId(ItemState item, UUID itemId) {
+        return item.contentId() == null ? itemId.toString() : item.contentId();
+    }
+
+    private void completePathWhenDone(UUID pathId) {
+        jdbcTemplate.update("""
+                update learning_paths set status = 'COMPLETED'
+                where id = ? and status = 'ACTIVE'
+                  and not exists (select 1 from learning_path_items
+                                  where learning_path_id = ? and status in ('PENDING', 'POSTPONED'))
+                """, pathId, pathId);
+    }
+
+    private Instant instant(Timestamp value) {
+        return value == null ? null : value.toInstant();
     }
 
     private UUID activePathId(UUID userId) {
@@ -301,7 +499,17 @@ class LearningPathService {
     private record ConceptCandidate(String conceptId, String nameEn, String nameVi, String domain, double mastery) {
     }
 
-    private record ItemState(String conceptId, String status) {
+    private record PathCandidate(ConceptCandidate concept, ContentRef content) {
+    }
+
+    private record ItemState(UUID pathId, String conceptId, String status, String contentType, String contentId,
+            BigDecimal difficulty, double mastery) {
+    }
+
+    private record MasteryParameters(double prior, double learn, double slip, double guess) {
+    }
+
+    private record ReplayEvent(UUID itemId, String eventType, Boolean successful) {
     }
 
     private record PathHeader(UUID id, String status, String explanation, UUID jobId, int dailyMinutes) {
