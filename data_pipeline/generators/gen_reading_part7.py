@@ -189,7 +189,8 @@ said, "but the revenue does not disappear overnight when one contract ends." """
     ("They are located in areas the fleet cannot reach", False,
      "Đó là lý do mua xe nhỏ, liên quan tới cửa hàng độc lập.")]),
 
-  ("What concern do analysts raise?", Q.RC_DETAIL, "rc_detail", 0.50,
+  ("What is meant by the statement that margins on independent contracts are \"thinner\"?",
+   Q.RC_PARAPHRASE, "rc_paraphrase", 0.50,
    "margins on independent contracts are thinner",
    [("The profit on each contract is smaller", True,
      "Bài dùng đúng chữ 'margins ... are thinner'."),
@@ -343,10 +344,22 @@ DOUBLE_QUESTIONS = [
 
  ("How long does Mr Brightwater need the room?", Q.RC_DETAIL, "rc_detail", 0.35, 1,
   "will need the room from 08:30 to 17:00",
-  [("Eight and a half hours", True, "Từ 08:30 đến 17:00 là tám tiếng rưỡi."),
+ [("Eight and a half hours", True, "Từ 08:30 đến 17:00 là tám tiếng rưỡi."),
    ("Six hours, finishing in the early afternoon", False, "Ngắn hơn khoảng thời gian nêu trong email."),
    ("A full two days", False, "Email chỉ nói một ngày, thứ Năm 6 tháng Hai."),
    ("Only the morning", False, "Email yêu cầu tới 17:00.")]),
+
+ ("What happens if written confirmation is not received in time?",
+  Q.RC_DETAIL, "rc_detail", 0.40, 2,
+  "After that the room is released without further notice",
+  [("The room is released to other customers", True,
+    "Bảng thông tin nói phòng sẽ được giải phóng nếu hết thời hạn giữ chỗ."),
+   ("An evening extension is added automatically", False,
+    "Gia hạn buổi tối phải được thỏa thuận trước."),
+   ("The daily rate is charged immediately", False,
+    "Không có thông tin về việc tự động thu phí."),
+   ("The booking is moved to another room", False,
+    "Không có việc tự động chuyển sang phòng khác.")]),
 ]
 
 

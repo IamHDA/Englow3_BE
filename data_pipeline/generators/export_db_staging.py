@@ -14,7 +14,6 @@ Chạy:
 from __future__ import annotations
 
 import argparse
-import collections
 import datetime as dt
 import json
 import sys
@@ -40,6 +39,8 @@ LOAD_ORDER = [
     "exam_items",
     "speaking_tasks",
     "writing_tasks",
+    "assessment_prompts",
+    "shadowing_clips",
     "options",
     "flashcard_concepts",
     "flashcard_examples",
@@ -47,6 +48,9 @@ LOAD_ORDER = [
     "exam_item_concepts",
     "grammar_point_concepts",
     "task_concepts",
+    "shadowing_segments",
+    "shadowing_clip_concepts",
+    "assessment_calibration_cases",
     "exam_set_items",
 ]
 
@@ -244,11 +248,14 @@ def export_speaking_writing() -> tuple[list[dict], list[dict], list[dict],
                 "rubric_ref": t["rubric_ref"],
                 "difficulty_prior": t["difficulty_prior"],
                 "review_status": t["review_status"],
+                "image_url": t.get("image_url"),
+                "stimulus_text": t.get("stimulus_text"),
             }
             if kind == "speaking":
                 sp_tasks.append({**base, "part_number": t["part_number"],
-                                 "prep_time_sec": t["prep_time_sec"],
-                                 "response_time_sec": t["response_time_sec"]})
+                                  "prep_time_sec": t["prep_time_sec"],
+                                  "response_time_sec": t["response_time_sec"],
+                                  "prompt_audio": t.get("audio")})
             else:
                 wr_tasks.append({**base, "task_type": t["task_type"],
                                  "min_words": t.get("min_words"),
@@ -259,6 +266,48 @@ def export_speaking_writing() -> tuple[list[dict], list[dict], list[dict],
                                       "task_kind": kind, "concept_id": cid})
 
     return rubrics, dims, sp_tasks, wr_tasks, task_concepts
+
+
+def export_shadowing() -> tuple[list[dict], list[dict], list[dict]]:
+    path = ROOT / "output" / "shadowing" / "shadowing_batch_001.json"
+    clips, segments, concepts = [], [], []
+    if not path.exists():
+        return clips, segments, concepts
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for clip in data.get("clips", []):
+        clips.append({
+            "clip_id": clip["clip_id"], "cefr_level": clip["cefr_level"],
+            "accent": clip["accent"], "script": clip["script"],
+            "audio_url": clip.get("audio_url"), "duration_ms": clip.get("duration_ms"),
+            "practice_modes": clip.get("practice_modes", ["shadowing", "dictation"]),
+            "review_status": clip.get("review_status", "draft"),
+        })
+        for segment in clip.get("segments", []):
+            segments.append({"clip_id": clip["clip_id"], **segment})
+        for cid in clip.get("concept_ids", []):
+            concepts.append({"clip_id": clip["clip_id"], "concept_id": cid})
+    return clips, segments, concepts
+
+
+def export_assessment() -> tuple[list[dict], list[dict]]:
+    directory = ROOT / "output" / "prompts"
+    prompts, cases = [], []
+    batch = directory / "assessment_prompts_batch_001.json"
+    if batch.exists():
+        data = json.loads(batch.read_text(encoding="utf-8"))
+        prompts.extend(data.get("prompts", []))
+    fixture = directory / "assessment_calibration_cases.json"
+    if fixture.exists():
+        data = json.loads(fixture.read_text(encoding="utf-8"))
+        for case in data.get("cases", []):
+            cases.append({
+                "case_id": case["case_id"], "target": case["target"],
+                "prompt_id": case["prompt_id"], "task": case["task"],
+                "learner_response": case["learner_response"],
+                "delivery_observations": case.get("delivery_observations"),
+                "expected_result": case["expected_result"],
+            })
+    return prompts, cases
 
 
 def export_exams() -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
@@ -303,6 +352,7 @@ def export_exams() -> tuple[list[dict], list[dict], list[dict], list[dict], list
                             "speaker_count": aud.get("speaker_count", 1),
                             "duration_ms": aud.get("duration_ms"),
                             "alignment_status": aud.get("alignment_status", "pending"),
+                            "cues": aud.get("cues", []),
                         })
 
                 for q in g.get("questions", []):
@@ -398,6 +448,15 @@ def main() -> int:
     tables["speaking_tasks"] = sp_tasks
     tables["writing_tasks"] = wr_tasks
     tables["task_concepts"] = task_concepts
+
+    shadowing, shadow_segments, shadow_concepts = export_shadowing()
+    tables["shadowing_clips"] = shadowing
+    tables["shadowing_segments"] = shadow_segments
+    tables["shadowing_clip_concepts"] = shadow_concepts
+
+    prompts, calibration_cases = export_assessment()
+    tables["assessment_prompts"] = prompts
+    tables["assessment_calibration_cases"] = calibration_cases
 
     tables["exam_items"] = g_items + e_items
     tables["options"] = g_options + e_options

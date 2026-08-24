@@ -72,8 +72,10 @@ services:
         sleep 2;
       done;
       mc mb --ignore-existing local/images;
+      mc mb --ignore-existing local/audio;
       mc mb --ignore-existing local/englow3;
       mc anonymous set download local/images;
+      mc anonymous set download local/audio;
       "
 
 volumes:

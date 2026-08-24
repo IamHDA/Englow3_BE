@@ -1,7 +1,7 @@
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: bootstrap venv install taxonomy seed gen-part5 gen-part6 export-db schema validate test clean tree doctor
+.PHONY: bootstrap venv install sources taxonomy seed gen-part5 gen-part6 export-db schema validate test clean tree doctor gen-learning-data
 
 # --- Bootstrap trên máy mới ---------------------------------------------------
 # Chạy `make bootstrap` là đủ: tự cài uv nếu chưa có, tự tải CPython 3.12,
@@ -38,9 +38,25 @@ taxonomy:
 seed:
 	$(PY) generators/build_vocab_seed.py
 
+# Pinned open-data inputs. Archives and extracted corpora stay outside Git.
+sources:
+	$(PY) generators/fetch_open_sources.py
+
 # Phase 7 — sinh de Reading
-gen-flashcards:
-	$(PY) generators/gen_flashcards.py
+gen-flashcards: sources
+	$(PY) generators/build_flashcard_bank.py
+
+# Complete non-exam learning content. TTS commands require network access.
+gen-learning-data:
+	$(PY) generators/build_flashcard_bank.py
+	$(PY) generators/gen_grammar.py
+	$(PY) generators/gen_shadowing.py
+	$(PY) generators/synthesize_shadowing_audio.py
+	$(PY) generators/gen_assessment_prompts.py
+	$(PY) generators/synthesize_flashcard_audio.py
+	$(PY) generators/export_db_staging.py
+	$(PY) generators/build_qa_reports.py
+	$(PY) validators/audit_data.py
 
 gen-sw:
 	$(PY) generators/gen_speaking_writing.py

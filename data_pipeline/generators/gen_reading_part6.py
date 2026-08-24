@@ -160,7 +160,7 @@ P3_ITEMS = [
     ]),
     ("(2)", QuestionType.VC_COLLOCATION, "vocab_shopping_finance_b1", 0.50, [
         ("discounted", True, "'discounted rate' là collocation chuẩn cho giá ưu đãi."),
-        ("reduced", False, "'reduced rate' cũng có nhưng không đi với 'free consultation and a' tự nhiên bằng."),
+        ("reduction", False, "Cần tính từ bổ nghĩa cho 'rate'; 'reduction' là danh từ."),
         ("lowered", False, "'lowered rate' không phải cụm thông dụng trong quảng cáo."),
         ("cheap", False, "'cheap rate' mang sắc thái rẻ tiền, không dùng trong văn quảng cáo trang trọng."),
     ]),
@@ -290,7 +290,7 @@ def main() -> int:
     print()
     for name, _, text, _ in PASSAGES:
         w = len(text.split())
-        flag = "" if 120 <= w <= 190 else f"  ⚠ ngoài khoảng 120–190"
+        flag = "" if 120 <= w <= 190 else "  ⚠ ngoài khoảng 120–190"
         print(f"  {name:45} {w:3d} từ{flag}")
     print()
     warns = report_bias(groups)

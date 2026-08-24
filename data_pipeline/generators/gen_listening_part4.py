@@ -506,16 +506,16 @@ reference number. Without the reference number we cannot find you.""",
    ("To ask callers to use email instead of telephone", False,
     "Không có đề nghị nào về email.")]),
 
-  ("What does the speaker say about inspections?", Q.LC_DETAIL, "lc_detail",
-   0.55, [
-   ("They must be booked two days in advance", True,
-    "Bốn mươi tám giờ trước, không phải trong ngày."),
-   ("They are carried out within eight working days", False,
-    "Tám ngày làm việc là thời gian cấp chứng nhận SAU khi kiểm tra xong."),
-   ("They can be arranged through the website", False,
-    "Trang web có sơ đồ quyết định, không phải chức năng đặt lịch."),
-   ("They are only available in the mornings", False,
-    "Không có chi tiết nào về khung giờ.")]),
+  ("Look at the graphic. Which project does NOT require approval?",
+   Q.LC_GRAPHIC_REFERENCE, "lc_graphic_reference", 0.55, [
+   ("Repainting an office interior", True,
+    "Flowchart xếp việc chỉ sơn lại nội thất vào nhánh không cần phê duyệt."),
+   ("Removing an internal wall", False,
+    "Thay đổi kết cấu, kể cả dỡ tường, cần được phê duyệt."),
+   ("Installing new electrical wiring", False,
+    "Hệ thống dây điện mới nằm trong nhánh cần phê duyệt."),
+   ("Changing the building's fire exits", False,
+    "Thay đổi lối thoát hiểm ảnh hưởng an toàn nên cần phê duyệt.")]),
 
   ("What must callers include in a message?", Q.LC_DETAIL, "lc_detail", 0.50, [
    ("Their reference number", True,
@@ -551,8 +551,13 @@ def build_group(idx: int, script: str, rows: list[tuple]) -> tuple[ExamGroup, in
 
 def main() -> int:
     groups, idx = [], 0
-    for script, rows in TALKS:
+    for group_index, (script, rows) in enumerate(TALKS):
         g, idx = build_group(idx, script, rows)
+        if group_index == len(TALKS) - 1:
+            payload = g.model_dump(mode="json")
+            payload["image_url"] = (
+                "http://localhost:9000/images/toeic/listening/graphics/approval_flowchart.svg")
+            g = g.__class__.model_validate(payload)
         groups.append(g)
 
     n_q = sum(len(g.questions) for g in groups)

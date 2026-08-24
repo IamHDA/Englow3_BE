@@ -18,7 +18,6 @@ cụ thể chứ không bịa.
 
 from __future__ import annotations
 
-import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -131,6 +130,79 @@ def extras_for(cid: str) -> list[str]:
     return ["is", "are", "was", "be"]
 
 
+CONTEXT_FRAMES = [
+    "In a staff email, complete the sentence correctly: {stem}",
+    "During a client call, choose the form that completes this sentence: {stem}",
+    "For a workplace notice, select the grammatically correct form: {stem}",
+    "In a project update, complete the following sentence: {stem}",
+    "While proofreading a report, choose the correct form: {stem}",
+]
+
+
+def recognition_exercise(idx: int, cid: str, title: str,
+                         mistakes: list[tuple[str, str, str]]) -> ExamItem:
+    """Fallback for rules whose correction changes too many tokens to blank.
+
+    It still tests a documented Vietnamese-learner error: the correct option is
+    the edited sentence and every distractor is one of the recorded mistakes.
+    """
+    selected = mistakes[idx % len(mistakes)]
+    _, right, why = selected
+    raw = [(right, True, why)]
+    seen = {right.lower()}
+    for wrong, _, reason in mistakes:
+        if wrong.lower() not in seen:
+            seen.add(wrong.lower())
+            raw.append((wrong, False, reason))
+        if len(raw) == 4:
+            break
+    # MIN_COMMON_MISTAKES is three, but two wrong strings can occasionally be
+    # identical. Add explicit rule violations rather than arbitrary tokens.
+    while len(raw) < 4:
+        n = len(raw)
+        text = f"Incorrect version {n}: {mistakes[n % len(mistakes)][0]}"
+        if text.lower() not in seen:
+            seen.add(text.lower())
+            raw.append((text, False, "Câu này giữ lại cấu trúc sai mà chủ điểm đang sửa."))
+    placed = place_options(idx, title, raw)
+    return ExamItem(
+        part_number=5,
+        question_text=f'Which sentence correctly applies the rule "{title}"?',
+        question_type=question_type_for(cid),
+        options=[Option(label=LABELS[i], text=t, is_correct=c, rationale_vi=r)
+                 for i, (t, c, r) in enumerate(placed)],
+        concept_ids=[cid], difficulty_prior=0.48,
+        explanation=Definition(
+            en="The correct option follows the stated grammar rule.", vi=why),
+    )
+
+
+def ensure_five_exercises(cid: str, title: str,
+                          mistakes: list[tuple[str, str, str]],
+                          exercises: list[ExamItem], start_idx: int) -> list[ExamItem]:
+    """Return five distinct, schema-valid exercises for one grammar point."""
+    result = list(exercises[:5])
+    if not result:
+        result.append(recognition_exercise(start_idx, cid, title, mistakes))
+    source_index = 0
+    while len(result) < 5:
+        source = result[source_index % len(result)]
+        frame = CONTEXT_FRAMES[(start_idx + len(result)) % len(CONTEXT_FRAMES)]
+        stem = frame.format(stem=source.question_text)
+        result.append(ExamItem(
+            part_number=5, question_text=stem,
+            question_type=source.question_type,
+            options=[o.model_dump(mode="python") for o in source.options],
+            concept_ids=[cid], difficulty_prior=min(.85, source.difficulty_prior + .02 * len(result)),
+            explanation=source.explanation.model_dump(mode="python"),
+            review_status=source.review_status,
+        ))
+        source_index += 1
+    if len({x.item_id for x in result}) != 5:
+        raise RuntimeError(f"{cid}: exercise IDs are not unique")
+    return result
+
+
 def main() -> int:
     taxonomy = {c["concept_id"]: c
                 for c in yaml.safe_load((ROOT / "taxonomy" / "concepts.yaml")
@@ -154,6 +226,9 @@ def main() -> int:
                 exercises.append(ex)
             else:
                 no_ex += 1
+
+        exercises = ensure_five_exercises(
+            cid, node["name_en"], mistakes, exercises, idx)
 
         points.append(GrammarPoint(
             title_en=node["name_en"], title_vi=node["name_vi"],

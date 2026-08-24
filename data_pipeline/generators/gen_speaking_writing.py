@@ -19,9 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from guarded_write import guarded_write_batch  # noqa: E402
 from schemas import (  # noqa: E402
-    BatchMetadata, ModuleType, Rubric, SpeakingBatch, SpeakingTask, WritingBatch,
-    WritingTask,
+    AudioAsset, BatchMetadata, ModuleType, Rubric, SpeakingBatch, SpeakingTask,
+    WritingBatch, WritingTask,
 )
+from schemas.enums import Accent  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_SP = ROOT / "output" / "speaking_writing" / "speaking_batch_001.json"
@@ -207,6 +208,14 @@ WR_RUBRIC = build_rubric("TOEIC-format Writing rubric", WRITING_DIMS)
 ALL_SP = [c for _, _, c, _ in SPEAKING_DIMS]
 ALL_WR = [c for _, _, c, _ in WRITING_DIMS]
 
+MEDIA_BASE = "http://localhost:9000/images/toeic/speaking-writing"
+TRAINING_SCHEDULE = (
+    "TRAINING SCHEDULE — Kelbrook Manufacturing — Tuesday, 14 October\n"
+    "09:00–10:30  Workplace Safety          Room B2    Mr Idris Fanshawe\n"
+    "10:45–12:00  New Equipment Operation   Workshop 3 Mrs Marta Oyelaran\n"
+    "13:00–14:30  Incident Reporting         Room B2    Mr Idris Fanshawe"
+)
+
 # ---------------------------------------------------------------------------
 # SPEAKING — 11 task, thời lượng theo bảng §Phase 9
 # ---------------------------------------------------------------------------
@@ -300,12 +309,8 @@ SPEAKING = [
      "[Ghi chú ăn điểm: chọn một phía rõ ràng, thừa nhận phía kia, rồi kết bằng "
      "cách dung hoà. Dùng 'would rather' và câu điều kiện loại 2 đúng chỗ.]"),
 
-    (8, "Respond using the information provided.\n\n"
-        "LỊCH TẬP HUẤN — Kelbrook Manufacturing, thứ Ba 14 tháng Mười\n"
-        "09:00–10:30  An toàn lao động        Phòng B2   Ông Idris Fanshawe\n"
-        "10:45–12:00  Vận hành thiết bị mới   Xưởng 3    Bà Marta Oyelaran\n"
-        "13:00–14:30  Quy trình báo cáo sự cố Phòng B2   Ông Idris Fanshawe\n\n"
-        "Câu hỏi: I heard the training is all in one room. Is that right?",
+    (8, "Respond using the information provided.\n\n" + TRAINING_SCHEDULE +
+        "\n\nQuestion: I heard the training is all in one room. Is that right?",
      45, 15, ["sp_content", "sp_grammar"], 0.40,
      "Not quite. Two of the three sessions are in Room B2, but the equipment "
      "session from ten forty-five to twelve takes place in Workshop 3, so you "
@@ -313,9 +318,8 @@ SPEAKING = [
      "[Ghi chú ăn điểm: sửa thông tin sai ngay bằng 'Not quite', rồi mới đưa dữ "
      "liệu đúng. Nêu hệ quả thực tế cho người hỏi.]"),
 
-    (9, "Respond using the information provided.\n\n"
-        "(Dùng lại lịch tập huấn ở câu 8.)\n\n"
-        "Câu hỏi: Who is running the afternoon session, and what is it about?",
+    (9, "Respond using the information provided.\n\n" + TRAINING_SCHEDULE +
+        "\n\nQuestion: Who is running the afternoon session, and what is it about?",
      45, 15, ["sp_content"], 0.35,
      "The afternoon session runs from one o'clock to two thirty and it covers "
      "incident reporting procedures. It is led by Mr Idris Fanshawe, the same "
@@ -323,9 +327,8 @@ SPEAKING = [
      "[Ghi chú ăn điểm: trả lời cả hai vế của câu hỏi. Thêm một liên hệ hữu ích "
      "('the same trainer') mà bảng có nhưng người hỏi chưa nhận ra.]"),
 
-    (10, "Respond using the information provided.\n\n"
-         "(Dùng lại lịch tập huấn ở câu 8.)\n\n"
-         "Câu hỏi: I can only arrive at eleven. What will I miss, and what can I "
+    (10, "Respond using the information provided.\n\n" + TRAINING_SCHEDULE +
+         "\n\nQuestion: I can only arrive at eleven. What will I miss, and what can I "
          "still attend?",
      45, 30, ["sp_content", "sp_grammar", "sp_fluency"], 0.45,
      "If you arrive at eleven, you will miss the whole safety session, which runs "
@@ -365,40 +368,35 @@ SPEAKING = [
 WRITING = [
     ("picture_description",
      "Write ONE sentence based on the picture, using the two words given.\n\n"
-     "[Ảnh: Một người đàn ông đang khoá xe đạp vào giá đỗ trước toà nhà văn phòng.]\n"
-     "Từ cho sẵn: bicycle / lock",
+     "Use the words: bicycle / lock",
      None, None, ["wr_grammar", "wr_vocabulary"], 0.25,
      "The man is locking his bicycle to the rack outside the office building.",
      []),
 
     ("picture_description",
      "Write ONE sentence based on the picture, using the two words given.\n\n"
-     "[Ảnh: Hai đồng nghiệp đứng cạnh máy photocopy, một người chỉ vào màn hình.]\n"
-     "Từ cho sẵn: colleague / explain",
+     "Use the words: colleague / explain",
      None, None, ["wr_grammar", "wr_vocabulary"], 0.25,
      "One colleague is explaining the settings on the screen while the other listens.",
      []),
 
     ("picture_description",
      "Write ONE sentence based on the picture, using the two words given.\n\n"
-     "[Ảnh: Nhân viên lễ tân trao một phong bì cho khách qua quầy.]\n"
-     "Từ cho sẵn: receptionist / hand",
+     "Use the words: receptionist / hand",
      None, None, ["wr_grammar", "wr_vocabulary"], 0.25,
      "The receptionist is handing an envelope to the visitor across the counter.",
      []),
 
     ("picture_description",
      "Write ONE sentence based on the picture, using the two words given.\n\n"
-     "[Ảnh: Trời mưa, nhiều người che ô đi ngang qua lối vào ga tàu.]\n"
-     "Từ cho sẵn: umbrella / because",
+     "Use the words: umbrella / because",
      None, None, ["wr_grammar", "wr_vocabulary"], 0.30,
      "The pedestrians are carrying umbrellas because it has started to rain heavily.",
      ["umbrella"]),
 
     ("picture_description",
      "Write ONE sentence based on the picture, using the two words given.\n\n"
-     "[Ảnh: Một phụ nữ dán thông báo lên bảng tin trong hành lang.]\n"
-     "Từ cho sẵn: notice / board",
+     "Use the words: notice / board",
      None, None, ["wr_grammar", "wr_vocabulary"], 0.30,
      "She is pinning a notice to the board in the corridor so that everyone can read it.",
      []),
@@ -498,19 +496,41 @@ WRITING = [
 
 
 def main() -> int:
+    speaking_images = {
+        3: f"{MEDIA_BASE}/speaking/meeting_presentation.jpg",
+        4: f"{MEDIA_BASE}/speaking/train_platform.jpg",
+    }
+    speaking_audio = {
+        8: ("I heard the training is all in one room. Is that right?", Accent.US),
+        9: ("Who is running the afternoon session, and what is it about?", Accent.UK),
+        10: ("I can only arrive at eleven. What will I miss, and what can I still attend?", Accent.AU),
+    }
     sp_tasks = [SpeakingTask(
         part_number=part, prompt=prompt, prep_time_sec=prep,
         response_time_sec=resp, sample_answer_c1=sample,
         rubric_ref=SP_RUBRIC.rubric_id, concept_ids=concepts,
-        difficulty_prior=diff)
+        difficulty_prior=diff,
+        image_url=speaking_images.get(part),
+        stimulus_text=TRAINING_SCHEDULE if part in (8, 9, 10) else None,
+        audio=(AudioAsset(script=speaking_audio[part][0], accent=speaking_audio[part][1])
+               if part in speaking_audio else None))
         for part, prompt, prep, resp, concepts, diff, sample in SPEAKING]
 
+    writing_images = [
+        f"{MEDIA_BASE}/writing/bicycle_lock.jpg",
+        f"{MEDIA_BASE}/writing/photocopier_help.jpg",
+        f"{MEDIA_BASE}/writing/reception_envelope.jpg",
+        f"{MEDIA_BASE}/writing/rainy_station.jpg",
+        f"{MEDIA_BASE}/writing/notice_board.jpg",
+    ]
     wr_tasks = [WritingTask(
         task_type=ttype, prompt=prompt, min_words=mn, max_words=mx,
         sample_answer_c1=sample, high_scoring_vocab=vocab,
         rubric_ref=WR_RUBRIC.rubric_id, concept_ids=concepts,
-        difficulty_prior=diff)
-        for ttype, prompt, mn, mx, concepts, diff, sample, vocab in WRITING]
+        difficulty_prior=diff,
+        image_url=(writing_images[index] if index < len(writing_images) else None))
+        for index, (ttype, prompt, mn, mx, concepts, diff, sample, vocab)
+        in enumerate(WRITING)]
 
     def meta(bid, mt, n):
         return BatchMetadata(batch_id=bid, module_type=mt, generated_by=GENERATED_BY,

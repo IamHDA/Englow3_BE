@@ -13,7 +13,7 @@ from .ids import exam_group_id, exam_item_id
 
 __all__ = [
     "Option", "IRTParams", "EvidenceSpan", "ExamItem", "Passage",
-    "AudioAsset", "ExamGroup", "ExamSet", "SetItemRef",
+    "AudioCue", "AudioAsset", "ExamGroup", "ExamSet", "SetItemRef",
 ]
 
 
@@ -122,6 +122,20 @@ class Passage(StrictModel):
     timestamp: str | None = None
 
 
+class AudioCue(StrictModel):
+    """A verified time range for one utterance in a generated audio asset."""
+    speaker: str | None = None
+    text: str = Field(min_length=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def end_after_start(self):
+        if self.end_ms <= self.start_ms:
+            raise ValueError("audio cue end_ms must be greater than start_ms")
+        return self
+
+
 class AudioAsset(StrictModel):
     # null cho tới khi Phase 8 TTS xong. §Phase 8 cấm nhét URL giả.
     audio_url: HttpUrl | None = None
@@ -130,11 +144,16 @@ class AudioAsset(StrictModel):
     speaker_count: int = Field(default=1, ge=1, le=4)
     duration_ms: int | None = Field(default=None, ge=0)
     alignment_status: AlignmentStatus = AlignmentStatus.PENDING
+    cues: list[AudioCue] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def aligned_needs_audio(self):
         if self.alignment_status is AlignmentStatus.ALIGNED and self.audio_url is None:
             raise ValueError("alignment_status=aligned nhưng chưa có audio_url")
+        if self.alignment_status is AlignmentStatus.ALIGNED and not self.cues:
+            raise ValueError("alignment_status=aligned requires at least one measured cue")
+        if self.duration_ms is not None and any(cue.end_ms > self.duration_ms for cue in self.cues):
+            raise ValueError("audio cue extends beyond duration_ms")
         return self
 
 

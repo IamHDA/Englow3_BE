@@ -20,9 +20,12 @@ from __future__ import annotations
 
 import collections
 import json
+import re
 import statistics
+import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from rapidfuzz import fuzz
@@ -30,8 +33,10 @@ from rapidfuzz import fuzz
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from schemas import (  # noqa: E402
-    ExamBatch, FlashcardBatch, GrammarBatch, SpeakingBatch, WritingBatch,
+    AssessmentPromptBatch, AssessmentResult, ExamBatch, FlashcardBatch,
+    GrammarBatch, ShadowingBatch, SpeakingBatch, WritingBatch,
 )
+from validators.exam_set_rules import check_exam_collection, check_exam_set  # noqa: E402
 from validators.part_rules import check_groups  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +44,8 @@ OUTPUT = ROOT / "output"
 NEAR_DUP = 92          # ngưỡng rapidfuzz của §Phase 3
 MIN_ITEMS_PER_CONCEPT = 10   # ngưỡng BKT hội tụ
 ACCENT_TARGET = {"US": 0.50, "UK": 0.17, "AU": 0.17, "CA": 0.17}
+NUMBERED_BLANK = re.compile(
+    r"(?:chỗ trống|blank)\s*\(\d+\)", re.IGNORECASE)
 
 findings: list[tuple[str, str]] = []      # (mức, mô tả)
 
@@ -52,6 +59,31 @@ def dedup_context(g) -> str:
     return g.audio.script[:200] if g.audio else ""
 
 
+def near_duplicate_pairs(records: list[tuple[str, str]], threshold: int = NEAR_DUP
+                         ) -> list[tuple[tuple[str, str], tuple[str, str]]]:
+    """Return near-duplicate questions only when both stem and context match.
+
+    Standard exam stems are intentionally reused across unrelated passages and
+    recordings. Numbered Part 6 blanks also share a context by design, so their
+    stems are exempt; other near-identical stems in the same context remain a
+    useful duplicate signal.
+    """
+    unique = list(dict.fromkeys(records))
+    pairs = []
+    for i, left in enumerate(unique):
+        left_stem, left_context = left
+        for right in unique[i + 1:]:
+            right_stem, right_context = right
+            if (left_context == right_context
+                    and NUMBERED_BLANK.search(left_stem)
+                    and NUMBERED_BLANK.search(right_stem)):
+                continue
+            if (fuzz.ratio(left_stem, right_stem) >= threshold
+                    and fuzz.ratio(left_context, right_context) >= threshold):
+                pairs.append((left, right))
+    return pairs
+
+
 
 def flag(level: str, msg: str) -> None:
     findings.append((level, msg))
@@ -61,14 +93,26 @@ def hdr(t: str) -> None:
     print(f"\n{'═' * 74}\n{t}\n{'═' * 74}")
 
 
-def load_batches(subdir: str, model):
+def probe_duration_ms(path: Path) -> int:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        check=True, capture_output=True, text=True,
+    )
+    return round(float(result.stdout.strip()) * 1000)
+
+
+def load_batches(subdir: str, model, excluded_dirs: set[str] | None = None):
     """Parse + validate mọi batch. Trả về (batches, lỗi)."""
     d = OUTPUT / subdir
     ok, errs = [], []
+    excluded_dirs = excluded_dirs or set()
     if not d.exists():
         return ok, errs
     for p in sorted(d.rglob("*.json")):
         if p.name.startswith("."):
+            continue
+        if excluded_dirs.intersection(p.relative_to(d).parts[:-1]):
             continue
         try:
             ok.append((p.name, model.model_validate(json.loads(p.read_text(encoding="utf-8")))))
@@ -88,13 +132,25 @@ def main() -> int:
 
     # ---------- A. Parse + validate ----------
     hdr("A. PARSE + VALIDATE SCHEMA")
-    exams, e_err = load_batches("exams", ExamBatch)
+    # Delivery packages intentionally duplicate selected source records and
+    # therefore are excluded from source-of-truth quality statistics.
+    exams, e_err = load_batches("exams", ExamBatch, {"individual_sets"})
     cards, c_err = load_batches("flashcards", FlashcardBatch)
     gram, g_err = load_batches("grammar", GrammarBatch)
     spk, s_err = load_batches("speaking_writing", SpeakingBatch)
     wrt, w_err = load_batches("speaking_writing", WritingBatch)
+    shadow, sh_err = load_batches("shadowing", ShadowingBatch)
+    prompt_path = OUTPUT / "prompts" / "assessment_prompts_batch_001.json"
+    prompts, p_err = [], []
+    if prompt_path.exists():
+        try:
+            prompts.append((prompt_path.name, AssessmentPromptBatch.model_validate(
+                json.loads(prompt_path.read_text(encoding="utf-8")))))
+        except Exception as exc:
+            p_err.append((prompt_path.name, str(exc)[:160]))
     for name, batches, errs in [("exam", exams, e_err), ("flashcard", cards, c_err),
-                                ("grammar", gram, g_err)]:
+                                ("grammar", gram, g_err), ("shadowing", shadow, sh_err),
+                                ("assessment", prompts, p_err)]:
         print(f"  {name:10} {len(batches):3d} batch OK, {len(errs)} lỗi")
         for f, msg in errs[:3]:
             print(f"      ✗ {f}: {msg}")
@@ -107,9 +163,12 @@ def main() -> int:
     sp_tasks = [t for _, b in spk for t in b.tasks]
     wr_tasks = [t for _, b in wrt for t in b.tasks]
     sets_ = [s for _, b in exams for s in b.sets]
+    shadow_clips = [c for _, b in shadow for c in b.clips]
+    assessment_prompts = [p for _, b in prompts for p in b.prompts]
     print(f"\n  Tổng: {len(groups)} group, {len(items)} câu hỏi, "
           f"{len(flashcards)} flashcard, {len(gpoints)} grammar point, {len(sets_)} bộ đề, "
-          f"{len(sp_tasks)} speaking + {len(wr_tasks)} writing task")
+          f"{len(sp_tasks)} speaking + {len(wr_tasks)} writing task, "
+          f"{len(shadow_clips)} shadowing/dictation clip, {len(assessment_prompts)} prompt")
 
     # ---------- B. Part rules ----------
     hdr("B. RÀNG BUỘC PART 1–7")
@@ -137,8 +196,9 @@ def main() -> int:
     #     hội thoại khác nhau — đúng như đề thật
     # Cả hai đều là câu khác nhau, không phải bản sao. Lần trước đã sửa cho
     # passage nhưng bỏ sót audio, nên Part 3 vừa bị báo trùng oan.
-    texts = [f"{q.question_text}##{dedup_context(g)}"
-             for g in groups for q in g.questions if q.question_text]
+    question_records = [(q.question_text, dedup_context(g))
+                        for g in groups for q in g.questions if q.question_text]
+    texts = [f"{stem}##{context}" for stem, context in question_records]
     exact = [k for k, v in collections.Counter(texts).items() if v > 1]
     print(f"  question_text trùng nguyên văn: {len(exact)} chuỗi "
           f"(chiếm {sum(collections.Counter(texts)[k] for k in exact)} câu)")
@@ -147,16 +207,11 @@ def main() -> int:
         for t in exact[:3]:
             print(f"      ×{collections.Counter(texts)[t]}  {t.split('##')[0][:70]}")
 
-    uniq = list(dict.fromkeys(t.split("##")[0] for t in texts))
-    sample = uniq[:400]
-    near = 0
-    for i in range(len(sample)):
-        for j in range(i + 1, len(sample)):
-            if fuzz.ratio(sample[i], sample[j]) >= NEAR_DUP:
-                near += 1
-    print(f"  gần trùng (rapidfuzz ≥{NEAR_DUP}) trên {len(sample)} câu đầu: {near} cặp")
+    sample = list(dict.fromkeys(question_records))[:400]
+    near = near_duplicate_pairs(sample)
+    print(f"  gần trùng (rapidfuzz ≥{NEAR_DUP}) trên {len(sample)} câu đầu: {len(near)} cặp")
     if near:
-        flag("CẢNH BÁO", f"{near} cặp câu hỏi gần trùng nhau trong {len(sample)} câu mẫu")
+        flag("CẢNH BÁO", f"{len(near)} cặp câu hỏi gần trùng nhau trong {len(sample)} câu mẫu")
 
     # ---------- D. Thiên lệch ----------
     hdr("D. THIÊN LỆCH THỐNG KÊ")
@@ -196,6 +251,8 @@ def main() -> int:
         used.update(p.concept_ids)
     for t in sp_tasks + wr_tasks:
         used.update(t.concept_ids)
+    for clip in shadow_clips:
+        used.update(clip.concept_ids)
     zero = sorted(leaves - set(used))
     thin = sorted([c for c in leaves if 0 < used[c] < MIN_ITEMS_PER_CONCEPT],
                   key=lambda c: used[c])
@@ -254,9 +311,26 @@ def main() -> int:
         defs = [f.definition.en for f in flashcards][:400]
         nd = sum(1 for i in range(len(defs)) for j in range(i + 1, len(defs))
                  if fuzz.ratio(defs[i], defs[j]) >= NEAR_DUP)
-        print(f"  định nghĩa gần trùng (≥{NEAR_DUP}) trên {len(defs)} mẫu: {nd} cặp")
-        if nd:
-            flag("CẢNH BÁO", f"{nd} cặp định nghĩa flashcard gần trùng nhau")
+        print(f"  định nghĩa gần nhau (≥{NEAR_DUP}) trên {len(defs)} mẫu: {nd} cặp "
+              "(thống kê; synonym/khác từ loại được phép)")
+        required_collocations = [f for f in flashcards if f.cefr_level.value in {"B2", "C1"}]
+        complete_collocations = sum(len(f.collocations) >= 3 for f in required_collocations)
+        print(f"  B2/C1 có >=3 collocation: {complete_collocations}/{len(required_collocations)}")
+        if complete_collocations != len(required_collocations):
+            flag("LỖI", "Flashcard B2/C1 chưa đủ tối thiểu 3 collocation")
+
+        pronunciation_dir = OUTPUT / "media" / "audio" / "flashcards"
+        missing_pronunciation = []
+        for card in flashcards:
+            for accent, value in (("us", card.audio_url_us), ("uk", card.audio_url_uk)):
+                filename = Path(urlparse(str(value)).path).name if value else ""
+                path = pronunciation_dir / filename
+                if not filename or not path.is_file() or path.stat().st_size <= 300:
+                    missing_pronunciation.append(f"{card.id}:{accent}")
+        print(f"  audio phát âm US/UK: {len(flashcards) * 2 - len(missing_pronunciation)}/"
+              f"{len(flashcards) * 2}")
+        if missing_pronunciation:
+            flag("LỖI", f"{len(missing_pronunciation)} audio phát âm flashcard còn thiếu")
 
     # ---------- I. Listening ----------
     audios = [g.audio for g in groups if g.audio]
@@ -273,9 +347,100 @@ def main() -> int:
         with_url = sum(1 for a in audios if a.audio_url)
         aligned = sum(1 for a in audios if a.alignment_status.value == "aligned")
         print(f"  có audio_url: {with_url}/{len(audios)}   alignment=aligned: {aligned}")
-        if with_url:
-            flag("LỖI", f"{with_url} audio có URL nhưng chưa có TTS engine nào chạy — "
-                        "§Phase 8 cấm nhét URL giả")
+        if with_url != len(audios):
+            flag("LỖI", f"{len(audios) - with_url} Listening audio chưa có audio_url thật")
+        if aligned != len(audios):
+            flag("LỖI", f"{len(audios) - aligned} Listening audio chưa có cue alignment đã đo")
+        media_dir = OUTPUT / "media" / "audio" / "toeic" / "listening"
+        missing_files = []
+        incomplete_metadata = 0
+        duration_mismatches = 0
+        for audio in audios:
+            if not audio.audio_url:
+                continue
+            filename = Path(urlparse(str(audio.audio_url)).path).name
+            local_file = media_dir / filename
+            if not local_file.is_file() or local_file.stat().st_size == 0:
+                missing_files.append(filename)
+            elif audio.duration_ms is not None:
+                measured = probe_duration_ms(local_file)
+                if abs(measured - audio.duration_ms) > 250:
+                    duration_mismatches += 1
+            if not audio.duration_ms or not audio.cues:
+                incomplete_metadata += 1
+        print(f"  MP3 hiện hữu: {with_url - len(missing_files)}/{with_url}   "
+              f"đủ duration+cues: {with_url - incomplete_metadata}/{with_url}")
+        if missing_files:
+            flag("LỖI", f"{len(missing_files)} audio_url không có tệp MP3 cục bộ tương ứng")
+        if incomplete_metadata:
+            flag("LỖI", f"{incomplete_metadata} audio thiếu duration_ms hoặc cue timing thật")
+        if duration_mismatches:
+            flag("LỖI", f"{duration_mismatches} audio có duration_ms lệch ffprobe quá 250 ms")
+
+    # ---------- I.2 Media used by exam and Speaking/Writing ----------
+    hdr("I.2 MEDIA FILES")
+    image_urls = [str(g.image_url) for g in groups if g.image_url]
+    image_urls += [str(t.image_url) for t in sp_tasks + wr_tasks if t.image_url]
+    missing_images = []
+    for url in image_urls:
+        relative = urlparse(url).path.removeprefix("/images/")
+        local_file = OUTPUT / "media" / "images" / relative
+        if not local_file.is_file() or local_file.stat().st_size == 0:
+            missing_images.append(relative)
+        elif local_file.suffix.lower() in (".jpg", ".jpeg"):
+            with local_file.open("rb") as stream:
+                if stream.read(3) != b"\xff\xd8\xff":
+                    missing_images.append(f"{relative} (not JPEG content)")
+    speaking_audio = [t.audio for t in sp_tasks if t.audio]
+    missing_speaking_audio = []
+    for audio in speaking_audio:
+        filename = Path(urlparse(str(audio.audio_url)).path).name if audio.audio_url else ""
+        local_file = OUTPUT / "media" / "audio" / "toeic" / "speaking" / filename
+        if not filename or not local_file.is_file() or local_file.stat().st_size == 0:
+            missing_speaking_audio.append(filename or "<no URL>")
+    print(f"  image_url có tệp cục bộ: {len(image_urls) - len(missing_images)}/{len(image_urls)}")
+    print(f"  Speaking prompt audio: {len(speaking_audio) - len(missing_speaking_audio)}/"
+          f"{len(speaking_audio)}")
+    if missing_images:
+        flag("LỖI", f"{len(missing_images)} image_url không có tệp media cục bộ")
+    if missing_speaking_audio:
+        flag("LỖI", f"{len(missing_speaking_audio)} Speaking audio thiếu tệp cục bộ")
+
+    # ---------- I.3 Shadowing / dictation + assessment prompts ----------
+    hdr("I.3 SHADOWING / DICTATION / ASSESSMENT")
+    shadow_media = OUTPUT / "media" / "audio" / "shadowing"
+    bad_shadow = []
+    for clip in shadow_clips:
+        filename = Path(urlparse(str(clip.audio_url)).path).name if clip.audio_url else ""
+        local = shadow_media / filename
+        timing_ok = all(s.start_ms is not None and s.end_ms is not None
+                        and s.end_ms > s.start_ms for s in clip.segments)
+        if (not filename or not local.is_file() or local.stat().st_size == 0
+                or clip.duration_ms is None or not 30_000 <= clip.duration_ms <= 60_000
+                or not timing_ok or set(clip.practice_modes) != {"shadowing", "dictation"}):
+            bad_shadow.append(clip.clip_id)
+    print(f"  clip đủ MP3 + timestamp + 30–60 giây + 2 mode: "
+          f"{len(shadow_clips) - len(bad_shadow)}/{len(shadow_clips)}")
+    if len(shadow_clips) != 30 or bad_shadow:
+        flag("LỖI", f"Shadowing/dictation không đạt blueprint: total={len(shadow_clips)}, bad={len(bad_shadow)}")
+
+    fixture_path = OUTPUT / "prompts" / "assessment_calibration_cases.json"
+    bad_cases, case_count = [], 0
+    prompt_ids = {p.prompt_id for p in assessment_prompts}
+    if fixture_path.exists():
+        fixture_data = json.loads(fixture_path.read_text(encoding="utf-8"))
+        for case in fixture_data.get("cases", []):
+            case_count += 1
+            try:
+                AssessmentResult.model_validate(case["expected_result"])
+                if case["prompt_id"] not in prompt_ids:
+                    raise ValueError("prompt_id not found")
+            except Exception as exc:
+                bad_cases.append(f"{case.get('case_id')}: {exc}")
+    print(f"  assessment prompt: {len(assessment_prompts)}/2; "
+          f"fixture hợp schema: {case_count - len(bad_cases)}/{case_count}")
+    if len(assessment_prompts) != 2 or case_count != 10 or bad_cases:
+        flag("LỖI", "Assessment prompt/calibration fixture chưa đủ hoặc sai schema")
 
     # ---------- J. Bộ đề ----------
     if sets_:
@@ -292,6 +457,10 @@ def main() -> int:
                 flag("CẢNH BÁO", f"{s.set_id}: L={nl} R={nr}, chuẩn là 100+100")
             if miss:
                 flag("LỖI", f"{s.set_id}: {miss} tham chiếu trỏ tới item_id không tồn tại")
+            for error in check_exam_set(s, groups):
+                flag("LỖI", f"{s.set_id}: {error}")
+        for error in check_exam_collection(sets_, groups):
+            flag("LỖI", f"10-set collection: {error}")
 
     # ---------- Tổng kết ----------
     hdr("TỔNG KẾT")
@@ -304,4 +473,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(encoding="utf-8")
     sys.exit(main())

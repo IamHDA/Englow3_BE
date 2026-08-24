@@ -67,7 +67,6 @@
     },
     "Collocation": {
       "additionalProperties": false,
-      "description": "Lỗi P1-9: object có `pattern`, không phải mảng chuỗi phẳng.",
       "properties": {
         "cefr": {
           "$ref": "#/$defs/CEFRLevel"

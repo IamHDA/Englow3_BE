@@ -80,7 +80,6 @@
     },
     "Collocation": {
       "additionalProperties": false,
-      "description": "Lỗi P1-9: object có `pattern`, không phải mảng chuỗi phẳng.",
       "properties": {
         "cefr": {
           "$ref": "#/$defs/CEFRLevel"
@@ -166,6 +165,30 @@
     "Flashcard": {
       "additionalProperties": false,
       "properties": {
+        "audio_url_uk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Url Uk"
+        },
+        "audio_url_us": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Url Us"
+        },
         "cefr_level": {
           "$ref": "#/$defs/CEFRLevel"
         },

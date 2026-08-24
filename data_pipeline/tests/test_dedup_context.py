@@ -13,7 +13,7 @@ import pytest
 from schemas import AudioAsset, ExamGroup
 from schemas.enums import Accent
 from tests.conftest import make_item, make_passage
-from validators.audit_data import dedup_context
+from validators.audit_data import dedup_context, near_duplicate_pairs
 
 STEM = "What are the speakers discussing?"
 
@@ -49,3 +49,34 @@ def test_phan_doc_van_dung_passage_lam_ngu_canh():
 def test_group_nghe_khong_co_passage_van_ra_ngu_canh_khac_rong(part):
     g = _listening_group("W: Kịch bản có nội dung thật, không rỗng." * 3)
     assert dedup_context(g)
+
+
+def test_near_duplicate_requires_both_stem_and_context_to_match():
+    records = [
+        ("What will the woman do next?", "A discussion about a council report."),
+        ("What will the man do next?", "A discussion about moving office furniture."),
+    ]
+    assert near_duplicate_pairs(records) == []
+
+
+def test_numbered_blanks_in_the_same_passage_are_not_near_duplicates():
+    context = "A single Part 6 passage shared by four numbered blanks."
+    records = [("Chỗ trống (1)", context), ("Chỗ trống (2)", context)]
+    assert near_duplicate_pairs(records) == []
+
+
+def test_near_duplicate_detects_matching_stem_and_matching_context():
+    records = [
+        ("Why was the meeting postponed?", "The meeting moved because the manager was ill."),
+        ("Why has the meeting been postponed?", "The meeting was moved because the manager was ill."),
+    ]
+    assert len(near_duplicate_pairs(records, threshold=85)) == 1
+
+
+def test_near_duplicate_in_the_same_context_is_still_reported():
+    context = "One listening script shared by three questions."
+    records = [
+        ("What is the main purpose of the discussion?", context),
+        ("What is the primary purpose of the discussion?", context),
+    ]
+    assert len(near_duplicate_pairs(records, threshold=85)) == 1

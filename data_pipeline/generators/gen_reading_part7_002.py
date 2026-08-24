@@ -213,12 +213,12 @@ TRIPLE_QUESTIONS = [
  ("What is the deadline for Ms Marchetti's payment?", Q.RC_CROSS_REFERENCE,
   "rc_cross_reference", 0.75, 1,
   "must pay in full within ten days of notification",
-  [("18 November", True,
-    "Quảng cáo nói trả trong vòng mười ngày kể từ khi được thông báo; email báo "
-    "kết quả ngày 8 tháng Mười một là hạn cuối 18 tháng Mười một."),
+  [("16 November", True,
+    "Email thông báo kết quả ngày 6 tháng Mười một; mười ngày sau là 16 tháng Mười một."),
    ("14 November", False, "Đó là hạn trả lời việc đổi quầy, không phải hạn thanh toán."),
    ("1 November", False, "Đó là hạn nộp hồ sơ."),
-   ("22 November, two weeks after notification", False, "Không mốc nào trong ba văn bản dẫn tới ngày này.")]),
+   ("22 November, more than two weeks after notification", False,
+    "Không mốc nào trong ba văn bản dẫn tới ngày này.")]),
 
  ("What should Ms Marchetti tell her neighbour?", Q.RC_CROSS_REFERENCE,
   "rc_cross_reference", 0.70, 1, "Applications close on 1 November",

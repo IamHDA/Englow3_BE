@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import Field, HttpUrl, model_validator
 
 from .common import StrictModel
+from .exam import AudioAsset
 from .enums import ReviewStatus, WritingTaskType
 from .ids import rubric_id as make_rubric_id, task_id as make_task_id
 
@@ -62,6 +63,9 @@ class _TaskBase(StrictModel):
     concept_ids: list[str] = Field(min_length=1)
     difficulty_prior: float = Field(ge=0.0, le=1.0)
     review_status: ReviewStatus = ReviewStatus.DRAFT
+    image_url: HttpUrl | None = None
+    stimulus_text: str | None = None
+    audio: AudioAsset | None = None
 
 
 class SpeakingTask(_TaskBase):
