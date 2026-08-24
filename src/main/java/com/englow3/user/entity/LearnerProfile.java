@@ -27,8 +27,9 @@ public class LearnerProfile {
     @Column(name = "current_level")
     private CertificateLevel currentLevel;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_certificate_type")
-    private String targetCertificateType;
+    private CertificateType targetCertificateType;
 
     @Column(name = "current_score")
     private BigDecimal currentScore;
@@ -53,11 +54,12 @@ public class LearnerProfile {
         this.currentLevel = level;
     }
 
-    public void aimAtCertificate(String certificateType) {
+    public void aimAtCertificate(CertificateType certificateType) {
         this.targetCertificateType = certificateType;
     }
 
-    public void setGoal(BigDecimal targetScore, LocalDate targetDate) {
+    public void setGoal(CertificateType targetCertificateType, BigDecimal targetScore, LocalDate targetDate) {
+        this.targetCertificateType = targetCertificateType;
         this.targetScore = targetScore;
         this.targetDate = targetDate;
     }

@@ -13,8 +13,8 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.englow3.user.dto.request.UpdateUserBasicInfoRequest;
-import com.englow3.user.dto.response.UserInformationResponse;
+import com.englow3.user.dto.command.UpdateUserBasicInfoCommand;
+import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
 
@@ -28,44 +28,41 @@ public class UserService {
     private final CurrentUser currentUser;
     private final ObjectStorageClient objectStorageClient;
     private final String publicBucket;
-    private final String publicBaseUrl;
 
     UserService(UserRepository userRepo, CurrentUser currentUser, ObjectStorageClient objectStorageClient,
-            @Value("${app.storage.public-bucket}") String publicBucket,
-            @Value("${app.storage.public-base-url}") String publicBaseUrl) {
+            @Value("${app.storage.public-bucket}") String publicBucket) {
         this.userRepo = userRepo;
         this.currentUser = currentUser;
         this.objectStorageClient = objectStorageClient;
         this.publicBucket = publicBucket;
-        this.publicBaseUrl = publicBaseUrl;
     }
 
     @Transactional(readOnly = true)
-    public UserInformationResponse me() {
-        return UserInformationResponse.of(requireCurrentUser(), publicBaseUrl);
+    public UserInformationResult me() {
+        return UserInformationResult.of(requireCurrentUser());
     }
 
     @Transactional
-    public UserInformationResponse updateBasicInfo(UpdateUserBasicInfoRequest request) {
+    public UserInformationResult updateBasicInfo(UpdateUserBasicInfoCommand command) {
         User user = requireCurrentUser();
 
-        user.changeFullName(request.fullName());
-        user.rename(request.displayName());
-        user.changeGender(request.gender());
-        user.changeBirthDate(request.birthDate());
+        user.changeFullName(command.fullName());
+        user.rename(command.displayName());
+        user.changeGender(command.gender());
+        user.changeBirthDate(command.birthDate());
 
-        return UserInformationResponse.of(user, publicBaseUrl);
+        return UserInformationResult.of(user);
     }
 
-    public UserInformationResponse changeAvatar(MultipartFile image) {
+    public UserInformationResult changeAvatar(MultipartFile image) {
         return storeImage(image, "avatar");
     }
 
-    public UserInformationResponse changeBanner(MultipartFile image) {
+    public UserInformationResult changeBanner(MultipartFile image) {
         return storeImage(image, "banner");
     }
 
-    private UserInformationResponse storeImage(MultipartFile image, String kind) {
+    private UserInformationResult storeImage(MultipartFile image, String kind) {
         User user = requireCurrentUser();
         String objectKey = upload(image, user.getId(), kind);
 
@@ -75,7 +72,7 @@ public class UserService {
             user.changeBanner(objectKey);
         }
 
-        return UserInformationResponse.of(userRepo.save(user), publicBaseUrl);
+        return UserInformationResult.of(userRepo.save(user));
     }
 
     private String upload(MultipartFile image, UUID userId, String kind) {

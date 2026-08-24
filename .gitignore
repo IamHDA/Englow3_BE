@@ -5,9 +5,16 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 HELP.md
 .env
+.env.*
+env
+env.local
 .mcp.json
 
-# --- data_pipeline ---
+# Python & Data Pipeline cache
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.checkpoints/
 data_pipeline/.venv/
 data_pipeline/**/__pycache__/
 data_pipeline/.pytest_cache/
@@ -23,8 +30,6 @@ data_pipeline/seeds/by_level/
 data_pipeline/rejects/*.json
 data_pipeline/output/_db/*.jsonl
 data_pipeline/output/_db/_manifest.json
-
-
 data_pipeline/output/audio/
 data_pipeline/output/*.mp3
 data_pipeline/rejects/*/
