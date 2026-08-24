@@ -74,12 +74,12 @@ final class AiGovernanceDtos {
     record ModelPolicyRequest(@NotBlank @Size(max = 50) String provider, @NotBlank @Size(max = 100) String model,
             @NotNull @DecimalMin("0.0") @DecimalMax("2.0") BigDecimal temperature,
             @Min(1) @Max(32768) int maxOutputTokens, @NotNull @DecimalMin("0.0") BigDecimal inputCostPerMillion,
-            @NotNull @DecimalMin("0.0") BigDecimal outputCostPerMillion, boolean enabled) {
+            @NotNull @DecimalMin("0.0") BigDecimal outputCostPerMillion, boolean enabled, UUID evaluationRunId) {
     }
 
     record ModelPolicyResponse(String capability, String provider, String model, BigDecimal temperature,
             int maxOutputTokens, BigDecimal inputCostPerMillion, BigDecimal outputCostPerMillion, boolean enabled,
-            Instant updatedAt) {
+            UUID evaluationRunId, Instant updatedAt) {
     }
 
     record AiOperationsMetrics(long totalJobs, long successfulJobs, long failedJobs, long pendingJobs, long inputTokens,
