@@ -9,5 +9,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 /** Both fields are optional - sending them empty is how a learner skips this step. */
-public record SetLearningGoalRequest(@NotNull CertificateType certificateType, @Positive BigDecimal targetScore, @Future LocalDate targetDate) {
+public record SetLearningGoalRequest(@NotNull CertificateType certificateType, @Positive BigDecimal targetScore,
+        @Future LocalDate targetDate) {
 }
