@@ -128,7 +128,7 @@ class OnboardingServiceTest {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
         assertThatThrownBy(
-                () -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS_GENERAL)))
+                () -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS)))
                         .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                         .isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
     }
@@ -184,10 +184,10 @@ class OnboardingServiceTest {
     void handsTheCompletionRuleTheLevelAndCertificateItMustJudge() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
         profile.declareCurrentLevel(CertificateLevel.B2);
-        profile.aimAtCertificate(CertificateType.IELTS_GENERAL);
+        profile.aimAtCertificate(CertificateType.IELTS);
 
         service.complete();
 
-        verify(user).completeOnboarding(CertificateLevel.B2, true, CertificateType.IELTS_GENERAL);
+        verify(user).completeOnboarding(CertificateLevel.B2, true, CertificateType.IELTS);
     }
 }
