@@ -8,52 +8,58 @@ import static org.mockito.Mockito.when;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.dto.result.UserIdentityResult;
+import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.entity.Role;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
 
-class UserDirectoryTest {
+class AdminAccessTest {
 
     private final UserRepository userRepo = mock(UserRepository.class);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final UserDirectory directory = new UserDirectory(userRepo);
+    private final AdminAccess adminAccess = new AdminAccess(userRepo, currentUser);
 
     private final UUID authProviderId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
     private final User user = mock(User.class);
 
-    @Test
-    void resolvesTheInternalIdBehindAnAuthProviderId() {
-        givenAUserWithRole(Role.LEARNER);
-
-        UserIdentityResult identity = directory.resolve(authProviderId);
-
-        assertThat(identity.userId()).isEqualTo(userId);
-        assertThat(identity.isAdmin()).isFalse();
+    @BeforeEach
+    void authenticate() {
+        when(currentUser.authProviderId()).thenReturn(authProviderId);
     }
 
     @Test
-    void reportsAnAdminAsOne() {
-        givenAUserWithRole(Role.ADMIN);
+    void handsBackTheInternalIdOfAnAdmin() {
+        signedInAs(Role.ADMIN);
 
-        assertThat(directory.resolve(authProviderId).isAdmin()).isTrue();
+        assertThat(adminAccess.requireAdminId()).isEqualTo(userId);
     }
 
     @Test
-    void failsWhenTheAuthProviderIdPointsAtNoUserRow() {
+    void refusesALearner() {
+        signedInAs(Role.LEARNER);
+
+        assertThatThrownBy(adminAccess::requireAdminId).isInstanceOf(ForbiddenException.class)
+                .extracting(e -> ((ForbiddenException) e).getCode()).isEqualTo("ADMIN_ONLY");
+    }
+
+    @Test
+    void failsWhenTheJwtPointsAtNoUserRow() {
         when(userRepo.findByAuthProviderId(authProviderId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> directory.resolve(authProviderId)).isInstanceOf(NotFoundException.class)
+        assertThatThrownBy(adminAccess::requireAdminId).isInstanceOf(NotFoundException.class)
                 .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("USER_NOT_FOUND");
     }
 
-    private void givenAUserWithRole(Role role) {
+    private void signedInAs(Role role) {
         when(userRepo.findByAuthProviderId(authProviderId)).thenReturn(Optional.of(user));
-        when(user.getId()).thenReturn(userId);
         when(user.getRole()).thenReturn(role);
+        when(user.getId()).thenReturn(userId);
     }
 }
