@@ -127,10 +127,9 @@ class OnboardingServiceTest {
     void refusesACertificateTargetFromALearnerNotOnThatBranch() {
         when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-        assertThatThrownBy(
-                () -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS)))
-                        .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
-                        .isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
+        assertThatThrownBy(() -> service.setCertificateTarget(new SetCertificateTargetCommand(CertificateType.IELTS)))
+                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                .isEqualTo("CERTIFICATE_TARGET_NOT_APPLICABLE");
     }
 
     @Test
