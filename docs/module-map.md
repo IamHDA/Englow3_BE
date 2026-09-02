@@ -132,12 +132,19 @@ content still arrives by SQL seed.
   `published_at` stays null. `max_raw_score` is entered rather than derived, because sections do
   not exist yet at create time; `publish()` is what makes the two agree.
 - **`Exam` is the one content entity with rules.** `Exam.draft(...)` assigns its own `UUID`;
-  `publish(long questionCount, BigDecimal sectionsRawTotal)` refuses a paper with no section, no
-  question, or whose section scores do not sum to `max_raw_score`, and is the only thing that sets
-  `status` and `published_at`. Plain values in - the service runs the counts, the entity touches no
-  repository. No setter for `status`, `publishedAt`, `versionNumber`, and no Lombok `@Setter` /
-  `@Data` on it, which would regenerate exactly those. `ExamSection`, `SectionPart`, `QuestionSet`,
-  `Question` stay plain read-only entities - authoring is supporting, not core.
+  `publish(long sectionCount, long questionCount, BigDecimal sectionsRawTotal, Instant now)` refuses
+  a paper that is not `DRAFT`, has no section, has no question, or whose section scores do not sum to
+  `max_raw_score`, and is the only thing that sets `status` and `published_at`. `sectionCount` is a
+  parameter of its own rather than inferred from a null total: one input per rule beats encoding
+  "no rows" as a null, which would tie the entity to how the service happens to query. The sum is
+  compared with `compareTo`, because `BigDecimal.equals` also compares scale and a summed
+  `numeric(8,2)` need not come back with the scale the paper declared.
+  `archive()` refuses only a paper that is already `ARCHIVED`; it is the retire path, and there is no
+  delete because every foreign key into `exams` is `on delete restrict`.
+  Plain values in - the service runs the counts, the entity touches no repository. No setter for
+  `status`, `publishedAt`, `versionNumber`, and no Lombok `@Setter` / `@Data` on it, which would
+  regenerate exactly those. `ExamSection`, `SectionPart`, `QuestionSet`, `Question` stay plain
+  read-only entities - authoring is supporting, not core.
 - **Read path:** the admin list is a `@Query` on `ExamRepository`, **not** `exam/query/`. Three
   optional filters (status, exam_type, title search) fit inline, and Spring Data derives the count
   query and the `Page` for free - hand-rolling both in `query/` to hold three null-guards would be
@@ -146,11 +153,18 @@ content still arrives by SQL seed.
   query back. **Move it to `exam/query/`** when the filter set outgrows that - the trigger is a
   second certificate making `certificate_type` / `certificate_variant` / `target_level` worth
   filtering on, which TOEIC-only papers do not.
-  Per-row counts are **not in the list yet**. Section and question count arrive with `publish()`,
-  which needs the same two figures; attempt count waits for `ExamAttempt` to exist at all. The
-  question count is a four-join descent (`exam_sections -> section_parts -> question_sets ->
-  questions`); acceptable on one page of rows, and not denormalised onto `exams`, where it would
-  rot. Every table joined is exam-owned, so no cross-module read exception is needed.
+  Per-row section and question counts come from `ExamRepository.contentTotals(examIds)` - **one
+  extra query for the whole page**, not one per row, which is an N+1 by another name. The same query
+  serves `publish()` with a single-element id list, so the two never drift. Attempt count is still
+  absent: it waits for `ExamAttempt` to exist at all.
+  That query is **native** - the tables below `exams` have no entity until authoring needs one - and
+  uses **correlated subqueries, not joins**: joining sections to questions multiplies the section
+  rows and would leave `sum(max_raw_score)` silently too large, which is the one figure `publish()`
+  checks against. It is written with `{h-schema}` because Hibernate applies `default_schema` to
+  generated SQL only, and with quoted aliases (`as "examId"`) so Postgres keeps their case for the
+  projection getters. The question count is a four-join descent (`exam_sections -> section_parts ->
+  question_sets -> questions`); acceptable on one page of rows, and not denormalised onto `exams`,
+  where it would rot. Every table joined is exam-owned, so no cross-module read exception is needed.
 - **The creator's name is not resolved server-side.** The list returns `createdByUserId` and the
   frontend composes it against the admin user list. One extra call on an admin screen costs less
   than the first `exam -> user` edge, and admins are few enough to cache.
@@ -185,7 +199,7 @@ file assumed they could still be rewritten in place; that stopped when the migra
 ## Deliberately left open
 
 - **Quiz** - tables not designed. It gets its own module when built (own tables, own admin CRUD); the `user` module calls into it. Not folded into `user`, not folded into `exam`.
-- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, but cannot publish it or fill it through the API - `publish()`, and the write path for sections, parts, question sets and questions, are still to come. **Authorization is decided (in #32) and now in use** (see `shared + config` and *Admin exam management*): `user.Role` (`LEARNER` / `ADMIN`) exists, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.AdminAccess.requireAdminId()` is the shared gate - one bean any module's admin use case injects, refusing a non-admin and returning the internal `userId`, so the check and `exams.created_by_user_id` are one lookup and there is no JWT claim to read. It sits in `user` rather than `shared` because `shared` may not know a `Role` and `user -> shared` already exists. Still absent: any `@PreAuthorize` (there is no authority on the `Authentication` for it to check - a `PermissionEvaluator` wired to `AdminAccess` is the way in), and `CurrentUser` still exposes only `authProviderId` and `email`; `@EnableMethodSecurity` and the `AccessDeniedException` handler stay pre-wired hooks. The Supabase-token-hook / role-claim / `JwtAuthenticationConverter` approach previously planned here is dropped - role is resolved per request, not carried in the token, so there is no "token issued before the role was granted" problem to solve. The cost is one uncached read per admin request; cache or reconsider the token if admin traffic ever stops being negligible.
+- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, publish it once the seeded content adds up, and archive it - but cannot **fill** it through the API: sections, parts, question sets and questions have no write path yet. So `publish()` is only satisfiable by a paper someone seeded by hand, which is exactly the current workflow. **Authorization is decided (in #32) and now in use** (see `shared + config` and *Admin exam management*): `user.Role` (`LEARNER` / `ADMIN`) exists, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.AdminAccess.requireAdminId()` is the shared gate - one bean any module's admin use case injects, refusing a non-admin and returning the internal `userId`, so the check and `exams.created_by_user_id` are one lookup and there is no JWT claim to read. It sits in `user` rather than `shared` because `shared` may not know a `Role` and `user -> shared` already exists. Still absent: any `@PreAuthorize` (there is no authority on the `Authentication` for it to check - a `PermissionEvaluator` wired to `AdminAccess` is the way in), and `CurrentUser` still exposes only `authProviderId` and `email`; `@EnableMethodSecurity` and the `AccessDeniedException` handler stay pre-wired hooks. The Supabase-token-hook / role-claim / `JwtAuthenticationConverter` approach previously planned here is dropped - role is resolved per request, not carried in the token, so there is no "token issued before the role was granted" problem to solve. The cost is one uncached read per admin request; cache or reconsider the token if admin traffic ever stops being negligible.
 - **AI grading**, and with it `ai_jobs`, `grading_criteria`, `attempt_answer_criterion_scores`, `exam_sections.is_scored_by_criteria` and Redis - all owned by `exam`, none used. Only TOEIC 2-skills papers exist, so every answer is objective-key gradable. `ai_jobs` stays a one-consumer table until a second consumer justifies pulling it out.
 - **`question_sets.is_single_use`** - the column implies a question-bank / reuse concept that no decision covers. Decide what it means before anything reads it.
 - **`spring.servlet.multipart.max-file-size: 2MB`** - too small for speaking recordings. Irrelevant until a 4-skills paper exists; the choice then is raising the limit or presigned direct-to-S3 upload.

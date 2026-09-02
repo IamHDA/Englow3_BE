@@ -12,11 +12,12 @@ import com.englow3.exam.entity.TargetLevel;
 
 public record ExamListItemResponse(UUID id, String title, ExamType examType, CertificateType certificateType,
         CertificateVariant certificateVariant, TargetLevel targetLevel, ExamStatus status, int versionNumber,
-        UUID createdByUserId, Instant publishedAt, Instant createdAt) {
+        long sectionCount, long questionCount, UUID createdByUserId, Instant publishedAt, Instant createdAt) {
 
     public static ExamListItemResponse from(ExamListItemResult result) {
         return new ExamListItemResponse(result.id(), result.title(), result.examType(), result.certificateType(),
                 result.certificateVariant(), result.targetLevel(), result.status(), result.versionNumber(),
-                result.createdByUserId(), result.publishedAt(), result.createdAt());
+                result.sectionCount(), result.questionCount(), result.createdByUserId(), result.publishedAt(),
+                result.createdAt());
     }
 }
