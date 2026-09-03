@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -105,6 +106,43 @@ public class Exam {
         exam.versionNumber = 1;
         exam.createdByUserId = createdByUserId;
         return exam;
+    }
+
+    /**
+     * The only thing that sets {@code status} to PUBLISHED and stamps {@code publishedAt}. It weighs plain numbers the
+     * service counted for it - the entity touches no repository - and refuses a paper that would be unusable once
+     * learners can sit it: nothing to sit, or a scoring scale that does not add up.
+     */
+    public void publish(long sectionCount, long questionCount, BigDecimal sectionsRawTotal, Instant now) {
+        if (status != ExamStatus.DRAFT) {
+            throw new ConflictException("EXAM_NOT_DRAFT",
+                    "Only a draft paper can be published; this one is %s".formatted(status));
+        }
+        if (sectionCount == 0) {
+            throw new ConflictException("EXAM_HAS_NO_SECTION", "A paper with no section cannot be published");
+        }
+        if (questionCount == 0) {
+            throw new ConflictException("EXAM_HAS_NO_QUESTION", "A paper with no question cannot be published");
+        }
+        // compareTo, not equals: BigDecimal.equals also compares scale, so 200.0 and 200.00 would disagree.
+        if (sectionsRawTotal.compareTo(maxRawScore) != 0) {
+            throw new ConflictException("EXAM_SCORE_MISMATCH",
+                    "Section scores total %s but the paper declares %s".formatted(sectionsRawTotal, maxRawScore));
+        }
+        this.status = ExamStatus.PUBLISHED;
+        this.publishedAt = now;
+    }
+
+    /**
+     * Retiring a paper, from draft or from publication. There is no delete: every foreign key into this row is
+     * {@code on delete restrict}, so a paper anyone has ever sat cannot be removed - and one nobody has sat is still
+     * worth keeping for the record.
+     */
+    public void archive() {
+        if (status == ExamStatus.ARCHIVED) {
+            throw new ConflictException("EXAM_ALREADY_ARCHIVED", "This paper is already archived");
+        }
+        this.status = ExamStatus.ARCHIVED;
     }
 
     /**

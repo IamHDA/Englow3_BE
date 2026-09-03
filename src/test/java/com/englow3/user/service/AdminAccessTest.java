@@ -36,14 +36,14 @@ class AdminAccessTest {
 
     @Test
     void handsBackTheInternalIdOfAnAdmin() {
-        signedInAs(Role.ADMIN);
+        signInAs(Role.ADMIN);
 
         assertThat(adminAccess.requireAdminId()).isEqualTo(userId);
     }
 
     @Test
     void refusesALearner() {
-        signedInAs(Role.LEARNER);
+        signInAs(Role.LEARNER);
 
         assertThatThrownBy(adminAccess::requireAdminId).isInstanceOf(ForbiddenException.class)
                 .extracting(e -> ((ForbiddenException) e).getCode()).isEqualTo("ADMIN_ONLY");
@@ -57,7 +57,7 @@ class AdminAccessTest {
                 .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("USER_NOT_FOUND");
     }
 
-    private void signedInAs(Role role) {
+    private void signInAs(Role role) {
         when(userRepo.findByAuthProviderId(authProviderId)).thenReturn(Optional.of(user));
         when(user.getRole()).thenReturn(role);
         when(user.getId()).thenReturn(userId);
