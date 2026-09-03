@@ -56,7 +56,7 @@ class AdminExamServiceTest {
 
     @Test
     void stampsTheDraftWithTheAdminsOwnUserId() {
-        ExamResult result = service.create(command());
+        ExamResult result = service.create(buildCreateCommand());
 
         ArgumentCaptor<Exam> saved = ArgumentCaptor.forClass(Exam.class);
         verify(examRepo).save(saved.capture());
@@ -66,15 +66,15 @@ class AdminExamServiceTest {
 
     @Test
     void writesNothingWhenTheGateRefusesTheCreate() {
-        gateRefuses();
+        refuseAdminAccess();
 
-        assertThatThrownBy(() -> service.create(command())).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.create(buildCreateCommand())).isInstanceOf(ForbiddenException.class);
         verify(examRepo, never()).save(any());
     }
 
     @Test
     void readsNothingWhenTheGateRefusesTheSearch() {
-        gateRefuses();
+        refuseAdminAccess();
 
         assertThatThrownBy(() -> service.search(new SearchExamCommand(null, null, null), Pageable.unpaged()))
                 .isInstanceOf(ForbiddenException.class);
@@ -93,8 +93,8 @@ class AdminExamServiceTest {
 
     @Test
     void hangsTheContentCountsOffEachRowOfThePage() {
-        Exam exam = draft();
-        ExamContentTotals totals = totals(exam.getId(), 2, 200);
+        Exam exam = buildDraft();
+        ExamContentTotals totals = mockContentTotals(exam.getId(), 2, 200);
         when(examRepo.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(exam)));
         when(examRepo.contentTotals(List.of(exam.getId()))).thenReturn(List.of(totals));
 
@@ -117,8 +117,8 @@ class AdminExamServiceTest {
 
     @Test
     void publishesWithTheTotalsItReadFromTheRepository() {
-        Exam exam = draft();
-        ExamContentTotals totals = totals(exam.getId(), 2, 200);
+        Exam exam = buildDraft();
+        ExamContentTotals totals = mockContentTotals(exam.getId(), 2, 200);
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
         when(examRepo.contentTotals(List.of(exam.getId()))).thenReturn(List.of(totals));
 
@@ -138,7 +138,7 @@ class AdminExamServiceTest {
 
     @Test
     void archivesThePaperItWasGiven() {
-        Exam exam = draft();
+        Exam exam = buildDraft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
 
         assertThat(service.archive(new ArchiveExamCommand(exam.getId())).status()).isEqualTo(ExamStatus.ARCHIVED);
@@ -146,7 +146,7 @@ class AdminExamServiceTest {
 
     @Test
     void touchesNothingWhenTheGateRefusesThePublish() {
-        gateRefuses();
+        refuseAdminAccess();
 
         assertThatThrownBy(() -> service.publish(new PublishExamCommand(UUID.randomUUID())))
                 .isInstanceOf(ForbiddenException.class);
@@ -154,11 +154,11 @@ class AdminExamServiceTest {
     }
 
     /** Which callers the gate lets through is AdminAccessTest's business - here it only has to run before the repo. */
-    private void gateRefuses() {
+    private void refuseAdminAccess() {
         when(adminAccess.requireAdminId()).thenThrow(new ForbiddenException("ADMIN_ONLY", "no"));
     }
 
-    private static ExamContentTotals totals(UUID examId, long sectionCount, long questionCount) {
+    private static ExamContentTotals mockContentTotals(UUID examId, long sectionCount, long questionCount) {
         ExamContentTotals totals = mock(ExamContentTotals.class);
         when(totals.getExamId()).thenReturn(examId);
         when(totals.getSectionCount()).thenReturn(sectionCount);
@@ -167,14 +167,14 @@ class AdminExamServiceTest {
         return totals;
     }
 
-    private static Exam draft() {
-        CreateExamCommand command = command();
+    private static Exam buildDraft() {
+        CreateExamCommand command = buildCreateCommand();
         return Exam.draft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
                 command.passScore(), UUID.randomUUID());
     }
 
-    private static CreateExamCommand command() {
+    private static CreateExamCommand buildCreateCommand() {
         return new CreateExamCommand("TOEIC Practice Test 1", "Two skills, seven parts", ExamType.MOCK,
                 CertificateType.TOEIC, CertificateVariant.LR, TargetLevel.B1, 7200, new BigDecimal("200.00"),
                 new BigDecimal("600.0"));
