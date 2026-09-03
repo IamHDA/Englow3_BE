@@ -65,8 +65,10 @@ class AzureSpeechProvider:
                     status_code=422,
                 )
             candidates = payload.get("NBest")
-            if not isinstance(candidates, list) or not candidates or not isinstance(
-                candidates[0], dict
+            if (
+                not isinstance(candidates, list)
+                or not candidates
+                or not isinstance(candidates[0], dict)
             ):
                 raise ValueError("Speech response has no best candidate")
             best = candidates[0]
