@@ -29,7 +29,7 @@ public class AiPromptService {
                 prompt.getResponseSchema());
     }
 
-    static String renderText(String template, Map<String, ?> variables) {
+    public static String renderText(String template, Map<String, ?> variables) {
         String rendered = template;
         for (Map.Entry<String, ?> entry : variables.entrySet()) {
             rendered = rendered.replace("{{" + entry.getKey() + "}}", String.valueOf(entry.getValue()));

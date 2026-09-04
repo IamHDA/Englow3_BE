@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.ai.foundation.AiCapability;
+import com.englow3.ai.evaluation.AiEvaluationService;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
@@ -25,13 +26,15 @@ class AiAdminService {
     private final CurrentUser currentUser;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final AiEvaluationService evaluationService;
 
     AiAdminService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper, AiEvaluationService evaluationService) {
         this.jdbcTemplate = jdbcTemplate;
         this.currentUser = currentUser;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
+        this.evaluationService = evaluationService;
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +88,7 @@ class AiAdminService {
     }
 
     @Transactional
-    void activateVersion(UUID templateId, int version) {
+    void activateVersion(UUID templateId, int version, UUID evaluationRunId) {
         User actor = requireUser();
         Integer exists = jdbcTemplate.queryForObject("""
                 select count(*) from ai_prompt_versions where template_id = ? and version = ?
@@ -93,49 +96,61 @@ class AiAdminService {
         if (exists == null || exists == 0) {
             throw new NotFoundException("AI_PROMPT_VERSION_NOT_FOUND", "AI prompt version was not found");
         }
+        evaluationService.requireAcceptedForPrompt(templateId, version, evaluationRunId);
         jdbcTemplate.update("update ai_prompt_versions set active = false where template_id = ? and active",
                 templateId);
         jdbcTemplate.update("""
-                update ai_prompt_versions set active = true where template_id = ? and version = ?
-                """, templateId, version);
-        audit(actor.getId(), "PROMPT_VERSION_ACTIVATE", "AI_PROMPT_TEMPLATE", templateId.toString(),
-                objectMapper.createObjectNode().put("version", version));
+                update ai_prompt_versions set active = true, evaluation_run_id = ?
+                where template_id = ? and version = ?
+                """, evaluationRunId, templateId, version);
+        audit(actor.getId(), "PROMPT_VERSION_ACTIVATE", "AI_PROMPT_TEMPLATE", templateId.toString(), objectMapper
+                .createObjectNode().put("version", version).put("evaluationRunId", evaluationRunId.toString()));
     }
 
     @Transactional(readOnly = true)
     List<AiGovernanceDtos.ModelPolicyResponse> policies() {
         return jdbcTemplate.query("""
                 select capability, provider_name, model_name, temperature, max_output_tokens,
-                       input_cost_per_million, output_cost_per_million, enabled, updated_at
+                       input_cost_per_million, output_cost_per_million, enabled, evaluation_run_id, updated_at
                 from ai_model_policies order by capability
                 """,
                 (rs, row) -> new AiGovernanceDtos.ModelPolicyResponse(rs.getString("capability"),
                         rs.getString("provider_name"), rs.getString("model_name"), rs.getBigDecimal("temperature"),
                         rs.getInt("max_output_tokens"), rs.getBigDecimal("input_cost_per_million"),
                         rs.getBigDecimal("output_cost_per_million"), rs.getBoolean("enabled"),
-                        rs.getTimestamp("updated_at").toInstant()));
+                        rs.getObject("evaluation_run_id", UUID.class), rs.getTimestamp("updated_at").toInstant()));
     }
 
     @Transactional
     AiGovernanceDtos.ModelPolicyResponse updatePolicy(AiCapability capability,
             AiGovernanceDtos.ModelPolicyRequest request) {
         User actor = requireUser();
+        if (request.enabled()) {
+            if (request.evaluationRunId() == null) {
+                throw new ConflictException("AI_EVALUATION_REQUIRED",
+                        "Enabling a model policy requires an accepted evaluation run");
+            }
+            evaluationService.requireAcceptedForModel(capability.name(), request.provider(), request.model(),
+                    request.evaluationRunId());
+        }
         jdbcTemplate.update("""
                 insert into ai_model_policies
                     (capability, provider_name, model_name, temperature, max_output_tokens,
-                     input_cost_per_million, output_cost_per_million, enabled)
-                values (?, ?, ?, ?, ?, ?, ?, ?)
+                     input_cost_per_million, output_cost_per_million, enabled, evaluation_run_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (capability) do update set
                     provider_name = excluded.provider_name, model_name = excluded.model_name,
                     temperature = excluded.temperature, max_output_tokens = excluded.max_output_tokens,
                     input_cost_per_million = excluded.input_cost_per_million,
                     output_cost_per_million = excluded.output_cost_per_million,
-                    enabled = excluded.enabled
+                    enabled = excluded.enabled, evaluation_run_id = excluded.evaluation_run_id
                 """, capability.name(), request.provider(), request.model(), request.temperature(),
                 request.maxOutputTokens(), request.inputCostPerMillion(), request.outputCostPerMillion(),
-                request.enabled());
+                request.enabled(), request.evaluationRunId());
         audit(actor.getId(), "MODEL_POLICY_UPDATE", "AI_CAPABILITY", capability.name(),
-                objectMapper.createObjectNode().put("model", request.model()).put("enabled", request.enabled()));
+                objectMapper.createObjectNode().put("model", request.model()).put("enabled", request.enabled()).put(
+                        "evaluationRunId",
+                        request.evaluationRunId() == null ? null : request.evaluationRunId().toString()));
         return policy(capability);
     }
 
@@ -181,7 +196,7 @@ class AiAdminService {
     private AiGovernanceDtos.ModelPolicyResponse policy(AiCapability capability) {
         return jdbcTemplate.query("""
                 select capability, provider_name, model_name, temperature, max_output_tokens,
-                       input_cost_per_million, output_cost_per_million, enabled, updated_at
+                       input_cost_per_million, output_cost_per_million, enabled, evaluation_run_id, updated_at
                 from ai_model_policies where capability = ?
                 """, rs -> {
             if (!rs.next()) {
@@ -190,7 +205,8 @@ class AiAdminService {
             return new AiGovernanceDtos.ModelPolicyResponse(rs.getString("capability"), rs.getString("provider_name"),
                     rs.getString("model_name"), rs.getBigDecimal("temperature"), rs.getInt("max_output_tokens"),
                     rs.getBigDecimal("input_cost_per_million"), rs.getBigDecimal("output_cost_per_million"),
-                    rs.getBoolean("enabled"), rs.getTimestamp("updated_at").toInstant());
+                    rs.getBoolean("enabled"), rs.getObject("evaluation_run_id", UUID.class),
+                    rs.getTimestamp("updated_at").toInstant());
         }, capability.name());
     }
 

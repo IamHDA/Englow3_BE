@@ -53,8 +53,9 @@ class AiAdminController {
 
     @PostMapping("/prompts/{templateId}/versions/{version}/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    void activate(@PathVariable UUID templateId, @PathVariable @Min(1) int version) {
-        adminService.activateVersion(templateId, version);
+    void activate(@PathVariable UUID templateId, @PathVariable @Min(1) int version,
+            @RequestParam UUID evaluationRunId) {
+        adminService.activateVersion(templateId, version, evaluationRunId);
     }
 
     @GetMapping("/model-policies")
