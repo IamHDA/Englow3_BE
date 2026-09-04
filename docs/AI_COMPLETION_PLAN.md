@@ -1,5 +1,9 @@
 # AI production completion plan
 
+> Implementation status: all repository-code work in this plan is implemented through migration `V270` on the
+> stacked feature branches. See `docs/AI_IMPLEMENTATION_STATUS.md` for branch order, verification evidence and
+> external production gates that still require authorized human/infrastructure work.
+
 Updated: 2026-08-24
 
 ## Target architecture
