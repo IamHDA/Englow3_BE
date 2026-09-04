@@ -49,6 +49,24 @@ class LearningPathController {
         return service.complete(itemId, request);
     }
 
+    @PostMapping("/items/{itemId}/skip")
+    LearningPathDtos.PathItem skip(@PathVariable UUID itemId,
+            @Valid @RequestBody LearningPathDtos.SkipItemRequest request) {
+        return service.skip(itemId, request);
+    }
+
+    @PostMapping("/items/{itemId}/postpone")
+    LearningPathDtos.PathItem postpone(@PathVariable UUID itemId,
+            @Valid @RequestBody LearningPathDtos.PostponeItemRequest request) {
+        return service.postpone(itemId, request);
+    }
+
+    @PostMapping("/items/{itemId}/replace")
+    LearningPathDtos.PathItem replace(@PathVariable UUID itemId,
+            @Valid @RequestBody LearningPathDtos.ReplaceItemRequest request) {
+        return service.replace(itemId, request);
+    }
+
     @GetMapping("/next")
     LearningPathDtos.PathItem next() {
         return service.next();
