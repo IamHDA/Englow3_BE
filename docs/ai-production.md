@@ -77,6 +77,9 @@ The CD workflow publishes two images for each `main` or `dev` push:
 - `ghcr.io/<owner>/<repository>:<branch>` for Spring Boot.
 - `ghcr.io/<owner>/<repository>-ai-service:<branch>` for FastAPI.
 
+Pull requests into `main` or `dev` build both images without publishing or deploying them, so container failures are
+detected before merge.
+
 Configure deployment destinations with repository secrets or variables:
 
 - `RENDER_BACKEND_DEPLOY_HOOK_URL` for the Spring service. The legacy
