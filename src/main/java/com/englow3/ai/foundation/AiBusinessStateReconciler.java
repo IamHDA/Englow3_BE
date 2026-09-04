@@ -35,5 +35,11 @@ class AiBusinessStateReconciler {
                 where d.ai_job_id = j.id and d.status = 'GENERATING'
                   and j.status in ('FAILED', 'CANCELLED')
                 """);
+        jdbcTemplate.update("""
+                update writing_submissions s set status = 'FAILED'
+                from ai_jobs j
+                where s.ai_job_id = j.id and s.status = 'PROCESSING'
+                  and j.status in ('FAILED', 'CANCELLED')
+                """);
     }
 }
