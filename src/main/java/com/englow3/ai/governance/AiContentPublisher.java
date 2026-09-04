@@ -48,14 +48,15 @@ class AiContentPublisher {
             String type = entity.path("entityType").asText();
             String id = entity.path("entityId").asText();
             int updated = switch (type) {
-                case "EXAM_ITEM" ->
-                        jdbcTemplate.update("update exam_items set review_status = 'archived' where item_id = ?", id);
-                case "SHADOWING_CLIP" -> jdbcTemplate
-                        .update("update shadowing_clips set review_status = 'archived' where clip_id = ?", id);
-                case "FLASHCARD" ->
-                        jdbcTemplate.update("update flashcards set review_status = 'archived' where id = ?", id);
-                case "GRAMMAR_POINT" ->
-                        jdbcTemplate.update("update grammar_points set review_status = 'archived' where id = ?", id);
+                case "EXAM_ITEM" -> jdbcTemplate.update(
+                        "update exam_items set review_status = 'archived', embedding = null where item_id = ?", id);
+                case "SHADOWING_CLIP" -> jdbcTemplate.update(
+                        "update shadowing_clips set review_status = 'archived', embedding = null where clip_id = ?",
+                        id);
+                case "FLASHCARD" -> jdbcTemplate
+                        .update("update flashcards set review_status = 'archived', embedding = null where id = ?", id);
+                case "GRAMMAR_POINT" -> jdbcTemplate.update(
+                        "update grammar_points set review_status = 'archived', embedding = null where id = ?", id);
                 default -> throw new IllegalStateException("Unknown published AI content entity type");
             };
             if (updated != 1) {

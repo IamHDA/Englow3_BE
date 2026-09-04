@@ -16,6 +16,7 @@ import com.englow3.ai.foundation.AiJob;
 import com.englow3.ai.foundation.AiJobService;
 import com.englow3.ai.foundation.AiPromptService;
 import com.englow3.ai.foundation.RenderedPrompt;
+import com.englow3.ai.embedding.AiEmbeddingIndexService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
@@ -38,10 +39,12 @@ class AiGovernanceService {
     private final ObjectMapper objectMapper;
     private final AiContentValidator contentValidator;
     private final AiContentPublisher contentPublisher;
+    private final AiEmbeddingIndexService embeddingIndexService;
 
     AiGovernanceService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository,
             AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper,
-            AiContentValidator contentValidator, AiContentPublisher contentPublisher) {
+            AiContentValidator contentValidator, AiContentPublisher contentPublisher,
+            AiEmbeddingIndexService embeddingIndexService) {
         this.jdbcTemplate = jdbcTemplate;
         this.currentUser = currentUser;
         this.userRepository = userRepository;
@@ -50,6 +53,7 @@ class AiGovernanceService {
         this.objectMapper = objectMapper;
         this.contentValidator = contentValidator;
         this.contentPublisher = contentPublisher;
+        this.embeddingIndexService = embeddingIndexService;
     }
 
     @Transactional
@@ -191,6 +195,7 @@ class AiGovernanceService {
                     """, draftId, draft.revision(), entity.path("entityType").asText(),
                     entity.path("entityId").asText(), publisher.getId());
         }
+        embeddingIndexService.enqueue(entities, draft.revision());
         int updated = jdbcTemplate.update("""
                 update ai_content_drafts
                 set status = 'PUBLISHED', published_entities = ?::jsonb, published_at = now()
@@ -214,6 +219,7 @@ class AiGovernanceService {
             throw new ConflictException("AI_CONTENT_NOT_ARCHIVABLE", "Published content entities were not found");
         }
         contentPublisher.archive(entities);
+        embeddingIndexService.archive(entities);
         jdbcTemplate.update("""
                 update ai_content_drafts set status = 'ARCHIVED', review_reason = ? where id = ?
                 """, reason.strip(), draftId);
