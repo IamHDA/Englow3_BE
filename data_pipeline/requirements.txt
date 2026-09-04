@@ -1,0 +1,25 @@
+# English Learning Platform — Data Pipeline
+# Python 3.11+ required (see AGENT_WORK_ORDER §0.6)
+
+# --- Core data modelling & validation ---
+pydantic>=2.6
+jsonschema>=4.21
+
+# --- Database ---
+psycopg[binary]>=3.1
+sqlalchemy>=2.0
+pgvector>=0.2.5
+
+# --- Config / env ---
+python-dotenv>=1.0
+PyYAML>=6.0
+
+# --- Serialization ---
+orjson>=3.9
+
+# --- Text / phonetics ---
+eng-to-ipa>=0.0.2
+rapidfuzz>=3.6
+
+# --- Testing ---
+pytest>=8.0

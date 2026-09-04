@@ -1,0 +1,31 @@
+package com.englow3.ai.tutor;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+
+class TutorDomainTest {
+
+    @Test
+    void archivesAConversation() {
+        TutorConversation conversation = TutorConversation.start(UUID.randomUUID(), "Grammar practice");
+
+        conversation.archive();
+
+        assertThat(conversation.active()).isFalse();
+        assertThat(conversation.getStatus()).isEqualTo(TutorConversationStatus.ARCHIVED);
+    }
+
+    @Test
+    void completesAPendingAssistantMessage() {
+        TutorMessage message = TutorMessage.pendingAssistant(UUID.randomUUID(), UUID.randomUUID());
+
+        message.complete("Use the present perfect here.", "test-model", 20, 10);
+
+        assertThat(message.getStatus()).isEqualTo(TutorMessageStatus.COMPLETED);
+        assertThat(message.getContent()).contains("present perfect");
+        assertThat(message.getInputTokens()).isEqualTo(20);
+    }
+}

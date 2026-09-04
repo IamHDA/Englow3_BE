@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "ReviewStatus": {
+      "enum": [
+        "draft",
+        "auto_validated",
+        "human_approved"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "WritingTaskType": {
+      "enum": [
+        "email",
+        "opinion_essay",
+        "picture_description"
+      ],
+      "title": "WritingTaskType",
+      "type": "string"
+    }
+  },
+  "$id": "https://englow3.local/schemas/writing_task.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "8 task theo định dạng TOEIC S&W (§Phase 9).",
+  "properties": {
+    "concept_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Concept Ids",
+      "type": "array"
+    },
+    "difficulty_prior": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Difficulty Prior",
+      "type": "number"
+    },
+    "high_scoring_vocab": {
+      "items": {
+        "type": "string"
+      },
+      "title": "High Scoring Vocab",
+      "type": "array"
+    },
+    "max_words": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Words"
+    },
+    "min_words": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Min Words"
+    },
+    "prompt": {
+      "minLength": 10,
+      "title": "Prompt",
+      "type": "string"
+    },
+    "review_status": {
+      "$ref": "#/$defs/ReviewStatus",
+      "default": "draft"
+    },
+    "rubric_ref": {
+      "minLength": 1,
+      "title": "Rubric Ref",
+      "type": "string"
+    },
+    "sample_answer_c1": {
+      "minLength": 30,
+      "title": "Sample Answer C1",
+      "type": "string"
+    },
+    "task_id": {
+      "default": "",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_type": {
+      "$ref": "#/$defs/WritingTaskType"
+    }
+  },
+  "required": [
+    "prompt",
+    "sample_answer_c1",
+    "rubric_ref",
+    "concept_ids",
+    "difficulty_prior",
+    "task_type"
+  ],
+  "title": "WritingTask",
+  "type": "object"
+}

@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "BandDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Band",
+          "type": "integer"
+        },
+        "descriptor_en": {
+          "minLength": 10,
+          "title": "Descriptor En",
+          "type": "string"
+        },
+        "descriptor_vi": {
+          "minLength": 10,
+          "title": "Descriptor Vi",
+          "type": "string"
+        }
+      },
+      "required": [
+        "band",
+        "descriptor_en",
+        "descriptor_vi"
+      ],
+      "title": "BandDescriptor",
+      "type": "object"
+    },
+    "RubricDimension": {
+      "additionalProperties": false,
+      "properties": {
+        "band_descriptors": {
+          "items": {
+            "$ref": "#/$defs/BandDescriptor"
+          },
+          "minItems": 6,
+          "title": "Band Descriptors",
+          "type": "array"
+        },
+        "concept_id": {
+          "minLength": 2,
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 2,
+          "title": "Name",
+          "type": "string"
+        },
+        "weight": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "weight",
+        "concept_id",
+        "band_descriptors"
+      ],
+      "title": "RubricDimension",
+      "type": "object"
+    }
+  },
+  "$id": "https://englow3.local/schemas/rubric.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Tách riêng; task chỉ giữ `rubric_ref` (§2.6).",
+  "properties": {
+    "dimensions": {
+      "items": {
+        "$ref": "#/$defs/RubricDimension"
+      },
+      "minItems": 1,
+      "title": "Dimensions",
+      "type": "array"
+    },
+    "name": {
+      "minLength": 3,
+      "title": "Name",
+      "type": "string"
+    },
+    "rubric_id": {
+      "default": "",
+      "title": "Rubric Id",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "dimensions"
+  ],
+  "title": "Rubric",
+  "type": "object"
+}

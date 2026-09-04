@@ -1,0 +1,49 @@
+# Cấu hình embedding — chốt cứng cho Phase 2 (DDL) và Phase 11 (ingest)
+#
+# Quyết định quan trọng nhất ở đây KHÔNG phải chọn model, mà là chốt SỐ CHIỀU.
+# Cột Postgres là `vector(N)`; đổi N sau khi đã ingest = phải drop cột, dựng lại
+# index, sinh lại toàn bộ embedding. Đổi model mà giữ nguyên N thì chỉ cần
+# re-embed, không phải migration.
+#
+# → Chốt N = 1024, vì đó là số chiều chung của cả 3 lựa chọn thực tế:
+#     bge-m3            1024   local, miễn phí, đa ngữ
+#     voyage-3.5        1024   API trả phí (Anthropic khuyến nghị Voyage;
+#                              Anthropic KHÔNG có embeddings API riêng)
+#     multilingual-e5-large 1024   local, miễn phí
+#   Đổi giữa ba model này về sau chỉ tốn thời gian re-embed.
+
+dimension: 1024
+
+model:
+  name: BAAI/bge-m3
+  provider: local            # local | voyage
+  revision: null             # ghim commit hash trước khi chạy production
+  max_input_tokens: 8192
+
+normalize: true              # chuẩn hoá L2 → dùng được cosine qua inner product
+
+# Toán tử và index tương ứng khi normalize = true
+distance_metric: cosine
+pgvector:
+  index_type: hnsw
+  opclass: vector_cosine_ops
+  m: 16
+  ef_construction: 64
+
+# Phương án trả phí, cùng 1024 chiều nên thay được mà không cần migration.
+# Anthropic không cung cấp embeddings API; Voyage AI là bên được khuyến nghị.
+alternatives:
+  - name: voyage-3.5
+    provider: voyage
+    dimension: 1024          # hỗ trợ Matryoshka 256/512/1024/2048 — chọn 1024
+    note: "Cần VOYAGE_API_KEY. Tính phí theo token."
+  - name: intfloat/multilingual-e5-large
+    provider: local
+    dimension: 1024
+    note: "Cần prefix 'query: ' / 'passage: ' khi encode."
+
+# Vì sao local là mặc định:
+#   - embedding_text (§2.7) chỉ gồm tiếng Anh, không cần model thương mại mạnh nhất
+#   - khối lượng lớn: 3000 flashcard + ~1200 exam item + grammar/speaking/writing
+#   - sinh lại nhiều lần trong lúc phát triển → API trả phí sẽ tốn vô ích
+#   - không cần API key, chạy được offline, tái lập được
