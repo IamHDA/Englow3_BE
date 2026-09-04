@@ -238,7 +238,7 @@ class PlacementService {
         ObjectNode payload = objectMapper.createObjectNode().put("reportId", reportId.toString())
                 .put("systemPrompt", prompt.systemPrompt()).put("userPrompt", prompt.userPrompt());
         AiJob job = jobService.submitForCurrentUser(AiCapability.PLACEMENT, "PLACEMENT_REPORT", "PLACEMENT_REPORT",
-                reportId, prompt.version(), payload, idempotencyKey);
+                reportId, prompt.version(), payload, "PLACEMENT:" + idempotencyKey);
         jdbcTemplate.update("update placement_ai_reports set ai_job_id = ? where id = ?", job.getId(), reportId);
         return new PlacementDtos.SubmitAttemptResponse(result(attemptId), reportId, job.getId());
     }
@@ -267,7 +267,7 @@ class PlacementService {
                         : null,
                 attemptId);
         if (report == null) {
-            throw new ConflictException("PLACEMENT_REPORT_MISSING", "The scored attempt has no placement report");
+            return new PlacementDtos.SubmitAttemptResponse(result(attemptId), null, null);
         }
         return new PlacementDtos.SubmitAttemptResponse(result(attemptId), report.id(), report.jobId());
     }
