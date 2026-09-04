@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, model_validator
 
 from .common import StrictModel
-from .enums import Accent, CEFRLevel
+from .enums import Accent, CEFRLevel, ReviewStatus
 
 __all__ = [
     "DimensionScore", "ErrorFinding", "AssessmentResult",
@@ -56,6 +58,7 @@ class AssessmentPrompt(StrictModel):
     system_prompt: str = Field(min_length=100)
     output_schema_ref: str = Field(default="AssessmentResult")
     version: str = Field(default="1.0.0", pattern=r"^\d+\.\d+\.\d+$")
+    review_status: ReviewStatus = ReviewStatus.DRAFT
 
 
 class ShadowingSegment(StrictModel):
@@ -75,6 +78,9 @@ class ShadowingClip(StrictModel):
     duration_ms: int | None = Field(default=None, ge=0)
     segments: list[ShadowingSegment] = Field(min_length=1)
     concept_ids: list[str] = Field(min_length=1)
+    practice_modes: list[Literal["shadowing", "dictation"]] = Field(
+        default_factory=lambda: ["shadowing", "dictation"], min_length=1)
+    review_status: ReviewStatus = ReviewStatus.DRAFT
 
     @model_validator(mode="after")
     def segment_order_contiguous(self):

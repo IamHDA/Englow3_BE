@@ -7,10 +7,12 @@ và cái gì phải làm lại nếu đổi ý.
 
 ## D1 — Dữ liệu học liệu chỉ lưu local, không đẩy git
 
-**Chốt:** `output/**/*.json`, `seeds/vocab_seed.csv`, `seeds/by_level/`,
-`seeds/raw/`, `rejects/*.json` đều nằm trong `.gitignore`.
+**Chốt:** `output/**/*.json`, `output/media/`, `output/exams/individual_sets/`,
+`sources/`, `seeds/vocab_seed.csv`, `seeds/by_level/`, `seeds/raw/`,
+`rejects/*.json` đều nằm trong `.gitignore`.
 
-**Vẫn nằm trong git:** script sinh dữ liệu, schema, taxonomy, validator, báo cáo QA.
+**Vẫn nằm trong git:** script sinh dữ liệu, schema, taxonomy, validator, báo cáo QA
+và file attribution/licence.
 Nghĩa là repo giữ *cách tạo ra* dữ liệu, không giữ *dữ liệu*.
 
 **Lý do:**
@@ -24,6 +26,7 @@ Nghĩa là repo giữ *cách tạo ra* dữ liệu, không giữ *dữ liệu*.
 ```bash
 cd data_pipeline/seeds/raw && ./fetch_wordlists.sh   # tải wordlist gốc
 cd ../.. && make seed                                # dựng vocab_seed.csv
+make sources                                         # tải corpus mở đã pin commit/hash
 ```
 
 **Hệ quả phải nhớ:** dữ liệu không có bản sao trên remote. Cần cơ chế backup riêng

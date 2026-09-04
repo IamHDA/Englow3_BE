@@ -2,9 +2,9 @@
 
 Sinh tự động bởi `validators/check_taxonomy.py --report`. Không sửa tay — sửa `taxonomy/concepts.yaml` rồi chạy lại.
 
-**Tổng số concept:** 171  
-**Node lá (mang item):** 150  
-**Node gom nhóm (không mang item):** 21  
+**Tổng số concept:** 177
+**Node lá (mang item):** 156
+**Node gom nhóm (không mang item):** 21
 **Độ sâu cây tối đa:** 1
 
 ## Phân bố theo domain
@@ -12,12 +12,12 @@ Sinh tự động bởi `validators/check_taxonomy.py --report`. Không sửa ta
 | Domain | Tổng | Node lá | Node gom |
 |---|---:|---:|---:|
 | grammar | 106 | 90 | 16 |
-| listening | 12 | 11 | 1 |
+| listening | 18 | 17 | 1 |
 | reading | 10 | 9 | 1 |
 | speaking | 7 | 6 | 1 |
 | vocabulary | 29 | 28 | 1 |
 | writing | 7 | 6 | 1 |
-| **TỔNG** | **171** | **150** | **21** |
+| **TỔNG** | **177** | **156** | **21** |
 
 ## Phân bố theo domain × CEFR band
 
@@ -26,19 +26,19 @@ Một concept trải nhiều band sẽ được đếm ở mọi band nó thuộ
 | Domain | A1 | A2 | B1 | B2 | C1 |
 |---|---|---|---|---|---|
 | grammar | 30 | 46 | 54 | 39 | 19 |
-| listening | 0 | 5 | 9 | 8 | 4 |
+| listening | 0 | 6 | 14 | 13 | 5 |
 | reading | 0 | 3 | 6 | 8 | 5 |
 | speaking | 0 | 3 | 7 | 7 | 7 |
 | vocabulary | 5 | 8 | 9 | 7 | 4 |
 | writing | 0 | 3 | 7 | 7 | 6 |
-| **TỔNG** | **35** | **68** | **92** | **76** | **45** |
+| **TỔNG** | **35** | **69** | **97** | **81** | **46** |
 
 ## Độ sâu cây
 
 | Độ sâu | Số concept |
 |---:|---:|
 | 0 | 21 |
-| 1 | 150 |
+| 1 | 156 |
 
 ## Cây concept
 
@@ -150,15 +150,21 @@ gram_word_formation  [B1,B2]
   gram_word_form_noun  [B1,B2]  *
   gram_word_form_verb  [B2]  *
 lc_listening_skills  [A2,B1,B2,C1]
+  lc_alternative_question  [B1,B2]  *
   lc_detail  [B1,B2]  *
   lc_gist  [B1,B2]  *
   lc_graphic_reference  [B2,C1]  *
   lc_indirect_response  [B2,C1]  *
   lc_inference  [B2,C1]  *
+  lc_negative_question  [B1,B2]  *
   lc_next_action  [B1,B2]  *
   lc_photo_action  [A2,B1]  *
   lc_photo_state  [A2,B1]  *
+  lc_request_offer  [A2,B1]  *
   lc_speaker_role  [B1,B2]  *
+  lc_statement_response  [B2,C1]  *
+  lc_suggestion  [B1,B2]  *
+  lc_tag_question  [B1,B2]  *
   lc_wh_question  [A2,B1]  *
   lc_yes_no  [A2,B1]  *
 rc_reading_skills  [A2,B1,B2,C1]
@@ -219,7 +225,7 @@ wr_writing_skills  [A2,B1,B2,C1]
 
 ## Node lá
 
-150 node dưới đây là nơi item thực sự gắn vào. Chỉ tiêu 10–30 item mỗi node áp dụng cho danh sách này, không áp cho node gom nhóm.
+156 node dưới đây là nơi item thực sự gắn vào. Chỉ tiêu 10–30 item mỗi node áp dụng cho danh sách này, không áp cho node gom nhóm.
 
 **grammar** (90)
 
@@ -314,17 +320,23 @@ wr_writing_skills  [A2,B1,B2,C1]
 - `gram_word_form_noun` — Cấu tạo danh từ
 - `gram_word_form_verb` — Cấu tạo động từ
 
-**listening** (11)
+**listening** (17)
 
+- `lc_alternative_question` — Đáp câu hỏi lựa chọn
 - `lc_detail` — Bắt chi tiết cụ thể
 - `lc_gist` — Nắm ý chính bài nghe
 - `lc_graphic_reference` — Đối chiếu bảng biểu khi nghe
 - `lc_indirect_response` — Đáp gián tiếp
 - `lc_inference` — Suy luận hàm ý
+- `lc_negative_question` — Đáp câu hỏi phủ định
 - `lc_next_action` — Dự đoán hành động tiếp theo
 - `lc_photo_action` — Mô tả hành động trong ảnh
 - `lc_photo_state` — Mô tả trạng thái trong ảnh
+- `lc_request_offer` — Đáp lời nhờ và lời mời
 - `lc_speaker_role` — Xác định vai người nói và địa điểm
+- `lc_statement_response` — Đáp lời trần thuật
+- `lc_suggestion` — Đáp lời đề nghị
+- `lc_tag_question` — Đáp câu hỏi đuôi
 - `lc_wh_question` — Đáp câu hỏi wh-
 - `lc_yes_no` — Đáp câu hỏi yes-no
 
@@ -535,34 +547,40 @@ Không có cycle. Thứ tự dưới đây là một trình tự học hợp l�
 139. gram_past_continuous
 140. gram_present_perfect
 141. gram_reported_statement
-142. lc_indirect_response
-143. gram_discourse_marker
-144. gram_article_definite
-145. gram_quantifier_advanced
-146. gram_participle_clause
-147. gram_phrasal_verb_three_part
-148. gram_relative_preposition
-149. rc_cross_reference
-150. rc_intent
-151. vocab_education_career_c1
-152. vocab_shopping_finance_b2
-153. vocab_technology_media_c1
-154. vocab_travel_transport_b2
-155. gram_conditional_second
-156. gram_passive_causative
-157. gram_future_perfect_continuous
-158. gram_modal_perfect
-159. gram_passive_perfect_modal
-160. gram_past_perfect
-161. gram_present_perfect_continuous
-162. gram_present_perfect_vs_past_simple
-163. gram_noun_clause
-164. gram_reported_backshift
-165. gram_reported_question
-166. gram_article_zero
-167. gram_relative_reduced
-168. gram_wish_regret
-169. gram_conditional_third
-170. gram_subjunctive_mandative
-171. gram_conditional_mixed
+142. lc_alternative_question
+143. lc_indirect_response
+144. lc_negative_question
+145. lc_request_offer
+146. lc_tag_question
+147. gram_discourse_marker
+148. gram_article_definite
+149. gram_quantifier_advanced
+150. gram_participle_clause
+151. gram_phrasal_verb_three_part
+152. gram_relative_preposition
+153. rc_cross_reference
+154. rc_intent
+155. vocab_education_career_c1
+156. vocab_shopping_finance_b2
+157. vocab_technology_media_c1
+158. vocab_travel_transport_b2
+159. gram_conditional_second
+160. gram_passive_causative
+161. gram_future_perfect_continuous
+162. gram_modal_perfect
+163. gram_passive_perfect_modal
+164. gram_past_perfect
+165. gram_present_perfect_continuous
+166. gram_present_perfect_vs_past_simple
+167. gram_noun_clause
+168. gram_reported_backshift
+169. gram_reported_question
+170. lc_statement_response
+171. lc_suggestion
+172. gram_article_zero
+173. gram_relative_reduced
+174. gram_wish_regret
+175. gram_conditional_third
+176. gram_subjunctive_mandative
+177. gram_conditional_mixed
 ```

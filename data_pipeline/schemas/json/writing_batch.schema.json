@@ -1,5 +1,130 @@
 {
   "$defs": {
+    "Accent": {
+      "description": "Lỗi P1-6 — bắt buộc trên mọi AudioAsset.",
+      "enum": [
+        "US",
+        "UK",
+        "AU",
+        "CA"
+      ],
+      "title": "Accent",
+      "type": "string"
+    },
+    "AlignmentStatus": {
+      "enum": [
+        "pending",
+        "aligned",
+        "failed"
+      ],
+      "title": "AlignmentStatus",
+      "type": "string"
+    },
+    "AudioAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "accent": {
+          "$ref": "#/$defs/Accent"
+        },
+        "alignment_status": {
+          "$ref": "#/$defs/AlignmentStatus",
+          "default": "pending"
+        },
+        "audio_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Url"
+        },
+        "cues": {
+          "items": {
+            "$ref": "#/$defs/AudioCue"
+          },
+          "title": "Cues",
+          "type": "array"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "script": {
+          "minLength": 10,
+          "title": "Script",
+          "type": "string"
+        },
+        "speaker_count": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Speaker Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "script",
+        "accent"
+      ],
+      "title": "AudioAsset",
+      "type": "object"
+    },
+    "AudioCue": {
+      "additionalProperties": false,
+      "description": "A verified time range for one utterance in a generated audio asset.",
+      "properties": {
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "AudioCue",
+      "type": "object"
+    },
     "BandDescriptor": {
       "additionalProperties": false,
       "properties": {
@@ -182,6 +307,17 @@
       "additionalProperties": false,
       "description": "8 task theo định dạng TOEIC S&W (§Phase 9).",
       "properties": {
+        "audio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudioAsset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "concept_ids": {
           "items": {
             "type": "string"
@@ -202,6 +338,21 @@
           },
           "title": "High Scoring Vocab",
           "type": "array"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Url"
         },
         "max_words": {
           "anyOf": [
@@ -247,6 +398,18 @@
           "minLength": 30,
           "title": "Sample Answer C1",
           "type": "string"
+        },
+        "stimulus_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stimulus Text"
         },
         "task_id": {
           "default": "",

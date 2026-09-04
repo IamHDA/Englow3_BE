@@ -53,12 +53,19 @@ REQUIRED_FIELDS = (
 # --- Quy ước p_guess (work order Phase 1, mục 3) -----------------------------
 # p_guess phải khớp số lựa chọn của dạng câu hỏi đánh giá concept đó.
 #
-# TOEIC-format Part 2 chỉ có 3 lựa chọn → 1/3. Ba concept dưới đây là các dạng
-# câu hỏi của Part 2, nên p_guess = 0.33.
+# TOEIC-format Part 2 chỉ có 3 lựa chọn → 1/3. Các concept dưới đây đều được
+# đánh giá bằng Part 2, nên p_guess = 0.33. Giữ danh sách này đồng bộ với các
+# concept Part 2 trong taxonomy và gen_listening_part2.py.
 THREE_OPTION_CONCEPTS = {
     "lc_wh_question",
     "lc_yes_no",
     "lc_indirect_response",
+    "lc_negative_question",
+    "lc_tag_question",
+    "lc_alternative_question",
+    "lc_request_offer",
+    "lc_suggestion",
+    "lc_statement_response",
 }
 # Speaking/Writing chấm bằng rubric, không phải trắc nghiệm → không đoán được.
 PRODUCTIVE_DOMAINS = {"speaking", "writing"}
@@ -330,9 +337,9 @@ def write_summary(by_id: dict[str, dict], order: list[str], path: Path) -> None:
         "Sinh tự động bởi `validators/check_taxonomy.py --report`. "
         "Không sửa tay — sửa `taxonomy/concepts.yaml` rồi chạy lại.\n"
     )
-    lines.append(f"**Tổng số concept:** {len(by_id)}  ")
-    lines.append(f"**Node lá (mang item):** {len(leaves)}  ")
-    lines.append(f"**Node gom nhóm (không mang item):** {len(containers)}  ")
+    lines.append(f"**Tổng số concept:** {len(by_id)}")
+    lines.append(f"**Node lá (mang item):** {len(leaves)}")
+    lines.append(f"**Node gom nhóm (không mang item):** {len(containers)}")
     lines.append(f"**Độ sâu cây tối đa:** {max_depth}\n")
 
     lines.append("## Phân bố theo domain\n")
@@ -448,9 +455,9 @@ def main() -> int:
     n_edges = sum(len(c.get("prerequisites") or []) for c in by_id.values())
     n_roots = sum(1 for c in by_id.values() if c.get("parent_id") is None)
     print(f"  concept_id unique          OK  ({len(by_id)} concept)")
-    print(f"  field & kiểu dữ liệu       OK")
-    print(f"  cefr_band hợp lệ           OK")
-    print(f"  bkt_priors trong (0,1)     OK")
+    print("  field & kiểu dữ liệu       OK")
+    print("  cefr_band hợp lệ           OK")
+    print("  bkt_priors trong (0,1)     OK")
     print(f"  p_guess khớp số đáp án     OK  (3 lựa chọn: {len(THREE_OPTION_CONCEPTS)}, rubric: "
           f"{sum(1 for c in by_id.values() if c['domain'] in PRODUCTIVE_DOMAINS)})")
     print(f"  parent_id tồn tại, no cycle OK  ({n_roots} node gốc)")
@@ -466,4 +473,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(encoding="utf-8")
     sys.exit(main())

@@ -1148,4 +1148,230 @@ GRAMMAR_CONTENT: dict[str, tuple[str, str, list[tuple[str, str, str]]]] = {
   ("The rule demands that everyone wears a badge.",
    "The rule demands that everyone wear a badge.",
    "'everyone' vẫn dùng nguyên thể trong thức giả định.")]),
+
+"gram_quantifier_advanced": (
+ "Lượng từ tiếng Anh phụ thuộc vào danh từ đếm được hay không đếm được và vào sắc thái "
+ "khẳng định hoặc phủ định. Tiếng Việt thường dùng chung 'nhiều', 'ít', 'mỗi' nên người học "
+ "dễ ghép một lượng từ với sai loại danh từ hoặc bỏ mất khác biệt giữa few và a few.",
+ "Advanced quantifiers encode countability and meaning differences such as few versus a few.",
+ [("There is many information in the report.", "There is much information in the report.",
+   "'information' không đếm được nên dùng 'much', không dùng 'many'."),
+  ("Only few employees completed the survey.", "Only a few employees completed the survey.",
+   "'a few' nghĩa là vẫn có một số người; 'few' nhấn mạnh gần như không có ai."),
+  ("Every of the applicants received an email.", "Each of the applicants received an email.",
+   "Trước 'of the + danh từ số nhiều' phải dùng 'each', không dùng 'every'."),
+  ("Neither options is suitable for the client.", "Neither option is suitable for the client.",
+   "Sau 'neither' dùng danh từ số ít khi nói riêng từng lựa chọn.")]),
+
+"gram_pronoun_reflexive": (
+ "Đại từ phản thân dùng khi chủ ngữ và tân ngữ là cùng một người hoặc để nhấn mạnh. Tiếng Việt "
+ "có thể dùng 'mình', 'bản thân' hoặc bỏ hẳn, nên người học thường dùng đại từ tân ngữ thông "
+ "thường ở nơi tiếng Anh cần myself, yourself, himself và các dạng tương ứng.",
+ "Reflexive pronouns are required when subject and object refer to the same participant.",
+ [("She taught her to use the new software.", "She taught herself to use the new software.",
+   "Người dạy và người học đều là 'she', vì vậy tân ngữ phải là 'herself'."),
+  ("Please help you to some refreshments.", "Please help yourself to some refreshments.",
+   "Cụm cố định là 'help yourself to', nghĩa là tự nhiên lấy đồ dùng."),
+  ("We really enjoyed us at the conference.", "We really enjoyed ourselves at the conference.",
+   "Cụm 'enjoy oneself' bắt buộc dùng đại từ phản thân phù hợp với chủ ngữ."),
+  ("The device resets it every night.", "The device resets itself every night.",
+   "Thiết bị tự đặt lại chính nó nên dùng 'itself', không dùng 'it'.")]),
+
+"gram_present_perfect": (
+ "Hiện tại hoàn thành nối một sự việc trong quá khứ với hiện tại: kinh nghiệm, kết quả hiện còn "
+ "tác dụng hoặc khoảng thời gian chưa kết thúc. Tiếng Việt dùng các từ 'đã', 'rồi', 'từng' mà "
+ "không đổi dạng động từ, nên người học thường giữ hiện tại đơn hoặc quá khứ đơn.",
+ "The present perfect connects an earlier event or continuing situation with the present.",
+ [("I live here for five years.", "I have lived here for five years.",
+   "Khoảng thời gian bắt đầu trong quá khứ và còn tiếp tục đến nay cần hiện tại hoàn thành."),
+  ("She just finished the monthly report.", "She has just finished the monthly report.",
+   "'just' diễn tả kết quả rất gần hiện tại nên dùng 'has finished'."),
+  ("They didn't arrive yet.", "They haven't arrived yet.",
+   "'yet' trong câu phủ định về việc chưa xảy ra đến hiện tại đi với hiện tại hoàn thành."),
+  ("Have you ever went to Canada?", "Have you ever gone to Canada?",
+   "Sau 'have' phải dùng quá khứ phân từ 'gone', không dùng quá khứ đơn 'went'.")]),
+
+"gram_time_clause_future": (
+ "Trong mệnh đề thời gian nói về tương lai sau when, before, after, until, as soon as, tiếng Anh "
+ "dùng hiện tại đơn chứ không dùng will. Tiếng Việt vẫn có thể lặp từ 'sẽ' ở cả hai vế nên người "
+ "học thường đưa will vào mệnh đề phụ.",
+ "Future time clauses use the present simple after when, before, until and similar conjunctions.",
+ [("I will call you when I will arrive.", "I will call you when I arrive.",
+   "Mệnh đề sau 'when' dùng hiện tại đơn dù toàn câu nói về tương lai."),
+  ("Wait here until the manager will return.", "Wait here until the manager returns.",
+   "Sau 'until' dùng hiện tại đơn 'returns', không dùng 'will return'."),
+  ("Before she will leave, she will lock the office.",
+   "Before she leaves, she will lock the office.",
+   "Mệnh đề mở đầu bằng 'before' dùng hiện tại đơn để chỉ tương lai."),
+  ("We will ship the order as soon as payment will clear.",
+   "We will ship the order as soon as payment clears.",
+   "Sau 'as soon as' dùng hiện tại đơn; will chỉ nằm ở mệnh đề chính.")]),
+
+"gram_gerund_after_prep": (
+ "Mọi động từ đứng ngay sau giới từ phải ở dạng V-ing, kể cả khi giới từ đó là 'to' trong một "
+ "cụm cố định. Người Việt thường nhận diện 'to' như dấu hiệu của nguyên mẫu và chọn sai to-V.",
+ "A verb immediately after a preposition takes the gerund form, including after prepositional to.",
+ [("She is interested in learn data analysis.", "She is interested in learning data analysis.",
+   "Sau giới từ 'in' phải dùng danh động từ 'learning'."),
+  ("Check every figure before submit the report.", "Check every figure before submitting the report.",
+   "'before' là giới từ trong cấu trúc này nên động từ theo sau ở dạng V-ing."),
+  ("He left without check the final total.", "He left without checking the final total.",
+   "Sau 'without' luôn dùng danh từ hoặc V-ing, ở đây là 'checking'."),
+  ("I look forward to meet the new team.", "I look forward to meeting the new team.",
+   "'to' trong 'look forward to' là giới từ nên phải theo sau bằng 'meeting'.")]),
+
+"gram_verb_object_infinitive": (
+ "Một số động từ cần cấu trúc động từ + tân ngữ + to-V, như ask someone to do, allow someone to "
+ "do và remind someone to do. Tiếng Việt đặt hai động từ cạnh nhau mà không có dấu hiệu 'to', "
+ "nên người học thường bỏ mất thành phần này.",
+ "Verbs such as ask, allow and remind take an object followed by a to-infinitive.",
+ [("The manager asked me send the revised file.", "The manager asked me to send the revised file.",
+   "Sau 'ask + tân ngữ' phải có 'to' trước động từ nguyên mẫu."),
+  ("The guard allowed us enter the building.", "The guard allowed us to enter the building.",
+   "Cấu trúc đúng là 'allow someone to do something'."),
+  ("Please remind him calling the supplier.", "Please remind him to call the supplier.",
+   "'remind + tân ngữ' đi với to-V khi nhắc ai làm một việc."),
+  ("They encouraged the interns apply early.", "They encouraged the interns to apply early.",
+   "Sau 'encourage + tân ngữ' cần to-V, vì vậy phải có 'to apply'.")]),
+
+"gram_preposition_time_advanced": (
+ "Các giới từ thời gian nâng cao phân biệt điểm bắt đầu, độ dài và hạn cuối: since + mốc, for + "
+ "khoảng, by + không muộn hơn, until + kéo dài tới. Tiếng Việt thường dùng chung 'từ', 'trong', "
+ "'đến' nên người học dễ hoán đổi các giới từ này.",
+ "Advanced time prepositions distinguish starting points, duration, deadlines and end points.",
+ [("She has worked here since three years.", "She has worked here for three years.",
+   "'three years' là khoảng thời gian nên dùng 'for', không dùng 'since'."),
+  ("The office has been closed for Monday.", "The office has been closed since Monday.",
+   "'Monday' là mốc bắt đầu nên dùng 'since'."),
+  ("Please submit the form until Friday.", "Please submit the form by Friday.",
+   "Hạn cuối nghĩa là không muộn hơn thứ Sáu nên dùng 'by'."),
+  ("The support desk is open by six o'clock.", "The support desk is open until six o'clock.",
+   "Hoạt động kéo dài liên tục tới sáu giờ nên dùng 'until'.")]),
+
+"gram_phrasal_verb_separable": (
+ "Với cụm động từ tách được, tân ngữ danh từ có thể đứng giữa hoặc sau cụm, nhưng đại từ bắt "
+ "buộc đứng giữa động từ và tiểu từ. Tiếng Việt không có sự dịch chuyển này nên người học hay "
+ "đặt it, them ở cuối cụm.",
+ "With separable phrasal verbs, a pronoun object must appear between the verb and particle.",
+ [("Please turn off it before leaving.", "Please turn it off before leaving.",
+   "Đại từ 'it' phải đứng giữa 'turn' và 'off'."),
+  ("Could you pick up them after lunch?", "Could you pick them up after lunch?",
+   "Đại từ 'them' phải tách cụm 'pick up'."),
+  ("Fill out it and return it today.", "Fill it out and return it today.",
+   "Với tân ngữ đại từ, cấu trúc đúng là 'fill it out'."),
+  ("The director put off it until next week.", "The director put it off until next week.",
+   "Đại từ đứng giữa hai phần của cụm động từ tách được 'put off'.")]),
+
+"gram_conjunction_subordinating": (
+ "Liên từ phụ thuộc nối một mệnh đề chính với mệnh đề nêu nguyên nhân, nhượng bộ, điều kiện hoặc "
+ "thời gian. Không được ghép đồng thời hai dấu nối mang cùng chức năng như although ... but; "
+ "đồng thời phải phân biệt liên từ với cụm giới từ như because và because of.",
+ "Subordinating conjunctions introduce dependent clauses and must match the structure that follows.",
+ [("We stayed inside because the storm.", "We stayed inside because of the storm.",
+   "Trước danh ngữ 'the storm' phải dùng cụm giới từ 'because of'."),
+  ("Because of the supplier was late, production stopped.",
+   "Because the supplier was late, production stopped.",
+   "Trước một mệnh đề đầy đủ dùng 'because', không dùng 'because of'."),
+  ("He left early so that he was feeling ill.", "He left early because he was feeling ill.",
+   "Đây là nguyên nhân nên dùng 'because'; 'so that' diễn tả mục đích."),
+  ("Despite the road was flooded, the bus continued.",
+   "Although the road was flooded, the bus continued.",
+   "Trước mệnh đề đầy đủ dùng 'although'; 'despite' phải đi với danh ngữ hoặc V-ing.")]),
+
+"gram_linking_contrast": (
+ "Các từ nối tương phản có cấu trúc khác nhau: although + mệnh đề, despite + danh ngữ/V-ing, "
+ "however đứng tách bằng dấu câu. Dịch tất cả thành 'mặc dù/tuy nhiên' khiến người học dùng "
+ "chúng thay thế cho nhau mà không đổi cấu trúc.",
+ "Contrast linkers differ syntactically: although takes a clause, despite a noun phrase, and however punctuation.",
+ [("Despite of the delay, the team finished on time.",
+   "Despite the delay, the team finished on time.",
+   "'despite' không đi với 'of'; chỉ 'in spite of' mới có giới từ này."),
+  ("However the high cost, the company approved the plan.",
+   "Despite the high cost, the company approved the plan.",
+   "Trước danh ngữ dùng 'despite'; 'however' không trực tiếp đứng trước danh ngữ như vậy."),
+  ("Although demand fell. However, revenue increased.",
+   "Although demand fell, revenue increased.",
+   "Mệnh đề although phải gắn với mệnh đề chính, không được kết thúc thành câu rời."),
+  ("In spite the rain, the event continued.", "In spite of the rain, the event continued.",
+   "Cụm cố định là 'in spite of', bắt buộc có 'of'.")]),
+
+"gram_linking_cause_result": (
+ "Từ nối nguyên nhân và kết quả phải phản ánh đúng hướng logic: because/as nêu nguyên nhân, "
+ "so/therefore/as a result nêu kết quả. Tiếng Việt có thể nối lỏng bằng 'nên', 'vì vậy', khiến "
+ "người học đặt because và so vào sai vế hoặc dùng because of trước một mệnh đề.",
+ "Cause linkers introduce reasons, while result linkers introduce consequences.",
+ [("The server failed because of it overheated.", "The server failed because it overheated.",
+   "Trước mệnh đề 'it overheated' dùng 'because', không dùng 'because of'."),
+  ("It rained heavily, because the event was cancelled.",
+   "It rained heavily, so the event was cancelled.",
+   "Vế sau là kết quả nên dùng 'so', không dùng từ nối nguyên nhân 'because'."),
+  ("The road was closed due to it was flooded.", "The road was closed because it was flooded.",
+   "'due to' đi với danh ngữ; trước mệnh đề đầy đủ phải dùng 'because'."),
+  ("Sales increased; because, the company hired more staff.",
+   "Sales increased; therefore, the company hired more staff.",
+   "Sau dấu chấm phẩy cần trạng từ kết quả 'therefore', không dùng 'because'.")]),
+
+"gram_linking_purpose": (
+ "Mục đích có thể diễn tả bằng to/in order to + động từ hoặc so that + mệnh đề. Tiếng Việt dùng "
+ "'để' cho cả hai kiểu nên người học thường ghép nhầm so that với nguyên mẫu hoặc dùng for + V.",
+ "Purpose is expressed with to or in order to plus a verb, or so that plus a full clause.",
+ [("We upgraded the system for reduce errors.", "We upgraded the system to reduce errors.",
+   "Trước động từ chỉ mục đích dùng 'to', không dùng 'for'."),
+  ("She spoke slowly so that help the new staff.",
+   "She spoke slowly to help the new staff.",
+   "Nếu không có chủ ngữ mới, dùng 'to help'; 'so that' phải mở đầu một mệnh đề."),
+  ("He saved the file in order that send it later.",
+   "He saved the file in order to send it later.",
+   "Cấu trúc với nguyên mẫu là 'in order to + động từ'."),
+  ("They left early for they could avoid traffic.",
+   "They left early so that they could avoid traffic.",
+   "Trước mệnh đề chỉ mục đích dùng 'so that', không dùng 'for' trong văn phong này.")]),
+
+"gram_discourse_marker": (
+ "Từ đánh dấu diễn ngôn tổ chức lập luận và cho người đọc biết quan hệ giữa các ý. Nhiều cụm là "
+ "khối cố định không thể dịch từng từ từ tiếng Việt; sai một giới từ vẫn khiến câu nghe thiếu tự nhiên.",
+ "Discourse markers are fixed expressions that organise arguments and signal relationships between ideas.",
+ [("Firstly of all, we need to define the problem.",
+   "First of all, we need to define the problem.",
+   "Cụm mở đầu cố định là 'first of all', không phải 'firstly of all'."),
+  ("By the contrary, the second proposal is affordable.",
+   "On the contrary, the second proposal is affordable.",
+   "Cụm cố định để bác bỏ ý trước là 'on the contrary'."),
+  ("In the other words, the deadline is flexible.",
+   "In other words, the deadline is flexible.",
+   "Cụm diễn đạt lại là 'in other words', không có mạo từ 'the'."),
+  ("From one hand, automation saves time.",
+   "On the one hand, automation saves time.",
+   "Cặp đánh dấu hai mặt bắt đầu bằng 'on the one hand'.")]),
+
+"gram_word_form_adj": (
+ "Tính từ tiếng Anh thường được tạo bằng hậu tố -ful, -ous, -able, -al, -ive nhưng không thể "
+ "đoán hoàn toàn từ danh từ gốc. Tiếng Việt ít biến đổi hình thái nên người học hay đặt thẳng "
+ "danh từ trước một danh từ khác ở nơi cần tính từ.",
+ "Adjective-forming suffixes must be selected for each word and cannot be replaced by the base noun.",
+ [("The launch was a success project.", "The launch was a successful project.",
+   "Trước danh từ 'project' cần tính từ 'successful', không dùng danh từ 'success'."),
+  ("This is danger equipment for untrained staff.",
+   "This is dangerous equipment for untrained staff.",
+   "Tính từ của 'danger' là 'dangerous'."),
+  ("We need a rely supplier for this component.",
+   "We need a reliable supplier for this component.",
+   "Trước danh từ cần tính từ 'reliable', không dùng động từ 'rely'."),
+  ("The team proposed an economy solution.",
+   "The team proposed an economical solution.",
+   "'economical' nghĩa là tiết kiệm và là tính từ phù hợp trước 'solution'.")]),
+
+"gram_negation": (
+ "Tiếng Anh tạo phủ định bằng trợ động từ do/does/did hoặc đặt not sau be và động từ khuyết "
+ "thiếu. Tiếng Việt chỉ đặt 'không' trước động từ, nên người học hay dịch trực tiếp thành no/not "
+ "mà không thêm hoặc không chia trợ động từ.",
+ "English negation uses an auxiliary plus not; lexical verbs do not take not directly.",
+ [("I no understand the new procedure.", "I do not understand the new procedure.",
+   "Động từ thường ở hiện tại cần trợ động từ 'do not' để tạo phủ định."),
+  ("She doesn't knows the access code.", "She doesn't know the access code.",
+   "Khi 'doesn't' đã mang dấu ngôi ba, động từ chính phải trở về nguyên mẫu."),
+  ("They not are ready for the inspection.", "They are not ready for the inspection.",
+   "Với động từ be, 'not' đứng sau dạng đã chia 'are'."),
+  ("He didn't submitted the expense claim.", "He didn't submit the expense claim.",
+   "Sau 'did not' phải dùng nguyên mẫu 'submit', không dùng quá khứ 'submitted'.")]),
 }

@@ -29,4 +29,7 @@ data_pipeline/rejects/*.json
 data_pipeline/output/_db/*.jsonl
 data_pipeline/output/_db/_manifest.json
 data_pipeline/output/*.mp3
+data_pipeline/output/media/
+data_pipeline/output/exams/individual_sets/
+data_pipeline/sources/
 data_pipeline/rejects/*/

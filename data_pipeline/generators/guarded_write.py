@@ -86,6 +86,13 @@ def guarded_write_batch(batch, out_path: Path, threshold: float = DIVERSITY_THRE
         records = payload.get(key)
         if not records:
             continue
+        # Listening Part 1 deliberately has no written question text: the
+        # candidate sees only the photograph and hears four descriptions.
+        # Treating those required nulls as duplicated prose is a false reject.
+        if key == "groups":
+            records = [record for record in records if record.get("part_number") != 1]
+            if not records:
+                continue
         for name, get in spec["fields"].items():
             ok, ratio, uniq = check_skeleton_diversity(
                 records, get, spec["vars"], threshold)

@@ -248,14 +248,14 @@ M: That's more useful than a guarantee I don't believe.""", 2, [
 M:  There is. One to nineteen seats is twenty-four pounds each, but anything
     under twenty is billed as twenty anyway.
 W1: We're at fourteen.
-W2: Which means going up to twenty costs us nothing extra — and twenty to
-    forty-nine is only eighteen a seat.
-M:  Correct. The next break is at fifty, where it drops to fifteen, and again
-    at a hundred.
+W2: Which means going up to twenty costs us nothing extra — it puts us in the
+    second band shown here.
+M:  Correct. The next break is at fifty, and again at a hundred.
 W1: We won't see fifty this year. Let's take twenty and stop worrying about
     who has an account.""", 3, [
 
- ("What rate per seat will the speakers pay?", Q.LC_DETAIL, "lc_detail",
+ ("Look at the graphic. What rate per seat will the speakers pay?",
+  Q.LC_GRAPHIC_REFERENCE, "lc_graphic_reference",
   0.70, [
   ("Eighteen pounds", True,
    "Họ chốt lấy 20 chỗ, rơi vào bậc 20–49 chỗ — mười tám bảng mỗi chỗ."),
@@ -289,8 +289,13 @@ W1: We won't see fifty this year. Let's take twenty and stop worrying about
 
 def main() -> int:
     groups, idx = [], 100
-    for script, spk, rows in CONVERSATIONS:
+    for group_index, (script, spk, rows) in enumerate(CONVERSATIONS):
         g, idx = build_group(idx, script, spk, rows)
+        if group_index == len(CONVERSATIONS) - 1:
+            payload = g.model_dump(mode="json")
+            payload["image_url"] = (
+                "http://localhost:9000/images/toeic/listening/graphics/seat_pricing.svg")
+            g = g.__class__.model_validate(payload)
         groups.append(g)
 
     n_q = sum(len(g.questions) for g in groups)

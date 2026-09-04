@@ -34,14 +34,18 @@ PART_ORDER = [5, 6, 7]          # thứ tự trong đề Reading thật
 def main() -> int:
     reading: list[tuple[int, str, str]] = []   # (part, group_id, item_id)
     listening: list[tuple[int, str, str]] = []
+    passage_counts: dict[str, int] = {}
+    question_types: dict[str, str] = {}
 
     for p in sorted(BANK.rglob("*.json")):
         if p.name.startswith("."):
             continue
         b = ExamBatch.model_validate(json.loads(p.read_text(encoding="utf-8")))
         for g in b.groups:
+            passage_counts[g.group_id] = len(g.passages)
             bucket = reading if g.part_number >= 5 else listening
             for q in g.questions:
+                question_types[q.item_id] = q.question_type.value
                 bucket.append((g.part_number, g.group_id, q.item_id))
 
     reading.sort(key=lambda r: (PART_ORDER.index(r[0]) if r[0] in PART_ORDER else 9))
@@ -72,8 +76,43 @@ def main() -> int:
             spare = f"  (dôi {got - want})" if got > want else ""
             print(f"  Part {part}: {got:3d}/{want}  {mark}{spare}")
 
+    # ETS linear blueprint: Part 7 = 29 questions from 10 single texts and
+    # 25 questions from exactly 5 multiple-passage sets (5 questions each).
+    base_r = take([row for row in reading if row[0] in (5, 6)], {5: 30, 6: 16})
+    grouped_p7: dict[str, list[tuple[int, str, str]]] = {}
+    for row in (r for r in reading if r[0] == 7):
+        grouped_p7.setdefault(row[1], []).append(row)
+    singles = [rows for gid, rows in grouped_p7.items() if passage_counts[gid] == 1]
+    multiples = [rows for gid, rows in grouped_p7.items() if passage_counts[gid] >= 2]
+
+    selected_p7: list[tuple[int, str, str]] = []
+    # Put the sentence-insertion single first; that same passage also supplies
+    # vocabulary-in-context. Keep nine more texts, then trim only to a minimum
+    # of two questions per text until the official total of 29 is reached.
+    singles.sort(key=lambda rows: (
+        not any(question_types[row[2]] == "rc_sentence_insertion" for row in rows),
+    ))
+    chosen_singles = singles[:10]
+    take_counts = [len(rows) for rows in chosen_singles]
+    excess = sum(take_counts) - 29
+    for index in range(len(take_counts) - 1, -1, -1):
+        removable = max(0, take_counts[index] - 2)
+        removed = min(removable, excess)
+        take_counts[index] -= removed
+        excess -= removed
+    for rows, count in zip(chosen_singles, take_counts):
+        selected_p7.extend(rows[:count])
+    for rows in multiples[:5]:
+        selected_p7.extend(rows[:5])
+    if excess or len(chosen_singles) != 10 or len(multiples[:5]) != 5 \
+            or len(selected_p7) != 54:
+        raise RuntimeError(
+            "Part 7 bank không dựng được blueprint ETS: cần 10 single/29 câu "
+            "và 5 multiple/25 câu")
+
+    selected_r = base_r + selected_p7
     refs_r = [SetItemRef(group_id=g, item_id=i, position=n + 1)
-              for n, (_, g, i) in enumerate(take(reading, R_QUOTA))]
+              for n, (_, g, i) in enumerate(selected_r)]
     refs_l = [SetItemRef(group_id=g, item_id=i, position=n + 1)
               for n, (_, g, i) in enumerate(take(listening, L_QUOTA))]
 

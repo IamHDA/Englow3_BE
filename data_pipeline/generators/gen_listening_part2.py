@@ -128,8 +128,8 @@ ITEMS: list[tuple] = [
  "lc_alternative_question", 0.50, [
  ("I'll take my own car, thanks.", True,
   "Câu hỏi lựa chọn — chọn vế thứ hai bằng cách nói lái xe riêng."),
- ("Yes, that would be lovely.", False,
-  "Câu hỏi 'A hay B' không trả lời bằng Yes."),
+ ("Yes, the fare was reasonable last time.", False,
+  "Câu trả lời nói về giá của chuyến trước, không chọn taxi hay tự lái lần này."),
  ("The taxi fare was quite reasonable.", False,
   "Bẫy lặp 'taxi' và nói về chuyện đã qua."),
 ]),

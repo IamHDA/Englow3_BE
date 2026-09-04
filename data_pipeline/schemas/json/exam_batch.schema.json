@@ -45,6 +45,13 @@
           "default": null,
           "title": "Audio Url"
         },
+        "cues": {
+          "items": {
+            "$ref": "#/$defs/AudioCue"
+          },
+          "title": "Cues",
+          "type": "array"
+        },
         "duration_ms": {
           "anyOf": [
             {
@@ -76,6 +83,46 @@
         "accent"
       ],
       "title": "AudioAsset",
+      "type": "object"
+    },
+    "AudioCue": {
+      "additionalProperties": false,
+      "description": "A verified time range for one utterance in a generated audio asset.",
+      "properties": {
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "AudioCue",
       "type": "object"
     },
     "BatchMetadata": {

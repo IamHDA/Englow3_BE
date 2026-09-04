@@ -1,6 +1,6 @@
 # TODO — Englow3 Data Pipeline
 
-**Cập nhật:** 2026-08-08 (đợt 2) · **Nhánh:** `feat/english-data-pipeline-phase1`
+**Cập nhật:** 2026-08-24 · **Nhánh:** `feat/english-data-pipeline-completion`
 Nguồn chân lý: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) · Quyết định đã chốt: [decisions.md](decisions.md) (D1–D8)
 
 ---
@@ -9,12 +9,9 @@ Nguồn chân lý: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md)
 
 ### Xoay vòng khoá Groq
 
-```
-gsk_en1Zoa…ExFRz   (khoá đầy đủ nằm trong lịch sử shell, không chép lại ở đây)
-```
-
-Từng hardcode trong 4 file generator. GitHub push protection đã chặn — **chưa lọt lên
-remote** (kiểm bằng `git log --all -S`). Code đã sửa đọc từ `os.environ["GROQ_API_KEY"]`.
+Một khoá Groq từng xuất hiện trong file local và có thể còn trong shell history hoặc
+backup. Không lưu bất kỳ phần nào của credential vào tài liệu hay Git. Code hiện tại
+không còn phụ thuộc trực tiếp vào khoá này.
 
 Vẫn phải vô hiệu hoá khoá này và tạo khoá mới: nó đã nằm plaintext trên đĩa, có thể
 đã vào shell history hoặc backup. Tốn 2 phút, rủi ro thì không đo được.
@@ -23,38 +20,34 @@ Vẫn phải vô hiệu hoá khoá này và tạo khoá mới: nó đã nằm pl
 
 ## Hiện trạng dữ liệu
 
-Toàn bộ đây là nội dung **viết tay, không gọi API**. Data cũ do LLM sinh hàng loạt đã
-bị loại vào `rejects/` vì rỗng nội dung (xem "Bài học" ở cuối).
+Data sinh ra chỉ lưu local/object storage; Git chỉ giữ generator, schema, validator và
+báo cáo QA. Mọi nội dung tự động vẫn ở trạng thái `draft` cho tới khi con người duyệt.
 
 | Hạng mục | Số lượng | Trạng thái |
 |---|---:|---|
-| **Reading** | **100/100** | ✅ đủ một phần thi hoàn chỉnh |
-| — Part 5 hoàn thành câu | 30/30 | ✅ |
-| — Part 6 điền đoạn văn | 16/16 | ✅ |
-| — Part 7 đọc hiểu | 54/54 | ✅ 15 single, 2 double, 3 triple (bank dôi 8 câu) |
-| **Listening** | **94/100** | 🟡 chỉ thiếu Part 1 |
-| — Part 1 mô tả ảnh | 0/6 | 🔴 **chặn bởi B6** — không có nguồn ảnh hợp pháp |
-| — Part 2 hỏi–đáp | 25/25 | ✅ |
-| — Part 3 hội thoại | 39/39 | ✅ |
-| — Part 4 bài nói | 30/30 | ✅ |
-| Flashcard | 195 | ✅ 100% IPA xác minh, chủ đề gán tay |
-| Grammar point | 75 | ✅ 300 cặp lỗi L1 người Việt, 243 bài tập |
+| TOEIC-format | 10 bộ × 200 câu | ✅ 2.000 item không tái sử dụng giữa các bộ |
+| Ngân hàng câu hỏi | 2.020 | ✅ 1.000 Listening + 1.020 Reading |
+| Listening media | 540/540 | ✅ MP3 thật, duration và cue đo bằng công cụ |
+| Ảnh Exam/Speaking/Writing | 105/105 | ✅ có file local và checksum |
+| Flashcard | 3.000 | ✅ IPA xác minh, 6.000 audio US/UK |
+| Grammar point | 90 | ✅ 450 quick exercise |
 | Speaking / Writing | 11 + 8 | ✅ kèm 2 rubric 12 chiều × 6 band |
-| Concept taxonomy | 177 (156 lá) | ✅ **153/156 lá đã có item** |
+| Shadowing / Dictation | 30 clip | ✅ 120 segment có timestamp |
+| Assessment | 2 prompt + 10 fixture | ✅ hợp schema; chưa phải human gold |
+| Concept taxonomy | 177 (156 lá) | ✅ **156/156 lá đã có item** |
 
-**Audit: 0 LỖI, 3 CẢNH BÁO** — chạy `make gate`. Test: **71 xanh**.
+**Audit: 0 LỖI, 0 CẢNH BÁO** — chạy `make gate`. Data-pipeline test: **85 xanh**.
 
-Chỉ số thiên lệch trên toàn bộ 202 câu:
+Chỉ số thiên lệch trên toàn bộ 2.020 câu:
 
 ```
-B-1 (4 lựa chọn, 177 câu)  A=26% B=25% C=25% D=24%   ✅
-B-1 (3 lựa chọn,  25 câu)  A=36% B=32% C=32%         ✅
-B-2 đáp án đúng dài nhất   ~12%                      ✅ (ngưỡng 35%)
+B-1 (4 lựa chọn, 1.770 câu) A=27% B=26% C=24% D=23%  ✅
+B-1 (3 lựa chọn,   250 câu) A=36% B=32% C=32%        ✅
+B-2 đáp án đúng dài nhất    21%                      ✅ (ngưỡng 35%)
 ```
 
-**Ba concept lá duy nhất chưa có item** đều cần ảnh: `lc_photo_action`,
-`lc_photo_state`, `lc_graphic_reference`. Cả ba chặn bởi B6 và không thể làm
-tiếp mà không bịa `image_url`.
+Không còn concept lá rỗng. Tuy nhiên 105/156 concept lá mới có 1–9 liên kết,
+chưa đủ dữ liệu để tuyên bố BKT ổn định cho từng concept.
 
 ---
 
@@ -62,17 +55,14 @@ tiếp mà không bịa `image_url`.
 
 | # | Việc | Còn thiếu | Ghi chú |
 |---|---|---:|---|
-| 1 | **Part 1** mô tả ảnh | 6 câu | ⛔ B6 — chỉ cần Owner chốt nguồn ảnh là làm được ngay |
-| 2 | ~~Xử lý 123 MP3 mồ côi~~ | — | ✅ đã cách ly vào `rejects/audio_orphan/` |
-| 2b | Host file audio | — | `audio_url` là `HttpUrl` nên không trỏ được file local. 683 MP3 đang nằm trên máy mà 0/195 flashcard dùng được |
-| 3 | `duration_ms` từ file MP3 thật | — | Hiện null; §Phase 8 cấm khai cứng |
-| 4 | Forced alignment | — | `alignment_status` giữ `pending` cho tới khi có timestamp thật |
-| 5 | Flashcard 195 → 800 | ~600 thẻ | ⛔ B10 — mỗi thẻ cần 1 định nghĩa + 2 ví dụ + 2 bản dịch viết tay |
-| 6 | Grammar 75 → 90 | 15 | Các concept còn lại đều rất hẹp |
-| 7 | Collocation | 4 200 | ⛔ B9 — 54 cụm đã viết tay cho từ B2/C1 đang dùng |
+| 1 | Human review | 5.161 record `draft` | Dùng hai human-review packet, chỉ reviewer mới được chuyển trạng thái |
+| 2 | Object storage | 6.726 media | Chạy upload script và smoke-test URL `images/` + `audio/` trong môi trường được cấp quyền |
+| 3 | IRT calibration | 2.020 item chưa calibrated | Cần response thật của learner |
+| 4 | Assessment calibration | 10 fixture offline | Cần provider thật, chạy lặp 3 lần và human gold |
+| 5 | BKT coverage | 105 concept dưới 10 liên kết | Cần thêm dữ liệu học thực tế hoặc nội dung đã human-review |
 
-**143/156 concept lá mới có 1–9 item**, dưới ngưỡng 10 để BKT hội tụ. Đây là
-cảnh báo lớn nhất còn lại và nó chỉ giảm được bằng cách viết thêm nội dung.
+Các gate cấu trúc đã hoàn tất; các mục trên là gate con người hoặc production
+observation, không được tự động đánh dấu hoàn thành.
 
 ---
 
@@ -81,12 +71,12 @@ cảnh báo lớn nhất còn lại và nó chỉ giảm được bằng cách v
 | | |
 |---|---|
 | Taxonomy + validator | 177 concept, DAG không cycle |
-| Schema | 23 Pydantic model, 17 JSON Schema, DDL 21 bảng |
+| Schema | Pydantic + JSON Schema, DDL/Flyway 26 bảng staging |
 | Lưới chắn đa dạng | `validators/diversity.py` — che token rồi mới đếm |
 | **Cổng ghi** | `generators/guarded_write.py` — chặn **TRƯỚC** khi ghi |
 | Kiểm thiên lệch | `authoring.report_bias` — B-1/B-2 in ra ngay lúc sinh |
 | Cổng chất lượng | `make gate` → `validators/audit_data.py`, exit ≠ 0 khi có LỖI |
-| Tầng staging | `output/_db/` — 21 file JSONL = 21 bảng |
+| Tầng staging | `output/_db/` — 26 file JSONL = 26 bảng |
 
 Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-part5`
 · `gen-part6` · `gen-part7` · `build-set` · `repair` · `gate` · `export-db` · `test`
@@ -97,13 +87,11 @@ Lệnh: `make bootstrap` · `taxonomy` · `seed` · `gen-flashcards` · `gen-par
 
 | # | Việc | Chặn |
 |---|---|---|
-| B6 | Nguồn ảnh Part 1 (6 câu cần `image_url` hợp pháp) | **Blocker duy nhất còn chặn nội dung**: 6 câu Part 1 và 3 concept lá cuối |
-| B9 | Nguồn collocation hợp pháp — Oxford/Macmillan có bản quyền; NLTK cần corpus phù hợp (Reuters là tin tài chính 1980s, lệch văn phong) | 4 200 cụm |
-| B10 | Giữ chỉ tiêu 3 000 flashcard, hay 800–1 000 chất lượng cao? | Khối lượng toàn bộ |
-| B1 | Postgres — Owner chốt để local, chưa dựng | Phase 11 |
-| B2 | Java 21 + Maven chưa cài | Phase 11 |
+| B13 | Human review | Chặn phát hành nội dung đang `draft` |
+| B14 | Dữ liệu learner thật | Chặn IRT/BKT calibration |
+| B15 | Assessment provider + human gold | Chặn đo variance và độ đồng thuận chấm điểm |
+| B16 | Production object storage credentials | Chặn smoke-test URL ngoài local |
 | B11 | Lịch sử git cũ còn 20 MB MP3 (đã gỡ khỏi tracking nhưng commit cũ vẫn giữ). Xoá hẳn phải `git filter-repo`, đổi mọi hash đã push | Dung lượng repo |
-| B12 | Nơi host audio để `audio_url` trỏ tới được | Phát âm flashcard, audio đề nghe |
 
 ---
 

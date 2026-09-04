@@ -36,8 +36,8 @@ class GrammarPoint(StrictModel):
     common_mistakes: list[CommonMistake] = Field(min_length=MIN_COMMON_MISTAKES)
 
     # Tái dùng ExamItem thay vì tạo schema thứ hai (§Phase 6).
-    # Quyết định D5: 12 câu/point, không phải 5 như work order viết ban đầu.
-    quick_exercises: list[ExamItem] = Field(default_factory=list)
+    # Work order baseline: at least five focused exercises per grammar point.
+    quick_exercises: list[ExamItem] = Field(min_length=5)
 
     embedding_text: str = Field(default="")
     review_status: ReviewStatus = ReviewStatus.DRAFT

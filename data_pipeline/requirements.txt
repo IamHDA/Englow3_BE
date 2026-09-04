@@ -20,6 +20,12 @@ orjson>=3.9
 # --- Text / phonetics ---
 eng-to-ipa>=0.0.2
 rapidfuzz>=3.6
+nltk>=3.8
+wordfreq>=3.1
+
+# --- External generation clients used by optional generators ---
+aiohttp>=3.9
+edge-tts>=6.1
 
 # --- Testing ---
 pytest>=8.0
