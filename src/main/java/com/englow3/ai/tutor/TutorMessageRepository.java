@@ -14,4 +14,8 @@ interface TutorMessageRepository extends JpaRepository<TutorMessage, UUID> {
             TutorMessageStatus status);
 
     Optional<TutorMessage> findByIdAndConversationId(UUID id, UUID conversationId);
+
+    Optional<TutorMessage> findByConversationIdAndIdempotencyKey(UUID conversationId, String idempotencyKey);
+
+    Optional<TutorMessage> findByConversationIdAndReplyToMessageId(UUID conversationId, UUID replyToMessageId);
 }

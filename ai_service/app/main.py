@@ -10,9 +10,12 @@ from fastapi.responses import JSONResponse
 
 from app.config import Settings, get_settings
 from app.errors import ServiceError
+from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
 from app.schemas import (
+    EmbeddingRequest,
+    EmbeddingResponse,
     ErrorResponse,
     LlmGenerateRequest,
     LlmGenerateResponse,
@@ -34,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         async with httpx.AsyncClient(timeout=timeout) as client:
             app.state.llm_provider = OpenAiCompatibleProvider(client, configured)
+            app.state.embedding_provider = OpenAiCompatibleEmbeddingProvider(client, configured)
             app.state.speech_provider = AzureSpeechProvider(client, configured)
             yield
 
@@ -105,6 +109,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await request.app.state.llm_provider.generate(body)
 
     @app.post(
+        "/internal/v1/embeddings",
+        response_model=EmbeddingResponse,
+        responses={401: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+        dependencies=internal,
+    )
+    async def embed(request: Request, body: EmbeddingRequest) -> EmbeddingResponse:
+        return await request.app.state.embedding_provider.embed(body)
+
+    @app.post(
         "/internal/v1/speech/assess",
         response_model=SpeechAssessmentResponse,
         responses={401: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
@@ -142,7 +155,15 @@ def _readiness(settings: Settings) -> dict[str, bool]:
     internal_auth = bool(settings.internal_api_key.get_secret_value())
     llm = not settings.llm_enabled or bool(settings.llm_api_key.get_secret_value())
     speech = not settings.speech_enabled or bool(settings.azure_speech_api_key.get_secret_value())
-    return {"internal_auth": internal_auth, "llm": llm, "speech": speech}
+    embedding = not settings.embedding_enabled or bool(
+        settings.embedding_api_key.get_secret_value()
+    )
+    return {
+        "internal_auth": internal_auth,
+        "llm": llm,
+        "embedding": embedding,
+        "speech": speech,
+    }
 
 
 app = create_app()

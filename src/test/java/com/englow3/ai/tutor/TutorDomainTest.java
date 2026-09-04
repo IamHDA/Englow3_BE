@@ -20,7 +20,8 @@ class TutorDomainTest {
 
     @Test
     void completesAPendingAssistantMessage() {
-        TutorMessage message = TutorMessage.pendingAssistant(UUID.randomUUID(), UUID.randomUUID());
+        TutorMessage message = TutorMessage.pendingAssistant(UUID.randomUUID(), UUID.randomUUID(), TutorMode.Q_AND_A,
+                true);
 
         message.complete("Use the present perfect here.", "test-model", 20, 10);
 

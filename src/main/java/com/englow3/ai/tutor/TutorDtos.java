@@ -17,7 +17,7 @@ final class TutorDtos {
     record CreateConversationRequest(@Size(max = 200) String title) {
     }
 
-    record SendMessageRequest(@NotBlank @Size(max = 4000) String message,
+    record SendMessageRequest(@NotBlank @Size(max = 4000) String message, TutorMode mode,
             @NotBlank @Size(max = 200) String idempotencyKey) {
     }
 
@@ -28,11 +28,13 @@ final class TutorDtos {
         INCORRECT, UNSAFE, IRRELEVANT, OTHER
     }
 
-    record MessageResponse(UUID id, String role, String status, String content, UUID jobId, Instant createdAt) {
+    record MessageResponse(UUID id, String role, String status, String mode, String safetyCategory,
+            String refusalReason, String content, UUID jobId, Instant createdAt) {
 
         static MessageResponse from(TutorMessage message) {
             return new MessageResponse(message.getId(), message.getRole().name(), message.getStatus().name(),
-                    message.getContent(), message.getAiJobId(), message.getCreatedAt());
+                    message.getMode() == null ? null : message.getMode().name(), message.getSafetyCategory(),
+                    message.getRefusalReason(), message.getContent(), message.getAiJobId(), message.getCreatedAt());
         }
     }
 
@@ -47,5 +49,9 @@ final class TutorDtos {
     }
 
     record SendMessageResponse(UUID userMessageId, UUID assistantMessageId, UUID jobId, String jobStatus) {
+    }
+
+    record CitationResponse(int position, String contentType, String contentId, int contentRevision, String label,
+            String groundingHash) {
     }
 }

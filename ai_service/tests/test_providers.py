@@ -8,9 +8,10 @@ from pydantic import SecretStr
 
 from app.config import Settings
 from app.errors import ProviderError
+from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
-from app.schemas import LlmGenerateRequest
+from app.schemas import EmbeddingRequest, LlmGenerateRequest
 
 
 def configured(**overrides) -> Settings:
@@ -18,6 +19,9 @@ def configured(**overrides) -> Settings:
         "llm_enabled": True,
         "llm_base_url": "https://llm.example/v1",
         "llm_api_key": SecretStr("llm-secret"),
+        "embedding_enabled": True,
+        "embedding_base_url": "https://embedding.example/v1",
+        "embedding_api_key": SecretStr("embedding-secret"),
         "speech_enabled": True,
         "azure_speech_base_url": "https://speech.example",
         "azure_speech_api_key": SecretStr("speech-secret"),
@@ -62,6 +66,46 @@ def test_llm_provider_normalizes_openai_compatible_response():
     assert result.model == "resolved-model"
     assert result.input_tokens == 12
     assert result.output_tokens == 4
+
+
+def test_embedding_provider_enforces_configured_dimensions():
+    async def run():
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url == "https://embedding.example/v1/embeddings"
+            assert request.headers["Authorization"] == "Bearer embedding-secret"
+            body = json.loads(request.content)
+            assert body["dimensions"] == 1024
+            return httpx.Response(
+                200,
+                json={
+                    "model": "resolved-embedding-model",
+                    "data": [{"embedding": [0.125] * 1024}],
+                    "usage": {"prompt_tokens": 3},
+                },
+            )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = OpenAiCompatibleEmbeddingProvider(client, configured())
+            return await provider.embed(EmbeddingRequest(text="present perfect"))
+
+    result = asyncio.run(run())
+    assert len(result.embedding) == 1024
+    assert result.model == "resolved-embedding-model"
+    assert result.input_tokens == 3
+
+
+def test_embedding_provider_rejects_dimension_mismatch():
+    async def run():
+        transport = httpx.MockTransport(
+            lambda _: httpx.Response(200, json={"data": [{"embedding": [0.1, 0.2]}]})
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
+            provider = OpenAiCompatibleEmbeddingProvider(client, configured())
+            await provider.embed(EmbeddingRequest(text="present perfect"))
+
+    with pytest.raises(ProviderError) as captured:
+        asyncio.run(run())
+    assert captured.value.code == "EMBEDDING_PROVIDER_INVALID_RESPONSE"
 
 
 def test_llm_rate_limit_is_reported_as_retryable_without_leaking_body():
