@@ -37,7 +37,7 @@ spring:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.104.183.3:4000}
 
   storage:
     public-bucket: ${STORAGE_PUBLIC_BUCKET:images}

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -56,6 +57,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiErrorResponse> onConcurrentUpdate(OptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(error("CONCURRENT_UPDATE", "The resource was modified concurrently, please retry"));
+    }
+
+    /**
+     * A sort parameter naming a property no entity has. Spring Data raises it while resolving the Pageable, so without
+     * this handler a mistyped ?sort= answers 500 on every paged endpoint.
+     */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiErrorResponse> onUnknownSortProperty(PropertyReferenceException ex) {
+        return ResponseEntity.badRequest()
+                .body(error("INVALID_SORT_PROPERTY", "Cannot sort by '%s'".formatted(ex.getPropertyName())));
     }
 
     @ExceptionHandler(Exception.class)
