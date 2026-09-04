@@ -58,9 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error_handler(
-        _: Request, __: RequestValidationError
-    ) -> JSONResponse:
+    async def validation_error_handler(_: Request, __: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content={
@@ -143,9 +141,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 def _readiness(settings: Settings) -> dict[str, bool]:
     internal_auth = bool(settings.internal_api_key.get_secret_value())
     llm = not settings.llm_enabled or bool(settings.llm_api_key.get_secret_value())
-    speech = not settings.speech_enabled or bool(
-        settings.azure_speech_api_key.get_secret_value()
-    )
+    speech = not settings.speech_enabled or bool(settings.azure_speech_api_key.get_secret_value())
     return {"internal_auth": internal_auth, "llm": llm, "speech": speech}
 
 

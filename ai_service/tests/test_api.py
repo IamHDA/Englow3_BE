@@ -48,18 +48,14 @@ def test_liveness_does_not_require_authentication():
 
 
 def test_readiness_fails_without_internal_key():
-    with TestClient(
-        create_app(settings(internal_api_key=SecretStr("")))
-    ) as client:
+    with TestClient(create_app(settings(internal_api_key=SecretStr("")))) as client:
         response = client.get("/health/ready")
         assert response.status_code == 503
         assert response.json()["checks"]["internal_auth"] is False
 
 
 def test_readiness_fails_when_enabled_provider_has_no_key():
-    with TestClient(
-        create_app(settings(llm_api_key=SecretStr("")))
-    ) as client:
+    with TestClient(create_app(settings(llm_api_key=SecretStr("")))) as client:
         response = client.get("/health/ready")
         assert response.status_code == 503
         assert response.json()["checks"]["llm"] is False

@@ -20,9 +20,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
 
     speech_enabled: bool = False
-    azure_speech_base_url: AnyHttpUrl = AnyHttpUrl(
-        "https://example.cognitiveservices.azure.com"
-    )
+    azure_speech_base_url: AnyHttpUrl = AnyHttpUrl("https://example.cognitiveservices.azure.com")
     azure_speech_api_key: SecretStr = SecretStr("")
 
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
