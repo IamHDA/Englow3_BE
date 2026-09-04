@@ -37,11 +37,12 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http.cors(Customizer.withDefaults()).csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
-                        auth -> auth.requestMatchers("/actuator/health", "/actuator/info", "/v3/api-docs/**",
-                                "/swagger-ui/**", "/swagger-ui.html").permitAll().anyRequest().authenticated())
+                        auth -> auth
+                                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info",
+                                        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                                .permitAll().anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())
                         .authenticationEntryPoint((request, response, ex) -> writeError(objectMapper, response,
                                 HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "A valid access token is required"))
