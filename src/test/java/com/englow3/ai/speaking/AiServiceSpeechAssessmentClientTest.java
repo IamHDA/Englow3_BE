@@ -28,6 +28,7 @@ class AiServiceSpeechAssessmentClientTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.MULTIPART_FORM_DATA))
                 .andRespond(withSuccess("""
                         {
+                          "provider":"azure-speech-v2",
                           "recognized_text":"Hello",
                           "accuracy":90.0,
                           "fluency":80.0,
@@ -35,7 +36,8 @@ class AiServiceSpeechAssessmentClientTest {
                           "prosody":75.0,
                           "pronunciation":88.0,
                           "request_id":"request-1",
-                          "words":[{"word":"Hello","accuracy":90.0,"error_type":"None","offset_ms":1,"duration_ms":2}],
+                          "words":[{"word":"Hello","accuracy":90.0,"error_type":"None","offset_ms":1,"duration_ms":2,
+                                    "phonemes":[{"phoneme":"h","accuracy":85.0}]}],
                           "raw":{"RecognitionStatus":"Success"}
                         }
                         """, MediaType.APPLICATION_JSON));
@@ -45,8 +47,11 @@ class AiServiceSpeechAssessmentClientTest {
                 "audio/wav; codecs=audio/pcm; samplerate=16000", "en-US", "Hello");
 
         assertThat(result.recognizedText()).isEqualTo("Hello");
+        assertThat(result.provider()).isEqualTo("azure-speech-v2");
         assertThat(result.pronunciation()).isEqualTo(88.0);
         assertThat(result.words()).singleElement().satisfies(word -> assertThat(word.offsetMs()).isEqualTo(1));
+        assertThat(result.words().getFirst().phonemes()).singleElement()
+                .satisfies(phoneme -> assertThat(phoneme.phoneme()).isEqualTo("h"));
         server.verify();
     }
 
@@ -67,7 +72,7 @@ class AiServiceSpeechAssessmentClientTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://ai-service");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("http://ai-service/internal/v1/speech/assess")).andRespond(withSuccess("""
-                {"recognized_text":"Hello","accuracy":101,"words":[],"raw":{}}
+                {"provider":"azure-speech","recognized_text":"Hello","accuracy":101,"words":[],"raw":{}}
                 """, MediaType.APPLICATION_JSON));
         AiServiceSpeechAssessmentClient client = client(builder.build(), true);
 

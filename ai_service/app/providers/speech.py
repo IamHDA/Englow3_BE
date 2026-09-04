@@ -6,7 +6,7 @@ import httpx
 
 from app.config import Settings
 from app.errors import ProviderError, is_retryable_http_status
-from app.schemas import SpeechAssessmentResponse, WordAssessment
+from app.schemas import PhonemeAssessment, SpeechAssessmentResponse, WordAssessment
 
 
 class AzureSpeechProvider:
@@ -80,6 +80,7 @@ class AzureSpeechProvider:
                 raise ValueError("Speech words must be a list")
             words = [self._word(item) for item in word_items]
             return SpeechAssessmentResponse(
+                provider="azure-speech",
                 recognized_text=str(best.get("Display") or payload.get("DisplayText") or ""),
                 accuracy=self._number(scores.get("AccuracyScore")),
                 fluency=self._number(scores.get("FluencyScore")),
@@ -136,7 +137,25 @@ class AzureSpeechProvider:
             error_type=scores.get("ErrorType"),
             offset_ms=cls._ticks_to_millis(item.get("Offset")),
             duration_ms=cls._ticks_to_millis(item.get("Duration")),
+            phonemes=cls._phonemes(item.get("Phonemes") or []),
         )
+
+    @classmethod
+    def _phonemes(cls, items: Any) -> list[PhonemeAssessment]:
+        if not isinstance(items, list):
+            raise TypeError("Speech phonemes must be a list")
+        result: list[PhonemeAssessment] = []
+        for item in items:
+            if not isinstance(item, dict):
+                raise TypeError("Speech phoneme must be an object")
+            scores = item.get("PronunciationAssessment") or {}
+            result.append(
+                PhonemeAssessment(
+                    phoneme=str(item.get("Phoneme") or ""),
+                    accuracy=cls._number(scores.get("AccuracyScore")),
+                )
+            )
+        return result
 
     @staticmethod
     def _ticks_to_millis(value: Any) -> int | None:

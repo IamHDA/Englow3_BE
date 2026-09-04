@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import com.englow3.ai.foundation.AiProviderException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class SpeakingAssessmentJobHandlerTest {
 
@@ -47,6 +48,28 @@ class SpeakingAssessmentJobHandlerTest {
                 "audio/wav; codecs=audio/pcm; samplerate=16000")).isInstanceOf(AiProviderException.class)
                         .extracting(exception -> ((AiProviderException) exception).code())
                         .isEqualTo("SPEAKING_AUDIO_ENCODING_INVALID");
+    }
+
+    @Test
+    void rejectsBlankLanguageModelFeedback() throws Exception {
+        var structured = new ObjectMapper().readTree("{\"grammarFeedback\":\"   \"}");
+
+        assertThatThrownBy(() -> SpeakingAssessmentJobHandler.requiredFeedback(structured, "grammarFeedback"))
+                .isInstanceOf(AiProviderException.class)
+                .extracting(exception -> ((AiProviderException) exception).code())
+                .isEqualTo("AI_SPEAKING_FEEDBACK_SCHEMA_INVALID");
+    }
+
+    @Test
+    void normalizesRecurringWordAndPhonemeErrors() {
+        org.assertj.core.api.Assertions.assertThat(SpeakingAssessmentPersistence.normalizeUnit("Hello!"))
+                .isEqualTo("hello");
+        org.assertj.core.api.Assertions
+                .assertThat(SpeakingAssessmentPersistence.normalizeError("Mispronunciation", 90d))
+                .isEqualTo("MISPRONUNCIATION");
+        org.assertj.core.api.Assertions.assertThat(SpeakingAssessmentPersistence.normalizeError(null, 79.9d))
+                .isEqualTo("LOW_ACCURACY");
+        org.assertj.core.api.Assertions.assertThat(SpeakingAssessmentPersistence.normalizeError("None", 95d)).isNull();
     }
 
     private byte[] wave(int channels, int sampleRate, int bits) {

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
@@ -49,6 +50,16 @@ class SpeakingController {
     @GetMapping
     List<SpeakingDtos.SessionSummary> history() {
         return service.history();
+    }
+
+    @GetMapping("/progress")
+    SpeakingDtos.ProgressResponse progress(@RequestParam(defaultValue = "30") int windowDays) {
+        return service.progress(windowDays);
+    }
+
+    @GetMapping("/errors")
+    List<SpeakingDtos.RecurringError> recurringErrors() {
+        return service.recurringErrors();
     }
 
     @DeleteMapping("/{sessionId}/recording")

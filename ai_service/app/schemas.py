@@ -33,15 +33,22 @@ class EmbeddingResponse(BaseModel):
     input_tokens: int = Field(default=0, ge=0)
 
 
+class PhonemeAssessment(BaseModel):
+    phoneme: str = Field(min_length=1, max_length=100)
+    accuracy: float | None = Field(default=None, ge=0, le=100)
+
+
 class WordAssessment(BaseModel):
     word: str = Field(min_length=1)
     accuracy: float | None = Field(default=None, ge=0, le=100)
     error_type: str | None = None
     offset_ms: int | None = Field(default=None, ge=0)
     duration_ms: int | None = Field(default=None, ge=0)
+    phonemes: list[PhonemeAssessment] = Field(default_factory=list)
 
 
 class SpeechAssessmentResponse(BaseModel):
+    provider: str = Field(min_length=1, max_length=100)
     recognized_text: str = Field(min_length=1)
     accuracy: float | None = Field(default=None, ge=0, le=100)
     fluency: float | None = Field(default=None, ge=0, le=100)

@@ -209,6 +209,12 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
                                         "AccuracyScore": 90,
                                         "ErrorType": "None",
                                     },
+                                    "Phonemes": [
+                                        {
+                                            "Phoneme": "h",
+                                            "PronunciationAssessment": {"AccuracyScore": 85},
+                                        }
+                                    ],
                                 }
                             ],
                         }
@@ -223,9 +229,11 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
 
     result = asyncio.run(run())
     assert result.recognized_text == "Hello"
+    assert result.provider == "azure-speech"
     assert result.pronunciation == 88
     assert result.request_id == "speech-request"
     assert result.words[0].offset_ms == 1
+    assert result.words[0].phonemes[0].phoneme == "h"
 
 
 def test_speech_recognition_failure_is_not_retryable():

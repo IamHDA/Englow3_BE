@@ -81,13 +81,27 @@ class AiServiceSpeechAssessmentClient implements SpeechAssessmentClient {
                     throw invalidResponse(null);
                 }
                 validateScore(word.accuracy());
+                List<SpeechAssessmentResult.PhonemeAssessment> phonemes = new ArrayList<>();
+                if (word.phonemes() != null) {
+                    for (PhonemeResponse phoneme : word.phonemes()) {
+                        if (phoneme == null || phoneme.phoneme() == null || phoneme.phoneme().isBlank()) {
+                            throw invalidResponse(null);
+                        }
+                        validateScore(phoneme.accuracy());
+                        phonemes.add(
+                                new SpeechAssessmentResult.PhonemeAssessment(phoneme.phoneme(), phoneme.accuracy()));
+                    }
+                }
                 words.add(new SpeechAssessmentResult.WordAssessment(word.word(), word.accuracy(), word.errorType(),
-                        word.offsetMs(), word.durationMs()));
+                        word.offsetMs(), word.durationMs(), List.copyOf(phonemes)));
             }
         }
-        return new SpeechAssessmentResult(response.recognizedText(), response.accuracy(), response.fluency(),
-                response.completeness(), response.prosody(), response.pronunciation(), response.requestId(),
-                List.copyOf(words), response.raw());
+        if (response.provider() == null || response.provider().isBlank()) {
+            throw invalidResponse(null);
+        }
+        return new SpeechAssessmentResult(response.provider(), response.recognizedText(), response.accuracy(),
+                response.fluency(), response.completeness(), response.prosody(), response.pronunciation(),
+                response.requestId(), List.copyOf(words), response.raw());
     }
 
     private void validateScore(Double score) {
@@ -148,13 +162,17 @@ class AiServiceSpeechAssessmentClient implements SpeechAssessmentClient {
         return statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode >= 500;
     }
 
-    private record ServiceResponse(@JsonProperty("recognized_text") String recognizedText, Double accuracy,
-            Double fluency, Double completeness, Double prosody, Double pronunciation,
+    private record ServiceResponse(String provider, @JsonProperty("recognized_text") String recognizedText,
+            Double accuracy, Double fluency, Double completeness, Double prosody, Double pronunciation,
             @JsonProperty("request_id") String requestId, List<WordResponse> words, JsonNode raw) {
     }
 
     private record WordResponse(String word, Double accuracy, @JsonProperty("error_type") String errorType,
-            @JsonProperty("offset_ms") Integer offsetMs, @JsonProperty("duration_ms") Integer durationMs) {
+            @JsonProperty("offset_ms") Integer offsetMs, @JsonProperty("duration_ms") Integer durationMs,
+            List<PhonemeResponse> phonemes) {
+    }
+
+    private record PhonemeResponse(String phoneme, Double accuracy) {
     }
 
     private record ErrorResponse(String code, String message, boolean retryable) {
