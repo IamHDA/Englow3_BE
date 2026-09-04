@@ -70,6 +70,32 @@ Set cost rates for every active model through `PUT /api/admin/ai/model-policies/
 6. Alert on `englow3.ai.requests{outcome="failure"}`, latency, queue depth, recent failures, FastAPI readiness and provider quota errors.
 7. Verify the object-storage lifecycle is at least as strict as `SPEECH_AUDIO_RETENTION`; the application also deletes expired recordings.
 
+## Automated deployment
+
+The CD workflow publishes two images for each `main` or `dev` push:
+
+- `ghcr.io/<owner>/<repository>:<branch>` for Spring Boot.
+- `ghcr.io/<owner>/<repository>-ai-service:<branch>` for FastAPI.
+
+Pull requests into `main` or `dev` build both images without publishing or deploying them, so container failures are
+detected before merge.
+
+Configure deployment destinations with repository secrets or variables:
+
+- `RENDER_BACKEND_DEPLOY_HOOK_URL` for the Spring service. The legacy
+  `RENDER_DEPLOY_HOOK_URL` remains supported as a fallback.
+- `RENDER_AI_DEPLOY_HOOK_URL` for the private FastAPI service.
+- `SERVER_HOST`, `SERVER_USER`, and `SERVER_SSH_KEY` for optional VPS deployment.
+
+For Render, create two services from the same repository. The backend uses the root `Dockerfile` and
+`/actuator/health/readiness`; the AI service uses `ai_service/Dockerfile` and `/health/ready`. Keep the AI service
+private, set `AI_SERVICE_BASE_URL` on Spring to its internal URL, and configure the same long random
+`AI_SERVICE_INTERNAL_API_KEY` on both services. If deploy hooks are enabled, disable Render's native auto-deploy to
+avoid deploying the same commit twice.
+
+For VPS deployment, both containers share the private `englow3-private` Docker network. Only Spring publishes a
+host port; FastAPI remains reachable solely as `http://englow3-ai-service:8000` inside that network.
+
 ## Operational behavior
 
 - Jobs use row locking with `SKIP LOCKED`, idempotency keys, bounded exponential retry and stale-lock recovery.
