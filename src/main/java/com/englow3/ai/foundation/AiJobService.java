@@ -21,22 +21,36 @@ public class AiJobService {
     private final AiModelPolicyService policyService;
     private final CurrentUser currentUser;
     private final UserRepository userRepository;
+    private final AiJobEventPublisher eventPublisher;
+    private final AiJobEventStream eventStream;
 
     AiJobService(AiJobRepository repository, AiModelPolicyService policyService, CurrentUser currentUser,
-            UserRepository userRepository) {
+            UserRepository userRepository, AiJobEventPublisher eventPublisher, AiJobEventStream eventStream) {
         this.repository = repository;
         this.policyService = policyService;
         this.currentUser = currentUser;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
+        this.eventStream = eventStream;
     }
 
     @Transactional
     public AiJob submitForCurrentUser(AiCapability capability, String jobType, String targetType, UUID targetId,
             String promptVersion, JsonNode inputPayload, String idempotencyKey) {
         User user = requireCurrentUser();
-        return repository.findByRequesterUserIdAndIdempotencyKey(user.getId(), idempotencyKey)
-                .orElseGet(() -> create(user.getId(), capability, jobType, targetType, targetId, promptVersion,
-                        inputPayload, idempotencyKey));
+        AiJob existing = repository.findByRequesterUserIdAndIdempotencyKey(user.getId(), idempotencyKey).orElse(null);
+        if (existing != null) {
+            if (existing.getCapability() != capability || !existing.getJobType().equals(jobType)
+                    || !existing.getTargetType().equals(targetType) || !existing.getTargetId().equals(targetId)
+                    || !existing.getPromptVersion().equals(promptVersion)
+                    || !existing.getInputPayload().equals(inputPayload)) {
+                throw new ConflictException("AI_JOB_IDEMPOTENCY_CONFLICT",
+                        "The idempotency key was already used for a different AI request");
+            }
+            return existing;
+        }
+        return create(user.getId(), capability, jobType, targetType, targetId, promptVersion, inputPayload,
+                idempotencyKey);
     }
 
     @Transactional(readOnly = true)
@@ -49,8 +63,17 @@ public class AiJobService {
     @Transactional
     public AiJob cancelForCurrentUser(UUID jobId) {
         AiJob job = getForCurrentUser(jobId);
+        AiJobStatus before = job.getStatus();
         job.cancel(Instant.now());
+        if (job.getStatus() == AiJobStatus.CANCELLED && before != AiJobStatus.CANCELLED) {
+            eventPublisher.record(job, "CANCELLED");
+        }
         return job;
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter eventsForCurrentUser(long afterEventId) {
+        return eventStream.subscribe(requireCurrentUser().getId(), Math.max(0, afterEventId));
     }
 
     @Transactional(readOnly = true)
@@ -64,8 +87,11 @@ public class AiJobService {
         if (!policy.enabled()) {
             throw new ConflictException("AI_CAPABILITY_DISABLED", "This AI capability is currently disabled");
         }
-        return repository.save(AiJob.pending(userId, capability, jobType, targetType, targetId, policy.provider(),
-                policy.model(), promptVersion, inputPayload, idempotencyKey, TraceIdFilter.current()));
+        AiJob job = repository
+                .saveAndFlush(AiJob.pending(userId, capability, jobType, targetType, targetId, policy.provider(),
+                        policy.model(), promptVersion, inputPayload, idempotencyKey, TraceIdFilter.current()));
+        eventPublisher.record(job, "QUEUED");
+        return job;
     }
 
     private User requireCurrentUser() {

@@ -100,6 +100,9 @@ public class AiJob {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
     @Column(name = "input_tokens", nullable = false)
     private int inputTokens;
 
@@ -134,6 +137,7 @@ public class AiJob {
         job.idempotencyKey = idempotencyKey;
         job.maxRetryCount = 3;
         job.availableAt = Instant.now();
+        job.createdAt = job.availableAt;
         job.estimatedCost = BigDecimal.ZERO;
         job.traceId = traceId;
         return job;

@@ -51,16 +51,18 @@ public class AiGateway {
             BigDecimal estimatedCost = estimateCost(result, policy);
             usageService.recordUsage(userId, result.inputTokens(), result.outputTokens(), estimatedCost);
             Counter.builder("englow3.ai.requests").tag("capability", capability.name())
-                    .tag("provider", policy.provider()).tag("outcome", "success").register(meterRegistry).increment();
+                    .tag("provider", policy.provider()).tag("model", policy.model()).tag("outcome", "success")
+                    .register(meterRegistry).increment();
             return new AiTextResult(result.content(), result.model(), result.inputTokens(), result.outputTokens(),
                     estimatedCost);
         } catch (RuntimeException ex) {
             Counter.builder("englow3.ai.requests").tag("capability", capability.name())
-                    .tag("provider", policy.provider()).tag("outcome", "failure").register(meterRegistry).increment();
+                    .tag("provider", policy.provider()).tag("model", policy.model()).tag("outcome", "failure")
+                    .register(meterRegistry).increment();
             throw ex;
         } finally {
             sample.stop(Timer.builder("englow3.ai.latency").tag("capability", capability.name())
-                    .tag("provider", policy.provider()).register(meterRegistry));
+                    .tag("provider", policy.provider()).tag("model", policy.model()).register(meterRegistry));
         }
     }
 
