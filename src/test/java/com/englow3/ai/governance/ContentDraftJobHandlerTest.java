@@ -3,6 +3,7 @@ package com.englow3.ai.governance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,20 +27,38 @@ class ContentDraftJobHandlerTest {
     private final AiGateway gateway = mock(AiGateway.class);
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ContentDraftJobHandler handler = new ContentDraftJobHandler(gateway, jdbcTemplate, objectMapper);
+    private final ContentDraftJobHandler handler = new ContentDraftJobHandler(gateway, jdbcTemplate, objectMapper,
+            new AiContentValidator(objectMapper));
 
     @Test
     void storesValidGeneratedDraftAsEditableDraft() {
         UUID draftId = UUID.randomUUID();
         AiJob job = job(draftId);
-        when(gateway.generate(any(), any(), eq("system"), eq("user"), eq(true)))
-                .thenReturn(new AiTextResult("{\"title\":\"T\",\"items\":[{\"question\":\"Q\"}]}", "model", 10, 8));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("gram_present_simple"))).thenReturn(1);
+        when(gateway.generate(any(), any(), eq("system"), eq("user"), eq(true))).thenReturn(new AiTextResult("""
+                {
+                  "title":"Present simple quiz",
+                  "items":[{
+                    "question":"Which sentence is correct?",
+                    "options":[
+                      {"text":"She works here.","isCorrect":true,"rationaleVi":"Chia động từ đúng."},
+                      {"text":"She work here.","isCorrect":false,"rationaleVi":"Thiếu -s."},
+                      {"text":"She working here.","isCorrect":false,"rationaleVi":"Thiếu trợ động từ."}
+                    ],
+                    "explanationEn":"Third-person singular takes -s.",
+                    "explanationVi":"Ngôi thứ ba số ít thêm -s.",
+                    "difficultyPrior":0.2,
+                    "conceptIds":["gram_present_simple"]
+                  }]
+                }
+                """, "model", 10, 8));
 
         AiJobExecutionResult result = handler.execute(job);
 
         assertThat(result.inputTokens()).isEqualTo(10);
         assertThat(result.output().path("status").asText()).isEqualTo("DRAFT");
-        verify(jdbcTemplate).update(any(String.class), any(String.class), eq(draftId));
+        verify(jdbcTemplate).update(any(String.class), any(String.class), any(String.class), any(String.class),
+                eq(draftId));
     }
 
     @Test
@@ -57,7 +76,7 @@ class ContentDraftJobHandlerTest {
     private AiJob job(UUID draftId) {
         AiJob job = mock(AiJob.class);
         ObjectNode payload = objectMapper.createObjectNode().put("draftId", draftId.toString())
-                .put("systemPrompt", "system").put("userPrompt", "user");
+                .put("contentType", "QUIZ").put("level", "B1").put("systemPrompt", "system").put("userPrompt", "user");
         when(job.getInputPayload()).thenReturn(payload);
         when(job.getRequesterUserId()).thenReturn(UUID.randomUUID());
         return job;

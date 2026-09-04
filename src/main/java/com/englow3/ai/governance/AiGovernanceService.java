@@ -36,22 +36,35 @@ class AiGovernanceService {
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
+    private final AiContentValidator contentValidator;
+    private final AiContentPublisher contentPublisher;
 
     AiGovernanceService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository,
-            AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper) {
+            AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper,
+            AiContentValidator contentValidator, AiContentPublisher contentPublisher) {
         this.jdbcTemplate = jdbcTemplate;
         this.currentUser = currentUser;
         this.userRepository = userRepository;
         this.promptService = promptService;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
+        this.contentValidator = contentValidator;
+        this.contentPublisher = contentPublisher;
     }
 
     @Transactional
     AiGovernanceDtos.DraftResponse generate(AiGovernanceDtos.GenerateDraftRequest request) {
         User actor = requireUser();
+        String level = request.level().strip().toUpperCase();
+        if (!List.of("A1", "A2", "B1", "B2", "C1").contains(level)) {
+            throw new BadRequestException("AI_CONTENT_LEVEL_INVALID", "Content requires a supported CEFR level");
+        }
         AiGovernanceDtos.DraftResponse existing = findDraftByIdempotency(actor.getId(), request.idempotencyKey());
         if (existing != null) {
+            if (!sameGenerationRequest(existing, request, level)) {
+                throw new ConflictException("AI_CONTENT_IDEMPOTENCY_CONFLICT",
+                        "The idempotency key was already used for a different generation request");
+            }
             return existing;
         }
         RenderedPrompt prompt = promptService.render("CONTENT_DRAFT_GENERATION",
@@ -65,13 +78,13 @@ class AiGovernanceService {
                     (id, created_by, content_type, title, level, generation_request, status, prompt_version,
                      idempotency_key)
                 values (?, ?, ?, ?, ?, ?::jsonb, 'GENERATING', ?, ?)
-                """, draftId, actor.getId(), request.contentType().name(), request.title().strip(),
-                request.level().strip().toUpperCase(), json(generationRequest), prompt.version(),
-                request.idempotencyKey());
+                """, draftId, actor.getId(), request.contentType().name(), request.title().strip(), level,
+                json(generationRequest), prompt.version(), request.idempotencyKey());
         ObjectNode payload = objectMapper.createObjectNode().put("draftId", draftId.toString())
+                .put("contentType", request.contentType().name()).put("level", level)
                 .put("systemPrompt", prompt.systemPrompt()).put("userPrompt", prompt.userPrompt());
         AiJob job = jobService.submitForCurrentUser(AiCapability.CONTENT_GENERATION, "CONTENT_DRAFT_GENERATION",
-                "AI_CONTENT_DRAFT", draftId, prompt.version(), payload, request.idempotencyKey());
+                "AI_CONTENT_DRAFT", draftId, prompt.version(), payload, "CONTENT:" + request.idempotencyKey());
         jdbcTemplate.update("update ai_content_drafts set ai_job_id = ? where id = ?", job.getId(), draftId);
         audit(actor.getId(), "CONTENT_DRAFT_GENERATE", "AI_CONTENT_DRAFT", draftId.toString(), generationRequest);
         return draft(draftId);
@@ -79,14 +92,14 @@ class AiGovernanceService {
 
     @Transactional(readOnly = true)
     List<AiGovernanceDtos.DraftResponse> drafts(String status) {
-        if (status != null
-                && !List.of("GENERATING", "DRAFT", "PENDING_REVIEW", "PUBLISHED", "REJECTED", "ARCHIVED", "FAILED")
-                        .contains(status)) {
+        if (status != null && !List
+                .of("GENERATING", "DRAFT", "PENDING_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "ARCHIVED", "FAILED")
+                .contains(status)) {
             throw new BadRequestException("AI_CONTENT_STATUS_INVALID", "Unknown AI content status");
         }
         String sql = """
-                select id, content_type, title, level, status, ai_job_id, generated_content, review_reason,
-                       created_at, updated_at
+                select id, content_type, title, level, status, ai_job_id, generated_content, validation_report,
+                       revision, published_entities, review_reason, created_at, updated_at
                 from ai_content_drafts
                 """ + (status == null ? "" : " where status = ?") + " order by created_at desc limit 200";
         return status == null ? jdbcTemplate.query(sql, this::mapDraft)
@@ -99,6 +112,7 @@ class AiGovernanceService {
         int updated = jdbcTemplate.update("""
                 update ai_content_drafts set status = 'PENDING_REVIEW', review_reason = null
                 where id = ? and created_by = ? and status in ('DRAFT', 'REJECTED')
+                  and validation_report->>'valid' = 'true' and content_hash is not null
                 """, draftId, actor.getId());
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_SUBMITTABLE",
@@ -111,18 +125,28 @@ class AiGovernanceService {
     @Transactional
     AiGovernanceDtos.DraftResponse updateDraft(UUID draftId, AiGovernanceDtos.UpdateDraftRequest request) {
         User actor = requireUser();
-        if (!request.generatedContent().isObject() || !request.generatedContent().path("items").isArray()
-                || request.generatedContent().path("items").isEmpty()) {
-            throw new BadRequestException("AI_CONTENT_SCHEMA_INVALID",
-                    "Generated content must be an object containing a non-empty items array");
-        }
+        DraftMetadata metadata = editableMetadata(draftId, actor.getId());
+        AiContentValidator.ValidationResult validation = contentValidator.validate(
+                AiGovernanceDtos.ContentType.valueOf(metadata.contentType()), metadata.level(),
+                request.generatedContent());
+        validateConcepts(validation);
+        int nextRevision = metadata.revision() + 1;
         int updated = jdbcTemplate.update("""
-                update ai_content_drafts set title = ?, generated_content = ?::jsonb, review_reason = null
+                update ai_content_drafts
+                set title = ?, generated_content = ?::jsonb, validation_report = ?::jsonb,
+                    content_hash = ?, revision = ?, review_reason = null, status = 'DRAFT'
                 where id = ? and created_by = ? and status in ('DRAFT', 'REJECTED')
-                """, request.title().strip(), json(request.generatedContent()), draftId, actor.getId());
+                """, request.title().strip(), json(request.generatedContent()), json(validation.report()),
+                validation.contentHash(), nextRevision, draftId, actor.getId());
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_EDITABLE", "Only your draft or rejected content can be edited");
         }
+        jdbcTemplate.update("""
+                insert into ai_content_draft_revisions
+                    (draft_id, revision, title, generated_content, validation_report, content_hash, created_by)
+                values (?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
+                """, draftId, nextRevision, request.title().strip(), json(request.generatedContent()),
+                json(validation.report()), validation.contentHash(), actor.getId());
         audit(actor.getId(), "CONTENT_DRAFT_EDIT", "AI_CONTENT_DRAFT", draftId.toString(), null);
         return draft(draftId);
     }
@@ -133,15 +157,68 @@ class AiGovernanceService {
         int updated = jdbcTemplate.update("""
                 update ai_content_drafts
                 set status = ?, reviewed_by = ?, review_reason = ?, reviewed_at = now(),
-                    published_at = case when ? then now() else null end
+                    published_at = null
                 where id = ? and status = 'PENDING_REVIEW' and generated_content is not null
-                """, publish ? "PUBLISHED" : "REJECTED", reviewer.getId(), reason.strip(), publish, draftId);
+                  and validation_report->>'valid' = 'true' and created_by <> ?
+                """, publish ? "APPROVED" : "REJECTED", reviewer.getId(), reason.strip(), draftId, reviewer.getId());
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_REVIEWABLE", "Content is not pending review");
         }
-        ObjectNode details = objectMapper.createObjectNode().put("decision", publish ? "PUBLISHED" : "REJECTED")
+        ObjectNode details = objectMapper.createObjectNode().put("decision", publish ? "APPROVED" : "REJECTED")
                 .put("reason", reason);
         audit(reviewer.getId(), "CONTENT_REVIEW", "AI_CONTENT_DRAFT", draftId.toString(), details);
+        return draft(draftId);
+    }
+
+    @Transactional
+    AiGovernanceDtos.DraftResponse publish(UUID draftId) {
+        User publisher = requireUser();
+        PublicationDraft draft = publicationDraft(draftId);
+        AiGovernanceDtos.ContentType type = AiGovernanceDtos.ContentType.valueOf(draft.contentType());
+        AiContentValidator.ValidationResult validation = contentValidator.validate(type, draft.level(),
+                draft.content());
+        if (!validation.contentHash().equals(draft.contentHash())) {
+            throw new ConflictException("AI_CONTENT_CHANGED_AFTER_APPROVAL",
+                    "Approved content no longer matches its validated revision");
+        }
+        validateConcepts(validation);
+        JsonNode entities = contentPublisher.publish(type, draft.level(), draft.content());
+        for (JsonNode entity : entities) {
+            jdbcTemplate.update("""
+                    insert into ai_content_publications
+                        (draft_id, revision, entity_type, entity_id, published_by)
+                    values (?, ?, ?, ?, ?)
+                    """, draftId, draft.revision(), entity.path("entityType").asText(),
+                    entity.path("entityId").asText(), publisher.getId());
+        }
+        int updated = jdbcTemplate.update("""
+                update ai_content_drafts
+                set status = 'PUBLISHED', published_entities = ?::jsonb, published_at = now()
+                where id = ? and status = 'APPROVED' and revision = ? and content_hash = ?
+                """, json(entities), draftId, draft.revision(), draft.contentHash());
+        if (updated == 0) {
+            throw new ConflictException("AI_CONTENT_NOT_PUBLISHABLE", "Content is no longer approved for publication");
+        }
+        audit(publisher.getId(), "CONTENT_PUBLISH", "AI_CONTENT_DRAFT", draftId.toString(), entities);
+        return draft(draftId);
+    }
+
+    @Transactional
+    AiGovernanceDtos.DraftResponse archive(UUID draftId, String reason) {
+        User actor = requireUser();
+        JsonNode entities = jdbcTemplate.query("""
+                select published_entities from ai_content_drafts
+                where id = ? and status = 'PUBLISHED' for update
+                """, rs -> rs.next() ? parse(rs.getString("published_entities")) : null, draftId);
+        if (entities == null || !entities.isArray() || entities.isEmpty()) {
+            throw new ConflictException("AI_CONTENT_NOT_ARCHIVABLE", "Published content entities were not found");
+        }
+        contentPublisher.archive(entities);
+        jdbcTemplate.update("""
+                update ai_content_drafts set status = 'ARCHIVED', review_reason = ? where id = ?
+                """, reason.strip(), draftId);
+        audit(actor.getId(), "CONTENT_ARCHIVE", "AI_CONTENT_DRAFT", draftId.toString(),
+                objectMapper.createObjectNode().put("reason", reason));
         return draft(draftId);
     }
 
@@ -201,16 +278,30 @@ class AiGovernanceService {
 
     private AiGovernanceDtos.DraftResponse findDraftByIdempotency(UUID userId, String key) {
         return jdbcTemplate.query("""
-                select id, content_type, title, level, status, ai_job_id, generated_content, review_reason,
-                       created_at, updated_at
+                select id, content_type, title, level, status, ai_job_id, generated_content, validation_report,
+                       revision, published_entities, review_reason, created_at, updated_at
                 from ai_content_drafts where created_by = ? and idempotency_key = ?
                 """, rs -> rs.next() ? mapDraft(rs, 0) : null, userId, key);
     }
 
+    private boolean sameGenerationRequest(AiGovernanceDtos.DraftResponse existing,
+            AiGovernanceDtos.GenerateDraftRequest request, String level) {
+        if (!existing.contentType().equals(request.contentType().name())
+                || !existing.title().equals(request.title().strip()) || !existing.level().equals(level)) {
+            return false;
+        }
+        Integer matches = jdbcTemplate.queryForObject("""
+                select count(*) from ai_content_drafts
+                where id = ? and (generation_request->>'itemCount')::integer = ?
+                  and generation_request->>'instructions' = ?
+                """, Integer.class, existing.id(), request.itemCount(), request.instructions());
+        return matches != null && matches == 1;
+    }
+
     private AiGovernanceDtos.DraftResponse draft(UUID id) {
         AiGovernanceDtos.DraftResponse response = jdbcTemplate.query("""
-                select id, content_type, title, level, status, ai_job_id, generated_content, review_reason,
-                       created_at, updated_at
+                select id, content_type, title, level, status, ai_job_id, generated_content, validation_report,
+                       revision, published_entities, review_reason, created_at, updated_at
                 from ai_content_drafts where id = ?
                 """, rs -> rs.next() ? mapDraft(rs, 0) : null, id);
         if (response == null) {
@@ -223,8 +314,50 @@ class AiGovernanceService {
         return new AiGovernanceDtos.DraftResponse(rs.getObject("id", UUID.class), rs.getString("content_type"),
                 rs.getString("title"), rs.getString("level"), rs.getString("status"),
                 rs.getObject("ai_job_id", UUID.class), parse(rs.getString("generated_content")),
-                rs.getString("review_reason"), rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant());
+                parse(rs.getString("validation_report")), rs.getInt("revision"),
+                parse(rs.getString("published_entities")), rs.getString("review_reason"),
+                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+    }
+
+    private DraftMetadata editableMetadata(UUID draftId, UUID actorId) {
+        DraftMetadata metadata = jdbcTemplate.query("""
+                select content_type, level, revision from ai_content_drafts
+                where id = ? and created_by = ? and status in ('DRAFT', 'REJECTED') for update
+                """,
+                rs -> rs.next()
+                        ? new DraftMetadata(rs.getString("content_type"), rs.getString("level"), rs.getInt("revision"))
+                        : null,
+                draftId, actorId);
+        if (metadata == null) {
+            throw new ConflictException("AI_CONTENT_NOT_EDITABLE", "Only your draft or rejected content can be edited");
+        }
+        return metadata;
+    }
+
+    private PublicationDraft publicationDraft(UUID draftId) {
+        PublicationDraft draft = jdbcTemplate.query("""
+                select content_type, level, generated_content, content_hash, revision
+                from ai_content_drafts where id = ? and status = 'APPROVED' for update
+                """,
+                rs -> rs.next() ? new PublicationDraft(rs.getString("content_type"), rs.getString("level"),
+                        parse(rs.getString("generated_content")), rs.getString("content_hash"), rs.getInt("revision"))
+                        : null,
+                draftId);
+        if (draft == null) {
+            throw new ConflictException("AI_CONTENT_NOT_PUBLISHABLE", "Only approved content can be published");
+        }
+        return draft;
+    }
+
+    private void validateConcepts(AiContentValidator.ValidationResult validation) {
+        for (String conceptId : validation.conceptIds()) {
+            Integer exists = jdbcTemplate.queryForObject("select count(*) from concepts where concept_id = ?",
+                    Integer.class, conceptId);
+            if (exists == null || exists == 0) {
+                throw new BadRequestException("AI_CONTENT_CONCEPT_NOT_FOUND",
+                        "Generated content references an unknown concept: " + conceptId);
+            }
+        }
     }
 
     private AiGovernanceDtos.FeedbackResponse feedback(UUID id) {
@@ -275,5 +408,12 @@ class AiGovernanceService {
     private User requireUser() {
         return userRepository.findByAuthProviderId(currentUser.authProviderId())
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    }
+
+    private record DraftMetadata(String contentType, String level, int revision) {
+    }
+
+    private record PublicationDraft(String contentType, String level, JsonNode content, String contentHash,
+            int revision) {
     }
 }

@@ -38,7 +38,8 @@ final class AiGovernanceDtos {
     }
 
     record DraftResponse(UUID id, String contentType, String title, String level, String status, UUID jobId,
-            JsonNode generatedContent, String reviewReason, Instant createdAt, Instant updatedAt) {
+            JsonNode generatedContent, JsonNode validationReport, int revision, JsonNode publishedEntities,
+            String reviewReason, Instant createdAt, Instant updatedAt) {
     }
 
     record ReviewRequest(@NotBlank @Size(max = 1000) String reason) {

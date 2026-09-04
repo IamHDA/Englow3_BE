@@ -41,4 +41,15 @@ class AiContentReviewController {
             @Valid @RequestBody AiGovernanceDtos.ReviewRequest request) {
         return service.review(draftId, false, request.reason());
     }
+
+    @PostMapping("/{draftId}/publish")
+    AiGovernanceDtos.DraftResponse publish(@PathVariable UUID draftId) {
+        return service.publish(draftId);
+    }
+
+    @PostMapping("/{draftId}/archive")
+    AiGovernanceDtos.DraftResponse archive(@PathVariable UUID draftId,
+            @Valid @RequestBody AiGovernanceDtos.ReviewRequest request) {
+        return service.archive(draftId, request.reason());
+    }
 }

@@ -85,6 +85,17 @@ class AiAdminController {
         return governanceService.review(draftId, false, request.reason());
     }
 
+    @PostMapping("/content/{draftId}/publish")
+    AiGovernanceDtos.DraftResponse publish(@PathVariable UUID draftId) {
+        return governanceService.publish(draftId);
+    }
+
+    @PostMapping("/content/{draftId}/archive")
+    AiGovernanceDtos.DraftResponse archive(@PathVariable UUID draftId,
+            @Valid @RequestBody AiGovernanceDtos.ReviewRequest request) {
+        return governanceService.archive(draftId, request.reason());
+    }
+
     @GetMapping("/feedback")
     List<AiGovernanceDtos.FeedbackResponse> feedback(@RequestParam(required = false) String status) {
         return governanceService.reports(status);
