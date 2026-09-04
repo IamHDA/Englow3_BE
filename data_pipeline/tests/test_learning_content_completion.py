@@ -7,12 +7,27 @@ import json
 from pathlib import Path
 from urllib.parse import urlparse
 
+import pytest
+
 from schemas import (
     AssessmentPromptBatch, AssessmentResult, FlashcardBatch, GrammarBatch,
     ShadowingBatch,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
+REQUIRED_ARTIFACTS = (
+    ROOT / "output" / "grammar" / "grammar_batch_001.json",
+    ROOT / "output" / "shadowing" / "shadowing_batch_001.json",
+    ROOT / "output" / "prompts" / "assessment_prompts_batch_001.json",
+    ROOT / "output" / "prompts" / "assessment_calibration_cases.json",
+    ROOT / "output" / "_db" / "_manifest.json",
+)
+
+pytestmark = pytest.mark.skipif(
+    not all(path.is_file() for path in REQUIRED_ARTIFACTS)
+    or not any((ROOT / "output" / "flashcards").glob("flashcard_batch_*.json")),
+    reason="requires generated learning-data artifacts; run make gen-learning-data",
+)
 
 
 def test_flashcard_bank_and_pronunciation_are_complete():
