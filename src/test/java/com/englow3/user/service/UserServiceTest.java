@@ -86,7 +86,7 @@ class UserServiceTest {
 
     @Test
     void storesAnAvatarUnderAServerGeneratedKeyInTheDefaultBucket() {
-        service.changeAvatar(image("image/png"));
+        service.changeAvatar(mockImage("image/png"));
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         verify(objectStorageClient).upload(eq(BUCKET), key.capture(), any(), anyLong(), eq("image/png"));
@@ -96,7 +96,7 @@ class UserServiceTest {
 
     @Test
     void storesABannerUnderTheBannerPrefix() {
-        service.changeBanner(image("image/jpeg"));
+        service.changeBanner(mockImage("image/jpeg"));
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         verify(objectStorageClient).upload(eq(BUCKET), key.capture(), any(), anyLong(), eq("image/jpeg"));
@@ -106,8 +106,9 @@ class UserServiceTest {
 
     @Test
     void refusesAContentTypeThatIsNotAnAllowedImage() {
-        assertThatThrownBy(() -> service.changeAvatar(image("image/svg+xml"))).isInstanceOf(BadRequestException.class)
-                .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
+        assertThatThrownBy(() -> service.changeAvatar(mockImage("image/svg+xml")))
+                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                .isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
         verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
     }
 
@@ -120,7 +121,7 @@ class UserServiceTest {
                 .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_REQUIRED");
     }
 
-    private MultipartFile image(String contentType) {
+    private MultipartFile mockImage(String contentType) {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getContentType()).thenReturn(contentType);

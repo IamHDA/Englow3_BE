@@ -139,9 +139,7 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
         def handler(request: httpx.Request) -> httpx.Response:
             assert request.url.params["language"] == "en-US"
             assert request.headers["Ocp-Apim-Subscription-Key"] == "speech-secret"
-            assessment = json.loads(
-                base64.b64decode(request.headers["Pronunciation-Assessment"])
-            )
+            assessment = json.loads(base64.b64decode(request.headers["Pronunciation-Assessment"]))
             assert assessment["ReferenceText"] == "Hello"
             assert request.content == b"RIFF-audio"
             return httpx.Response(
