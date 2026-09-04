@@ -56,6 +56,40 @@ class ExamTest {
     }
 
     @Test
+    void editsADraftInPlaceAndLeavesItADraft() {
+        Exam exam = buildToeicDraft(CertificateVariant.LR);
+
+        exam.updateDraft("TOEIC Practice Test 2", "Revised", ExamType.PLACEMENT, CertificateType.TOEIC,
+                CertificateVariant.SW, TargetLevel.B2, 3600, new BigDecimal("400.00"), null);
+
+        assertThat(exam.getTitle()).isEqualTo("TOEIC Practice Test 2");
+        assertThat(exam.getCertificateVariant()).isEqualTo(CertificateVariant.SW);
+        assertThat(exam.getPassScore()).isNull();
+        assertThat(exam.getStatus()).isEqualTo(ExamStatus.DRAFT);
+    }
+
+    @Test
+    void refusesToEditAPublishedPaper() {
+        Exam exam = buildPublishedExam();
+
+        assertThatThrownBy(() -> exam.updateDraft("New title", "d", ExamType.MOCK, CertificateType.TOEIC,
+                CertificateVariant.LR, TargetLevel.B1, 7200, DECLARED_SCORE, null))
+                        .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                        .isEqualTo("EXAM_NOT_DRAFT");
+    }
+
+    /** The same coherence rule as draft(), reached through the other door - an edit must not smuggle IELTS + LR in. */
+    @Test
+    void refusesAnEditThatMixesACertificateWithAnotherCertificatesVariant() {
+        Exam exam = buildToeicDraft(CertificateVariant.LR);
+
+        assertThatThrownBy(() -> exam.updateDraft("t", "d", ExamType.MOCK, CertificateType.TOEIC,
+                CertificateVariant.ACADEMIC, TargetLevel.B1, 7200, DECLARED_SCORE, null))
+                        .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                        .isEqualTo("EXAM_CERTIFICATE_VARIANT_MISMATCH");
+    }
+
+    @Test
     void publishesAPaperWhoseSectionsAddUpToItsDeclaredScore() {
         Exam exam = buildToeicDraft(CertificateVariant.LR);
         Instant now = Instant.parse("2026-09-01T10:00:00Z");

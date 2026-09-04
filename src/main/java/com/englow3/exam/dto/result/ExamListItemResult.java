@@ -13,15 +13,18 @@ import com.englow3.exam.entity.TargetLevel;
 /**
  * No description - it is a text column and the list has no room for it. {@code createdByUserId} is not resolved to a
  * name either: the frontend composes it against the admin user list, which costs less than the first exam -> user edge.
- * No attempt count yet - that one waits for the sitting, which has no entity.
+ * **No content counts.** A section or question count reads as "is this ready to publish" and is a bad answer to that: a
+ * paper with two hundred questions still fails on a score that does not add up. `publish()` answers it exactly, with a
+ * code saying which rule broke - so the counts cost an extra aggregate query per page to tell the admin something
+ * misleading.
  */
 public record ExamListItemResult(UUID id, String title, ExamType examType, CertificateType certificateType,
         CertificateVariant certificateVariant, TargetLevel targetLevel, ExamStatus status, int versionNumber,
-        long sectionCount, long questionCount, UUID createdByUserId, Instant publishedAt, Instant createdAt) {
+        UUID createdByUserId, Instant publishedAt, Instant createdAt) {
 
-    public static ExamListItemResult of(Exam exam, long sectionCount, long questionCount) {
+    public static ExamListItemResult of(Exam exam) {
         return new ExamListItemResult(exam.getId(), exam.getTitle(), exam.getExamType(), exam.getCertificateType(),
                 exam.getCertificateVariant(), exam.getTargetLevel(), exam.getStatus(), exam.getVersionNumber(),
-                sectionCount, questionCount, exam.getCreatedByUserId(), exam.getPublishedAt(), exam.getCreatedAt());
+                exam.getCreatedByUserId(), exam.getPublishedAt(), exam.getCreatedAt());
     }
 }
