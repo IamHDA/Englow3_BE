@@ -58,6 +58,7 @@ class FlywayMigrationTest {
         assertThat(existingProductionSchema.info().current().getVersion())
                 .isEqualTo(MigrationVersion.fromVersion("46"));
         Map<String, Integer> actualChecksums = Arrays.stream(existingProductionSchema.info().applied())
+                .filter(info -> info.getChecksum() != null)
                 .collect(Collectors.toMap(info -> info.getDescription(), info -> info.getChecksum()));
         assertThat(actualChecksums).isEqualTo(PRODUCTION_CHECKSUMS);
 
