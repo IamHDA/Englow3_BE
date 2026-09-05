@@ -1,4 +1,8 @@
-create function englow3.sync_auth_user()
+alter table users
+    add column gender varchar(20),
+    add column birth_date date;
+
+create or replace function englow3.sync_auth_user()
 returns trigger
 language plpgsql
 security definer
@@ -29,7 +33,3 @@ begin
     return new;
 end;
 $$;
-
-create trigger trg_users_sync_from_auth
-after insert on auth.users
-for each row execute function englow3.sync_auth_user();
