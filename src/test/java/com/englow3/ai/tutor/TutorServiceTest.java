@@ -17,10 +17,8 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.ai.foundation.AiJobService;
 import com.englow3.ai.foundation.AiPromptService;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
 import com.englow3.user.repository.LearnerProfileRepository;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.englow3.shared.error.ConflictException;
@@ -29,37 +27,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TutorServiceTest {
 
     private TutorConversationRepository conversationRepository;
-    private UserRepository userRepository;
+    private UserDirectory userDirectory;
+    private UUID userId;
     private TutorMessageRepository messageRepository;
     private TutorRetrievalPort retrievalPort;
     private PromptInjectionDetector injectionDetector;
     private AiJobService jobService;
-    private CurrentUser currentUser;
     private TutorService service;
-    private User user;
 
     @BeforeEach
     void setUp() {
         conversationRepository = mock(TutorConversationRepository.class);
-        userRepository = mock(UserRepository.class);
-        currentUser = mock(CurrentUser.class);
+        userDirectory = mock(UserDirectory.class);
         messageRepository = mock(TutorMessageRepository.class);
         retrievalPort = mock(TutorRetrievalPort.class);
         injectionDetector = mock(PromptInjectionDetector.class);
         jobService = mock(AiJobService.class);
-        user = mock(User.class);
         service = new TutorService(conversationRepository, messageRepository, mock(TutorFeedbackRepository.class),
-                retrievalPort, injectionDetector, mock(AiPromptService.class), jobService, userRepository,
-                mock(LearnerProfileRepository.class), currentUser, new ObjectMapper(), mock(JdbcTemplate.class));
+                retrievalPort, injectionDetector, mock(AiPromptService.class), jobService, userDirectory,
+                mock(LearnerProfileRepository.class), new ObjectMapper(), mock(JdbcTemplate.class));
     }
 
     @Test
     void createsConversationForAuthenticatedInternalUser() {
         UUID authId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        when(currentUser.authProviderId()).thenReturn(authId);
-        when(userRepository.findByAuthProviderId(authId)).thenReturn(Optional.of(user));
-        when(user.getId()).thenReturn(userId);
+        userId = UUID.randomUUID();
+        when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(conversationRepository.save(any(TutorConversation.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -73,10 +66,8 @@ class TutorServiceTest {
     @Test
     void listsOnlyCurrentUsersConversations() {
         UUID authId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        when(currentUser.authProviderId()).thenReturn(authId);
-        when(userRepository.findByAuthProviderId(authId)).thenReturn(Optional.of(user));
-        when(user.getId()).thenReturn(userId);
+        userId = UUID.randomUUID();
+        when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId)).thenReturn(List.of());
 
         assertThat(service.list()).isEmpty();
@@ -88,9 +79,8 @@ class TutorServiceTest {
     void refusesPromptInjectionWithoutCallingRetrievalOrProvider() {
         authenticatedUser();
         UUID conversationId = UUID.randomUUID();
-        TutorConversation conversation = TutorConversation.start(user.getId(), "Safe tutor");
-        when(conversationRepository.findByIdAndUserId(conversationId, user.getId()))
-                .thenReturn(Optional.of(conversation));
+        TutorConversation conversation = TutorConversation.start(userId, "Safe tutor");
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
         when(messageRepository.findByConversationIdAndIdempotencyKey(conversationId, "request-1"))
                 .thenReturn(Optional.empty());
         when(messageRepository.save(any(TutorMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -109,10 +99,9 @@ class TutorServiceTest {
     void rejectsIdempotencyReplayWithDifferentContent() {
         authenticatedUser();
         UUID conversationId = UUID.randomUUID();
-        TutorConversation conversation = TutorConversation.start(user.getId(), "Tutor");
+        TutorConversation conversation = TutorConversation.start(userId, "Tutor");
         TutorMessage existing = TutorMessage.user(conversationId, "Original question", "request-1", TutorMode.Q_AND_A);
-        when(conversationRepository.findByIdAndUserId(conversationId, user.getId()))
-                .thenReturn(Optional.of(conversation));
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
         when(messageRepository.findByConversationIdAndIdempotencyKey(conversationId, "request-1"))
                 .thenReturn(Optional.of(existing));
 
@@ -123,9 +112,7 @@ class TutorServiceTest {
 
     private void authenticatedUser() {
         UUID authId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        when(currentUser.authProviderId()).thenReturn(authId);
-        when(userRepository.findByAuthProviderId(authId)).thenReturn(Optional.of(user));
-        when(user.getId()).thenReturn(userId);
+        userId = UUID.randomUUID();
+        when(userDirectory.requireCurrentUserId()).thenReturn(userId);
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.englow3.shared.error.ApiErrorResponse;
 import com.englow3.shared.logging.TraceIdFilter;
+import com.englow3.shared.security.SupabaseRoleConverter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,12 +45,23 @@ public class SecurityConfig {
                                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info",
                                         "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                                 .permitAll().anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter()))
                         .authenticationEntryPoint((request, response, ex) -> writeError(objectMapper, response,
                                 HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "A valid access token is required"))
                         .accessDeniedHandler((request, response, ex) -> writeError(objectMapper, response,
                                 HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You are not allowed to perform this action")));
         return http.build();
+    }
+
+    /**
+     * What makes {@code @PreAuthorize("hasRole('ADMIN')")} work: without a converter the JWT yields no authority and
+     * every role check refuses. The role is read from {@code app_metadata}, so no endpoint pays a database lookup to
+     * find out who may call it.
+     */
+    private static JwtAuthenticationConverter roleConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(new SupabaseRoleConverter());
+        return converter;
     }
 
     /** Errors raised in the filter chain never reach GlobalExceptionHandler, so the shape is written by hand here. */

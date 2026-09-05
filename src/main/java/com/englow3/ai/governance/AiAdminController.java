@@ -22,7 +22,7 @@ import jakarta.validation.constraints.Min;
 
 @RestController
 @RequestMapping("/api/admin/ai")
-@PreAuthorize("@authorization.isAdmin()")
+@PreAuthorize("hasRole('ADMIN')")
 class AiAdminController {
 
     private final AiAdminService adminService;

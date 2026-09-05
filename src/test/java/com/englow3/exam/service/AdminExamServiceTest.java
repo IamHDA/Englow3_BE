@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -38,23 +37,22 @@ import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
-import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.Authorization;
+import com.englow3.user.service.UserDirectory;
 
 class AdminExamServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
-    private final Authorization authorization = mock(Authorization.class);
+    private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final AdminExamService service = new AdminExamService(examRepo, examPaperQuery, authorization);
+    private final AdminExamService service = new AdminExamService(examRepo, examPaperQuery, userDirectory);
 
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach
     void passTheGate() {
-        when(authorization.requireAdminId()).thenReturn(adminId);
+        when(userDirectory.requireCurrentUserId()).thenReturn(adminId);
         when(examRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -66,23 +64,6 @@ class AdminExamServiceTest {
         verify(examRepo).save(saved.capture());
         assertThat(saved.getValue().getCreatedByUserId()).isEqualTo(adminId);
         assertThat(result.id()).isEqualTo(saved.getValue().getId());
-    }
-
-    @Test
-    void writesNothingWhenTheGateRefusesTheCreate() {
-        gateRefuses();
-
-        assertThatThrownBy(() -> service.create(command())).isInstanceOf(ForbiddenException.class);
-        verify(examRepo, never()).save(any());
-    }
-
-    @Test
-    void readsNothingWhenTheGateRefusesTheSearch() {
-        gateRefuses();
-
-        assertThatThrownBy(() -> service.search(new SearchExamCommand(null, null, null), Pageable.unpaged()))
-                .isInstanceOf(ForbiddenException.class);
-        verifyNoInteractions(examRepo);
     }
 
     @Test
@@ -121,15 +102,6 @@ class AdminExamServiceTest {
 
         assertThatThrownBy(() -> service.detail(new ExamDetailCommand(missing))).isInstanceOf(NotFoundException.class)
                 .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("EXAM_NOT_FOUND");
-    }
-
-    @Test
-    void loadsNothingWhenTheGateRefusesTheDetail() {
-        gateRefuses();
-
-        assertThatThrownBy(() -> service.detail(new ExamDetailCommand(UUID.randomUUID())))
-                .isInstanceOf(ForbiddenException.class);
-        verifyNoInteractions(examPaperQuery);
     }
 
     @Test
@@ -185,22 +157,6 @@ class AdminExamServiceTest {
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
 
         assertThat(service.archive(new ArchiveExamCommand(exam.getId())).status()).isEqualTo(ExamStatus.ARCHIVED);
-    }
-
-    @Test
-    void touchesNothingWhenTheGateRefusesThePublish() {
-        gateRefuses();
-
-        assertThatThrownBy(() -> service.publish(new PublishExamCommand(UUID.randomUUID())))
-                .isInstanceOf(ForbiddenException.class);
-        verifyNoInteractions(examRepo);
-    }
-
-    /**
-     * Which callers the gate lets through is AuthorizationTest's business - here it only has to run before the repo.
-     */
-    private void gateRefuses() {
-        when(authorization.requireAdminId()).thenThrow(new ForbiddenException("ACCESS_DENIED", "no"));
     }
 
     private static Exam draft() {

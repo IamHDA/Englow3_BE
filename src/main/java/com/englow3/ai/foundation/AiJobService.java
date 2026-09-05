@@ -9,9 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.logging.TraceIdFilter;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.JsonNode;
 
 @Service
@@ -19,17 +17,15 @@ public class AiJobService {
 
     private final AiJobRepository repository;
     private final AiModelPolicyService policyService;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
     private final AiJobEventPublisher eventPublisher;
     private final AiJobEventStream eventStream;
 
-    AiJobService(AiJobRepository repository, AiModelPolicyService policyService, CurrentUser currentUser,
-            UserRepository userRepository, AiJobEventPublisher eventPublisher, AiJobEventStream eventStream) {
+    AiJobService(AiJobRepository repository, AiModelPolicyService policyService, UserDirectory userDirectory,
+            AiJobEventPublisher eventPublisher, AiJobEventStream eventStream) {
         this.repository = repository;
         this.policyService = policyService;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
         this.eventPublisher = eventPublisher;
         this.eventStream = eventStream;
     }
@@ -37,8 +33,8 @@ public class AiJobService {
     @Transactional
     public AiJob submitForCurrentUser(AiCapability capability, String jobType, String targetType, UUID targetId,
             String promptVersion, JsonNode inputPayload, String idempotencyKey) {
-        User user = requireCurrentUser();
-        AiJob existing = repository.findByRequesterUserIdAndIdempotencyKey(user.getId(), idempotencyKey).orElse(null);
+        UUID userId = requireCurrentUserId();
+        AiJob existing = repository.findByRequesterUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
         if (existing != null) {
             if (existing.getCapability() != capability || !existing.getJobType().equals(jobType)
                     || !existing.getTargetType().equals(targetType) || !existing.getTargetId().equals(targetId)
@@ -49,13 +45,12 @@ public class AiJobService {
             }
             return existing;
         }
-        return create(user.getId(), capability, jobType, targetType, targetId, promptVersion, inputPayload,
-                idempotencyKey);
+        return create(userId, capability, jobType, targetType, targetId, promptVersion, inputPayload, idempotencyKey);
     }
 
     @Transactional(readOnly = true)
     public AiJob getForCurrentUser(UUID jobId) {
-        UUID userId = requireCurrentUser().getId();
+        UUID userId = requireCurrentUserId();
         return repository.findByIdAndRequesterUserId(jobId, userId)
                 .orElseThrow(() -> new NotFoundException("AI_JOB_NOT_FOUND", "AI job was not found"));
     }
@@ -73,7 +68,7 @@ public class AiJobService {
 
     @Transactional(readOnly = true)
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter eventsForCurrentUser(long afterEventId) {
-        return eventStream.subscribe(requireCurrentUser().getId(), Math.max(0, afterEventId));
+        return eventStream.subscribe(requireCurrentUserId(), Math.max(0, afterEventId));
     }
 
     @Transactional(readOnly = true)
@@ -94,8 +89,7 @@ public class AiJobService {
         return job;
     }
 
-    private User requireCurrentUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireCurrentUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 }

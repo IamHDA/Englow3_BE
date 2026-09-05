@@ -20,10 +20,8 @@ import com.englow3.ai.foundation.RenderedPrompt;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -34,20 +32,18 @@ class SpeakingSessionService {
             "wav", "audio/ogg; codecs=opus", "ogg");
 
     private final JdbcTemplate jdbcTemplate;
-    private final UserRepository userRepository;
-    private final CurrentUser currentUser;
+    private final UserDirectory userDirectory;
     private final ObjectStorageClient storage;
     private final SpeechProperties properties;
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
 
-    SpeakingSessionService(JdbcTemplate jdbcTemplate, UserRepository userRepository, CurrentUser currentUser,
-            ObjectStorageClient storage, SpeechProperties properties, AiPromptService promptService,
-            AiJobService jobService, ObjectMapper objectMapper) {
+    SpeakingSessionService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, ObjectStorageClient storage,
+            SpeechProperties properties, AiPromptService promptService, AiJobService jobService,
+            ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userRepository = userRepository;
-        this.currentUser = currentUser;
+        this.userDirectory = userDirectory;
         this.storage = storage;
         this.properties = properties;
         this.promptService = promptService;
@@ -57,7 +53,7 @@ class SpeakingSessionService {
 
     @Transactional
     SpeakingDtos.CreateSessionResponse create(SpeakingDtos.CreateSessionRequest request) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         String extension = CONTENT_TYPES.get(request.contentType());
         if (extension == null) {
             throw new BadRequestException("SPEAKING_AUDIO_TYPE_UNSUPPORTED", "Use WAV PCM 16 kHz or OGG Opus audio");
@@ -68,9 +64,9 @@ class SpeakingSessionService {
         }
         UUID sessionId = UUID.randomUUID();
         UUID practiceId = request.practiceId() == null ? sessionId : request.practiceId();
-        int turnNumber = nextTurn(user.getId(), request.practiceId());
+        int turnNumber = nextTurn(userId, request.practiceId());
         String bucket = storage.defaultBucket();
-        String objectKey = "users/%s/speaking/%s/input.%s".formatted(user.getId(), sessionId, extension);
+        String objectKey = "users/%s/speaking/%s/input.%s".formatted(userId, sessionId, extension);
         Instant now = Instant.now();
         Instant retentionUntil = now.plus(properties.retention());
         jdbcTemplate.update("""
@@ -78,7 +74,7 @@ class SpeakingSessionService {
                     (id, user_id, mode, locale, reference_text, audio_bucket, audio_object_key,
                      audio_content_type, status, consented_at, retention_until, practice_id, turn_number)
                 values (?, ?, ?, ?, ?, ?, ?, ?, 'AWAITING_UPLOAD', ?, ?, ?, ?)
-                """, sessionId, user.getId(), request.mode().name(), properties.locale(), reference, bucket, objectKey,
+                """, sessionId, userId, request.mode().name(), properties.locale(), reference, bucket, objectKey,
                 request.contentType(), Timestamp.from(now), Timestamp.from(retentionUntil), practiceId, turnNumber);
         URL uploadUrl = storage.presignPut(bucket, objectKey, request.contentType(), properties.uploadUrlTtl());
         return new SpeakingDtos.CreateSessionResponse(sessionId, practiceId, turnNumber, uploadUrl, objectKey,
@@ -87,8 +83,8 @@ class SpeakingSessionService {
 
     @Transactional
     SpeakingDtos.SubmitSessionResponse submit(UUID sessionId, String idempotencyKey) {
-        User user = requireUser();
-        SessionUpload upload = lockUpload(sessionId, user.getId());
+        UUID userId = requireUserId();
+        SessionUpload upload = lockUpload(sessionId, userId);
         if (upload.jobId() != null && idempotencyKey.equals(upload.submitIdempotencyKey())) {
             return new SpeakingDtos.SubmitSessionResponse(sessionId, upload.jobId(), "EXISTING");
         }
@@ -128,7 +124,7 @@ class SpeakingSessionService {
 
     @Transactional(readOnly = true)
     SpeakingDtos.SessionResult result(UUID sessionId) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         SessionResultRow row = jdbcTemplate.query("""
                 select s.id, s.mode, s.status, s.retention_until, a.recognized_text, a.accuracy_score,
                        a.fluency_score, a.completeness_score, a.prosody_score, a.pronunciation_score,
@@ -147,7 +143,7 @@ class SpeakingSessionService {
                     rs.getString("grammar_feedback"), rs.getString("vocabulary_feedback"),
                     rs.getString("provider_name"), rs.getTimestamp("retention_until").toInstant(),
                     instant(rs.getTimestamp("audio_deleted_at")));
-        }, sessionId, user.getId());
+        }, sessionId, userId);
         if (row == null) {
             throw new NotFoundException("SPEAKING_SESSION_NOT_FOUND", "Speaking session was not found");
         }
@@ -159,7 +155,7 @@ class SpeakingSessionService {
 
     @Transactional(readOnly = true)
     List<SpeakingDtos.SessionSummary> history() {
-        User user = requireUser();
+        UUID userId = requireUserId();
         return jdbcTemplate.query("""
                 select s.id, s.mode, s.status, s.created_at, s.completed_at, s.retention_until,
                        a.recognized_text, a.pronunciation_score
@@ -173,12 +169,12 @@ class SpeakingSessionService {
                         rs.getString("status"), rs.getString("recognized_text"),
                         decimal(rs.getBigDecimal("pronunciation_score")), rs.getTimestamp("created_at").toInstant(),
                         instant(rs.getTimestamp("completed_at")), rs.getTimestamp("retention_until").toInstant()),
-                user.getId());
+                userId);
     }
 
     @Transactional(readOnly = true)
     List<SpeakingDtos.RecurringError> recurringErrors() {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         return jdbcTemplate.query("""
                 select unit_type, normalized_unit, error_type, occurrence_count, average_accuracy,
                        first_seen_at, last_seen_at
@@ -198,7 +194,7 @@ class SpeakingSessionService {
             throw new BadRequestException("SPEAKING_PROGRESS_WINDOW_INVALID",
                     "Progress window must be between 1 and 365 days");
         }
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         Instant from = Instant.now().minusSeconds(windowDays * 86_400L);
         ProgressRow row = jdbcTemplate.query("""
                 select count(*) sessions, avg(a.accuracy_score) accuracy, avg(a.fluency_score) fluency,
@@ -223,14 +219,14 @@ class SpeakingSessionService {
 
     @Transactional
     void delete(UUID sessionId) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         SessionUpload upload = jdbcTemplate.query("""
                 select audio_bucket, audio_object_key, audio_content_type, status, ai_job_id,
                        submit_idempotency_key, audio_status
                 from speaking_sessions where id = ? and user_id = ? for update
                 """, rs -> rs.next() ? new SessionUpload(rs.getString("audio_bucket"), rs.getString("audio_object_key"),
                 rs.getString("audio_content_type"), rs.getString("status"), rs.getObject("ai_job_id", UUID.class),
-                rs.getString("submit_idempotency_key"), rs.getString("audio_status")) : null, sessionId, user.getId());
+                rs.getString("submit_idempotency_key"), rs.getString("audio_status")) : null, sessionId, userId);
         if (upload == null) {
             throw new NotFoundException("SPEAKING_SESSION_NOT_FOUND", "Speaking session was not found");
         }
@@ -332,9 +328,8 @@ class SpeakingSessionService {
         return value == null ? null : value.toInstant();
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     record SessionUpload(String bucket, String objectKey, String contentType, String status, UUID jobId,

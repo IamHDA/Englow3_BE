@@ -12,9 +12,7 @@ import com.englow3.ai.foundation.AiCapability;
 import com.englow3.ai.evaluation.AiEvaluationService;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,16 +21,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 class AiAdminService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
     private final ObjectMapper objectMapper;
     private final AiEvaluationService evaluationService;
 
-    AiAdminService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository,
-            ObjectMapper objectMapper, AiEvaluationService evaluationService) {
+    AiAdminService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, ObjectMapper objectMapper,
+            AiEvaluationService evaluationService) {
         this.jdbcTemplate = jdbcTemplate;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
         this.objectMapper = objectMapper;
         this.evaluationService = evaluationService;
     }
@@ -52,7 +48,7 @@ class AiAdminService {
 
     @Transactional
     AiGovernanceDtos.PromptSummary createPrompt(AiGovernanceDtos.PromptTemplateRequest request) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         UUID id = UUID.randomUUID();
         try {
             jdbcTemplate.update("""
@@ -61,13 +57,13 @@ class AiAdminService {
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
             throw new ConflictException("AI_PROMPT_EXISTS", "A prompt with this key already exists");
         }
-        audit(actor.getId(), "PROMPT_CREATE", "AI_PROMPT_TEMPLATE", id.toString(), null);
+        audit(actorId, "PROMPT_CREATE", "AI_PROMPT_TEMPLATE", id.toString(), null);
         return prompt(id);
     }
 
     @Transactional
     int createVersion(UUID templateId, AiGovernanceDtos.PromptVersionRequest request) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         UUID lockedId = jdbcTemplate.query("select id from ai_prompt_templates where id = ? for update",
                 rs -> rs.next() ? rs.getObject("id", UUID.class) : null, templateId);
         if (lockedId == null) {
@@ -81,15 +77,15 @@ class AiAdminService {
                     (id, template_id, version, system_template, user_template, response_schema, active, created_by)
                 values (?, ?, ?, ?, ?, ?::jsonb, false, ?)
                 """, UUID.randomUUID(), templateId, next, request.systemTemplate(), request.userTemplate(),
-                json(request.responseSchema()), actor.getId());
-        audit(actor.getId(), "PROMPT_VERSION_CREATE", "AI_PROMPT_TEMPLATE", templateId.toString(),
+                json(request.responseSchema()), actorId);
+        audit(actorId, "PROMPT_VERSION_CREATE", "AI_PROMPT_TEMPLATE", templateId.toString(),
                 objectMapper.createObjectNode().put("version", next));
         return next;
     }
 
     @Transactional
     void activateVersion(UUID templateId, int version, UUID evaluationRunId) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         Integer exists = jdbcTemplate.queryForObject("""
                 select count(*) from ai_prompt_versions where template_id = ? and version = ?
                 """, Integer.class, templateId, version);
@@ -103,7 +99,7 @@ class AiAdminService {
                 update ai_prompt_versions set active = true, evaluation_run_id = ?
                 where template_id = ? and version = ?
                 """, evaluationRunId, templateId, version);
-        audit(actor.getId(), "PROMPT_VERSION_ACTIVATE", "AI_PROMPT_TEMPLATE", templateId.toString(), objectMapper
+        audit(actorId, "PROMPT_VERSION_ACTIVATE", "AI_PROMPT_TEMPLATE", templateId.toString(), objectMapper
                 .createObjectNode().put("version", version).put("evaluationRunId", evaluationRunId.toString()));
     }
 
@@ -124,7 +120,7 @@ class AiAdminService {
     @Transactional
     AiGovernanceDtos.ModelPolicyResponse updatePolicy(AiCapability capability,
             AiGovernanceDtos.ModelPolicyRequest request) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         if (request.enabled()) {
             if (request.evaluationRunId() == null) {
                 throw new ConflictException("AI_EVALUATION_REQUIRED",
@@ -147,7 +143,7 @@ class AiAdminService {
                 """, capability.name(), request.provider(), request.model(), request.temperature(),
                 request.maxOutputTokens(), request.inputCostPerMillion(), request.outputCostPerMillion(),
                 request.enabled(), request.evaluationRunId());
-        audit(actor.getId(), "MODEL_POLICY_UPDATE", "AI_CAPABILITY", capability.name(),
+        audit(actorId, "MODEL_POLICY_UPDATE", "AI_CAPABILITY", capability.name(),
                 objectMapper.createObjectNode().put("model", request.model()).put("enabled", request.enabled()).put(
                         "evaluationRunId",
                         request.evaluationRunId() == null ? null : request.evaluationRunId().toString()));
@@ -230,8 +226,7 @@ class AiAdminService {
         return input == null ? BigDecimal.ZERO : input;
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 }

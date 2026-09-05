@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.englow3.shared.error.ConflictException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class AiEvaluationActivationGateTest {
@@ -44,6 +43,6 @@ class AiEvaluationActivationGateTest {
     }
 
     private AiEvaluationService service(JdbcTemplate jdbc) {
-        return new AiEvaluationService(jdbc, new ObjectMapper(), mock(CurrentUser.class), mock(UserRepository.class));
+        return new AiEvaluationService(jdbc, new ObjectMapper(), mock(UserDirectory.class));
     }
 }

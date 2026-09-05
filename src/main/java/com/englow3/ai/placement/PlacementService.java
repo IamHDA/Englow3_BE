@@ -23,9 +23,7 @@ import com.englow3.ai.foundation.AiPromptService;
 import com.englow3.ai.foundation.RenderedPrompt;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -35,17 +33,15 @@ class PlacementService {
     private static final int SCORING_POLICY_VERSION = 1;
 
     private final JdbcTemplate jdbcTemplate;
-    private final UserRepository userRepository;
-    private final CurrentUser currentUser;
+    private final UserDirectory userDirectory;
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
 
-    PlacementService(JdbcTemplate jdbcTemplate, UserRepository userRepository, CurrentUser currentUser,
-            AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper) {
+    PlacementService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, AiPromptService promptService,
+            AiJobService jobService, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userRepository = userRepository;
-        this.currentUser = currentUser;
+        this.userDirectory = userDirectory;
         this.promptService = promptService;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
@@ -69,11 +65,11 @@ class PlacementService {
 
     @Transactional
     PlacementDtos.StartAttemptResponse start(UUID examId) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         Integer activeAttempts = jdbcTemplate.queryForObject("""
                 select count(*) from exam_attempts
                 where user_id = ? and exam_id = ? and status = 'IN_PROGRESS' and expires_at > now()
-                """, Integer.class, user.getId(), examId);
+                """, Integer.class, userId, examId);
         if (activeAttempts != null && activeAttempts > 0) {
             throw new ConflictException("PLACEMENT_ATTEMPT_ACTIVE",
                     "An active placement attempt already exists for this exam");
@@ -99,14 +95,14 @@ class PlacementService {
                     (id, exam_id, exam_version_number, user_id, status, started_at, expires_at,
                      max_raw_score, question_count)
                 values (?, ?, ?, ?, 'IN_PROGRESS', ?, ?, ?, ?)
-                """, attemptId, examId, exam.version(), user.getId(), Timestamp.from(startedAt),
-                Timestamp.from(expiresAt), exam.maxScore(), exam.questionCount());
+                """, attemptId, examId, exam.version(), userId, Timestamp.from(startedAt), Timestamp.from(expiresAt),
+                exam.maxScore(), exam.questionCount());
         return new PlacementDtos.StartAttemptResponse(attemptId, expiresAt, exam.questionCount());
     }
 
     @Transactional(readOnly = true)
     List<PlacementDtos.QuestionResponse> questions(UUID attemptId) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         List<QuestionRow> rows = jdbcTemplate.query("""
                 select q.id as question_id, q.content as question_content, q.skill_type, q.order_no,
                        qo.id as option_id, qo.content as option_content, qo.order_no as option_order
@@ -139,7 +135,7 @@ class PlacementService {
 
     @Transactional
     void answer(UUID attemptId, PlacementDtos.SubmitAnswerRequest request) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         Integer valid = jdbcTemplate.queryForObject("""
                 select count(*)
                 from exam_attempts a
@@ -182,13 +178,13 @@ class PlacementService {
 
     @Transactional
     PlacementDtos.SubmitAttemptResponse submit(UUID attemptId, String idempotencyKey) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         AttemptState state = jdbcTemplate.query("""
                 select status, expires_at from exam_attempts where id = ? and user_id = ? for update
                 """,
                 rs -> rs.next() ? new AttemptState(rs.getString("status"), rs.getTimestamp("expires_at").toInstant())
                         : null,
-                attemptId, user.getId());
+                attemptId, userId);
         if (state == null) {
             throw new NotFoundException("PLACEMENT_ATTEMPT_NOT_FOUND", "Placement attempt was not found");
         }
@@ -220,7 +216,7 @@ class PlacementService {
                 on conflict (user_id) do update
                 set placement_attempt_id = excluded.placement_attempt_id,
                     current_level = excluded.current_level
-                """, UUID.randomUUID(), user.getId(), attemptId, level);
+                """, UUID.randomUUID(), userId, attemptId, level);
 
         if (!jobService.isEnabled(AiCapability.PLACEMENT)) {
             return new PlacementDtos.SubmitAttemptResponse(result(attemptId), null, null);
@@ -245,7 +241,7 @@ class PlacementService {
 
     @Transactional(readOnly = true)
     PlacementDtos.AttemptResult result(UUID attemptId) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         PlacementDtos.AttemptResult result = jdbcTemplate.query("""
                 select a.id, a.status, a.raw_score, a.max_raw_score, a.score_percentage, a.assessed_level,
                        r.ai_job_id, r.summary, r.strengths, r.learning_gaps
@@ -356,9 +352,8 @@ class PlacementService {
         }
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record ExamDefinition(int version, int durationSeconds, BigDecimal maxScore, int questionCount) {

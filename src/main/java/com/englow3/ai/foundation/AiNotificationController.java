@@ -14,21 +14,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 
 @RestController
 @RequestMapping("/api/ai/notifications")
 class AiNotificationController {
 
     private final JdbcTemplate jdbcTemplate;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
 
-    AiNotificationController(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository) {
+    AiNotificationController(JdbcTemplate jdbcTemplate, UserDirectory userDirectory) {
         this.jdbcTemplate = jdbcTemplate;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
     }
 
     @GetMapping
@@ -58,9 +55,7 @@ class AiNotificationController {
     }
 
     private UUID userId() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"))
-                .getId();
+        return userDirectory.requireCurrentUserId();
     }
 
     private Instant instant(java.sql.Timestamp value) {

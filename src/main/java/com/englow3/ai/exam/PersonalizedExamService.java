@@ -22,9 +22,7 @@ import com.englow3.ai.exam.PersonalizedExamSelector.Candidate;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -37,39 +35,37 @@ class PersonalizedExamService {
     private static final String CONCEPT_SEPARATOR = "\u001f";
 
     private final JdbcTemplate jdbcTemplate;
-    private final UserRepository userRepository;
-    private final CurrentUser currentUser;
+    private final UserDirectory userDirectory;
     private final PersonalizedExamSelector selector;
     private final ObjectMapper objectMapper;
 
-    PersonalizedExamService(JdbcTemplate jdbcTemplate, UserRepository userRepository, CurrentUser currentUser,
-            PersonalizedExamSelector selector, ObjectMapper objectMapper) {
+    PersonalizedExamService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, PersonalizedExamSelector selector,
+            ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userRepository = userRepository;
-        this.currentUser = currentUser;
+        this.userDirectory = userDirectory;
         this.selector = selector;
         this.objectMapper = objectMapper;
     }
 
     @Transactional
     PersonalizedExamDtos.ExamResponse generate(PersonalizedExamDtos.GenerateRequest request) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         if (request.difficultyMax().compareTo(request.difficultyMin()) < 0) {
             throw new BadRequestException("PERSONALIZED_EXAM_DIFFICULTY_INVALID",
                     "Maximum difficulty must not be lower than minimum difficulty");
         }
         String requestHash = requestHash(request);
-        Existing existing = existing(user.getId(), request.idempotencyKey());
+        Existing existing = existing(userId, request.idempotencyKey());
         if (existing != null) {
             if (!existing.requestHash().equals(requestHash)) {
                 throw new ConflictException("PERSONALIZED_EXAM_IDEMPOTENCY_CONFLICT",
                         "The idempotency key was already used for a different exam blueprint");
             }
-            return load(existing.examId(), user.getId());
+            return load(existing.examId(), userId);
         }
 
         UUID seed = UUID.randomUUID();
-        List<Candidate> candidates = candidates(user.getId(), request.targetLevel().name());
+        List<Candidate> candidates = candidates(userId, request.targetLevel().name());
         List<Candidate> selected = selector.select(candidates, request.skill(), request.questionCount(),
                 request.difficultyMin(), request.difficultyMax(), seed);
         if (selected.size() != request.questionCount()) {
@@ -88,23 +84,23 @@ class PersonalizedExamService {
                      status, version_number, created_by_user_id, published_at)
                 values (?, ?, ?, 'PERSONALIZED', ?, ?, ?, 'PUBLISHED', 1, ?, now())
                 """, examId, title, "Personalized practice assembled from human-approved content",
-                request.targetLevel().name(), duration, BigDecimal.valueOf(request.questionCount()), user.getId());
+                request.targetLevel().name(), duration, BigDecimal.valueOf(request.questionCount()), userId);
         jdbcTemplate.update("""
                 insert into personalized_exam_blueprints
                     (exam_id, user_id, target_level, requested_skill, requested_questions,
                      difficulty_min, difficulty_max, selection_policy_version, selection_seed,
                      request_hash, idempotency_key)
                 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, examId, user.getId(), request.targetLevel().name(), request.skill().name(),
-                request.questionCount(), request.difficultyMin(), request.difficultyMax(), POLICY_VERSION, seed,
-                requestHash, request.idempotencyKey());
+                """, examId, userId, request.targetLevel().name(), request.skill().name(), request.questionCount(),
+                request.difficultyMin(), request.difficultyMax(), POLICY_VERSION, seed, requestHash,
+                request.idempotencyKey());
         materialize(examId, selected);
-        return load(examId, user.getId());
+        return load(examId, userId);
     }
 
     @Transactional(readOnly = true)
     List<PersonalizedExamDtos.ExamResponse> history() {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         List<UUID> ids = jdbcTemplate.queryForList("""
                 select exam_id from personalized_exam_blueprints
                 where user_id = ? order by created_at desc limit 100
@@ -114,7 +110,7 @@ class PersonalizedExamService {
 
     @Transactional(readOnly = true)
     PersonalizedExamDtos.ExamResponse get(UUID examId) {
-        return load(examId, requireUser().getId());
+        return load(examId, requireUserId());
     }
 
     private List<Candidate> candidates(UUID userId, String targetLevel) {
@@ -345,9 +341,8 @@ class PersonalizedExamService {
         }
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record Existing(UUID examId, String requestHash) {

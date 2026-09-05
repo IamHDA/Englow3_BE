@@ -23,8 +23,7 @@ import com.englow3.ai.evaluation.AiEvaluationDtos.SuiteResponse;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,15 +32,12 @@ public class AiEvaluationService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
 
-    AiEvaluationService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, CurrentUser currentUser,
-            UserRepository userRepository) {
+    AiEvaluationService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, UserDirectory userDirectory) {
         this.jdbcTemplate = jdbcTemplate;
+        this.userDirectory = userDirectory;
         this.objectMapper = objectMapper;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -379,9 +375,7 @@ public class AiEvaluationService {
     }
 
     private UUID actorId() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"))
-                .getId();
+        return userDirectory.requireCurrentUserId();
     }
 
     private void audit(UUID actor, String action, UUID runId, JsonNode details) {

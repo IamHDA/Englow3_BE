@@ -21,31 +21,28 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.Authorization;
+import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class AdminExamService {
-
     private final ExamRepository examRepo;
     private final AdminExamPaperQuery examPaperQuery;
-    private final Authorization authorization;
+    private final UserDirectory userDirectory;
 
     @Transactional
     public ExamResult create(CreateExamCommand command) {
         Exam exam = Exam.draft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
-                command.passScore(), authorization.requireAdminId());
+                command.passScore(), userDirectory.requireCurrentUserId());
 
         return ExamResult.of(examRepo.save(exam));
     }
 
     @Transactional(readOnly = true)
     public Page<ExamListItemResult> search(SearchExamCommand command, Pageable pageable) {
-        authorization.requireAdminId();
-
         return examRepo.search(command.status(), command.examType(), command.title(), pageable)
                 .map(ExamListItemResult::of);
     }
@@ -53,16 +50,12 @@ public class AdminExamService {
     /** The whole paper with answer keys - what the detail screen renders and what its printed form uses. */
     @Transactional(readOnly = true)
     public ExamDetailResult detail(ExamDetailCommand command) {
-        authorization.requireAdminId();
-
         return examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId()));
     }
 
     /** No {@code save()}: the entity is managed, so the change flushes at commit. */
     @Transactional
     public ExamResult update(UpdateExamCommand command) {
-        authorization.requireAdminId();
-
         Exam exam = requireExam(command.examId());
         exam.updateDraft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
@@ -73,8 +66,6 @@ public class AdminExamService {
 
     @Transactional
     public ExamResult publish(PublishExamCommand command) {
-        authorization.requireAdminId();
-
         Exam exam = requireExam(command.examId());
         exam.publish(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), Instant.now());
@@ -84,8 +75,6 @@ public class AdminExamService {
 
     @Transactional
     public ExamResult archive(ArchiveExamCommand command) {
-        authorization.requireAdminId();
-
         Exam exam = requireExam(command.examId());
         exam.archive();
 

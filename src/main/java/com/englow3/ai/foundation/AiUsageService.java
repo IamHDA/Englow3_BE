@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,11 @@ public class AiUsageService {
     private final AiProperties properties;
     private final Clock clock;
 
+    /**
+     * {@code @Autowired} is load-bearing: with two constructors and neither marked, Spring falls back to looking for a
+     * no-arg one and the context fails to start. The second constructor exists only so a test can pin the clock.
+     */
+    @Autowired
     AiUsageService(JdbcTemplate jdbcTemplate, AiProperties properties) {
         this(jdbcTemplate, properties, Clock.systemUTC());
     }

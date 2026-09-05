@@ -15,9 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 
 @Service
 class AdaptivePlacementService {
@@ -25,17 +23,15 @@ class AdaptivePlacementService {
     private static final double COMPLETION_STANDARD_ERROR = 0.35;
 
     private final JdbcTemplate jdbcTemplate;
-    private final UserRepository userRepository;
-    private final CurrentUser currentUser;
+    private final UserDirectory userDirectory;
     private final PlacementService fixedPlacementService;
     private final IrtCalculator calculator;
     private final AdaptivePlacementSelector selector;
 
-    AdaptivePlacementService(JdbcTemplate jdbcTemplate, UserRepository userRepository, CurrentUser currentUser,
+    AdaptivePlacementService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory,
             PlacementService fixedPlacementService, IrtCalculator calculator) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userRepository = userRepository;
-        this.currentUser = currentUser;
+        this.userDirectory = userDirectory;
         this.fixedPlacementService = fixedPlacementService;
         this.calculator = calculator;
         this.selector = new AdaptivePlacementSelector(calculator);
@@ -47,11 +43,11 @@ class AdaptivePlacementService {
             throw new BadRequestException("ADAPTIVE_PLACEMENT_ITEM_LIMITS",
                     "maxItems must be greater than or equal to minItems");
         }
-        User user = requireUser();
+        UUID userId = requireUserId();
         Integer active = jdbcTemplate.queryForObject("""
                 select count(*) from adaptive_placement_attempts
                 where user_id = ? and status = 'IN_PROGRESS'
-                """, Integer.class, user.getId());
+                """, Integer.class, userId);
         if (active != null && active > 0) {
             throw new ConflictException("ADAPTIVE_PLACEMENT_ACTIVE",
                     "An adaptive placement attempt is already in progress");
@@ -67,7 +63,7 @@ class AdaptivePlacementService {
                     insert into adaptive_placement_attempts
                         (id, user_id, status, fallback_exam_attempt_id, min_items, max_items)
                     values (?, ?, 'FALLBACK', ?, ?, ?)
-                    """, attemptId, user.getId(), fallback.attemptId(), request.minItems(), request.maxItems());
+                    """, attemptId, userId, fallback.attemptId(), request.minItems(), request.maxItems());
             return new AdaptivePlacementDtos.AttemptResponse(attemptId, "FIXED", "FALLBACK", null, fallback.attemptId(),
                     0, null, null, null, null);
         }
@@ -78,19 +74,18 @@ class AdaptivePlacementService {
                     (id, user_id, status, calibration_version, current_theta, selected_item_id,
                      min_items, max_items)
                 values (?, ?, 'IN_PROGRESS', ?, 0, ?, ?, ?)
-                """, attemptId, user.getId(), calibration.version(), first.itemId(), request.minItems(),
-                request.maxItems());
-        return response(loadOwned(attemptId, user.getId(), false));
+                """, attemptId, userId, calibration.version(), first.itemId(), request.minItems(), request.maxItems());
+        return response(loadOwned(attemptId, userId, false));
     }
 
     @Transactional(readOnly = true)
     AdaptivePlacementDtos.AttemptResponse get(UUID attemptId) {
-        return response(loadOwned(attemptId, requireUser().getId(), false));
+        return response(loadOwned(attemptId, requireUserId(), false));
     }
 
     @Transactional
     AdaptivePlacementDtos.AttemptResponse answer(UUID attemptId, AdaptivePlacementDtos.AnswerRequest request) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         Attempt attempt = loadOwned(attemptId, userId, true);
         if (!"IN_PROGRESS".equals(attempt.status())) {
             throw new ConflictException("ADAPTIVE_PLACEMENT_NOT_ACTIVE",
@@ -286,9 +281,8 @@ class AdaptivePlacementService {
         return "C1";
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record ActiveCalibration(int version, int minimumResponses) {

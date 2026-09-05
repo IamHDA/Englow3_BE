@@ -18,26 +18,22 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 
 @Service
 class IrtCalibrationService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
 
-    IrtCalibrationService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository) {
+    IrtCalibrationService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory) {
         this.jdbcTemplate = jdbcTemplate;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
     }
 
     @Transactional
     AdaptivePlacementDtos.CalibrationResponse importVersion(AdaptivePlacementDtos.CalibrationImportRequest request) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         Set<String> ids = new HashSet<>();
         for (AdaptivePlacementDtos.CalibrationItem item : request.items()) {
             String id = item.itemId().strip();
@@ -59,7 +55,7 @@ class IrtCalibrationService {
                     insert into irt_calibration_versions
                         (version, source_hash, minimum_responses, status, created_by)
                     values (?, ?, ?, 'DRAFT', ?)
-                    """, request.version(), sourceHash, request.minimumResponses(), actor.getId());
+                    """, request.version(), sourceHash, request.minimumResponses(), actorId);
             request.items().stream().sorted(Comparator.comparing(AdaptivePlacementDtos.CalibrationItem::itemId))
                     .forEach(item -> jdbcTemplate.update("""
                             insert into irt_item_parameters
@@ -72,13 +68,13 @@ class IrtCalibrationService {
             throw new ConflictException("IRT_CALIBRATION_VERSION_EXISTS",
                     "The calibration version or its immutable source already exists");
         }
-        audit(actor.getId(), "IRT_CALIBRATION_IMPORT", request.version(), sourceHash);
+        audit(actorId, "IRT_CALIBRATION_IMPORT", request.version(), sourceHash);
         return response(request.version());
     }
 
     @Transactional
     AdaptivePlacementDtos.CalibrationResponse activate(int version) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         CalibrationVersion calibration = jdbcTemplate.query("""
                 select status, created_by, minimum_responses, source_hash
                 from irt_calibration_versions where version = ? for update
@@ -94,7 +90,7 @@ class IrtCalibrationService {
         if (!"DRAFT".equals(calibration.status())) {
             throw new ConflictException("IRT_CALIBRATION_NOT_DRAFT", "Only a draft calibration can be activated");
         }
-        if (actor.getId().equals(calibration.createdBy())) {
+        if (actorId.equals(calibration.createdBy())) {
             throw new ConflictException("IRT_CALIBRATION_FOUR_EYES_REQUIRED",
                     "A different administrator must activate the imported calibration");
         }
@@ -114,8 +110,8 @@ class IrtCalibrationService {
                 update irt_calibration_versions
                 set status = 'ACTIVE', activated_by = ?, activated_at = now()
                 where version = ?
-                """, actor.getId(), version);
-        audit(actor.getId(), "IRT_CALIBRATION_ACTIVATE", version, calibration.sourceHash());
+                """, actorId, version);
+        audit(actorId, "IRT_CALIBRATION_ACTIVATE", version, calibration.sourceHash());
         return response(version);
     }
 
@@ -171,9 +167,8 @@ class IrtCalibrationService {
                 """, UUID.randomUUID(), actorId, action, Integer.toString(version), sourceHash);
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record CalibrationVersion(String status, UUID createdBy, int minimumResponses, String sourceHash) {

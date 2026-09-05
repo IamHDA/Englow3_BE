@@ -14,7 +14,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/ai/embeddings")
-@PreAuthorize("@authorization.isAdmin()")
+@PreAuthorize("hasRole('ADMIN')")
 class AiEmbeddingAdminController {
 
     private final AiEmbeddingIndexService service;
