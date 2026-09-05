@@ -2,6 +2,8 @@
 
 Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, được xây dựng trên nền tảng **Java 21** và **Spring Boot 3**, triển khai tự động qua **Docker**, **GitHub Actions (CI/CD)** và **Render Cloud**.
 
+Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipeline sinh/kiểm định học liệu nằm tại [`data_pipeline/`](data_pipeline/); tài liệu kỹ thuật nằm tại [`docs/`](docs/).
+
 ---
 
 ## 🌐 Hệ thống môi trường (Live Deployments)
@@ -21,8 +23,8 @@ Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, đư
 * **Core Backend:** Java 21, Spring Boot 3.x (Spring Web, Spring Security, Spring Data JPA).
 * **Xác thực (Authentication):** Supabase Auth (JWT Resource Server with ES256).
 * **Cơ sở dữ liệu (Database):** PostgreSQL (Supabase) + Schema Migration với **Flyway**.
-* **Cache & Memory Store:** Redis (Upstash Cloud / Local Redis).
 * **Lưu trữ tệp (Object Storage):** S3-compatible Storage (MinIO / Supabase Storage).
+* **Học liệu:** Python data pipeline sinh và kiểm định flashcard, grammar, exam, speaking và writing.
 * **Tài liệu API:** OpenAPI 3 / Swagger UI (`springdoc-openapi`).
 * **Đóng gói & CI/CD:** Docker (Multi-stage build), GitHub Actions, GitHub Packages (`ghcr.io`), Render Deploy Hooks.
 
@@ -33,7 +35,7 @@ Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, đư
 ### 1. Yêu cầu môi trường
 * **Java**: OpenJDK 21 (Temurin khuyến nghị)
 * **Maven**: 3.9+
-* **Docker & Docker Compose** (để chạy Redis và MinIO local)
+* **Docker & Docker Compose** (để chạy PostgreSQL, MinIO và AI service local)
 
 ### 2. Cài đặt các bước
 
@@ -48,14 +50,15 @@ Tạo file `.env` từ mẫu [.env.example](.env.example):
 ```bash
 cp .env.example .env
 ```
-Cập nhật các thông số kết nối Database (Supabase hoặc Postgres local), Redis, S3 nếu cần.
+Cập nhật các thông số kết nối Database (Supabase hoặc Postgres local), S3 và AI service nếu cần.
 
-#### Bước 3: Khởi chạy các dịch vụ hỗ trợ (Redis & MinIO)
+#### Bước 3: Khởi chạy các dịch vụ hỗ trợ
 ```bash
 docker compose up -d
 ```
 * **MinIO Console**: `http://localhost:9001` (User: `minioadmin` / Pass: `minioadmin`)
-* **Redis**: `localhost:6379`
+* **PostgreSQL**: `localhost:5432`
+* **AI service**: `http://localhost:8001`
 
 #### Bước 4: Chạy ứng dụng Spring Boot
 ```bash
@@ -64,6 +67,7 @@ mvn spring-boot:run
 Ứng dụng sẽ khởi chạy tại: `http://localhost:8080`
 * **Swagger UI Local**: `http://localhost:8080/swagger-ui/index.html`
 * **Actuator Health**: `http://localhost:8080/actuator/health`
+* **AI production runbook**: [`docs/ai-production.md`](docs/ai-production.md)
 
 ---
 
@@ -97,8 +101,10 @@ Englow3_BE/
 │   │       ├── application.yml # Cấu hình Spring Boot
 │   │       └── db/migration/   # Script migration Flyway
 │   └── test/                   # Unit & Integration Tests
+├── data_pipeline/              # Pipeline Python sinh và kiểm định học liệu
+├── docs/                       # Tài liệu kiến trúc và pipeline
 ├── Dockerfile                  # Cấu hình Docker multi-stage build Java 21
-├── docker-compose.yml          # Môi trường chạy Redis & MinIO local
+├── docker-compose.yml          # PostgreSQL, MinIO và AI service local
 ├── .env.example                # Template cấu hình biến môi trường
 └── README.md                   # Tài liệu dự án
 ```

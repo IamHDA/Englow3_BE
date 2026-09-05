@@ -21,7 +21,7 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.AdminAccess;
+import com.englow3.user.service.Authorization;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,20 +31,20 @@ public class AdminExamService {
 
     private final ExamRepository examRepo;
     private final AdminExamPaperQuery examPaperQuery;
-    private final AdminAccess adminAccess;
+    private final Authorization authorization;
 
     @Transactional
     public ExamResult create(CreateExamCommand command) {
         Exam exam = Exam.draft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
-                command.passScore(), adminAccess.requireAdminId());
+                command.passScore(), authorization.requireAdminId());
 
         return ExamResult.of(examRepo.save(exam));
     }
 
     @Transactional(readOnly = true)
     public Page<ExamListItemResult> search(SearchExamCommand command, Pageable pageable) {
-        adminAccess.requireAdminId();
+        authorization.requireAdminId();
 
         return examRepo.search(command.status(), command.examType(), command.title(), pageable)
                 .map(ExamListItemResult::of);
@@ -53,7 +53,7 @@ public class AdminExamService {
     /** The whole paper with answer keys - what the detail screen renders and what its printed form uses. */
     @Transactional(readOnly = true)
     public ExamDetailResult detail(ExamDetailCommand command) {
-        adminAccess.requireAdminId();
+        authorization.requireAdminId();
 
         return examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId()));
     }
@@ -61,7 +61,7 @@ public class AdminExamService {
     /** No {@code save()}: the entity is managed, so the change flushes at commit. */
     @Transactional
     public ExamResult update(UpdateExamCommand command) {
-        adminAccess.requireAdminId();
+        authorization.requireAdminId();
 
         Exam exam = requireExam(command.examId());
         exam.updateDraft(command.title(), command.description(), command.examType(), command.certificateType(),
@@ -73,7 +73,7 @@ public class AdminExamService {
 
     @Transactional
     public ExamResult publish(PublishExamCommand command) {
-        adminAccess.requireAdminId();
+        authorization.requireAdminId();
 
         Exam exam = requireExam(command.examId());
         exam.publish(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
@@ -84,7 +84,7 @@ public class AdminExamService {
 
     @Transactional
     public ExamResult archive(ArchiveExamCommand command) {
-        adminAccess.requireAdminId();
+        authorization.requireAdminId();
 
         Exam exam = requireExam(command.examId());
         exam.archive();

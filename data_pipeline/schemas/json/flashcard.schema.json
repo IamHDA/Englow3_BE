@@ -1,0 +1,318 @@
+{
+  "$defs": {
+    "CEFRLevel": {
+      "description": "§3.2 — C2 nằm ngoài phạm vi.",
+      "enum": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "title": "CEFRLevel",
+      "type": "string"
+    },
+    "CEFRSource": {
+      "description": "Nguồn của nhãn CEFR — §0.4 bắt buộc truy vết được.\n\n`octanove` là bổ sung ngoài §2.3 (quyết định D3): 600 từ band C1 đến từ\nOctanove Vocabulary Profile, không phải CEFR-J. Gán bừa thành `cefrj` là\nkhai sai nguồn.",
+      "enum": [
+        "evp",
+        "cefrj",
+        "octanove",
+        "ngsl_band",
+        "llm_estimate",
+        "human_verified"
+      ],
+      "title": "CEFRSource",
+      "type": "string"
+    },
+    "Collocation": {
+      "additionalProperties": false,
+      "properties": {
+        "cefr": {
+          "$ref": "#/$defs/CEFRLevel"
+        },
+        "pattern": {
+          "$ref": "#/$defs/CollocationPattern"
+        },
+        "text": {
+          "minLength": 3,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern",
+        "text",
+        "cefr"
+      ],
+      "title": "Collocation",
+      "type": "object"
+    },
+    "CollocationPattern": {
+      "description": "Lỗi P1-9: collocation là object có `pattern`, không phải chuỗi phẳng.",
+      "enum": [
+        "V+N",
+        "ADJ+N",
+        "N+N",
+        "V+PREP",
+        "PREP+N",
+        "ADV+ADJ",
+        "N+PREP"
+      ],
+      "title": "CollocationPattern",
+      "type": "string"
+    },
+    "Definition": {
+      "additionalProperties": false,
+      "description": "Cặp Anh–Việt. Dùng cho định nghĩa flashcard và giải thích đáp án.",
+      "properties": {
+        "en": {
+          "minLength": 5,
+          "title": "En",
+          "type": "string"
+        },
+        "vi": {
+          "minLength": 2,
+          "title": "Vi",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en",
+        "vi"
+      ],
+      "title": "Definition",
+      "type": "object"
+    },
+    "Example": {
+      "additionalProperties": false,
+      "properties": {
+        "sentence": {
+          "minLength": 5,
+          "title": "Sentence",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceType",
+          "default": "generated"
+        },
+        "translation": {
+          "minLength": 2,
+          "title": "Translation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sentence",
+        "translation"
+      ],
+      "title": "Example",
+      "type": "object"
+    },
+    "PartOfSpeech": {
+      "enum": [
+        "noun",
+        "verb",
+        "adjective",
+        "adverb",
+        "preposition",
+        "conjunction",
+        "pronoun",
+        "determiner",
+        "phrasal_verb",
+        "idiom",
+        "collocation"
+      ],
+      "title": "PartOfSpeech",
+      "type": "string"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "draft",
+        "auto_validated",
+        "human_approved"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "SourceType": {
+      "enum": [
+        "generated",
+        "corpus"
+      ],
+      "title": "SourceType",
+      "type": "string"
+    }
+  },
+  "$id": "https://englow3.local/schemas/flashcard.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "audio_url_uk": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Audio Url Uk"
+    },
+    "audio_url_us": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Audio Url Us"
+    },
+    "cefr_level": {
+      "$ref": "#/$defs/CEFRLevel"
+    },
+    "cefr_source": {
+      "$ref": "#/$defs/CEFRSource"
+    },
+    "collocations": {
+      "items": {
+        "$ref": "#/$defs/Collocation"
+      },
+      "title": "Collocations",
+      "type": "array"
+    },
+    "concept_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Concept Ids",
+      "type": "array"
+    },
+    "definition": {
+      "$ref": "#/$defs/Definition"
+    },
+    "difficulty_prior": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Difficulty Prior",
+      "type": "number"
+    },
+    "embedding_text": {
+      "default": "",
+      "title": "Embedding Text",
+      "type": "string"
+    },
+    "examples": {
+      "items": {
+        "$ref": "#/$defs/Example"
+      },
+      "maxItems": 4,
+      "minItems": 2,
+      "title": "Examples",
+      "type": "array"
+    },
+    "frequency_rank": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frequency Rank"
+    },
+    "id": {
+      "default": "",
+      "title": "Id",
+      "type": "string"
+    },
+    "ipa_uk": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ipa Uk"
+    },
+    "ipa_us": {
+      "minLength": 2,
+      "title": "Ipa Us",
+      "type": "string"
+    },
+    "ipa_verified": {
+      "default": false,
+      "title": "Ipa Verified",
+      "type": "boolean"
+    },
+    "lemma": {
+      "minLength": 1,
+      "title": "Lemma",
+      "type": "string"
+    },
+    "mnemonic_tip_vi": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mnemonic Tip Vi"
+    },
+    "pos": {
+      "$ref": "#/$defs/PartOfSpeech"
+    },
+    "review_status": {
+      "$ref": "#/$defs/ReviewStatus",
+      "default": "draft"
+    },
+    "sense_index": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Sense Index",
+      "type": "integer"
+    },
+    "sense_label_en": {
+      "minLength": 3,
+      "title": "Sense Label En",
+      "type": "string"
+    },
+    "topics": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Topics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "lemma",
+    "pos",
+    "sense_label_en",
+    "ipa_us",
+    "definition",
+    "examples",
+    "cefr_level",
+    "cefr_source",
+    "topics",
+    "concept_ids",
+    "difficulty_prior"
+  ],
+  "title": "Flashcard",
+  "type": "object"
+}

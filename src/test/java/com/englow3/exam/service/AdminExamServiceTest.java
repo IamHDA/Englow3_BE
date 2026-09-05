@@ -40,21 +40,21 @@ import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.AdminAccess;
+import com.englow3.user.service.Authorization;
 
 class AdminExamServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
-    private final AdminAccess adminAccess = mock(AdminAccess.class);
+    private final Authorization authorization = mock(Authorization.class);
 
-    private final AdminExamService service = new AdminExamService(examRepo, examPaperQuery, adminAccess);
+    private final AdminExamService service = new AdminExamService(examRepo, examPaperQuery, authorization);
 
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach
     void passTheGate() {
-        when(adminAccess.requireAdminId()).thenReturn(adminId);
+        when(authorization.requireAdminId()).thenReturn(adminId);
         when(examRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -196,9 +196,11 @@ class AdminExamServiceTest {
         verifyNoInteractions(examRepo);
     }
 
-    /** Which callers the gate lets through is AdminAccessTest's business - here it only has to run before the repo. */
+    /**
+     * Which callers the gate lets through is AuthorizationTest's business - here it only has to run before the repo.
+     */
     private void gateRefuses() {
-        when(adminAccess.requireAdminId()).thenThrow(new ForbiddenException("ADMIN_ONLY", "no"));
+        when(authorization.requireAdminId()).thenThrow(new ForbiddenException("ACCESS_DENIED", "no"));
     }
 
     private static Exam draft() {

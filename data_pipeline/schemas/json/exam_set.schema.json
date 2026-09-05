@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "SetItemRef": {
+      "additionalProperties": false,
+      "description": "Bộ đề chỉ THAM CHIẾU câu hỏi, không sao chép nội dung — xem\ndocs/exam-set-structure.md.",
+      "properties": {
+        "group_id": {
+          "minLength": 1,
+          "title": "Group Id",
+          "type": "string"
+        },
+        "item_id": {
+          "minLength": 1,
+          "title": "Item Id",
+          "type": "string"
+        },
+        "position": {
+          "minimum": 1,
+          "title": "Position",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "group_id",
+        "item_id",
+        "position"
+      ],
+      "title": "SetItemRef",
+      "type": "object"
+    }
+  },
+  "$id": "https://englow3.local/schemas/exam_set.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "listening": {
+      "items": {
+        "$ref": "#/$defs/SetItemRef"
+      },
+      "title": "Listening",
+      "type": "array"
+    },
+    "reading": {
+      "items": {
+        "$ref": "#/$defs/SetItemRef"
+      },
+      "title": "Reading",
+      "type": "array"
+    },
+    "set_id": {
+      "minLength": 1,
+      "title": "Set Id",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "total_questions": {
+      "minimum": 0,
+      "title": "Total Questions",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "set_id",
+    "title",
+    "total_questions"
+  ],
+  "title": "ExamSet",
+  "type": "object"
+}

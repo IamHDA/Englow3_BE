@@ -5,14 +5,28 @@ on:
     branches:
       - main
       - dev
+  pull_request:
+    branches:
+      - main
+      - dev
 
 jobs:
   build-and-push:
-    name: Build & Push Docker Image
+    name: Build & Push ${{ matrix.service }} Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: Backend
+            context: .
+            image_suffix: ''
+          - service: AI Service
+            context: ./ai_service
+            image_suffix: -ai-service
 
     steps:
       - name: Checkout repository
@@ -22,17 +36,23 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name == 'push' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Normalize image repository
+        id: image
+        shell: bash
+        run: echo "repository=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ steps.image.outputs.repository }}${{ matrix.image_suffix }}
           tags: |
             type=raw,value=${{ github.ref_name }}
             type=sha,format=short
@@ -40,8 +60,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          push: true
+          context: ${{ matrix.context }}
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -51,34 +71,81 @@ jobs:
     name: Trigger Render Deploy Hook
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ vars.RENDER_DEPLOY_HOOK_URL != '' || secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+    if: ${{ github.event_name == 'push' }}
     steps:
-      - name: Call Render Deploy Hook
+      - name: Trigger backend deployment
+        shell: bash
+        env:
+          RENDER_BACKEND_HOOK_SECRET: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          RENDER_BACKEND_HOOK_VAR: ${{ vars.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          RENDER_LEGACY_HOOK_SECRET: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_LEGACY_HOOK_VAR: ${{ vars.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          DEPLOY_HOOK="${{ secrets.RENDER_DEPLOY_HOOK_URL || vars.RENDER_DEPLOY_HOOK_URL }}"
-          if [ -n "$DEPLOY_HOOK" ]; then
-            echo "Triggering Render deployment..."
-            curl -s -X POST "$DEPLOY_HOOK"
-            echo "Render deploy triggered successfully."
-          else
-            echo "No Render Deploy Hook URL provided, skipping."
+          DEPLOY_HOOK="$RENDER_BACKEND_HOOK_SECRET"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$RENDER_BACKEND_HOOK_VAR"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$RENDER_LEGACY_HOOK_SECRET"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$RENDER_LEGACY_HOOK_VAR"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "No backend Render deploy hook configured; skipping."
+            exit 0
           fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
+          echo "Backend Render deployment triggered."
+
+      - name: Trigger AI service deployment
+        shell: bash
+        env:
+          RENDER_AI_HOOK_SECRET: ${{ secrets.RENDER_AI_DEPLOY_HOOK_URL }}
+          RENDER_AI_HOOK_VAR: ${{ vars.RENDER_AI_DEPLOY_HOOK_URL }}
+        run: |
+          DEPLOY_HOOK="$RENDER_AI_HOOK_SECRET"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$RENDER_AI_HOOK_VAR"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "No AI service Render deploy hook configured; skipping."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
+          echo "AI service Render deployment triggered."
 
   deploy-vps:
     name: Deploy to VPS via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ secrets.SERVER_HOST != '' }}
+    if: ${{ github.event_name == 'push' }}
     steps:
+      - name: Check VPS deployment configuration
+        id: vps
+        shell: bash
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          if [ -n "$SERVER_HOST" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No VPS host configured; skipping."
+          fi
+
       - name: Deploy via SSH
+        if: ${{ steps.vps.outputs.enabled == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            REPOSITORY="$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+            BACKEND_IMAGE="ghcr.io/${REPOSITORY}:${{ github.ref_name }}"
+            AI_IMAGE="ghcr.io/${REPOSITORY}-ai-service:${{ github.ref_name }}"
+            docker pull "$BACKEND_IMAGE"
+            docker pull "$AI_IMAGE"
+            docker network inspect englow3-private >/dev/null 2>&1 || docker network create englow3-private
+            docker stop englow3-ai-service || true
+            docker rm englow3-ai-service || true
             docker stop englow3-be || true
             docker rm englow3-be || true
-            docker run -d --name englow3-be --restart always -p 8080:8080 --env-file /etc/englow3/.env ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            docker run -d --name englow3-ai-service --restart always --network englow3-private \
+              --env-file /etc/englow3/.env "$AI_IMAGE"
+            docker run -d --name englow3-be --restart always --network englow3-private -p 8080:8080 \
+              --env-file /etc/englow3/.env -e AI_SERVICE_BASE_URL=http://englow3-ai-service:8000 "$BACKEND_IMAGE"
 

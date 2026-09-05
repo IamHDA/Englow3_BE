@@ -1,0 +1,1891 @@
+# =============================================================================
+# CONCEPT TAXONOMY — Englow3
+# Phase 1 của docs/AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md
+# =============================================================================
+#
+# Đây là xương sống của BKT. Mọi mastery của học viên được cập nhật lên concept_id
+# trong file này.
+#
+# ⚠️  concept_id ỔN ĐỊNH VĨNH VIỄN. Đổi tên một id = xoá sạch lịch sử mastery của
+#     mọi học viên trên concept đó. Thêm mới thì được, đổi/xoá thì không.
+#
+# bkt_priors:
+#   p_init   xác suất học viên đã biết concept này trước khi học
+#   p_learn  xác suất học được sau 1 lần gặp
+#   p_slip   biết nhưng vẫn làm sai
+#   p_guess  không biết nhưng đoán đúng
+#
+# Quy ước p_guess — validators/check_taxonomy.py cưỡng chế:
+#   0.33  concept đánh giá bằng MCQ 3 lựa chọn (TOEIC-format Part 2)
+#   0.25  concept đánh giá bằng MCQ 4 lựa chọn (mặc định)
+#   0.05  concept kỹ năng sản sinh (speaking/writing) — chấm bằng rubric, không đoán được
+#
+# Quy ước p_init/p_learn theo band thấp nhất trong cefr_band:
+#   A1 → 0.40/0.22   A2 → 0.30/0.20   B1 → 0.22/0.16   B2 → 0.15/0.12   C1 → 0.10/0.10
+#
+# p_slip mặc định 0.10. Nâng lên 0.15 ở các điểm người Việt sai dai dẳng kể cả khi
+# đã hiểu quy tắc: article, -s số nhiều, -s ngôi 3, present perfect vs past simple,
+# giới từ đi kèm, word form.
+#
+# Node CÓ CON là node gom nhóm (container): không gắn item trực tiếp, không kỳ vọng
+# đạt ngưỡng 10–30 item. Item gắn vào node LÁ.
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — container
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_nouns_determiners
+  name_en: "Nouns and determiners"
+  name_vi: "Danh từ và từ hạn định"
+  domain: grammar
+  cefr_band: [A1, A2, B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: số nhiều, đếm được/không đếm được, mạo từ, lượng từ."
+
+- concept_id: gram_pronouns
+  name_en: "Pronouns"
+  name_vi: "Đại từ"
+  domain: grammar
+  cefr_band: [A1, A2, B1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: đại từ nhân xưng, sở hữu, phản thân."
+
+- concept_id: gram_tense_aspect
+  name_en: "Tense and aspect"
+  name_vi: "Thì và thể"
+  domain: grammar
+  cefr_band: [A1, A2, B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: toàn bộ hệ thống thì hiện tại, quá khứ, tương lai."
+
+- concept_id: gram_modality
+  name_en: "Modality"
+  name_vi: "Động từ khuyết thiếu"
+  domain: grammar
+  cefr_band: [A1, A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: khả năng, xin phép, bắt buộc, suy đoán."
+
+- concept_id: gram_conditionals
+  name_en: "Conditionals and hypothetical meaning"
+  name_vi: "Câu điều kiện và giả định"
+  domain: grammar
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: điều kiện loại 0–3, hỗn hợp, wish/if only."
+
+- concept_id: gram_voice
+  name_en: "Voice"
+  name_vi: "Thể chủ động và bị động"
+  domain: grammar
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: câu bị động các thì, bị động khuyết thiếu, thể sai khiến."
+
+- concept_id: gram_reported_speech
+  name_en: "Reported speech"
+  name_vi: "Câu tường thuật"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: tường thuật câu kể, câu hỏi, lùi thì."
+
+- concept_id: gram_clauses
+  name_en: "Clause structure"
+  name_vi: "Mệnh đề"
+  domain: grammar
+  cefr_band: [B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: mệnh đề quan hệ, mệnh đề danh từ, mệnh đề phân từ."
+
+- concept_id: gram_verb_patterns
+  name_en: "Verb patterns"
+  name_vi: "Cấu trúc theo sau động từ"
+  domain: grammar
+  cefr_band: [A2, B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: gerund, to-infinitive, verb + object + infinitive."
+
+- concept_id: gram_comparison
+  name_en: "Comparison"
+  name_vi: "So sánh"
+  domain: grammar
+  cefr_band: [A1, A2, B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: so sánh hơn, nhất, bằng, so sánh kép."
+
+- concept_id: gram_adverbials
+  name_en: "Adjectives and adverbs"
+  name_vi: "Tính từ và trạng từ"
+  domain: grammar
+  cefr_band: [A1, A2, B1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: cấu tạo trạng từ, trạng từ tần suất/mức độ, trật tự tính từ."
+
+- concept_id: gram_prepositions
+  name_en: "Prepositions"
+  name_vi: "Giới từ"
+  domain: grammar
+  cefr_band: [A1, A2, B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Nhóm gom: giới từ thời gian, nơi chốn, chuyển động, giới từ đi kèm."
+
+- concept_id: gram_phrasal_verbs
+  name_en: "Phrasal verbs"
+  name_vi: "Cụm động từ"
+  domain: grammar
+  cefr_band: [B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: phrasal verb tách được, không tách được, ba thành phần."
+
+- concept_id: gram_cohesion
+  name_en: "Cohesion and linking"
+  name_vi: "Liên kết câu"
+  domain: grammar
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: liên từ, từ nối tương phản/nguyên nhân/mục đích, discourse marker."
+
+- concept_id: gram_word_formation
+  name_en: "Word formation"
+  name_vi: "Cấu tạo từ"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Nhóm gom: hậu tố tạo danh từ/tính từ/động từ/trạng từ, tiền tố phủ định."
+
+- concept_id: gram_sentence_structure
+  name_en: "Sentence structure"
+  name_vi: "Cấu trúc câu"
+  domain: grammar
+  cefr_band: [A1, A2, B1, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom: câu hỏi, phủ định, hoà hợp chủ vị, đảo ngữ, câu chẻ."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Nouns and determiners
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_plural_forms
+  name_en: "Plural noun forms"
+  name_vi: "Danh từ số nhiều"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_nouns_determiners
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Số nhiều quy tắc (-s/-es/-ies) và bất quy tắc (children, feet). Người Việt hay quên -s vì tiếng Việt không biến đổi hình thái."
+
+- concept_id: gram_noun_countability
+  name_en: "Countable and uncountable nouns"
+  name_vi: "Danh từ đếm được và không đếm được"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_plural_forms]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Phân biệt information/advice/equipment (không đếm được) với các danh từ đếm được."
+
+- concept_id: gram_article_indefinite
+  name_en: "Indefinite article a/an"
+  name_vi: "Mạo từ không xác định a/an"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_noun_countability]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "a/an theo âm đầu chứ không theo chữ cái (an hour, a university)."
+
+- concept_id: gram_article_definite
+  name_en: "Definite article the"
+  name_vi: "Mạo từ xác định the"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_article_indefinite]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "the cho vật đã xác định, duy nhất, nhắc lại. Lỗi kinh điển của người Việt."
+
+- concept_id: gram_article_zero
+  name_en: "Zero article"
+  name_vi: "Không dùng mạo từ"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_article_definite]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Không mạo từ với danh từ số nhiều/không đếm được mang nghĩa chung, tên riêng, bữa ăn."
+
+- concept_id: gram_quantifier_basic
+  name_en: "Basic quantifiers"
+  name_vi: "Lượng từ cơ bản"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_noun_countability]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "some/any/much/many/a lot of theo tính đếm được và theo câu khẳng định/phủ định/nghi vấn."
+
+- concept_id: gram_quantifier_advanced
+  name_en: "Advanced quantifiers"
+  name_vi: "Lượng từ nâng cao"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_quantifier_basic]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "few/a few/little/a little/several/plenty of/the majority of — sắc thái khẳng định vs phủ định."
+
+- concept_id: gram_possessive_s
+  name_en: "Possessive forms"
+  name_vi: "Sở hữu cách"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_nouns_determiners
+  prerequisites: [gram_plural_forms]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "'s / s' / of-phrase; chọn dạng nào theo người hay vật."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Pronouns
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_pronoun_subject_object
+  name_en: "Subject and object pronouns"
+  name_vi: "Đại từ chủ ngữ và tân ngữ"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_pronouns
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "I/me, he/him, they/them — chọn theo vị trí trong câu."
+
+- concept_id: gram_pronoun_possessive
+  name_en: "Possessive adjectives and pronouns"
+  name_vi: "Tính từ và đại từ sở hữu"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_pronouns
+  prerequisites: [gram_pronoun_subject_object]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "my/mine, their/theirs — phân biệt đứng trước danh từ hay đứng một mình."
+
+- concept_id: gram_pronoun_reflexive
+  name_en: "Reflexive pronouns"
+  name_vi: "Đại từ phản thân"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_pronouns
+  prerequisites: [gram_pronoun_subject_object]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "myself/yourself/themselves; by oneself mang nghĩa 'một mình'."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Tense and aspect
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_be_present
+  name_en: "Verb to be, present"
+  name_vi: "Động từ to be ở hiện tại"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_tense_aspect
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "am/is/are ở khẳng định, phủ định, nghi vấn."
+
+- concept_id: gram_subject_verb_agreement
+  name_en: "Subject-verb agreement"
+  name_vi: "Hoà hợp chủ ngữ và động từ"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_be_present, gram_present_simple]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "-s ngôi 3 số ít; chủ ngữ tập hợp; each/every + số ít. Lỗi dai dẳng của người Việt."
+
+- concept_id: gram_present_simple
+  name_en: "Present simple"
+  name_vi: "Thì hiện tại đơn"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_be_present]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Thói quen, sự thật hiển nhiên, lịch trình cố định."
+
+- concept_id: gram_present_continuous
+  name_en: "Present continuous"
+  name_vi: "Thì hiện tại tiếp diễn"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_be_present]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hành động đang diễn ra, kế hoạch đã sắp xếp."
+
+- concept_id: gram_present_simple_vs_continuous
+  name_en: "Present simple vs continuous"
+  name_vi: "Hiện tại đơn và hiện tại tiếp diễn"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_simple, gram_present_continuous]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Chọn thì theo ngữ cảnh; động từ trạng thái (know, belong) không dùng tiếp diễn."
+
+- concept_id: gram_past_simple
+  name_en: "Past simple"
+  name_vi: "Thì quá khứ đơn"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_simple]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Động từ quy tắc -ed và bất quy tắc; mốc thời gian xác định trong quá khứ."
+
+- concept_id: gram_past_continuous
+  name_en: "Past continuous"
+  name_vi: "Thì quá khứ tiếp diễn"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_past_simple, gram_present_continuous]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hành động đang diễn ra thì bị cắt ngang; bối cảnh của câu chuyện."
+
+- concept_id: gram_present_perfect
+  name_en: "Present perfect"
+  name_vi: "Thì hiện tại hoàn thành"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_past_simple]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Kinh nghiệm, kết quả còn liên quan hiện tại; đi với ever/never/already/yet/since/for."
+
+- concept_id: gram_present_perfect_vs_past_simple
+  name_en: "Present perfect vs past simple"
+  name_vi: "Hiện tại hoàn thành và quá khứ đơn"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_perfect]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Tiếng Việt không có sự đối lập này nên người học chọn sai rất dai dẳng."
+
+- concept_id: gram_present_perfect_continuous
+  name_en: "Present perfect continuous"
+  name_vi: "Thì hiện tại hoàn thành tiếp diễn"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_perfect, gram_present_continuous]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhấn vào thời lượng của hành động kéo dài tới hiện tại."
+
+- concept_id: gram_past_perfect
+  name_en: "Past perfect"
+  name_vi: "Thì quá khứ hoàn thành"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_perfect]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Việc xảy ra trước một mốc quá khứ khác."
+
+- concept_id: gram_future_will
+  name_en: "Future with will"
+  name_vi: "Tương lai với will"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_simple]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Quyết định tức thời, dự đoán, lời hứa."
+
+- concept_id: gram_future_going_to
+  name_en: "Future with be going to"
+  name_vi: "Tương lai với be going to"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_present_continuous]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Dự định đã có sẵn, dự đoán dựa vào bằng chứng hiện tại."
+
+- concept_id: gram_future_perfect_continuous
+  name_en: "Future continuous and future perfect"
+  name_vi: "Tương lai tiếp diễn và tương lai hoàn thành"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_future_will, gram_present_perfect]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "will be doing / will have done — hay gặp trong thông báo lịch công tác ở Part 6."
+
+- concept_id: gram_time_clause_future
+  name_en: "Time clauses referring to the future"
+  name_vi: "Mệnh đề thời gian chỉ tương lai"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_tense_aspect
+  prerequisites: [gram_future_will, gram_present_simple]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Sau when/after/as soon as/before dùng hiện tại, không dùng will."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Modality
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_modal_ability
+  name_en: "Modals of ability"
+  name_vi: "Khuyết thiếu chỉ khả năng"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_modality
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "can/could/be able to ở hiện tại, quá khứ, tương lai."
+
+- concept_id: gram_modal_permission_request
+  name_en: "Modals for permission and requests"
+  name_vi: "Khuyết thiếu xin phép và đề nghị"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_modality
+  prerequisites: [gram_modal_ability]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "can/could/may/would you mind — thang độ lịch sự, rất hay gặp ở Part 2."
+
+- concept_id: gram_modal_obligation
+  name_en: "Modals of obligation and advice"
+  name_vi: "Khuyết thiếu chỉ bắt buộc và lời khuyên"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_modality
+  prerequisites: [gram_modal_ability]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "must/have to/should/ought to; mustn't (cấm) khác don't have to (không cần)."
+
+- concept_id: gram_modal_deduction
+  name_en: "Modals of deduction"
+  name_vi: "Khuyết thiếu chỉ suy đoán"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_modality
+  prerequisites: [gram_modal_obligation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "must be / can't be / might / could — mức độ chắc chắn của phỏng đoán."
+
+- concept_id: gram_modal_perfect
+  name_en: "Perfect modals"
+  name_vi: "Khuyết thiếu hoàn thành"
+  domain: grammar
+  cefr_band: [B2, C1]
+  parent_id: gram_modality
+  prerequisites: [gram_modal_deduction, gram_present_perfect]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "should have done / must have done / needn't have done — nuối tiếc, suy đoán về quá khứ."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Conditionals
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_conditional_zero
+  name_en: "Zero conditional"
+  name_vi: "Câu điều kiện loại 0"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_conditionals
+  prerequisites: [gram_present_simple]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "If + hiện tại đơn, hiện tại đơn — sự thật luôn đúng."
+
+- concept_id: gram_conditional_first
+  name_en: "First conditional"
+  name_vi: "Câu điều kiện loại 1"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_conditionals
+  prerequisites: [gram_conditional_zero, gram_future_will]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "If + hiện tại đơn, will + V — điều kiện có thật ở tương lai. Không dùng will sau if."
+
+- concept_id: gram_conditional_second
+  name_en: "Second conditional"
+  name_vi: "Câu điều kiện loại 2"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_conditionals
+  prerequisites: [gram_conditional_first, gram_past_simple]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "If + quá khứ đơn, would + V — giả định trái hiện tại."
+
+- concept_id: gram_conditional_third
+  name_en: "Third conditional"
+  name_vi: "Câu điều kiện loại 3"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_conditionals
+  prerequisites: [gram_conditional_second, gram_past_perfect]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "If + quá khứ hoàn thành, would have + V3 — giả định trái quá khứ."
+
+- concept_id: gram_conditional_mixed
+  name_en: "Mixed conditionals"
+  name_vi: "Câu điều kiện hỗn hợp"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_conditionals
+  prerequisites: [gram_conditional_third]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Điều kiện quá khứ với kết quả hiện tại và ngược lại."
+
+- concept_id: gram_wish_regret
+  name_en: "Wish and regret structures"
+  name_vi: "Cấu trúc wish và nuối tiếc"
+  domain: grammar
+  cefr_band: [B2, C1]
+  parent_id: gram_conditionals
+  prerequisites: [gram_conditional_second]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "wish/if only + quá khứ đơn hoặc quá khứ hoàn thành; would rather."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Voice
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_passive_present
+  name_en: "Present passive"
+  name_vi: "Bị động hiện tại"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_voice
+  prerequisites: [gram_present_simple, gram_be_present]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "am/is/are + V3; dùng khi tác nhân không quan trọng — rất phổ biến trong thông báo công ty."
+
+- concept_id: gram_passive_past
+  name_en: "Past and future passive"
+  name_vi: "Bị động quá khứ và tương lai"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_voice
+  prerequisites: [gram_passive_present, gram_past_simple]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "was/were + V3, will be + V3."
+
+- concept_id: gram_passive_perfect_modal
+  name_en: "Perfect and modal passive"
+  name_vi: "Bị động hoàn thành và khuyết thiếu"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_voice
+  prerequisites: [gram_passive_past, gram_present_perfect]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "has been + V3, must be + V3, should have been + V3."
+
+- concept_id: gram_passive_causative
+  name_en: "Causative have/get something done"
+  name_vi: "Thể sai khiến"
+  domain: grammar
+  cefr_band: [B2, C1]
+  parent_id: gram_voice
+  prerequisites: [gram_passive_past]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "have/get + tân ngữ + V3 — nhờ người khác làm, hay gặp trong ngữ cảnh dịch vụ."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Reported speech
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_reported_statement
+  name_en: "Reported statements"
+  name_vi: "Tường thuật câu kể"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_reported_speech
+  prerequisites: [gram_past_simple]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "say/tell + that-clause; đổi đại từ và trạng từ chỉ thời gian."
+
+- concept_id: gram_reported_question
+  name_en: "Reported questions"
+  name_vi: "Tường thuật câu hỏi"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_reported_speech
+  prerequisites: [gram_reported_statement, gram_question_formation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Trật tự khẳng định sau ask/wonder; if/whether cho câu hỏi yes-no."
+
+- concept_id: gram_reported_backshift
+  name_en: "Backshift in reported speech"
+  name_vi: "Lùi thì trong câu tường thuật"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_reported_speech
+  prerequisites: [gram_reported_statement]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Quy tắc lùi thì và các trường hợp không cần lùi (sự thật vẫn đúng)."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Clauses
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_relative_defining
+  name_en: "Defining relative clauses"
+  name_vi: "Mệnh đề quan hệ xác định"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_clauses
+  prerequisites: [gram_pronoun_subject_object]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "who/which/that; lược bỏ đại từ quan hệ khi làm tân ngữ."
+
+- concept_id: gram_relative_nondefining
+  name_en: "Non-defining relative clauses"
+  name_vi: "Mệnh đề quan hệ không xác định"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_clauses
+  prerequisites: [gram_relative_defining]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Có dấu phẩy, không dùng that, bổ sung thông tin không thiết yếu."
+
+- concept_id: gram_relative_preposition
+  name_en: "Relative clauses with prepositions"
+  name_vi: "Mệnh đề quan hệ có giới từ"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_clauses
+  prerequisites: [gram_relative_nondefining]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "to whom / in which / all of which — văn phong trang trọng trong văn bản công việc."
+
+- concept_id: gram_participle_clause
+  name_en: "Participle clauses"
+  name_vi: "Mệnh đề phân từ"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_clauses
+  prerequisites: [gram_verb_gerund_vs_infinitive]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Having finished..., Attached is... — rút gọn mệnh đề, rất hay là đáp án Part 5."
+
+- concept_id: gram_relative_reduced
+  name_en: "Reduced relative clauses"
+  name_vi: "Mệnh đề quan hệ rút gọn"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_clauses
+  prerequisites: [gram_relative_defining, gram_participle_clause]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "the report submitted yesterday = the report which was submitted yesterday."
+
+- concept_id: gram_noun_clause
+  name_en: "Noun clauses"
+  name_vi: "Mệnh đề danh từ"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_clauses
+  prerequisites: [gram_reported_statement]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "that-clause, wh-clause làm chủ ngữ hoặc tân ngữ."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Verb patterns
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_infinitive_purpose
+  name_en: "Infinitive of purpose"
+  name_vi: "Động từ nguyên mẫu chỉ mục đích"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_verb_patterns
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "to + V trả lời câu hỏi 'để làm gì'."
+
+- concept_id: gram_gerund_after_prep
+  name_en: "Gerund after preposition"
+  name_vi: "Danh động từ sau giới từ"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_verb_patterns
+  prerequisites: [gram_preposition_basic]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Sau giới từ luôn là V-ing: interested in working, before leaving."
+
+- concept_id: gram_gerund_as_subject
+  name_en: "Gerund as subject or object"
+  name_vi: "Danh động từ làm chủ ngữ hoặc tân ngữ"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_verb_patterns
+  prerequisites: [gram_gerund_after_prep]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Reading improves vocabulary — V-ing đứng vị trí danh từ."
+
+- concept_id: gram_verb_gerund_vs_infinitive
+  name_en: "Verb + gerund vs verb + infinitive"
+  name_vi: "Động từ theo sau bởi V-ing hay to-V"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_verb_patterns
+  prerequisites: [gram_gerund_after_prep, gram_infinitive_purpose]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "enjoy doing vs decide to do; stop/remember/try đổi nghĩa theo dạng đi sau."
+
+- concept_id: gram_verb_object_infinitive
+  name_en: "Verb + object + infinitive"
+  name_vi: "Động từ + tân ngữ + to-V"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_verb_patterns
+  prerequisites: [gram_infinitive_purpose]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "want/ask/expect/allow somebody to do something."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Comparison
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_comparative_adj
+  name_en: "Comparative adjectives"
+  name_vi: "So sánh hơn của tính từ"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_comparison
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "-er / more + tính từ + than; dạng bất quy tắc better, worse."
+
+- concept_id: gram_superlative_adj
+  name_en: "Superlative adjectives"
+  name_vi: "So sánh nhất của tính từ"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_comparison
+  prerequisites: [gram_comparative_adj]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "the + -est / the most + tính từ."
+
+- concept_id: gram_as_as_comparison
+  name_en: "As...as comparisons"
+  name_vi: "So sánh bằng"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_comparison
+  prerequisites: [gram_comparative_adj]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "as + tính từ + as; not as/so ... as."
+
+- concept_id: gram_comparative_adv
+  name_en: "Comparative adverbs"
+  name_vi: "So sánh của trạng từ"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_comparison
+  prerequisites: [gram_comparative_adj, gram_adverb_formation]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "more quickly, faster, the most efficiently."
+
+- concept_id: gram_double_comparative
+  name_en: "Double comparatives"
+  name_vi: "So sánh kép"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_comparison
+  prerequisites: [gram_comparative_adj]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "The more..., the more...; càng ngày càng (getting better and better)."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Adjectives and adverbs
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_adverb_frequency
+  name_en: "Adverbs of frequency"
+  name_vi: "Trạng từ tần suất"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_adverbials
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "always/usually/rarely và vị trí của chúng so với động từ."
+
+- concept_id: gram_adverb_formation
+  name_en: "Adverb formation"
+  name_vi: "Cấu tạo trạng từ"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_adverbials
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "tính từ + -ly; ngoại lệ hard/fast/well."
+
+- concept_id: gram_adverb_degree
+  name_en: "Adverbs of degree"
+  name_vi: "Trạng từ chỉ mức độ"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_adverbials
+  prerequisites: [gram_adverb_formation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "quite/rather/fairly/extremely và mức độ chúng bổ nghĩa."
+
+- concept_id: gram_adj_ed_ing
+  name_en: "Adjectives ending in -ed and -ing"
+  name_vi: "Tính từ đuôi -ed và -ing"
+  domain: grammar
+  cefr_band: [A2, B1]
+  parent_id: gram_adverbials
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "interested (cảm nhận) vs interesting (gây ra cảm nhận)."
+
+- concept_id: gram_adj_order
+  name_en: "Order of adjectives"
+  name_vi: "Trật tự tính từ"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_adverbials
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Ý kiến - kích thước - tuổi - hình dáng - màu - nguồn gốc - chất liệu. Tiếng Việt đặt ngược nên hay sai."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Prepositions
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_preposition_basic
+  name_en: "Basic prepositions of time and place"
+  name_vi: "Giới từ thời gian và nơi chốn cơ bản"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_prepositions
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "in/on/at cho thời gian và nơi chốn."
+
+- concept_id: gram_preposition_movement
+  name_en: "Prepositions of movement"
+  name_vi: "Giới từ chuyển động"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_prepositions
+  prerequisites: [gram_preposition_basic]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "to/into/onto/through/across/along."
+
+- concept_id: gram_preposition_time_advanced
+  name_en: "Advanced prepositions of time"
+  name_vi: "Giới từ thời gian nâng cao"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_prepositions
+  prerequisites: [gram_preposition_basic]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "by/until/within/throughout/prior to — cực kỳ hay gặp ở Part 5 và thông báo hạn chót."
+
+- concept_id: gram_dependent_preposition
+  name_en: "Dependent prepositions"
+  name_vi: "Giới từ đi kèm"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_prepositions
+  prerequisites: [gram_preposition_basic]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "depend on, responsible for, increase in — phải học thuộc theo cụm, không suy ra được."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Phrasal verbs
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_phrasal_verb_separable
+  name_en: "Separable phrasal verbs"
+  name_vi: "Cụm động từ tách được"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_phrasal_verbs
+  prerequisites: [gram_preposition_basic]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "turn off the light / turn the light off; đại từ bắt buộc đứng giữa (turn it off)."
+
+- concept_id: gram_phrasal_verb_inseparable
+  name_en: "Inseparable phrasal verbs"
+  name_vi: "Cụm động từ không tách được"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_phrasal_verbs
+  prerequisites: [gram_phrasal_verb_separable]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "look after somebody, run into somebody — không được chèn tân ngữ vào giữa."
+
+- concept_id: gram_phrasal_verb_three_part
+  name_en: "Three-part phrasal verbs"
+  name_vi: "Cụm động từ ba thành phần"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_phrasal_verbs
+  prerequisites: [gram_phrasal_verb_inseparable]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "come up with, look forward to, get on with."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Cohesion
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_conjunction_coordinating
+  name_en: "Coordinating conjunctions"
+  name_vi: "Liên từ kết hợp"
+  domain: grammar
+  cefr_band: [A2]
+  parent_id: gram_cohesion
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "and/but/or/so/yet nối hai mệnh đề ngang hàng."
+
+- concept_id: gram_conjunction_subordinating
+  name_en: "Subordinating conjunctions"
+  name_vi: "Liên từ phụ thuộc"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_cohesion
+  prerequisites: [gram_conjunction_coordinating]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "because/although/while/since dẫn mệnh đề phụ."
+
+- concept_id: gram_linking_contrast
+  name_en: "Linking words of contrast"
+  name_vi: "Từ nối chỉ tương phản"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_cohesion
+  prerequisites: [gram_conjunction_subordinating]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "although + mệnh đề vs despite + danh từ vs however + dấu chấm phẩy. Nhầm từ loại là bẫy kinh điển Part 5/6."
+
+- concept_id: gram_linking_cause_result
+  name_en: "Linking words of cause and result"
+  name_vi: "Từ nối chỉ nguyên nhân và kết quả"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_cohesion
+  prerequisites: [gram_conjunction_subordinating]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "because vs because of, therefore, as a result, consequently."
+
+- concept_id: gram_linking_purpose
+  name_en: "Linking words of purpose"
+  name_vi: "Từ nối chỉ mục đích"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_cohesion
+  prerequisites: [gram_infinitive_purpose]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "so that / in order to / so as to."
+
+- concept_id: gram_discourse_marker
+  name_en: "Discourse markers"
+  name_vi: "Từ đánh dấu diễn ngôn"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_cohesion
+  prerequisites: [gram_linking_contrast]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "nevertheless, furthermore, in that regard — thường là đáp án câu chèn của Part 6."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Word formation
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_word_form_noun
+  name_en: "Noun formation"
+  name_vi: "Cấu tạo danh từ"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_word_formation
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "-tion/-ment/-ance/-ity/-ness. Dạng câu hỏi chủ lực của Part 5."
+
+- concept_id: gram_word_form_adj
+  name_en: "Adjective formation"
+  name_vi: "Cấu tạo tính từ"
+  domain: grammar
+  cefr_band: [B1, B2]
+  parent_id: gram_word_formation
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "-able/-ive/-ous/-ful/-al."
+
+- concept_id: gram_word_form_verb
+  name_en: "Verb formation"
+  name_vi: "Cấu tạo động từ"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_word_formation
+  prerequisites: []
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "-ise/-ize/-ify/-en."
+
+- concept_id: gram_word_form_adverb
+  name_en: "Adverb formation from adjectives"
+  name_vi: "Cấu tạo trạng từ từ tính từ"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_word_formation
+  prerequisites: [gram_adverb_formation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Chọn giữa danh từ / tính từ / trạng từ theo vị trí chỗ trống."
+
+- concept_id: gram_prefix_negative
+  name_en: "Negative prefixes"
+  name_vi: "Tiền tố phủ định"
+  domain: grammar
+  cefr_band: [B2]
+  parent_id: gram_word_formation
+  prerequisites: [gram_word_form_adj]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "un-/in-/im-/ir-/dis-/mis- và cách chọn đúng tiền tố cho từng gốc."
+
+# -----------------------------------------------------------------------------
+# GRAMMAR — Sentence structure
+# -----------------------------------------------------------------------------
+
+- concept_id: gram_there_is_are
+  name_en: "There is / there are"
+  name_vi: "Cấu trúc there is / there are"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_be_present]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Diễn tả sự tồn tại; hoà hợp với danh từ đứng sau."
+
+- concept_id: gram_negation
+  name_en: "Negation"
+  name_vi: "Câu phủ định"
+  domain: grammar
+  cefr_band: [A1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_be_present]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "don't/doesn't/didn't và phủ định với to be."
+
+- concept_id: gram_question_formation
+  name_en: "Question formation"
+  name_vi: "Cấu tạo câu hỏi"
+  domain: grammar
+  cefr_band: [A1, A2]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_be_present]
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Câu hỏi yes-no và wh-; đảo trợ động từ. Nền tảng để nghe hiểu Part 2."
+
+- concept_id: gram_question_tag
+  name_en: "Question tags"
+  name_vi: "Câu hỏi đuôi"
+  domain: grammar
+  cefr_band: [B1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_question_formation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Khẳng định đi với đuôi phủ định và ngược lại; ngữ điệu quyết định là hỏi thật hay xác nhận."
+
+- concept_id: gram_inversion_negative
+  name_en: "Inversion after negative adverbials"
+  name_vi: "Đảo ngữ sau trạng từ phủ định"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_question_formation, gram_adverb_frequency]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Not only... but also, Rarely has..., Under no circumstances..."
+
+- concept_id: gram_cleft_sentence
+  name_en: "Cleft sentences"
+  name_vi: "Câu chẻ"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_relative_defining]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "It is X that... / What we need is... — dùng để nhấn mạnh."
+
+- concept_id: gram_subjunctive_mandative
+  name_en: "Mandative subjunctive"
+  name_vi: "Thức giả định trong mệnh lệnh gián tiếp"
+  domain: grammar
+  cefr_band: [C1]
+  parent_id: gram_sentence_structure
+  prerequisites: [gram_noun_clause]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "recommend/insist/require that + chủ ngữ + V nguyên mẫu (that he be informed)."
+
+# =============================================================================
+# READING SKILLS
+# =============================================================================
+
+- concept_id: rc_reading_skills
+  name_en: "Reading comprehension skills"
+  name_vi: "Kỹ năng đọc hiểu"
+  domain: reading
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom toàn bộ kỹ năng đọc dùng cho Part 6 và Part 7."
+
+- concept_id: rc_main_idea
+  name_en: "Identifying main idea"
+  name_vi: "Xác định ý chính"
+  domain: reading
+  cefr_band: [A2, B1]
+  parent_id: rc_reading_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nắm mục đích tổng thể của văn bản: 'What is the purpose of this notice?'"
+
+- concept_id: rc_detail
+  name_en: "Locating specific detail"
+  name_vi: "Tìm chi tiết cụ thể"
+  domain: reading
+  cefr_band: [A2, B1]
+  parent_id: rc_reading_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Quét tìm thông tin nêu tường minh: ngày, giá, tên, địa điểm."
+
+- concept_id: rc_vocab_in_context
+  name_en: "Vocabulary in context"
+  name_vi: "Từ vựng theo ngữ cảnh"
+  domain: reading
+  cefr_band: [B1, B2]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_detail]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Chọn từ gần nghĩa nhất với một từ trong đoạn — nghĩa phụ thuộc ngữ cảnh, không phải nghĩa từ điển phổ biến nhất."
+
+- concept_id: rc_paraphrase
+  name_en: "Recognising paraphrase"
+  name_vi: "Nhận diện diễn đạt lại"
+  domain: reading
+  cefr_band: [B1, B2]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_detail]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Đáp án đúng hầu như không lặp nguyên văn mà diễn đạt lại ý trong bài."
+
+- concept_id: rc_inference
+  name_en: "Making inferences"
+  name_vi: "Suy luận"
+  domain: reading
+  cefr_band: [B2, C1]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_paraphrase]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Rút ra kết luận không nêu tường minh: 'What is suggested about...?'"
+
+- concept_id: rc_not_true
+  name_en: "NOT/EXCEPT questions"
+  name_vi: "Câu hỏi phủ định NOT/EXCEPT"
+  domain: reading
+  cefr_band: [B1, B2]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_detail]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.15, p_guess: 0.25}
+  description_vi: "Phải kiểm chứng cả bốn lựa chọn; sai vì đọc lướt bỏ mất chữ NOT."
+
+- concept_id: rc_intent
+  name_en: "Inferring writer intent"
+  name_vi: "Suy ý định người viết"
+  domain: reading
+  cefr_band: [B2, C1]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_inference]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Dạng 'At 10:45, what does the writer mean when he writes...?' trong đoạn chat."
+
+- concept_id: rc_sentence_insertion
+  name_en: "Sentence insertion"
+  name_vi: "Chèn câu vào vị trí đúng"
+  domain: reading
+  cefr_band: [B2, C1]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_paraphrase]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Đặt câu cho sẵn vào đúng chỗ dựa vào đại từ, từ nối và mạch ý."
+
+- concept_id: rc_cross_reference
+  name_en: "Cross-referencing multiple passages"
+  name_vi: "Đối chiếu nhiều văn bản"
+  domain: reading
+  cefr_band: [B2, C1]
+  parent_id: rc_reading_skills
+  prerequisites: [rc_inference, rc_detail]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Ghép thông tin từ hai hoặc ba văn bản mới ra đáp án. Kỹ năng phân loại điểm cao ở Part 7."
+
+# =============================================================================
+# LISTENING SKILLS
+# =============================================================================
+
+- concept_id: lc_listening_skills
+  name_en: "Listening comprehension skills"
+  name_vi: "Kỹ năng nghe hiểu"
+  domain: listening
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom toàn bộ kỹ năng nghe dùng cho Part 1 đến Part 4."
+
+- concept_id: lc_photo_action
+  name_en: "Describing actions in a photo"
+  name_vi: "Mô tả hành động trong ảnh"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nghe câu mô tả người đang làm gì; bẫy là hiện tại tiếp diễn bị động vs chủ động."
+
+- concept_id: lc_photo_state
+  name_en: "Describing states in a photo"
+  name_vi: "Mô tả trạng thái trong ảnh"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_photo_action]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Vị trí và trạng thái của đồ vật; phân biệt is being placed với has been placed."
+
+- concept_id: lc_wh_question
+  name_en: "Responding to wh-questions"
+  name_vi: "Đáp câu hỏi wh-"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: [gram_question_formation]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "Nhận diện từ để hỏi ở đầu câu để loại đáp án sai loại. Part 2 chỉ có 3 lựa chọn."
+
+- concept_id: lc_yes_no
+  name_en: "Responding to yes-no questions"
+  name_vi: "Đáp câu hỏi yes-no"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: [gram_question_formation]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "Câu hỏi trợ động từ và đáp án hợp lý, kể cả khi không mở đầu bằng yes/no. Part 2, 3 lựa chọn."
+
+- concept_id: lc_negative_question
+  name_en: "Responding to negative questions"
+  name_vi: "Đáp câu hỏi phủ định"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.20, p_learn: 0.15, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Haven't they arrived yet?\" — trả lời theo sự thật, không theo dấu phủ định. Part 2, 3 lựa chọn."
+
+- concept_id: lc_tag_question
+  name_en: "Responding to tag questions"
+  name_vi: "Đáp câu hỏi đuôi"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"You've met her, haven't you?\" — đuôi câu chỉ để xác nhận. Part 2, 3 lựa chọn."
+
+- concept_id: lc_alternative_question
+  name_en: "Responding to alternative questions"
+  name_vi: "Đáp câu hỏi lựa chọn"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.20, p_learn: 0.15, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"A hay B?\" — không đáp bằng yes/no. Part 2, 3 lựa chọn."
+
+- concept_id: lc_request_offer
+  name_en: "Responding to requests and offers"
+  name_vi: "Đáp lời nhờ và lời mời"
+  domain: listening
+  cefr_band: [A2, B1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_yes_no]
+  bkt_priors: {p_init: 0.28, p_learn: 0.18, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Could you...?\", \"Would you mind...?\" — nhận, từ chối hoặc nêu điều kiện. Part 2, 3 lựa chọn."
+
+- concept_id: lc_suggestion
+  name_en: "Responding to suggestions"
+  name_vi: "Đáp lời đề nghị"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_request_offer]
+  bkt_priors: {p_init: 0.24, p_learn: 0.17, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "\"Why don't we...?\", \"How about...?\" — là đề nghị, không phải câu hỏi lý do. Part 2, 3 lựa chọn."
+
+- concept_id: lc_statement_response
+  name_en: "Responding to statements"
+  name_vi: "Đáp lời trần thuật"
+  domain: listening
+  cefr_band: [B2, C1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_indirect_response]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "Không có câu hỏi nào cả — chỉ một nhận xét cần phản hồi hợp lý. Dạng khó nhất Part 2."
+
+- concept_id: lc_indirect_response
+  name_en: "Indirect responses"
+  name_vi: "Đáp gián tiếp"
+  domain: listening
+  cefr_band: [B2, C1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_wh_question, lc_yes_no]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.33}
+  description_vi: "'Khi nào báo cáo xong?' → 'Tôi vẫn đang chờ số liệu.' Dạng khó nhất của Part 2, 3 lựa chọn."
+
+- concept_id: lc_gist
+  name_en: "Understanding gist"
+  name_vi: "Nắm ý chính bài nghe"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Chủ đề hội thoại, nơi diễn ra, vấn đề đang bàn."
+
+- concept_id: lc_detail
+  name_en: "Catching specific detail"
+  name_vi: "Bắt chi tiết cụ thể"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_gist]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Số, ngày, tên riêng, phòng ban nhắc tới một lần trong audio."
+
+- concept_id: lc_speaker_role
+  name_en: "Identifying speaker role and place"
+  name_vi: "Xác định vai người nói và địa điểm"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_gist]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Suy ra nghề nghiệp hoặc nơi chốn từ từ vựng đặc trưng chứ không từ lời nói thẳng."
+
+- concept_id: lc_inference
+  name_en: "Inferring implied meaning"
+  name_vi: "Suy luận hàm ý"
+  domain: listening
+  cefr_band: [B2, C1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_detail, lc_speaker_role]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Thái độ, hàm ý, ẩn ý: 'What does the woman imply?'"
+
+- concept_id: lc_next_action
+  name_en: "Predicting the next action"
+  name_vi: "Dự đoán hành động tiếp theo"
+  domain: listening
+  cefr_band: [B1, B2]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_detail]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "'What will the man probably do next?' — thường nằm ở câu cuối của audio."
+
+- concept_id: lc_graphic_reference
+  name_en: "Using a graphic while listening"
+  name_vi: "Đối chiếu bảng biểu khi nghe"
+  domain: listening
+  cefr_band: [B2, C1]
+  parent_id: lc_listening_skills
+  prerequisites: [lc_detail]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "'Look at the graphic' — đáp án nằm ở chỗ giao giữa audio và bảng, không nằm hẳn ở bên nào."
+
+# =============================================================================
+# VOCABULARY — theo topic × CEFR band
+# =============================================================================
+
+- concept_id: vocab_topics
+  name_en: "Topical vocabulary"
+  name_vi: "Từ vựng theo chủ đề"
+  domain: vocabulary
+  cefr_band: [A1, A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nhóm gom 8 chủ đề × các band CEFR tương ứng."
+
+- concept_id: vocab_daily_life_a1
+  name_en: "Daily life and housing vocabulary, A1"
+  name_vi: "Từ vựng đời sống và nhà ở, A1"
+  domain: vocabulary
+  cefr_band: [A1]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Đồ đạc, phòng ốc, sinh hoạt thường ngày."
+
+- concept_id: vocab_daily_life_a2
+  name_en: "Daily life and housing vocabulary, A2"
+  name_vi: "Từ vựng đời sống và nhà ở, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_daily_life_a1]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Thuê nhà, tiện ích, sửa chữa, hàng xóm."
+
+- concept_id: vocab_daily_life_b1
+  name_en: "Daily life and housing vocabulary, B1"
+  name_vi: "Từ vựng đời sống và nhà ở, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_daily_life_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hợp đồng thuê, đặt cọc, bảo trì, chuyển nhà."
+
+- concept_id: vocab_shopping_finance_a1
+  name_en: "Shopping and money vocabulary, A1"
+  name_vi: "Từ vựng mua sắm và tiền bạc, A1"
+  domain: vocabulary
+  cefr_band: [A1]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Giá, tiền lẻ, hoá đơn, cửa hàng."
+
+- concept_id: vocab_shopping_finance_a2
+  name_en: "Shopping and money vocabulary, A2"
+  name_vi: "Từ vựng mua sắm và tiền bạc, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_shopping_finance_a1]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Giảm giá, đổi trả, bảo hành, phương thức thanh toán."
+
+- concept_id: vocab_shopping_finance_b1
+  name_en: "Shopping and finance vocabulary, B1"
+  name_vi: "Từ vựng mua sắm và tài chính, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_shopping_finance_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hoá đơn, đơn đặt hàng, hoàn tiền, phí vận chuyển."
+
+- concept_id: vocab_shopping_finance_b2
+  name_en: "Finance and accounting vocabulary, B2"
+  name_vi: "Từ vựng tài chính và kế toán, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_shopping_finance_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Ngân sách, doanh thu, chi phí, quyết toán, dòng tiền."
+
+- concept_id: vocab_travel_transport_a1
+  name_en: "Travel and transport vocabulary, A1"
+  name_vi: "Từ vựng du lịch và giao thông, A1"
+  domain: vocabulary
+  cefr_band: [A1]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Phương tiện, vé, nhà ga, sân bay."
+
+- concept_id: vocab_travel_transport_a2
+  name_en: "Travel and transport vocabulary, A2"
+  name_vi: "Từ vựng du lịch và giao thông, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_travel_transport_a1]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Đặt chỗ, hoãn chuyến, hành lý, khách sạn."
+
+- concept_id: vocab_travel_transport_b1
+  name_en: "Business travel vocabulary, B1"
+  name_vi: "Từ vựng công tác, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_travel_transport_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Lịch trình, hoàn phí công tác, đưa đón, chỗ ở."
+
+- concept_id: vocab_travel_transport_b2
+  name_en: "Logistics and shipping vocabulary, B2"
+  name_vi: "Từ vựng vận chuyển và kho vận, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_travel_transport_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Lô hàng, thông quan, tồn kho, nhà cung ứng."
+
+- concept_id: vocab_dining_entertainment_a1
+  name_en: "Food and dining vocabulary, A1"
+  name_vi: "Từ vựng ăn uống, A1"
+  domain: vocabulary
+  cefr_band: [A1]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.40, p_learn: 0.22, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Món ăn, đồ uống, bữa ăn, nhà hàng."
+
+- concept_id: vocab_dining_entertainment_a2
+  name_en: "Dining and leisure vocabulary, A2"
+  name_vi: "Từ vựng ăn uống và giải trí, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_dining_entertainment_a1]
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Đặt bàn, thực đơn, sự kiện, vé xem."
+
+- concept_id: vocab_dining_entertainment_b1
+  name_en: "Events and hospitality vocabulary, B1"
+  name_vi: "Từ vựng sự kiện và dịch vụ tiếp đón, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_dining_entertainment_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Tổ chức tiệc công ty, cung cấp suất ăn, địa điểm, đăng ký tham dự."
+
+- concept_id: vocab_health_wellbeing_a2
+  name_en: "Health vocabulary, A2"
+  name_vi: "Từ vựng sức khoẻ, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Triệu chứng, khám bệnh, thuốc, hẹn khám."
+
+- concept_id: vocab_health_wellbeing_b1
+  name_en: "Health and safety vocabulary, B1"
+  name_vi: "Từ vựng sức khoẻ và an toàn, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_health_wellbeing_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "An toàn lao động, bảo hiểm y tế, nghỉ ốm, sơ tán."
+
+- concept_id: vocab_health_wellbeing_b2
+  name_en: "Workplace wellbeing vocabulary, B2"
+  name_vi: "Từ vựng phúc lợi nơi làm việc, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_health_wellbeing_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Chế độ đãi ngộ, cân bằng công việc, phòng ngừa rủi ro, tuân thủ quy định."
+
+- concept_id: vocab_education_career_a2
+  name_en: "Education vocabulary, A2"
+  name_vi: "Từ vựng học tập, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Môn học, kỳ thi, lớp học, chứng chỉ."
+
+- concept_id: vocab_education_career_b1
+  name_en: "Training and career vocabulary, B1"
+  name_vi: "Từ vựng đào tạo và nghề nghiệp, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_education_career_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hồ sơ ứng tuyển, phỏng vấn, tập huấn, thăng chức."
+
+- concept_id: vocab_education_career_b2
+  name_en: "Human resources vocabulary, B2"
+  name_vi: "Từ vựng nhân sự, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_education_career_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Tuyển dụng, đánh giá hiệu suất, phúc lợi, thôi việc."
+
+- concept_id: vocab_education_career_c1
+  name_en: "Professional development vocabulary, C1"
+  name_vi: "Từ vựng phát triển chuyên môn, C1"
+  domain: vocabulary
+  cefr_band: [C1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_education_career_b2]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Cố vấn, kế thừa vị trí, năng lực cốt lõi, lộ trình thăng tiến."
+
+- concept_id: vocab_technology_media_a2
+  name_en: "Technology vocabulary, A2"
+  name_vi: "Từ vựng công nghệ, A2"
+  domain: vocabulary
+  cefr_band: [A2]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Thiết bị, phần mềm, email, mạng."
+
+- concept_id: vocab_technology_media_b1
+  name_en: "Office technology vocabulary, B1"
+  name_vi: "Từ vựng công nghệ văn phòng, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_technology_media_a2]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hỗ trợ kỹ thuật, nâng cấp, sự cố, sao lưu."
+
+- concept_id: vocab_technology_media_b2
+  name_en: "Digital and media vocabulary, B2"
+  name_vi: "Từ vựng số và truyền thông, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_technology_media_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Nền tảng, triển khai, tích hợp, phân tích dữ liệu."
+
+- concept_id: vocab_technology_media_c1
+  name_en: "Technology strategy vocabulary, C1"
+  name_vi: "Từ vựng chiến lược công nghệ, C1"
+  domain: vocabulary
+  cefr_band: [C1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_technology_media_b2]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Chuyển đổi số, khả năng mở rộng, hạ tầng, tối ưu quy trình."
+
+- concept_id: vocab_business_office_b1
+  name_en: "Office communication vocabulary, B1"
+  name_vi: "Từ vựng giao tiếp văn phòng, B1"
+  domain: vocabulary
+  cefr_band: [B1]
+  parent_id: vocab_topics
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Họp, thông báo nội bộ, thời hạn, phòng ban."
+
+- concept_id: vocab_business_office_b2
+  name_en: "Business operations vocabulary, B2"
+  name_vi: "Từ vựng vận hành doanh nghiệp, B2"
+  domain: vocabulary
+  cefr_band: [B2]
+  parent_id: vocab_topics
+  prerequisites: [vocab_business_office_b1]
+  bkt_priors: {p_init: 0.15, p_learn: 0.12, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Hợp đồng, đàm phán, đối tác, quy trình phê duyệt."
+
+- concept_id: vocab_business_office_c1
+  name_en: "Corporate strategy vocabulary, C1"
+  name_vi: "Từ vựng chiến lược doanh nghiệp, C1"
+  domain: vocabulary
+  cefr_band: [C1]
+  parent_id: vocab_topics
+  prerequisites: [vocab_business_office_b2]
+  bkt_priors: {p_init: 0.10, p_learn: 0.10, p_slip: 0.10, p_guess: 0.25}
+  description_vi: "Sáp nhập, cổ đông, thị phần, tái cấu trúc, quản trị."
+
+# =============================================================================
+# SPEAKING — theo rubric dimension
+# =============================================================================
+
+- concept_id: sp_speaking_skills
+  name_en: "Speaking skills"
+  name_vi: "Kỹ năng nói"
+  domain: speaking
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Nhóm gom các chiều chấm điểm nói. Chấm bằng rubric nên không có yếu tố đoán."
+
+- concept_id: sp_pronunciation
+  name_en: "Pronunciation"
+  name_vi: "Phát âm"
+  domain: speaking
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Âm cuối, phụ âm kép, âm /θ/ /ð/ — các điểm người Việt hay lược bỏ."
+
+- concept_id: sp_intonation_stress
+  name_en: "Intonation and stress"
+  name_vi: "Ngữ điệu và trọng âm"
+  domain: speaking
+  cefr_band: [B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: [sp_pronunciation]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Trọng âm từ, trọng âm câu, ngữ điệu lên xuống. Chấm riêng ở phần đọc thành tiếng."
+
+- concept_id: sp_fluency
+  name_en: "Fluency"
+  name_vi: "Độ trôi chảy"
+  domain: speaking
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Tốc độ, ngập ngừng, tự sửa lời, ngắt nghỉ đúng chỗ."
+
+- concept_id: sp_grammar
+  name_en: "Grammatical range and accuracy in speech"
+  name_vi: "Độ chính xác và đa dạng ngữ pháp khi nói"
+  domain: speaking
+  cefr_band: [B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Dùng đúng thì, cấu trúc đa dạng khi nói tự phát."
+
+- concept_id: sp_vocabulary
+  name_en: "Lexical range in speech"
+  name_vi: "Vốn từ khi nói"
+  domain: speaking
+  cefr_band: [B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Chọn từ chính xác, dùng collocation tự nhiên, tránh lặp từ."
+
+- concept_id: sp_content
+  name_en: "Content relevance and development"
+  name_vi: "Nội dung và triển khai ý"
+  domain: speaking
+  cefr_band: [B1, B2, C1]
+  parent_id: sp_speaking_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Trả lời đúng trọng tâm, có lý do và ví dụ, đủ thời lượng yêu cầu."
+
+# =============================================================================
+# WRITING — theo rubric dimension
+# =============================================================================
+
+- concept_id: wr_writing_skills
+  name_en: "Writing skills"
+  name_vi: "Kỹ năng viết"
+  domain: writing
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: null
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Nhóm gom các chiều chấm điểm viết. Chấm bằng rubric nên không có yếu tố đoán."
+
+- concept_id: wr_task_response
+  name_en: "Task response"
+  name_vi: "Đáp ứng yêu cầu đề"
+  domain: writing
+  cefr_band: [A2, B1, B2, C1]
+  parent_id: wr_writing_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Trả lời đủ mọi phần của đề, đúng số từ, không lạc đề."
+
+- concept_id: wr_organization
+  name_en: "Organisation"
+  name_vi: "Bố cục"
+  domain: writing
+  cefr_band: [B1, B2, C1]
+  parent_id: wr_writing_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Mở - thân - kết, mỗi đoạn một ý, câu chủ đề rõ ràng."
+
+- concept_id: wr_coherence
+  name_en: "Coherence and cohesion"
+  name_vi: "Mạch lạc và liên kết"
+  domain: writing
+  cefr_band: [B1, B2, C1]
+  parent_id: wr_writing_skills
+  prerequisites: [wr_organization]
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Từ nối dùng đúng chỗ, tham chiếu đại từ rõ ràng, ý nối tiếp tự nhiên."
+
+- concept_id: wr_grammar
+  name_en: "Grammatical range and accuracy in writing"
+  name_vi: "Độ chính xác và đa dạng ngữ pháp khi viết"
+  domain: writing
+  cefr_band: [B1, B2, C1]
+  parent_id: wr_writing_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Câu phức, đúng thì, đúng hoà hợp chủ vị trong văn viết."
+
+- concept_id: wr_vocabulary
+  name_en: "Lexical range in writing"
+  name_vi: "Vốn từ khi viết"
+  domain: writing
+  cefr_band: [B1, B2, C1]
+  parent_id: wr_writing_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.22, p_learn: 0.16, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Từ vựng chính xác và trang trọng phù hợp văn cảnh công việc."
+
+- concept_id: wr_mechanics
+  name_en: "Mechanics and register"
+  name_vi: "Chính tả, dấu câu và văn phong"
+  domain: writing
+  cefr_band: [A2, B1, B2]
+  parent_id: wr_writing_skills
+  prerequisites: []
+  bkt_priors: {p_init: 0.30, p_learn: 0.20, p_slip: 0.10, p_guess: 0.05}
+  description_vi: "Chính tả, dấu câu, viết hoa, định dạng email và mức độ trang trọng."

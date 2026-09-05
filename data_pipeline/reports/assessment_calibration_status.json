@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-08-21T08:24:41.267241+00:00",
+  "fixture_count": 10,
+  "schema_validated": true,
+  "live_provider_runs": 0,
+  "three_run_variance": null,
+  "status": "pending_live_provider_and_human_adjudication",
+  "reason": "No assessment provider credentials or human gold labels are available."
+}

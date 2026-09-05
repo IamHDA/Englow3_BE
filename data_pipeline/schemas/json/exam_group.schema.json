@@ -1,0 +1,629 @@
+{
+  "$defs": {
+    "Accent": {
+      "description": "Lỗi P1-6 — bắt buộc trên mọi AudioAsset.",
+      "enum": [
+        "US",
+        "UK",
+        "AU",
+        "CA"
+      ],
+      "title": "Accent",
+      "type": "string"
+    },
+    "AlignmentStatus": {
+      "enum": [
+        "pending",
+        "aligned",
+        "failed"
+      ],
+      "title": "AlignmentStatus",
+      "type": "string"
+    },
+    "AudioAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "accent": {
+          "$ref": "#/$defs/Accent"
+        },
+        "alignment_status": {
+          "$ref": "#/$defs/AlignmentStatus",
+          "default": "pending"
+        },
+        "audio_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Url"
+        },
+        "cues": {
+          "items": {
+            "$ref": "#/$defs/AudioCue"
+          },
+          "title": "Cues",
+          "type": "array"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "script": {
+          "minLength": 10,
+          "title": "Script",
+          "type": "string"
+        },
+        "speaker_count": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Speaker Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "script",
+        "accent"
+      ],
+      "title": "AudioAsset",
+      "type": "object"
+    },
+    "AudioCue": {
+      "additionalProperties": false,
+      "description": "A verified time range for one utterance in a generated audio asset.",
+      "properties": {
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "AudioCue",
+      "type": "object"
+    },
+    "CalibrationStatus": {
+      "description": "Lỗi P1-2. Không được khai `calibrated` khi chưa có lượt trả lời thật.",
+      "enum": [
+        "uncalibrated",
+        "provisional",
+        "calibrated"
+      ],
+      "title": "CalibrationStatus",
+      "type": "string"
+    },
+    "Definition": {
+      "additionalProperties": false,
+      "description": "Cặp Anh–Việt. Dùng cho định nghĩa flashcard và giải thích đáp án.",
+      "properties": {
+        "en": {
+          "minLength": 5,
+          "title": "En",
+          "type": "string"
+        },
+        "vi": {
+          "minLength": 2,
+          "title": "Vi",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en",
+        "vi"
+      ],
+      "title": "Definition",
+      "type": "object"
+    },
+    "EvidenceSpan": {
+      "additionalProperties": false,
+      "description": "Vị trí bằng chứng. Reading dùng char offset, Listening dùng ms.",
+      "properties": {
+        "audio_end_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio End Ms"
+        },
+        "audio_start_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Start Ms"
+        },
+        "char_end": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Char End"
+        },
+        "char_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Char Start"
+        },
+        "passage_order": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Passage Order"
+        }
+      },
+      "title": "EvidenceSpan",
+      "type": "object"
+    },
+    "ExamItem": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "difficulty_prior": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Difficulty Prior",
+          "type": "number"
+        },
+        "embedding_text": {
+          "default": "",
+          "title": "Embedding Text",
+          "type": "string"
+        },
+        "evidence_span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "explanation": {
+          "$ref": "#/$defs/Definition"
+        },
+        "irt_params": {
+          "$ref": "#/$defs/IRTParams"
+        },
+        "item_id": {
+          "default": "",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "maxItems": 4,
+          "minItems": 3,
+          "title": "Options",
+          "type": "array"
+        },
+        "part_number": {
+          "maximum": 7,
+          "minimum": 1,
+          "title": "Part Number",
+          "type": "integer"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "question_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question Text"
+        },
+        "question_type": {
+          "$ref": "#/$defs/QuestionType"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "draft"
+        }
+      },
+      "required": [
+        "part_number",
+        "question_type",
+        "options",
+        "concept_ids",
+        "difficulty_prior",
+        "explanation"
+      ],
+      "title": "ExamItem",
+      "type": "object"
+    },
+    "IRTParams": {
+      "additionalProperties": false,
+      "description": "Lỗi P1-2. Khởi tạo `uncalibrated`; chỉ lượt trả lời thật mới nâng cấp được.",
+      "properties": {
+        "a": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "A"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "B"
+        },
+        "c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "C"
+        },
+        "calibration_status": {
+          "$ref": "#/$defs/CalibrationStatus",
+          "default": "uncalibrated"
+        },
+        "n_responses": {
+          "default": 0,
+          "minimum": 0,
+          "title": "N Responses",
+          "type": "integer"
+        }
+      },
+      "title": "IRTParams",
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": false,
+      "description": "Lỗi P0-2: mảng option, không phải object hard-code {A,B,C,D} —\nPart 2 chỉ có 3 lựa chọn.",
+      "properties": {
+        "is_correct": {
+          "title": "Is Correct",
+          "type": "boolean"
+        },
+        "label": {
+          "$ref": "#/$defs/OptionLabel"
+        },
+        "rationale_vi": {
+          "minLength": 5,
+          "title": "Rationale Vi",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "text",
+        "is_correct",
+        "rationale_vi"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
+    "OptionLabel": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "title": "OptionLabel",
+      "type": "string"
+    },
+    "Passage": {
+      "additionalProperties": false,
+      "description": "Lỗi P0-3: passages là ARRAY trên group — Part 7 có double/triple.",
+      "properties": {
+        "graphic_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graphic Url"
+        },
+        "order": {
+          "minimum": 1,
+          "title": "Order",
+          "type": "integer"
+        },
+        "passage_type": {
+          "$ref": "#/$defs/PassageType"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "text": {
+          "minLength": 20,
+          "title": "Text",
+          "type": "string"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timestamp"
+        }
+      },
+      "required": [
+        "order",
+        "passage_type",
+        "text"
+      ],
+      "title": "Passage",
+      "type": "object"
+    },
+    "PassageType": {
+      "enum": [
+        "email",
+        "letter",
+        "notice",
+        "advertisement",
+        "article",
+        "memo",
+        "form",
+        "schedule",
+        "chart",
+        "chat_message",
+        "invoice",
+        "web_page"
+      ],
+      "title": "PassageType",
+      "type": "string"
+    },
+    "QuestionType": {
+      "description": "§3.1 — enum đầy đủ, khớp 1-1 với concept_id của taxonomy Phase 1.",
+      "enum": [
+        "rc_main_idea",
+        "rc_detail",
+        "rc_inference",
+        "rc_vocab_in_context",
+        "rc_paraphrase",
+        "rc_not_true",
+        "rc_cross_reference",
+        "rc_intent",
+        "rc_sentence_insertion",
+        "gr_word_form",
+        "gr_tense",
+        "gr_preposition",
+        "gr_conjunction",
+        "gr_pronoun",
+        "gr_comparison",
+        "gr_relative_clause",
+        "gr_voice",
+        "gr_participle",
+        "gr_article",
+        "vc_word_choice",
+        "vc_collocation",
+        "vc_phrasal_verb",
+        "ds_cohesion",
+        "ds_sentence_insertion",
+        "lc_photo_action",
+        "lc_photo_state",
+        "lc_wh_question",
+        "lc_yes_no",
+        "lc_indirect_response",
+        "lc_gist",
+        "lc_detail",
+        "lc_inference",
+        "lc_speaker_role",
+        "lc_next_action",
+        "lc_graphic_reference"
+      ],
+      "title": "QuestionType",
+      "type": "string"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "draft",
+        "auto_validated",
+        "human_approved"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    }
+  },
+  "$id": "https://englow3.local/schemas/exam_group.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "audio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AudioAsset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "group_id": {
+      "default": "",
+      "title": "Group Id",
+      "type": "string"
+    },
+    "image_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Image Url"
+    },
+    "part_number": {
+      "maximum": 7,
+      "minimum": 1,
+      "title": "Part Number",
+      "type": "integer"
+    },
+    "passages": {
+      "items": {
+        "$ref": "#/$defs/Passage"
+      },
+      "title": "Passages",
+      "type": "array"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/ExamItem"
+      },
+      "minItems": 1,
+      "title": "Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "part_number",
+    "questions"
+  ],
+  "title": "ExamGroup",
+  "type": "object"
+}
