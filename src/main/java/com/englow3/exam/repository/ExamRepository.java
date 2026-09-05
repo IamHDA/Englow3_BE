@@ -1,5 +1,6 @@
 package com.englow3.exam.repository;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -35,26 +36,30 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             @Param("title") String title, Pageable pageable);
 
     /**
-     * What {@code Exam.publish(...)} weighs, and what the admin list shows per row - one query for both, so the list
-     * costs one extra round trip rather than one per row. Native because the tables below `exams` have no entity yet;
-     * content is still seeded by SQL. Correlated subqueries rather than joins on purpose: joining sections to questions
-     * multiplies the section rows, which would leave {@code sum(max_raw_score)} silently too large - the one figure
-     * {@code publish()} compares against. {@code {h-schema\}} expands to the configured default schema; a native query
-     * gets no schema applied for it.
+     * The three figures {@code Exam.publish(...)} weighs, as three plain scalars. They were one projection record and
+     * one round trip until the record turned out to be the only reason a persistence type crossed into the service, and
+     * the only reason this file carried a constructor expression naming its own nested class. Publishing is a rare
+     * admin action; two extra round trips buy back a type nobody needed.
      */
-    @Query(nativeQuery = true, value = """
-            select e.id as "examId",
-                   (select count(*) from {h-schema}exam_sections s
-                     where s.exam_id = e.id) as "sectionCount",
-                   (select count(*) from {h-schema}questions q
-                     join {h-schema}question_sets qs on qs.id = q.question_set_id
-                     join {h-schema}section_parts sp on sp.id = qs.section_part_id
-                     join {h-schema}exam_sections s on s.id = sp.exam_section_id
-                     where s.exam_id = e.id) as "questionCount",
-                   (select coalesce(sum(s.max_raw_score), 0) from {h-schema}exam_sections s
-                     where s.exam_id = e.id) as "sectionsRawTotal"
-              from {h-schema}exams e
-             where e.id in (:examIds)
+    @Query("select count(s) from ExamSection s where s.examId = :examId")
+    long countSections(@Param("examId") UUID examId);
+
+    /**
+     * A four-level descent, joined by id rather than by association because the content entities hold plain UUID keys.
+     * Every table is exam-owned, so no cross-module read exception is needed.
+     */
+    @Query("""
+            select count(q) from Question q, QuestionSet qs, SectionPart sp, ExamSection s
+             where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+               and sp.examSectionId = s.id and s.examId = :examId
             """)
-    List<ExamContentTotals> contentTotals(@Param("examIds") Collection<UUID> examIds);
+    long countQuestions(@Param("examId") UUID examId);
+
+    /**
+     * Its own query rather than a column of a join: joining sections to questions multiplies the section rows, so the
+     * sum comes back too large - and {@code sum(distinct ...)} is no fix either, since it would collapse a TOEIC
+     * paper's LISTENING 100 and READING 100 into 100. {@code coalesce} because a paper with no section sums to null.
+     */
+    @Query("select coalesce(sum(s.maxRawScore), 0) from ExamSection s where s.examId = :examId")
+    BigDecimal sumSectionScores(@Param("examId") UUID examId);
 }

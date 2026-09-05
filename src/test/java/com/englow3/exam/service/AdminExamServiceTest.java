@@ -23,8 +23,11 @@ import org.springframework.data.domain.Pageable;
 
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
+import com.englow3.exam.dto.command.ExamDetailCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
 import com.englow3.exam.dto.command.SearchExamCommand;
+import com.englow3.exam.dto.command.UpdateExamCommand;
+import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.dto.result.ExamListItemResult;
 import com.englow3.exam.dto.result.ExamResult;
 import com.englow3.exam.entity.CertificateType;
@@ -33,30 +36,31 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
-import com.englow3.exam.repository.ExamContentTotals;
+import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.AdminAccess;
+import com.englow3.user.service.Authorization;
 
 class AdminExamServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
-    private final AdminAccess adminAccess = mock(AdminAccess.class);
+    private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
+    private final Authorization authorization = mock(Authorization.class);
 
-    private final AdminExamService service = new AdminExamService(examRepo, adminAccess);
+    private final AdminExamService service = new AdminExamService(examRepo, examPaperQuery, authorization);
 
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach
     void passTheGate() {
-        when(adminAccess.requireAdminId()).thenReturn(adminId);
+        when(authorization.requireAdminId()).thenReturn(adminId);
         when(examRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void stampsTheDraftWithTheAdminsOwnUserId() {
-        ExamResult result = service.create(buildCreateCommand());
+        ExamResult result = service.create(command());
 
         ArgumentCaptor<Exam> saved = ArgumentCaptor.forClass(Exam.class);
         verify(examRepo).save(saved.capture());
@@ -66,15 +70,15 @@ class AdminExamServiceTest {
 
     @Test
     void writesNothingWhenTheGateRefusesTheCreate() {
-        refuseAdminAccess();
+        gateRefuses();
 
-        assertThatThrownBy(() -> service.create(buildCreateCommand())).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.create(command())).isInstanceOf(ForbiddenException.class);
         verify(examRepo, never()).save(any());
     }
 
     @Test
     void readsNothingWhenTheGateRefusesTheSearch() {
-        refuseAdminAccess();
+        gateRefuses();
 
         assertThatThrownBy(() -> service.search(new SearchExamCommand(null, null, null), Pageable.unpaged()))
                 .isInstanceOf(ForbiddenException.class);
@@ -91,36 +95,75 @@ class AdminExamServiceTest {
         verify(examRepo).search(ExamStatus.DRAFT, ExamType.MOCK, "toeic", pageable);
     }
 
+    /** The list is one query. Content counts were dropped from it - they read as "ready to publish" and are not. */
     @Test
-    void hangsTheContentCountsOffEachRowOfThePage() {
-        Exam exam = buildDraft();
-        ExamContentTotals totals = mockContentTotals(exam.getId(), 2, 200);
-        when(examRepo.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(exam)));
-        when(examRepo.contentTotals(List.of(exam.getId()))).thenReturn(List.of(totals));
-
-        ExamListItemResult row = service.search(new SearchExamCommand(null, null, null), PageRequest.of(0, 20))
-                .getContent().getFirst();
-
-        assertThat(row.sectionCount()).isEqualTo(2);
-        assertThat(row.questionCount()).isEqualTo(200);
-    }
-
-    /** {@code in ()} is not valid SQL, so an empty page must never reach the totals query. */
-    @Test
-    void doesNotAskForTotalsOfAnEmptyPage() {
-        when(examRepo.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of()));
+    void doesNotWeighContentToListPapers() {
+        when(examRepo.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(draft())));
 
         service.search(new SearchExamCommand(null, null, null), PageRequest.of(0, 20));
 
-        verify(examRepo, never()).contentTotals(any());
+        verify(examRepo, never()).countQuestions(any());
     }
 
     @Test
-    void publishesWithTheTotalsItReadFromTheRepository() {
-        Exam exam = buildDraft();
-        ExamContentTotals totals = mockContentTotals(exam.getId(), 2, 200);
+    void handsBackThePaperTheQueryLoaded() {
+        Exam exam = draft();
+        ExamDetailResult loaded = ExamDetailResult.of(exam, List.of());
+        when(examPaperQuery.loadForAdmin(exam.getId())).thenReturn(Optional.of(loaded));
+
+        assertThat(service.detail(new ExamDetailCommand(exam.getId()))).isSameAs(loaded);
+    }
+
+    @Test
+    void failsToLoadAPaperThatDoesNotExist() {
+        UUID missing = UUID.randomUUID();
+        when(examPaperQuery.loadForAdmin(missing)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.detail(new ExamDetailCommand(missing))).isInstanceOf(NotFoundException.class)
+                .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("EXAM_NOT_FOUND");
+    }
+
+    @Test
+    void loadsNothingWhenTheGateRefusesTheDetail() {
+        gateRefuses();
+
+        assertThatThrownBy(() -> service.detail(new ExamDetailCommand(UUID.randomUUID())))
+                .isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(examPaperQuery);
+    }
+
+    @Test
+    void editsThePaperItWasGiven() {
+        Exam exam = draft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
-        when(examRepo.contentTotals(List.of(exam.getId()))).thenReturn(List.of(totals));
+
+        ExamResult result = service.update(new UpdateExamCommand(exam.getId(), "TOEIC Practice Test 2", "Revised",
+                ExamType.MOCK, CertificateType.TOEIC, CertificateVariant.LR, TargetLevel.B2, 7200,
+                new BigDecimal("200.00"), new BigDecimal("650.0")));
+
+        assertThat(result.title()).isEqualTo("TOEIC Practice Test 2");
+        assertThat(result.targetLevel()).isEqualTo(TargetLevel.B2);
+        assertThat(result.status()).isEqualTo(ExamStatus.DRAFT);
+    }
+
+    @Test
+    void failsToEditAPaperThatDoesNotExist() {
+        UUID missing = UUID.randomUUID();
+        when(examRepo.findById(missing)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.update(
+                new UpdateExamCommand(missing, "x", "y", ExamType.MOCK, null, null, null, 60, BigDecimal.ONE, null)))
+                        .isInstanceOf(NotFoundException.class).extracting(e -> ((NotFoundException) e).getCode())
+                        .isEqualTo("EXAM_NOT_FOUND");
+    }
+
+    @Test
+    void publishesWithTheFiguresItReadFromTheRepository() {
+        Exam exam = draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.countSections(exam.getId())).thenReturn(2L);
+        when(examRepo.countQuestions(exam.getId())).thenReturn(200L);
+        when(examRepo.sumSectionScores(exam.getId())).thenReturn(new BigDecimal("200.00"));
 
         ExamResult result = service.publish(new PublishExamCommand(exam.getId()));
 
@@ -138,7 +181,7 @@ class AdminExamServiceTest {
 
     @Test
     void archivesThePaperItWasGiven() {
-        Exam exam = buildDraft();
+        Exam exam = draft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
 
         assertThat(service.archive(new ArchiveExamCommand(exam.getId())).status()).isEqualTo(ExamStatus.ARCHIVED);
@@ -146,35 +189,28 @@ class AdminExamServiceTest {
 
     @Test
     void touchesNothingWhenTheGateRefusesThePublish() {
-        refuseAdminAccess();
+        gateRefuses();
 
         assertThatThrownBy(() -> service.publish(new PublishExamCommand(UUID.randomUUID())))
                 .isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(examRepo);
     }
 
-    /** Which callers the gate lets through is AdminAccessTest's business - here it only has to run before the repo. */
-    private void refuseAdminAccess() {
-        when(adminAccess.requireAdminId()).thenThrow(new ForbiddenException("ADMIN_ONLY", "no"));
+    /**
+     * Which callers the gate lets through is AuthorizationTest's business - here it only has to run before the repo.
+     */
+    private void gateRefuses() {
+        when(authorization.requireAdminId()).thenThrow(new ForbiddenException("ACCESS_DENIED", "no"));
     }
 
-    private static ExamContentTotals mockContentTotals(UUID examId, long sectionCount, long questionCount) {
-        ExamContentTotals totals = mock(ExamContentTotals.class);
-        when(totals.getExamId()).thenReturn(examId);
-        when(totals.getSectionCount()).thenReturn(sectionCount);
-        when(totals.getQuestionCount()).thenReturn(questionCount);
-        when(totals.getSectionsRawTotal()).thenReturn(new BigDecimal("200.00"));
-        return totals;
-    }
-
-    private static Exam buildDraft() {
-        CreateExamCommand command = buildCreateCommand();
+    private static Exam draft() {
+        CreateExamCommand command = command();
         return Exam.draft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
                 command.passScore(), UUID.randomUUID());
     }
 
-    private static CreateExamCommand buildCreateCommand() {
+    private static CreateExamCommand command() {
         return new CreateExamCommand("TOEIC Practice Test 1", "Two skills, seven parts", ExamType.MOCK,
                 CertificateType.TOEIC, CertificateVariant.LR, TargetLevel.B1, 7200, new BigDecimal("200.00"),
                 new BigDecimal("600.0"));

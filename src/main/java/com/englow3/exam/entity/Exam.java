@@ -109,6 +109,32 @@ public class Exam {
     }
 
     /**
+     * Correcting the shell, draft only. A published paper is immutable on purpose: attempts snapshot it through
+     * {@code exam_attempts.exam_version_number}, so allowing an edit afterwards would mean either bumping that version
+     * or letting a sat paper change underneath its own results. Refusing is the cheaper of the three, and it can be
+     * relaxed later without invalidating anything already recorded.
+     */
+    public void updateDraft(String title, String description, ExamType examType, CertificateType certificateType,
+            CertificateVariant certificateVariant, TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
+            BigDecimal passScore) {
+        if (status != ExamStatus.DRAFT) {
+            throw new ConflictException("EXAM_NOT_DRAFT",
+                    "Only a draft paper can be edited; this one is %s".formatted(status));
+        }
+        requireCoherentCertificate(certificateType, certificateVariant);
+
+        this.title = title;
+        this.description = description;
+        this.examType = examType;
+        this.certificateType = certificateType;
+        this.certificateVariant = certificateVariant;
+        this.targetLevel = targetLevel;
+        this.durationSeconds = durationSeconds;
+        this.maxRawScore = maxRawScore;
+        this.passScore = passScore;
+    }
+
+    /**
      * The only thing that sets {@code status} to PUBLISHED and stamps {@code publishedAt}. It weighs plain numbers the
      * service counted for it - the entity touches no repository - and refuses a paper that would be unusable once
      * learners can sit it: nothing to sit, or a scoring scale that does not add up.

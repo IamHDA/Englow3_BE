@@ -24,14 +24,15 @@ in the same module and differ only by controller (`/api/admin/**` with
 - **Owns writes to:** none
 - **Reads from:** none
 - **Contains:**
-  - `config`: `SecurityConfig` (SecurityFilterChain, Supabase JWT via `jwk-set-uri` + `jws-algorithms: ES256`, method security), `StorageConfig` (S3 client/presigner beans + nested `S3Properties`).
-  - `shared/security`: `CurrentUser` - exposes only what the Supabase JWT carries (`authProviderId` = `sub`, `email`). Internal user id and business role live in the `users` table and are resolved by the `user` module, not here.
+  - `config`: `SecurityConfig` (SecurityFilterChain, Supabase JWT via `jwk-set-uri` + `jws-algorithms: ES256`, method security), `StorageConfig` (S3 client/presigner beans + nested `S3Properties`). Redis needs no config class - Spring Boot autoconfigures the connection factory and `StringRedisTemplate` from `spring.data.redis.*`.
+  - `shared/security`: `CurrentUser` - exposes only what the Supabase JWT carries (`authProviderId` = `sub`, `email`). Internal user id and business role live in the `users` table and are resolved by the `user` module, not here - see `user.Authorization`. **`shared` knows no `Role` and holds no role check**: a `CurrentAuthorization` in this package briefly did, and it made `shared` import `user.entity.Role` + `user.repository.UserRepository` while `user` already imports `shared.error` and `shared.security` - a package cycle. It was folded into `user.Authorization`. An earlier design had a Supabase Custom Access Token Hook copy `users.id` and `users.role` into the token, with a `JwtAuthenticationConverter` mapping the role claim to an authority; #32 dropped it in favor of resolving per request. **Revisit only the `user_id` half** if a lookup on every request ever hurts - that claim is immutable, so a stale copy is never wrong, unlike a role, where a copy means a revoked admin keeps their powers until the token expires.
   - `shared/error`: `DomainException` (code + `HttpStatus`), typed bases `NotFoundException` / `ConflictException` / `BadRequestException` / `ForbiddenException`, `ApiErrorResponse`, `GlobalExceptionHandler` (also maps `OptimisticLockingFailureException` -> 409 `CONCURRENT_UPDATE`).
   - `shared/storage`: `ObjectStorageClient` - generic `upload(bucket, key, stream)` / `presignGet(bucket, key, ttl)` / `delete`, no knowledge of what a key means.
 - **Explicitly does NOT contain:**
   - business error codes (e.g. `ATTEMPT_ALREADY_SUBMITTED`) - live in the owning module, exception extends `DomainException`
   - `@PreAuthorize` / "who can do what" rules - declared per module at the controller/service that owns the action
   - business enums (e.g. `TargetSkill`) - they belong to the owning module
+  - Redis lock key naming, TTL, and lock semantics - owned by the module that needs the lock
   - S3 object key/path conventions and bucket choice per file type - owned by the module that owns the file: `user` (avatar/banner), `exam` (question audio/image, speaking recordings)
 - **Why:** security/error/storage config are pure infrastructure - no business vocabulary, no business reason to change, and adding a field to them forces no module to change. Auth is delegated to Supabase (JWT issuance, no self-managed sessions), so this layer only verifies tokens.
 - **Revisit if:** any business-specific rule (lock semantics, key naming, authorization logic) starts leaking in - that is domain logic misplaced, move it into the owning module. Also revisit if the project stops relying on Supabase for auth.
@@ -48,8 +49,13 @@ set of use cases inside this module, not a module of its own.
   - `User` - `completeOnboarding(CertificateLevel currentLevel, boolean certificatePurposeSelected, CertificateType certificateType)` refuses when the learner has no learning purpose, no `current_level`, or is on the certificate branch without a certificate. Receives plain values only - no repository, no service, no `Clock`.
   - `LearnerProfile` - `placement_attempt_id` can be assigned only once and only for the certificate branch; `current_level` is written from the attempt's `assessed_level`. **Needs `@Version`** - the request thread and the attempt-scored listener both write it - but no migration adds the column yet and no entity declares it. Until then the race is unguarded; conflict is meant to surface as 409 `CONCURRENT_UPDATE`, which `GlobalExceptionHandler` already maps.
   - Plain CRUD: `LearningPurpose`, and the join rows in `user_learning_purposes` / `user_target_skills`.
-- **Module API it publishes:** one class, `AdminAccess.requireAdminId()` - reads `CurrentUser`, turns the auth provider id into this application's own `userId`, refuses a non-admin with `ADMIN_ONLY`, and hands the id back. **The admin gate lives here, not in `shared`** - `shared` may not know a `Role` (see `shared + config`), and since `user` already depends on `shared` the reverse edge would be a cycle. It answers *who the caller is*; *which actions need an admin* stays each module's own decision, made by choosing to call it.
-  - #32 shipped this as two classes - `UserDirectory.resolve(authProviderId)` returning a `UserIdentityResult` record whose `isAdmin()` existed "so consumers never import `Role`" - and both were **folded into `AdminAccess` and deleted**. `UserDirectory` never gained a second caller, and its one caller was inside `user`, where importing `Role` is free: the indirection guarded nothing. **Split it out again** when a module needs the id of a user who is *not* the current caller, or the current caller's id with no admin check - the latter is what the sitting will want for `exam_attempts.user_id`, and it belongs beside `requireAdminId()` as a sibling method before it justifies a class.
+- **Module API it publishes:** one class, `Authorization`, registered as bean **`authorization`** so `@PreAuthorize("@authorization.isAdmin()")` resolves it by name from any module without importing it. Two shapes over one lookup:
+  - `isAdmin()` / `isStaff()` - booleans for `@PreAuthorize`, where the endpoint needs a yes/no gate and nothing else. `isStaff()` admits `STAFF` **and** `ADMIN`: the roles are a ladder, not a partition.
+  - `requireAdminId()` - the gate *and* the caller's internal `userId` in one lookup, for a use case that needs both. `exams.created_by_user_id` is why it exists.
+  Both refuse with the **same `ACCESS_DENIED`** the `@PreAuthorize` path produces, so one refusal never reaches the client under two codes. A token whose subject matches no `users` row is a sync defect: it is logged and answered as a refusal, not leaked out as a 404.
+  **The gate lives here, not in `shared`** - `shared` may not know a `Role` (see `shared + config`), and since `user` already depends on `shared` the reverse edge is a cycle. It answers *who the caller is*; *which actions need which role* stays each module's own decision, made by choosing which method to call.
+  - Three classes have been folded into this one. #32 shipped `UserDirectory.resolve(authProviderId)` + a `UserIdentityResult` record whose `isAdmin()` existed "so consumers never import `Role`"; both went, because the indirection guarded a single caller that lived inside `user` anyway. A later merge added `shared/security/CurrentAuthorization` for the `@PreAuthorize` path, which duplicated the lookup **and** created the `shared -> user` cycle; it went too. **Split out again** when a module needs the id of a user who is *not* the current caller, or the current caller's id with no role check - the latter is what the sitting will want for `exam_attempts.user_id`, and it belongs beside `requireAdminId()` as a sibling method before it justifies a class.
+  - `isReviewer()` was removed with `CurrentAuthorization`: it named a `CONTENT_REVIEWER` value `Role` has never had, so it was authority nothing could grant. `AiContentReviewController` uses `isStaff()`. Add a reviewer gate back when the enum actually grows the value.
 - **Talks to `exam` via:**
   - module API - starts the placement attempt (`exam_type=PLACEMENT`) and stores the returned id in `placement_attempt_id`; reads a per-skill result record (`skillType`, `correctCount`, `questionCount`) to build target-skill recommendations
   - domain event - `exam` publishes "attempt scored"; this module listens and, when the id matches `placement_attempt_id`, writes `assessed_level` into `current_level` and `converted_score` into `current_score`. A self-declared level leaves `current_score` empty.
@@ -85,10 +91,10 @@ attempts are one module**, so `attempt_answers -> questions` is an internal join
 cross-module read.
 
 - **Subdomain:** **core**. Two things the product competes on land here: the sitting itself (time honoured, nothing lost) and the per-skill result that feeds the personalised path. Authoring is supporting, and deferred. AI feedback was explicitly *not* chosen as the differentiator, so it stays supporting when it arrives.
-- **Owns writes to:** `exams`, `exam_sections`, `section_parts`, `question_sets`, `question_set_options`, `questions`, `question_options`, `question_matching_answers`, `question_accepted_answers`, `grading_criteria`, `score_conversions`, `exam_attempts`, `attempt_section_parts`, `attempt_section_results`, `attempt_answers`, `attempt_answer_options`, `attempt_answer_criterion_scores`
+- **Owns writes to:** `exams`, `exam_sections`, `section_parts`, `question_sets`, `question_set_options`, `questions`, `question_options`, `question_matching_answers`, `question_accepted_answers`, `grading_criteria`, `score_conversions`, `exam_attempts`, `attempt_section_parts`, `attempt_section_results`, `attempt_answers`, `attempt_answer_options`, `attempt_answer_criterion_scores`. **Not `ai_jobs`** - the `ai` module owns that table (`AiJob`, `@Table(name = "ai_jobs")`); future AI grading calls into `ai`, it does not give `exam` a second writer on it.
 - **Written by nothing yet:** every content and reference table above **except `exams`**, which the admin create endpoint now writes. Content below the paper is still seeded by SQL - there is no authoring endpoint - so `ExamSection`, `SectionPart`, `QuestionSet`, `Question` and the answer-key tables stay **read-only entities**: no setters, no factories, no rules. `Exam` is the exception and always was, see *Admin exam management*. Ownership is recorded here for all of them because this module is where authoring will land.
 - **TOEIC L&R only in this phase.** `question_set_options`, `question_matching_answers` and `question_accepted_answers` serve matching and fill-in questions, which a TOEIC L&R paper (Parts 1-7, every question multiple choice) never has. The tables exist - V012 / V015 / V016 have run - but **no entity maps them and no read descends into them**, so the paper tree is five levels deep, not eight. The `CertificateType` / `CertificateVariant` / `SkillType` enums still carry their IELTS values; what is skipped is code that branches on them. Map them when a paper that needs them is authored.
-- **Reads from:** no table outside the module - `exam_attempts.user_id` and `exams.created_by_user_id` are plain `UUID`s. It does call one **module API**: `user.AdminAccess.requireAdminId()`, on every `/api/admin/**` request, because the JWT carries neither the internal user id nor the role (see *Admin exam management*). That is a service call, not a read of `users`, so the "one module owns its tables" rule holds; what changed is that `exam` is no longer free of any dependency on `user`.
+- **Reads from:** no table outside the module - `exam_attempts.user_id` and `exams.created_by_user_id` are plain `UUID`s. It does call one **module API**: `user.Authorization.requireAdminId()`, on every `/api/admin/**` request, because the JWT carries neither the internal user id nor the role (see *Admin exam management*). That is a service call, not a read of `users`, so the "one module owns its tables" rule holds; what changed is that `exam` is no longer free of any dependency on `user`.
 - **Entities with rules:** `ExamAttempt` only.
   - `ExamAttempt` - refuses answering after submit or past `expires_at`; refuses a second submit; refuses scoring before submit or twice; refuses a `PLACEMENT` paper sat in custom mode or untimed; the selected part set is fixed at start. `@Getter` only, `protected` no-arg constructor, named factories `startFull` / `startCustom` that assign the `UUID` themselves, and no setter for `status`, `submittedAt`, `scoredAt`, `expiresAt` or any score field. `examType` arrives as a plain enum value so `startCustom` can refuse a placement paper without the entity ever touching `Exam`.
   - Near-plain: `AttemptAnswer`. "Can I still answer?" is `ExamAttempt`'s rule, and with synchronous grading an answer is never graded while answering is open. It keeps its own repository because answering is per-question and reloading the whole attempt each time is waste. Revisit if grading becomes async.
@@ -106,7 +112,7 @@ cross-module read.
   - ID only, no `@ManyToOne` across the boundary. This module never calls `user`, so there is no cycle.
 - **Read path:** repository for lookups, plus `exam/query/` (read-only) for two reads that a repository cannot express - the per-skill breakdown (`attempt_answers` joined to `questions`, grouped by `skill_type`) and loading the paper tree for a sitting with answer keys excluded. Both join only exam-owned tables, so **no cross-module read exception is needed**. No jOOQ or QueryDSL on the classpath, so these are JPQL or native SQL with record projections; `open-in-view` is false, so the whole tree loads inside the transaction.
 - **Why:** the sitting is one consistency boundary - start, answer, submit, grade, convert - and every table it writes is this module's. Cutting authoring, grading, or scoring out would each hand another module a write on `attempt_*`, which is the definition of a wrong boundary here. Content and attempts stay together because grading needs the answer keys directly, not through a service call.
-- **Revisit if:** authoring grows enough of its own vocabulary and lifecycle to diverge (its own review workflow, versioning rules, contributor roles) - that is the line to split along, and writes were already owned by one path so the split stays tractable. Also revisit when AI grading needs a contract with the AI foundation, or when a question bank makes papers generated rather than authored.
+- **Revisit if:** authoring grows enough of its own vocabulary and lifecycle to diverge (its own review workflow, versioning rules, contributor roles) - that is the line to split along, and writes were already owned by one path so the split stays tractable. Also revisit when AI grading needs a contract with the `ai` module, or when a question bank makes papers generated rather than authored.
 
 ### Admin exam management
 
@@ -116,7 +122,7 @@ content still arrives by SQL seed.
 
 - **Authorization (decided in #32, supersedes the token-claim design below):** no `role` claim in
   the JWT, no Supabase token hook, no `JwtAuthenticationConverter`. `user` exposes a module API,
-  `user.AdminAccess.requireAdminId()`, which this module's admin services call per request and which
+  `user.Authorization.requireAdminId()`, which this module's admin services call per request and which
   returns the internal `userId` for `exams.created_by_user_id` while refusing a non-admin - the gate
   and the id in one lookup. It is `user`'s because `user` owns `Role` and the `users` row; **what
   needs an admin is still declared here**, by this module choosing to call it. **This module now does
@@ -152,18 +158,29 @@ content still arrives by SQL seed.
   query back. **Move it to `exam/query/`** when the filter set outgrows that - the trigger is a
   second certificate making `certificate_type` / `certificate_variant` / `target_level` worth
   filtering on, which TOEIC-only papers do not.
-  Per-row section and question counts come from `ExamRepository.contentTotals(examIds)` - **one
-  extra query for the whole page**, not one per row, which is an N+1 by another name. The same query
-  serves `publish()` with a single-element id list, so the two never drift. Attempt count is still
-  absent: it waits for `ExamAttempt` to exist at all.
-  That query is **native** - the tables below `exams` have no entity until authoring needs one - and
-  uses **correlated subqueries, not joins**: joining sections to questions multiplies the section
-  rows and would leave `sum(max_raw_score)` silently too large, which is the one figure `publish()`
-  checks against. It is written with `{h-schema}` because Hibernate applies `default_schema` to
-  generated SQL only, and with quoted aliases (`as "examId"`) so Postgres keeps their case for the
-  projection getters. The question count is a four-join descent (`exam_sections -> section_parts ->
-  question_sets -> questions`); acceptable on one page of rows, and not denormalised onto `exams`,
-  where it would rot. Every table joined is exam-owned, so no cross-module read exception is needed.
+  **The list carries no content counts at all** - it is one query, nothing more. A section or
+  question count beside each row reads as "is this ready to publish", and is a bad answer to that
+  question: a paper with two hundred questions still fails on a score that does not add up.
+  `publish()` answers it exactly, with a code naming the rule that broke, so the counts bought an
+  extra aggregate query per page in exchange for a misleading number. Attempt count is absent for a
+  different reason - `ExamAttempt` does not exist yet - and should be judged on the same test when it
+  can be built. The counts were designed here before anything needed them; that is the whole reason
+  they were cut.
+- **What `publish()` weighs is three plain scalars** - `countSections`, `countQuestions`,
+  `sumSectionScores` on `ExamRepository`, and nothing else calls them. Each is its own query rather
+  than one row of a join, because joining sections to questions multiplies the section rows, so the
+  score sum comes back too large - and `sum(distinct ...)` is no fix either, since it would collapse
+  a TOEIC paper's LISTENING 100 and READING 100 into 100. The question count is a four-level descent
+  (`exam_sections -> section_parts -> question_sets -> questions`) joined by id, because the content
+  entities hold plain UUID keys; every table is exam-owned, so no cross-module read exception is
+  needed.
+  This was a native query, then one JPQL projection record, before it settled here. The record bought
+  one round trip instead of three, and cost a persistence type crossing into the service plus a
+  constructor expression naming the repository's own nested class - the most brittle line in the
+  module. Publishing is a rare admin action, so three round trips are the cheaper side of that trade.
+  **Revisit** if publishing ever gets slow: the fix is `publish()` writing the count onto `exams`,
+  which is safe because a published paper is frozen - not a join, and not a count kept for drafts,
+  where it would rot.
 - **The creator's name is not resolved server-side.** The list returns `createdByUserId` and the
   frontend composes it against the admin user list. One extra call on an admin screen costs less
   than the first `exam -> user` edge, and admins are few enough to cache.
@@ -176,9 +193,27 @@ content still arrives by SQL seed.
 - **`exam/query/` owes two tree loads, not one:** the sitting loads the paper with answer keys
   **excluded**, the admin detail loads it with keys and `explanation` **included**. Same descent,
   different projection - and the admin one is what both the detail screen and its printed form use.
-- **Editing a paper after publish** is not decided. `exam_attempts.exam_version_number` snapshots
-  the paper, so a content edit must either bump `version_number` or be refused. It cannot happen
-  yet because nothing can edit content; decide it with the authoring endpoints.
+  `AdminExamPaperQuery.loadForAdmin(examId)` is the built half: **five flat queries assembled in
+  memory**, one per level, each filtered by its parent-id set and ordered by `order_no`. Not five
+  `join fetch`es - more than one collection level is either MultipleBagFetchException or a cartesian
+  product. The sitting's half must be **its own method, not a boolean on this one**: a flag is one
+  edit away from serving an answer key into a paper being sat.
+  The five content entities (`ExamSection`, `SectionPart`, `QuestionSet`, `Question`,
+  `QuestionOption`) hold **plain `UUID` foreign keys, no `@ManyToOne`** - nothing navigates the
+  graph, so an association would only add lazy loading. `metadata jsonb` (three tables) and
+  `question_sets.is_single_use` are **deliberately unmapped**: nothing reads them, and how to map
+  `jsonb` is a decision for whoever first needs its contents. `validate` checks the columns an entity
+  claims, not that it claims every column.
+- **Media is presigned, not public.** `section_parts` / `question_sets` audio and image are returned
+  as presigned URLs from the private bucket (`ExamMediaUrls` in `exam/dto/response/`, one hour),
+  never as a stable public URL like a `user` avatar: a permanent link to a listening recording is a
+  leaked paper. The swap from object key to URL happens in the response layer, so `exam/query/` needs
+  no storage dependency.
+- **Editing a paper after publish is refused** - `Exam.updateDraft(...)` accepts a `DRAFT` only. That
+  settles what this file previously left open: `exam_attempts.exam_version_number` snapshots the
+  paper, and refusing the edit is cheaper than bumping `version_number` or letting a sat paper change
+  under its own results. **Revisit** when authoring makes a post-publish correction worth the
+  versioning work; nothing recorded so far becomes invalid by relaxing it later.
 
 ### Schema changes for this module (decided, not yet applied)
 
@@ -193,13 +228,15 @@ file assumed they could still be rewritten in place; that stopped when the migra
 - `exam_attempts.version bigint not null default 0` - the optimistic lock above.
 - partial unique index on `exam_attempts (user_id, exam_id) where status = 'IN_PROGRESS'`.
 - `exams.status` values -> `DRAFT` / `PUBLISHED` / `ARCHIVED`, `certificate_variant` values -> `LR` / `SW` / `ACADEMIC` / `GENERAL`. Both columns already exist as `varchar` with no check constraint, so neither needs a migration; the enums guard them.
-- **V029 is written and on disk**, unlike everything above it, which is decided but has no migration file yet: `question_sets.content` and `question_sets.metadata`, `question_options.explanation`. The TOEIC delivery package carries Part 6/7 passage text per group, an audio script with cues, and a Vietnamese rationale for every single option - and the schema had nowhere to put any of the three. All nullable, no backfill.
+- **V029 has now run** - it sat on disk unapplied for a while, and nothing noticed because no entity mapped a table below `exams`, so `ddl-auto: validate` had nothing to compare. The first entity that mapped `question_options` failed startup with *missing column [explanation]*, and the database turned out to be at 028. **Check `flyway_schema_history`, not the migrations folder, before assuming a column exists.** It adds `question_sets.content` and `question_sets.metadata`, `question_options.explanation`. The TOEIC delivery package carries Part 6/7 passage text per group, an audio script with cues, and a Vietnamese rationale for every single option - and the schema had nowhere to put any of the three. All nullable, no backfill.
 
 ## Deliberately left open
 
 - **Quiz** - tables not designed. It gets its own module when built (own tables, own admin CRUD); the `user` module calls into it. Not folded into `user`, not folded into `exam`.
-- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, publish it once the seeded content adds up, and archive it - but cannot **fill** it through the API: sections, parts, question sets and questions have no write path yet. So `publish()` is only satisfiable by a paper someone seeded by hand, which is exactly the current workflow. **Authorization is decided (in #32) and now in use** (see `shared + config` and *Admin exam management*): `user.Role` (`LEARNER` / `ADMIN`) exists, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.AdminAccess.requireAdminId()` is the shared gate - one bean any module's admin use case injects, refusing a non-admin and returning the internal `userId`, so the check and `exams.created_by_user_id` are one lookup and there is no JWT claim to read. It sits in `user` rather than `shared` because `shared` may not know a `Role` and `user -> shared` already exists. Still absent: any `@PreAuthorize` (there is no authority on the `Authentication` for it to check - a `PermissionEvaluator` wired to `AdminAccess` is the way in), and `CurrentUser` still exposes only `authProviderId` and `email`; `@EnableMethodSecurity` and the `AccessDeniedException` handler stay pre-wired hooks. The Supabase-token-hook / role-claim / `JwtAuthenticationConverter` approach previously planned here is dropped - role is resolved per request, not carried in the token, so there is no "token issued before the role was granted" problem to solve. The cost is one uncached read per admin request; cache or reconsider the token if admin traffic ever stops being negligible.
-- **AI grading** remains open. `grading_criteria`, `attempt_answer_criterion_scores` and `exam_sections.is_scored_by_criteria` are exam-owned and unused for the current TOEIC objective-key flow. The AI foundation owns `ai_jobs`; future AI grading must call that module instead of making `exam` a second writer.
+- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, edit it while it is a draft, read the whole paper back with answer keys, publish it once the seeded content adds up, and archive it - but cannot **fill** it through the API: sections, parts, question sets and questions have no write path yet. So `publish()` is only satisfiable by a paper someone seeded by hand, which is exactly the current workflow. Authoring is also what forces the two decisions parked on the content entities: what `question_sets.is_single_use` means (it is `not null default true`, so an insert that does not map it takes the default), and how `metadata jsonb` should be mapped. **Authorization is settled** (see `shared + config` and the `user` module API): `user.Role` is `LEARNER` / `ADMIN` / `STAFF`, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.Authorization` is the single gate - `requireAdminId()` where the caller's own id is also needed, `isAdmin()` / `isStaff()` behind `@PreAuthorize` where a yes/no answer is enough.
+  **`@PreAuthorize` does work, and needs no `PermissionEvaluator`** - an earlier note here claimed otherwise. `@PreAuthorize("@authorization.isAdmin()")` is a SpEL *bean reference*, not `hasRole(...)`, so it never asks the `Authentication` for a `GrantedAuthority`; the bean does the lookup itself. That is why no role claim in the token is needed, and why `CurrentUser` still exposes only `authProviderId` and `email`. `@EnableMethodSecurity` and the `AccessDeniedException` handler were already wired.
+  The Supabase-token-hook / role-claim / `JwtAuthenticationConverter` approach previously planned here is dropped - role is resolved per request, so granting or revoking one takes effect immediately, and there is no "token issued before the role was granted" problem. The cost is one uncached read per gated request.
+- **AI grading** remains open. `grading_criteria`, `attempt_answer_criterion_scores` and `exam_sections.is_scored_by_criteria` are exam-owned and unused for the current TOEIC objective-key flow. The `ai` module owns `ai_jobs`; future AI grading must call that module instead of making `exam` a second writer.
 - **`question_sets.is_single_use`** - the column implies a question-bank / reuse concept that no decision covers. Decide what it means before anything reads it.
 - **`spring.servlet.multipart.max-file-size: 2MB`** - too small for speaking recordings. Irrelevant until a 4-skills paper exists; the choice then is raising the limit or presigned direct-to-S3 upload.
 - **`@Version` columns** - the design calls for them on `LearnerProfile` and `ExamAttempt`; neither exists in a migration or an entity yet.
