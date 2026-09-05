@@ -1,12 +1,14 @@
 package com.englow3.ai.foundation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestClient;
 
 import com.englow3.ai.speaking.SpeechProperties;
@@ -14,7 +16,11 @@ import com.englow3.ai.speaking.SpeechProperties;
 class AiFoundationConfigTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 
-            .withBean(RestClient.Builder.class, RestClient::builder).withUserConfiguration(AiFoundationConfig.class)
+            .withBean(RestClient.Builder.class, RestClient::builder)
+
+            .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
+
+            .withUserConfiguration(AiFoundationConfig.class, AiUsageService.class)
 
             .withPropertyValues("app.ai.enabled=true", "app.ai.base-url=http://ai-service:8000",
 
@@ -31,7 +37,8 @@ class AiFoundationConfigTest {
         void registersAndBindsAiAndSpeechProperties() {
             contextRunner.run(context -> {
                 assertThat(context).hasNotFailed().hasSingleBean(AiProperties.class)
-                        .hasSingleBean(SpeechProperties.class).hasSingleBean(RestClient.class);
+                        .hasSingleBean(SpeechProperties.class).hasSingleBean(RestClient.class)
+                        .hasSingleBean(AiUsageService.class);
 
                 AiProperties ai = context.getBean(AiProperties.class);
                 assertThat(ai.enabled()).isTrue();
