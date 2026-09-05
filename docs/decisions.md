@@ -20,11 +20,11 @@ Nghĩa là repo giữ *cách tạo ra* dữ liệu, không giữ *dữ liệu*.
   hay vài nghìn item JSON không ai đọc được, và làm repo phình theo mỗi lần regenerate.
 - Gỡ luôn nghĩa vụ share-alike: wordlist nguồn là CC BY-SA, nhưng share-alike chỉ
   phát sinh khi **phân phối**. Không đẩy lên repo công khai = không phân phối.
-  Xem [ATTRIBUTION.md](../data_pipeline/seeds/ATTRIBUTION.md).
+  Xem [ATTRIBUTION.md](../ai/data_pipeline/seeds/ATTRIBUTION.md).
 
 **Dựng lại trên máy mới:**
 ```bash
-cd data_pipeline/seeds/raw && ./fetch_wordlists.sh   # tải wordlist gốc
+cd ai/data_pipeline/seeds/raw && ./fetch_wordlists.sh   # tải wordlist gốc
 cd ../.. && make seed                                # dựng vocab_seed.csv
 make sources                                         # tải corpus mở đã pin commit/hash
 ```
@@ -52,7 +52,7 @@ khoá chính dùng `stable_id()` có sẵn nên `ON CONFLICT DO UPDATE` idempote
 
 ## D2 — Embedding: 1024 chiều, `bge-m3`
 
-**Chốt:** [schemas/embedding_config.yaml](../data_pipeline/schemas/embedding_config.yaml) — `dimension: 1024`, `BAAI/bge-m3`, chạy local, normalize L2, index HNSW `vector_cosine_ops`.
+**Chốt:** [schemas/embedding_config.yaml](../ai/data_pipeline/schemas/embedding_config.yaml) — `dimension: 1024`, `BAAI/bge-m3`, chạy local, normalize L2, index HNSW `vector_cosine_ops`.
 
 **Lý do:** quyết định thật sự không phải chọn model mà là chốt **số chiều**, vì cột
 `vector(N)` đổi N là phải drop cột, dựng lại index, sinh lại toàn bộ embedding.

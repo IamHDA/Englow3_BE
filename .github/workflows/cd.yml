@@ -25,7 +25,7 @@ jobs:
             context: .
             image_suffix: ''
           - service: AI Service
-            context: ./ai_service
+            context: ./ai/service
             image_suffix: -ai-service
 
     steps:
@@ -147,5 +147,5 @@ jobs:
             docker run -d --name englow3-ai-service --restart always --network englow3-private \
               --env-file /etc/englow3/.env "$AI_IMAGE"
             docker run -d --name englow3-be --restart always --network englow3-private -p 8080:8080 \
-              --env-file /etc/englow3/.env -e AI_SERVICE_BASE_URL=http://englow3-ai-service:8000 "$BACKEND_IMAGE"
+              --env-file /etc/englow3/.env "$BACKEND_IMAGE"
 

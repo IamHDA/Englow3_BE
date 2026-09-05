@@ -1,8 +1,8 @@
-# data_pipeline
+# AI data pipeline
 
 Data pipeline cho hệ thống học tiếng Anh A1–C1 + luyện thi định dạng TOEIC.
 Nguồn chân lý: [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
-Mã nguồn nằm ở [`data_pipeline/`](../data_pipeline/) ở gốc repo.
+Mã nguồn nằm ở [`ai/data_pipeline/`](../ai/data_pipeline/) trong không gian AI riêng của repo.
 
 ## Cấu trúc
 
@@ -23,7 +23,7 @@ Mã nguồn nằm ở [`data_pipeline/`](../data_pipeline/) ở gốc repo.
 
 ```bash
 git clone https://github.com/IamHDA/Englow3_BE.git
-cd Englow3_BE/data_pipeline
+cd Englow3_BE/ai/data_pipeline
 make bootstrap
 cp .env.example .env
 ```

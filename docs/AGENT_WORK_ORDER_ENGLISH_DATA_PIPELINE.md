@@ -147,7 +147,7 @@ Thứ tự này là bắt buộc. Lý do: taxonomy trước schema, schema trư�
 3. Kiểm tra Postgres: version, đã có extension `vector` chưa (`SELECT * FROM pg_extension;`).
 4. Dựng cây thư mục:
    ```
-   data_pipeline/
+   ai/data_pipeline/
      taxonomy/
      schemas/          # Pydantic models
      schemas/json/     # JSON Schema sinh tự động
@@ -168,7 +168,7 @@ Thứ tự này là bắt buộc. Lý do: taxonomy trước schema, schema trư�
 6. Chạy `pip install -r requirements.txt`, paste output.
 
 ### DoD
-- [ ] Cây thư mục tồn tại (paste `tree data_pipeline`)
+- [ ] Cây thư mục tồn tại (paste `tree ai/data_pipeline`)
 - [ ] `pip list | grep -E 'pydantic|jsonschema'` có output
 - [ ] Đã trả lời rõ: migration tool nào, DB ở đâu, `vector` extension có chưa
 - [ ] Chưa có một dòng dữ liệu nội dung nào được sinh

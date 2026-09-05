@@ -1,111 +1,70 @@
-# AI production architecture and runbook
+# AI service deployment
 
-## Service boundary
+## Current boundary
 
-The project uses two runtime services with a deliberately narrow internal contract:
+The `dev` branch contains two independent AI projects under [`ai/`](../ai/):
 
-- Spring Boot owns every public API, JWT authorization, deterministic business rule,
-  PostgreSQL transaction, durable job, quota and audit record.
-- `ai_service/` is a stateless FastAPI inference adapter. It owns external LLM and
-  speech provider credentials, provider-specific payloads and response normalization.
-- Spring calls FastAPI with `X-Internal-API-Key` over a private network. No frontend
-  or mobile client calls FastAPI directly.
+- [`ai/service/`](../ai/service/) is a stateless FastAPI provider adapter.
+- [`ai/data_pipeline/`](../ai/data_pipeline/) is an offline authoring and QA toolchain.
 
-This split does not change public endpoints or database ownership. It adds one
-internal HTTP hop and an independently deployable/scalable failure boundary.
+The Spring Boot backend does not contain an AI package, does not import either
+Python project and does not require an AI service URL to start. The FastAPI
+service currently exposes internal provider contracts only; adding a public AI
+feature requires an explicit backend or gateway integration in a future change.
 
-## Scope
+## FastAPI contract
 
-The AI platform implements five isolated capabilities on top of one durable PostgreSQL job queue:
+- `POST /internal/v1/llm/generate`
+- `POST /internal/v1/embeddings`
+- `POST /internal/v1/speech/assess`
+- `GET /health/live`
+- `GET /health/ready`
 
-| Capability | Deterministic responsibility | AI responsibility |
-|---|---|---|
-| Tutor | ownership, history, approved-content grounding and citations | grounded explanation |
-| Placement | exam integrity, grading, CEFR band and learner-profile update | learner-friendly report only |
-| Learning path | prerequisites, mastery/BKT updates and ordering | explanation of the computed path |
-| Speaking | private audio lifecycle and Azure pronunciation scores | grammar and vocabulary feedback only |
-| Content generation | draft/review/publish state machine | staff-editable draft generation |
+Every `/internal/*` request requires `X-Internal-API-Key`. Keep port 8000 and
+all internal routes off the public internet.
 
-AI output is never trusted for authorization, grading, CEFR placement or direct publication.
+## Configuration
 
-## Main API groups
+Copy [`ai/service/.env.example`](../ai/service/.env.example) to
+`ai/service/.env` for local development. Provider credentials belong to the AI
+service and must not be added to Spring's `application.yml`.
 
-- `/api/ai/jobs/{jobId}`: poll or cancel an owned asynchronous job.
-- `/api/ai/tutor/conversations`: create, list, archive and message the grounded tutor.
-- `/api/placement`: start, answer, submit and read deterministic placement results.
-- `/api/learning-paths`: generate, read, progress and update preferences.
-- `/api/speaking/sessions`: create an upload session, submit audio, read history/result and delete a recording.
-- `/api/ai/feedback`: report an AI response.
-- `/api/staff/ai/content`: generate, edit and submit a draft for review (`STAFF` or higher).
-- `/api/reviewer/ai/content`: approve/reject pending content (`CONTENT_REVIEWER` or `ADMIN`).
-- `/api/admin/ai`: prompt versions, model policies, reports, reviewed content and operational metrics (`ADMIN`).
+Required for a ready production instance:
 
-Swagger exposes the exact request/response schemas at `/swagger-ui/index.html`.
+- `AI_SERVICE_ENVIRONMENT=production`
+- a long random `AI_SERVICE_INTERNAL_API_KEY`
+- the enable flag, base URL and secret for each configured provider
 
-## Required production configuration
+## Verification
 
-Copy `.env.example` and replace all local defaults. At minimum:
+```bash
+python -m pip install -r ai/service/requirements-dev.txt
+(cd ai/service && python -m ruff check app tests)
+(cd ai/service && python -m ruff format --check app tests)
+(cd ai/service && python -m pytest)
+```
 
-- `SUPABASE_ISSUER_URI`, `SUPABASE_JWKS_URI`, `SUPABASE_JWT_AUDIENCE`.
-- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` with TLS enabled.
-- `AI_ENABLED=true`, `AI_SERVICE_BASE_URL`, `AI_SERVICE_INTERNAL_API_KEY`,
-  `AI_DEFAULT_MODEL` for Spring Boot.
-- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` for a private bucket.
-- In FastAPI: `AI_SERVICE_LLM_ENABLED=true`, `AI_SERVICE_LLM_BASE_URL`,
-  `AI_SERVICE_LLM_API_KEY`.
-- For speaking: set `SPEECH_ENABLED=true` in Spring and
-  `AI_SERVICE_SPEECH_ENABLED=true`, `AI_SERVICE_AZURE_SPEECH_BASE_URL`,
-  `AI_SERVICE_AZURE_SPEECH_API_KEY` for FastAPI.
-- Restrictive `CORS_ALLOWED_ORIGINS`.
+The data pipeline is verified separately:
 
-Set cost rates for every active model through `PUT /api/admin/ai/model-policies/{capability}`. Rates are expressed per one million tokens and feed both per-job and aggregate cost metrics.
+```bash
+python -m pip install -r ai/data_pipeline/requirements.txt
+(cd ai/data_pipeline && python -m pytest -q)
+```
 
-## Deployment gates
+The repository CI keeps Java, FastAPI and data-pipeline checks in separate jobs.
 
-1. Run `pytest` in `ai_service/` and `mvn test` at repository root. `FlywayMigrationTest` applies every migration to PostgreSQL when Docker is available and skips only on developer machines without Docker.
-2. Run `mvn formatter:validate`, `mvn package`, and build both container images.
-3. Deploy FastAPI on the private application network. Verify `/health/live` and `/health/ready`; expose neither `/internal/*` nor port 8000 publicly.
-4. Deploy Spring with AI and speech disabled first and verify `/actuator/health`, `/actuator/health/liveness`, and `/actuator/health/readiness`.
-5. Configure prompt/model policies with provider `ai-service`, canary one capability, then enable the remaining capabilities.
-6. Alert on `englow3.ai.requests{outcome="failure"}`, latency, queue depth, recent failures, FastAPI readiness and provider quota errors.
-7. Verify the object-storage lifecycle is at least as strict as `SPEECH_AUDIO_RETENTION`; the application also deletes expired recordings.
+## Deployment
 
-## Automated deployment
+The CD workflow builds two independent images:
 
-The CD workflow publishes two images for each `main` or `dev` push:
+- `ghcr.io/<owner>/<repository>:<branch>` from the root Spring Dockerfile.
+- `ghcr.io/<owner>/<repository>-ai-service:<branch>` from
+  `ai/service/Dockerfile`.
 
-- `ghcr.io/<owner>/<repository>:<branch>` for Spring Boot.
-- `ghcr.io/<owner>/<repository>-ai-service:<branch>` for FastAPI.
+Configure `RENDER_BACKEND_DEPLOY_HOOK_URL` and `RENDER_AI_DEPLOY_HOOK_URL`
+independently. On a VPS, only the backend publishes port 8080; the AI container
+stays on the private `englow3-private` network.
 
-Pull requests into `main` or `dev` build both images without publishing or deploying them, so container failures are
-detected before merge.
-
-Configure deployment destinations with repository secrets or variables:
-
-- `RENDER_BACKEND_DEPLOY_HOOK_URL` for the Spring service. The legacy
-  `RENDER_DEPLOY_HOOK_URL` remains supported as a fallback.
-- `RENDER_AI_DEPLOY_HOOK_URL` for the private FastAPI service.
-- `SERVER_HOST`, `SERVER_USER`, and `SERVER_SSH_KEY` for optional VPS deployment.
-
-For Render, create two services from the same repository. The backend uses the root `Dockerfile` and
-`/actuator/health/readiness`; the AI service uses `ai_service/Dockerfile` and `/health/ready`. Keep the AI service
-private, set `AI_SERVICE_BASE_URL` on Spring to its internal URL, and configure the same long random
-`AI_SERVICE_INTERNAL_API_KEY` on both services. If deploy hooks are enabled, disable Render's native auto-deploy to
-avoid deploying the same commit twice.
-
-For VPS deployment, both containers share the private `englow3-private` Docker network. Only Spring publishes a
-host port; FastAPI remains reachable solely as `http://englow3-ai-service:8000` inside that network.
-
-## Operational behavior
-
-- Jobs use row locking with `SKIP LOCKED`, idempotency keys, bounded exponential retry and stale-lock recovery.
-- A reconciliation worker repairs business records after terminal/cancelled jobs, including jobs recovered after a worker crash.
-- Prompt text and prompt version are frozen into each job so an admin activation cannot change in-flight work.
-- Provider error bodies, credentials and raw exceptions are not returned to clients.
-- User quotas are reserved atomically per UTC day. Token usage and configured estimated cost are stored for audit.
-- Speaking uploads accept only signed WAV PCM 16 kHz or OGG Opus requests, enforce size/content type and verify file signatures before processing.
-- Speech recordings require explicit consent and are private, user-scoped and automatically retained/deleted.
-
-## Rollback
-
-Disable a capability through its model policy first; queued data remains auditable. Roll back application code without reverting Flyway migrations. Prompt versions are append-only: activate the previous version rather than editing a deployed version. Do not delete AI jobs or audit rows during an incident.
+For local use, run `docker compose up ai-service`. The Compose build context is
+`ai/service`, while the root backend Docker context excludes the complete `ai/`
+directory.

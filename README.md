@@ -2,7 +2,7 @@
 
 Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, được xây dựng trên nền tảng **Java 21** và **Spring Boot 3**, triển khai tự động qua **Docker**, **GitHub Actions (CI/CD)** và **Render Cloud**.
 
-Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipeline sinh/kiểm định học liệu nằm tại [`data_pipeline/`](data_pipeline/); tài liệu kỹ thuật nằm tại [`docs/`](docs/).
+Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Toàn bộ mã AI được tách tại [`ai/`](ai/); tài liệu kỹ thuật nằm tại [`docs/`](docs/).
 
 ---
 
@@ -49,8 +49,9 @@ cd Englow3_BE
 Tạo file `.env` từ mẫu [.env.example](.env.example):
 ```bash
 cp .env.example .env
+cp ai/service/.env.example ai/service/.env
 ```
-Cập nhật các thông số kết nối Database (Supabase hoặc Postgres local), S3 và AI service nếu cần.
+Cập nhật `.env` cho Spring backend và `ai/service/.env` cho AI service độc lập.
 
 #### Bước 3: Khởi chạy các dịch vụ hỗ trợ
 ```bash
@@ -101,7 +102,9 @@ Englow3_BE/
 │   │       ├── application.yml # Cấu hình Spring Boot
 │   │       └── db/migration/   # Script migration Flyway
 │   └── test/                   # Unit & Integration Tests
-├── data_pipeline/              # Pipeline Python sinh và kiểm định học liệu
+├── ai/                         # Không gian AI độc lập với Spring backend
+│   ├── service/                # FastAPI inference service
+│   └── data_pipeline/          # Pipeline Python sinh và kiểm định học liệu
 ├── docs/                       # Tài liệu kiến trúc và pipeline
 ├── Dockerfile                  # Cấu hình Docker multi-stage build Java 21
 ├── docker-compose.yml          # PostgreSQL, MinIO và AI service local

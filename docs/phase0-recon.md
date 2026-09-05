@@ -10,7 +10,7 @@
 Repo là **Spring Boot backend mới khởi tạo, gần như trống**. Toàn bộ mã nguồn Java hiện có là 1 file.
 
 > Đây là ảnh chụp hiện trạng **tại thời điểm recon**, trước khi dựng skeleton.
-> Sau Phase 0, tài liệu đã chuyển vào `docs/` và có thêm `data_pipeline/` (xem §6).
+> Sau Phase 0, tài liệu đã chuyển vào `docs/` và có thêm `ai/data_pipeline/` (xem §6).
 
 ```
 Englow3_BE/
@@ -68,7 +68,7 @@ spring:
 Điều này khớp với luật của skill `implement-english-learning-backend`:
 > "Flyway owns the schema. `ddl-auto` is `validate`. Never edit a migration that has already run - add a new one."
 
-**Hệ quả cho Phase 2:** DDL không xuất ra `data_pipeline/migrations/` như §2.8 của work
+**Hệ quả cho Phase 2:** DDL không xuất ra `ai/data_pipeline/migrations/` như §2.8 của work
 order gợi ý, mà phải xuất vào `src/main/resources/db/migration/V<n>__content_tables.sql`
 để Flyway của Spring Boot quản lý. → **Cần Owner xác nhận** (xem §6 Câu hỏi).
 
@@ -128,10 +128,10 @@ docs/                     ← toàn bộ tài liệu viết tay
 ├── README.md             (index)
 ├── AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md
 ├── TODO.md               (checklist 13 phase + blocker)
-├── data-pipeline.md      (layout + ràng buộc của data_pipeline/)
+├── data-pipeline.md      (layout + ràng buộc của ai/data_pipeline/)
 └── phase0-recon.md       (file này)
 
-data_pipeline/            ← mã nguồn + artifact sinh ra
+ai/data_pipeline/         ← mã nguồn + artifact sinh ra
 ├── .env.example          (template env, KHÔNG chứa secret)
 ├── Makefile              (venv/install/taxonomy/schema/validate/test)
 ├── requirements.txt
@@ -141,18 +141,18 @@ data_pipeline/            ← mã nguồn + artifact sinh ra
 └── rejects/  reports/  tests/fixtures/
 ```
 
-`reports/` giữ nguyên trong `data_pipeline/` vì đó là **output do script sinh ra**
+`reports/` giữ nguyên trong `ai/data_pipeline/` vì đó là **output do script sinh ra**
 (`validation_<batch_id>.json`, `taxonomy_summary.md`, `flashcard_qa.md`, ...) —
 work order tham chiếu đường dẫn này ở mọi phase. `docs/` chỉ chứa tài liệu viết tay.
 
-`.gitignore` đã thêm: `data_pipeline/.venv/`, `__pycache__/`, `.pytest_cache/`, `.env`.
+`.gitignore` đã thêm: `ai/data_pipeline/.venv/`, `__pycache__/`, `.pytest_cache/`, `.env`.
 
 ## 7. Sai lệch so với work order
 
 | §  | Work order nói | Thực tế | Lý do |
 |---|---|---|---|
 | 0.6 | Python 3.11+ | 3.12.13 qua `uv`, không phải Python hệ thống | Python hệ thống 3.9.6; brew không dùng được |
-| 0 (cây thư mục) | `data_pipeline/` ở gốc repo | Đúng như spec | — |
+| 0 (cây thư mục) | `ai/data_pipeline/` trong thư mục AI | Đúng như cấu trúc đã tách | — |
 | 0 (requirements) | "eng-to-ipa hoặc phonemizer" | Chọn `eng-to-ipa` | `phonemizer` cần binary `espeak-ng` (lại phải qua brew). `eng-to-ipa` là pure-Python, dựa trên CMUdict |
 | 2.8 | DDL → `migrations/xxx_content_tables.sql` | Đề xuất `src/main/resources/db/migration/V1__...sql` | Flyway của Spring Boot phải là chủ sở hữu schema duy nhất |
 

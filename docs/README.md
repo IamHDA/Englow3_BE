@@ -9,7 +9,7 @@ Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
 | [AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) | **Nguồn chân lý.** Nguyên tắc vận hành, 13 phase, spec schema, danh sách lỗi P0/P1 phải sửa |
 | [decisions.md](decisions.md) | **Quyết định đã chốt** — dữ liệu local, embedding 1024 chiều, cấu trúc bộ đề, sản lượng item |
 | [TODO.md](TODO.md) | Checklist tiến độ từng phase + bảng blocker cần Owner quyết |
-| [data-pipeline.md](data-pipeline.md) | Layout thư mục `data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
+| [data-pipeline.md](data-pipeline.md) | Layout thư mục `ai/data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
 | [storage-layout.md](storage-layout.md) | Bố cục trên đĩa: tầng batch vs tầng staging `_db/`, 21 bảng và thứ tự nạp |
 | [exam-quality-bar.md](exam-quality-bar.md) | Chuẩn chất lượng bộ đề: thiết kế distractor, evidence_span, 3 kiểm tra thiên lệch thống kê |
 | [exam-set-structure.md](exam-set-structure.md) | Cấu trúc bộ đề: ngân hàng câu tách khỏi manifest, thành phần 200 câu, cần bao nhiêu bộ |
@@ -29,6 +29,6 @@ Chi tiết luật: §0 của work order.
 
 ## Không nằm ở đây
 
-- `data_pipeline/reports/` — báo cáo **do script sinh ra** (validation, QA, coverage).
+- `ai/data_pipeline/reports/` — báo cáo **do script sinh ra** (validation, QA, coverage).
   Work order tham chiếu đường dẫn đó trực tiếp nên giữ nguyên vị trí.
 - `.claude/skills/` — luật kiến trúc cho agent, không phải tài liệu người đọc.

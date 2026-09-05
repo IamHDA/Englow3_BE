@@ -18,13 +18,9 @@ to the public internet in production; use a private network and a secret manager
 ## Local development
 
 ```powershell
+Copy-Item .env.example .env
 python -m venv .venv
 .\.venv\Scripts\pip.exe install -r requirements-dev.txt
-$env:AI_SERVICE_INTERNAL_API_KEY='replace-me'
-$env:AI_SERVICE_LLM_ENABLED='true'
-$env:AI_SERVICE_LLM_API_KEY='provider-secret'
-$env:AI_SERVICE_EMBEDDING_ENABLED='true'
-$env:AI_SERVICE_EMBEDDING_API_KEY='embedding-provider-secret'
 .\.venv\Scripts\uvicorn.exe app.main:app --reload --port 8001
 ```
 

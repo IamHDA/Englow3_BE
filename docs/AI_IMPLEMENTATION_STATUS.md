@@ -26,9 +26,10 @@ FastAPI AI service (inference boundary)
 Configured model / speech / embedding providers
 ```
 
-`data_pipeline/` is an offline authoring, validation, media and delivery toolchain. Runtime AI inference is
-not stored there. Runtime provider code is in `ai_service/`; runtime domain orchestration is in
-`src/main/java/com/englow3/ai/`.
+`ai/data_pipeline/` is an offline authoring, validation, media and delivery toolchain. Runtime AI inference is
+not stored there. Runtime provider code is isolated in `ai/service/`. The Spring backend on `dev` no longer
+contains `src/main/java/com/englow3/ai/`; the orchestration described below belongs to the historical stacked
+feature branches and must not be treated as code currently deployed from `dev`.
 
 ## Feature status
 

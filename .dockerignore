@@ -5,7 +5,7 @@
 .idea
 *.iml
 target
-data_pipeline
+ai
 docs
 CLAUDE.md
 README.md

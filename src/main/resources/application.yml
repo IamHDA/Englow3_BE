@@ -50,29 +50,6 @@ app:
       secret-key: ${S3_SECRET_KEY:}
       bucket: ${S3_BUCKET:englow3}
 
-  ai:
-    enabled: ${AI_ENABLED:false}
-    provider: ${AI_PROVIDER:ai-service}
-    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
-    internal-api-key: ${AI_SERVICE_INTERNAL_API_KEY:}
-    default-model: ${AI_DEFAULT_MODEL:llama-3.3-70b-versatile}
-    connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
-    read-timeout: ${AI_READ_TIMEOUT:45s}
-    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
-    daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
-    worker:
-      fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
-      batch-size: ${AI_WORKER_BATCH_SIZE:5}
-      lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:5m}
-      reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:1m}
-
-  speech:
-    enabled: ${SPEECH_ENABLED:false}
-    locale: ${SPEECH_LOCALE:en-US}
-    max-audio-bytes: ${SPEECH_MAX_AUDIO_BYTES:10485760}
-    upload-url-ttl: ${SPEECH_UPLOAD_URL_TTL:10m}
-    retention: ${SPEECH_AUDIO_RETENTION:30d}
-
 server:
   port: ${PORT:${SERVER_PORT:8080}}
 

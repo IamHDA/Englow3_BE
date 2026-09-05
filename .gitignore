@@ -6,6 +6,7 @@ target/
 HELP.md
 .env
 .env.*
+!**/.env.example
 env
 env.local
 .mcp.json
@@ -15,21 +16,21 @@ env.local
 *.pyc
 .pytest_cache/
 .checkpoints/
-data_pipeline/output/audio/
+ai/data_pipeline/output/audio/
 
 # Data pipeline local/generated artifacts
-data_pipeline/.venv/
-data_pipeline/**/__pycache__/
-data_pipeline/.pytest_cache/
-data_pipeline/seeds/raw/
-data_pipeline/output/**/*.json
-data_pipeline/seeds/vocab_seed.csv
-data_pipeline/seeds/by_level/
-data_pipeline/rejects/*.json
-data_pipeline/output/_db/*.jsonl
-data_pipeline/output/_db/_manifest.json
-data_pipeline/output/*.mp3
-data_pipeline/output/media/
-data_pipeline/output/exams/individual_sets/
-data_pipeline/sources/
-data_pipeline/rejects/*/
+ai/data_pipeline/.venv/
+ai/data_pipeline/**/__pycache__/
+ai/data_pipeline/.pytest_cache/
+ai/data_pipeline/seeds/raw/
+ai/data_pipeline/output/**/*.json
+ai/data_pipeline/seeds/vocab_seed.csv
+ai/data_pipeline/seeds/by_level/
+ai/data_pipeline/rejects/*.json
+ai/data_pipeline/output/_db/*.jsonl
+ai/data_pipeline/output/_db/_manifest.json
+ai/data_pipeline/output/*.mp3
+ai/data_pipeline/output/media/
+ai/data_pipeline/output/exams/individual_sets/
+ai/data_pipeline/sources/
+ai/data_pipeline/rejects/*/
