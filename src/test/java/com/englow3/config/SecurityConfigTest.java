@@ -3,6 +3,7 @@ package com.englow3.config;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,16 +26,24 @@ class SecurityConfigTest {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
-    @Test
-    void exposesHealthProbePathsWithoutAuthentication() throws Exception {
-        mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
-        mockMvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
-        mockMvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+    @Nested
+    class Success {
+
+        @Test
+        void exposesHealthProbePathsWithoutAuthentication() throws Exception {
+            mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+            mockMvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+            mockMvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+        }
     }
 
-    @Test
-    void keepsApplicationEndpointsAuthenticated() throws Exception {
-        mockMvc.perform(get("/api/private-test")).andExpect(status().isUnauthorized());
+    @Nested
+    class Failure {
+
+        @Test
+        void keepsApplicationEndpointsAuthenticated() throws Exception {
+            mockMvc.perform(get("/api/private-test")).andExpect(status().isUnauthorized());
+        }
     }
 }
 
