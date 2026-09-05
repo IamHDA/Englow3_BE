@@ -3,6 +3,8 @@ create table question_options (
     question_id uuid not null references questions (id) on delete restrict,
     content text not null,
     order_no integer not null,
+    -- the Vietnamese rationale carried per option by the TOEIC delivery package
+    explanation text,
     is_correct boolean not null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()

@@ -20,10 +20,10 @@ class FlywayMigrationTest {
         createSupabaseAuthFixture(url, username, password);
 
         Flyway existingProductionSchema = configureFlyway(url, username, password)
-                .target(MigrationVersion.fromVersion("270")).load();
+                .target(MigrationVersion.fromVersion("29")).load();
         assertThat(existingProductionSchema.migrate().success).isTrue();
         assertThat(existingProductionSchema.info().current().getVersion())
-                .isEqualTo(MigrationVersion.fromVersion("270"));
+                .isEqualTo(MigrationVersion.fromVersion("29"));
 
         Flyway flyway = configureFlyway(url, username, password).load();
         assertThat(flyway.migrate().success).isTrue();
