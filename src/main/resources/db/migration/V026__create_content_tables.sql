@@ -108,8 +108,10 @@ CREATE TABLE IF NOT EXISTS audio_assets (
     speaker_count       INT  NOT NULL DEFAULT 1,
     duration_ms         INT,
     alignment_status    TEXT NOT NULL DEFAULT 'pending',
+    cues                JSONB NOT NULL DEFAULT '[]'::jsonb,
     -- Cấm khai đã căn chỉnh khi chưa có audio (§Phase 8)
-    CHECK (alignment_status <> 'aligned' OR audio_url IS NOT NULL)
+    CHECK (alignment_status <> 'aligned' OR audio_url IS NOT NULL),
+    CONSTRAINT ck_audio_assets_cues_array CHECK (jsonb_typeof(cues) = 'array')
 );
 
 CREATE TABLE IF NOT EXISTS exam_items (
@@ -209,7 +211,12 @@ CREATE TABLE IF NOT EXISTS speaking_tasks (
     sample_answer_c1 TEXT NOT NULL,
     rubric_ref      TEXT NOT NULL REFERENCES rubrics(rubric_id),
     difficulty_prior REAL NOT NULL CHECK (difficulty_prior BETWEEN 0 AND 1),
-    review_status   TEXT NOT NULL DEFAULT 'draft'
+    review_status   TEXT NOT NULL DEFAULT 'draft',
+    image_url       TEXT,
+    stimulus_text   TEXT,
+    prompt_audio    JSONB,
+    CONSTRAINT ck_speaking_tasks_prompt_audio_object
+        CHECK (prompt_audio IS NULL OR jsonb_typeof(prompt_audio) = 'object')
 );
 
 CREATE TABLE IF NOT EXISTS writing_tasks (
@@ -224,6 +231,8 @@ CREATE TABLE IF NOT EXISTS writing_tasks (
     rubric_ref      TEXT NOT NULL REFERENCES rubrics(rubric_id),
     difficulty_prior REAL NOT NULL CHECK (difficulty_prior BETWEEN 0 AND 1),
     review_status   TEXT NOT NULL DEFAULT 'draft',
+    image_url       TEXT,
+    stimulus_text   TEXT,
     CHECK (max_words IS NULL OR min_words IS NULL OR max_words >= min_words)
 );
 
