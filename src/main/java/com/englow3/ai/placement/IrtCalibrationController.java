@@ -17,7 +17,7 @@ import jakarta.validation.constraints.Min;
 
 @RestController
 @RequestMapping("/api/admin/ai/placement/calibrations")
-@PreAuthorize("@authorization.isAdmin()")
+@PreAuthorize("hasRole('ADMIN')")
 class IrtCalibrationController {
 
     private final IrtCalibrationService service;

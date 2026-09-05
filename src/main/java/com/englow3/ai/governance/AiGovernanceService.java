@@ -20,9 +20,7 @@ import com.englow3.ai.embedding.AiEmbeddingIndexService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,8 +30,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 class AiGovernanceService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final CurrentUser currentUser;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
@@ -41,13 +38,11 @@ class AiGovernanceService {
     private final AiContentPublisher contentPublisher;
     private final AiEmbeddingIndexService embeddingIndexService;
 
-    AiGovernanceService(JdbcTemplate jdbcTemplate, CurrentUser currentUser, UserRepository userRepository,
-            AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper,
-            AiContentValidator contentValidator, AiContentPublisher contentPublisher,
-            AiEmbeddingIndexService embeddingIndexService) {
+    AiGovernanceService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, AiPromptService promptService,
+            AiJobService jobService, ObjectMapper objectMapper, AiContentValidator contentValidator,
+            AiContentPublisher contentPublisher, AiEmbeddingIndexService embeddingIndexService) {
         this.jdbcTemplate = jdbcTemplate;
-        this.currentUser = currentUser;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
         this.promptService = promptService;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
@@ -58,12 +53,12 @@ class AiGovernanceService {
 
     @Transactional
     AiGovernanceDtos.DraftResponse generate(AiGovernanceDtos.GenerateDraftRequest request) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         String level = request.level().strip().toUpperCase();
         if (!List.of("A1", "A2", "B1", "B2", "C1").contains(level)) {
             throw new BadRequestException("AI_CONTENT_LEVEL_INVALID", "Content requires a supported CEFR level");
         }
-        AiGovernanceDtos.DraftResponse existing = findDraftByIdempotency(actor.getId(), request.idempotencyKey());
+        AiGovernanceDtos.DraftResponse existing = findDraftByIdempotency(actorId, request.idempotencyKey());
         if (existing != null) {
             if (!sameGenerationRequest(existing, request, level)) {
                 throw new ConflictException("AI_CONTENT_IDEMPOTENCY_CONFLICT",
@@ -82,7 +77,7 @@ class AiGovernanceService {
                     (id, created_by, content_type, title, level, generation_request, status, prompt_version,
                      idempotency_key)
                 values (?, ?, ?, ?, ?, ?::jsonb, 'GENERATING', ?, ?)
-                """, draftId, actor.getId(), request.contentType().name(), request.title().strip(), level,
+                """, draftId, actorId, request.contentType().name(), request.title().strip(), level,
                 json(generationRequest), prompt.version(), request.idempotencyKey());
         ObjectNode payload = objectMapper.createObjectNode().put("draftId", draftId.toString())
                 .put("contentType", request.contentType().name()).put("level", level)
@@ -90,7 +85,7 @@ class AiGovernanceService {
         AiJob job = jobService.submitForCurrentUser(AiCapability.CONTENT_GENERATION, "CONTENT_DRAFT_GENERATION",
                 "AI_CONTENT_DRAFT", draftId, prompt.version(), payload, "CONTENT:" + request.idempotencyKey());
         jdbcTemplate.update("update ai_content_drafts set ai_job_id = ? where id = ?", job.getId(), draftId);
-        audit(actor.getId(), "CONTENT_DRAFT_GENERATE", "AI_CONTENT_DRAFT", draftId.toString(), generationRequest);
+        audit(actorId, "CONTENT_DRAFT_GENERATE", "AI_CONTENT_DRAFT", draftId.toString(), generationRequest);
         return draft(draftId);
     }
 
@@ -112,24 +107,24 @@ class AiGovernanceService {
 
     @Transactional
     AiGovernanceDtos.DraftResponse submitForReview(UUID draftId) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         int updated = jdbcTemplate.update("""
                 update ai_content_drafts set status = 'PENDING_REVIEW', review_reason = null
                 where id = ? and created_by = ? and status in ('DRAFT', 'REJECTED')
                   and validation_report->>'valid' = 'true' and content_hash is not null
-                """, draftId, actor.getId());
+                """, draftId, actorId);
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_SUBMITTABLE",
                     "Only your generated draft or rejected content can be submitted");
         }
-        audit(actor.getId(), "CONTENT_SUBMIT_REVIEW", "AI_CONTENT_DRAFT", draftId.toString(), null);
+        audit(actorId, "CONTENT_SUBMIT_REVIEW", "AI_CONTENT_DRAFT", draftId.toString(), null);
         return draft(draftId);
     }
 
     @Transactional
     AiGovernanceDtos.DraftResponse updateDraft(UUID draftId, AiGovernanceDtos.UpdateDraftRequest request) {
-        User actor = requireUser();
-        DraftMetadata metadata = editableMetadata(draftId, actor.getId());
+        UUID actorId = requireUserId();
+        DraftMetadata metadata = editableMetadata(draftId, actorId);
         AiContentValidator.ValidationResult validation = contentValidator.validate(
                 AiGovernanceDtos.ContentType.valueOf(metadata.contentType()), metadata.level(),
                 request.generatedContent());
@@ -141,7 +136,7 @@ class AiGovernanceService {
                     content_hash = ?, revision = ?, review_reason = null, status = 'DRAFT'
                 where id = ? and created_by = ? and status in ('DRAFT', 'REJECTED')
                 """, request.title().strip(), json(request.generatedContent()), json(validation.report()),
-                validation.contentHash(), nextRevision, draftId, actor.getId());
+                validation.contentHash(), nextRevision, draftId, actorId);
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_EDITABLE", "Only your draft or rejected content can be edited");
         }
@@ -150,33 +145,33 @@ class AiGovernanceService {
                     (draft_id, revision, title, generated_content, validation_report, content_hash, created_by)
                 values (?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
                 """, draftId, nextRevision, request.title().strip(), json(request.generatedContent()),
-                json(validation.report()), validation.contentHash(), actor.getId());
-        audit(actor.getId(), "CONTENT_DRAFT_EDIT", "AI_CONTENT_DRAFT", draftId.toString(), null);
+                json(validation.report()), validation.contentHash(), actorId);
+        audit(actorId, "CONTENT_DRAFT_EDIT", "AI_CONTENT_DRAFT", draftId.toString(), null);
         return draft(draftId);
     }
 
     @Transactional
     AiGovernanceDtos.DraftResponse review(UUID draftId, boolean publish, String reason) {
-        User reviewer = requireUser();
+        UUID reviewerId = requireUserId();
         int updated = jdbcTemplate.update("""
                 update ai_content_drafts
                 set status = ?, reviewed_by = ?, review_reason = ?, reviewed_at = now(),
                     published_at = null
                 where id = ? and status = 'PENDING_REVIEW' and generated_content is not null
                   and validation_report->>'valid' = 'true' and created_by <> ?
-                """, publish ? "APPROVED" : "REJECTED", reviewer.getId(), reason.strip(), draftId, reviewer.getId());
+                """, publish ? "APPROVED" : "REJECTED", reviewerId, reason.strip(), draftId, reviewerId);
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_REVIEWABLE", "Content is not pending review");
         }
         ObjectNode details = objectMapper.createObjectNode().put("decision", publish ? "APPROVED" : "REJECTED")
                 .put("reason", reason);
-        audit(reviewer.getId(), "CONTENT_REVIEW", "AI_CONTENT_DRAFT", draftId.toString(), details);
+        audit(reviewerId, "CONTENT_REVIEW", "AI_CONTENT_DRAFT", draftId.toString(), details);
         return draft(draftId);
     }
 
     @Transactional
     AiGovernanceDtos.DraftResponse publish(UUID draftId) {
-        User publisher = requireUser();
+        UUID publisherId = requireUserId();
         PublicationDraft draft = publicationDraft(draftId);
         AiGovernanceDtos.ContentType type = AiGovernanceDtos.ContentType.valueOf(draft.contentType());
         AiContentValidator.ValidationResult validation = contentValidator.validate(type, draft.level(),
@@ -193,7 +188,7 @@ class AiGovernanceService {
                         (draft_id, revision, entity_type, entity_id, published_by)
                     values (?, ?, ?, ?, ?)
                     """, draftId, draft.revision(), entity.path("entityType").asText(),
-                    entity.path("entityId").asText(), publisher.getId());
+                    entity.path("entityId").asText(), publisherId);
         }
         embeddingIndexService.enqueue(entities, draft.revision());
         int updated = jdbcTemplate.update("""
@@ -204,13 +199,13 @@ class AiGovernanceService {
         if (updated == 0) {
             throw new ConflictException("AI_CONTENT_NOT_PUBLISHABLE", "Content is no longer approved for publication");
         }
-        audit(publisher.getId(), "CONTENT_PUBLISH", "AI_CONTENT_DRAFT", draftId.toString(), entities);
+        audit(publisherId, "CONTENT_PUBLISH", "AI_CONTENT_DRAFT", draftId.toString(), entities);
         return draft(draftId);
     }
 
     @Transactional
     AiGovernanceDtos.DraftResponse archive(UUID draftId, String reason) {
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         JsonNode entities = jdbcTemplate.query("""
                 select published_entities from ai_content_drafts
                 where id = ? and status = 'PUBLISHED' for update
@@ -223,18 +218,18 @@ class AiGovernanceService {
         jdbcTemplate.update("""
                 update ai_content_drafts set status = 'ARCHIVED', review_reason = ? where id = ?
                 """, reason.strip(), draftId);
-        audit(actor.getId(), "CONTENT_ARCHIVE", "AI_CONTENT_DRAFT", draftId.toString(),
+        audit(actorId, "CONTENT_ARCHIVE", "AI_CONTENT_DRAFT", draftId.toString(),
                 objectMapper.createObjectNode().put("reason", reason));
         return draft(draftId);
     }
 
     @Transactional
     AiGovernanceDtos.FeedbackResponse report(AiGovernanceDtos.FeedbackRequest request) {
-        User reporter = requireUser();
+        UUID reporterId = requireUserId();
         if (request.aiJobId() != null) {
             Integer owned = jdbcTemplate.queryForObject(
                     "select count(*) from ai_jobs where id = ? and requester_user_id = ?", Integer.class,
-                    request.aiJobId(), reporter.getId());
+                    request.aiJobId(), reporterId);
             if (owned == null || owned == 0) {
                 throw new NotFoundException("AI_JOB_NOT_FOUND", "AI job was not found");
             }
@@ -244,7 +239,7 @@ class AiGovernanceService {
                 insert into ai_feedback_reports
                     (id, reporter_user_id, ai_job_id, capability, category, details)
                 values (?, ?, ?, ?, ?, ?)
-                """, id, reporter.getId(), request.aiJobId(), request.capability().name(), request.category().name(),
+                """, id, reporterId, request.aiJobId(), request.capability().name(), request.category().name(),
                 request.details());
         return feedback(id);
     }
@@ -268,16 +263,16 @@ class AiGovernanceService {
         if (request.status() == AiGovernanceDtos.FeedbackStatus.OPEN) {
             throw new BadRequestException("AI_FEEDBACK_RESOLUTION_INVALID", "Resolution status cannot be OPEN");
         }
-        User actor = requireUser();
+        UUID actorId = requireUserId();
         int updated = jdbcTemplate.update("""
                 update ai_feedback_reports set status = ?, resolution = ?, resolved_by = ?,
                     resolved_at = case when ? in ('RESOLVED', 'DISMISSED') then now() else null end
                 where id = ?
-                """, request.status().name(), request.resolution(), actor.getId(), request.status().name(), reportId);
+                """, request.status().name(), request.resolution(), actorId, request.status().name(), reportId);
         if (updated == 0) {
             throw new NotFoundException("AI_FEEDBACK_NOT_FOUND", "AI feedback report was not found");
         }
-        audit(actor.getId(), "FEEDBACK_RESOLVE", "AI_FEEDBACK_REPORT", reportId.toString(),
+        audit(actorId, "FEEDBACK_RESOLVE", "AI_FEEDBACK_REPORT", reportId.toString(),
                 objectMapper.createObjectNode().put("status", request.status().name()));
         return feedback(reportId);
     }
@@ -411,9 +406,8 @@ class AiGovernanceService {
                 json(details == null ? objectMapper.createObjectNode() : details));
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record DraftMetadata(String contentType, String level, int revision) {

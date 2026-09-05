@@ -21,9 +21,7 @@ import com.englow3.ai.foundation.RenderedPrompt;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,17 +34,15 @@ class WritingAssessmentService {
     private static final int MAX_WORDS = 2000;
 
     private final JdbcTemplate jdbcTemplate;
-    private final UserRepository userRepository;
-    private final CurrentUser currentUser;
+    private final UserDirectory userDirectory;
     private final AiPromptService promptService;
     private final AiJobService jobService;
     private final ObjectMapper objectMapper;
 
-    WritingAssessmentService(JdbcTemplate jdbcTemplate, UserRepository userRepository, CurrentUser currentUser,
-            AiPromptService promptService, AiJobService jobService, ObjectMapper objectMapper) {
+    WritingAssessmentService(JdbcTemplate jdbcTemplate, UserDirectory userDirectory, AiPromptService promptService,
+            AiJobService jobService, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userRepository = userRepository;
-        this.currentUser = currentUser;
+        this.userDirectory = userDirectory;
         this.promptService = promptService;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
@@ -67,7 +63,7 @@ class WritingAssessmentService {
 
     @Transactional
     WritingDtos.SubmissionAccepted submit(WritingDtos.CreateSubmissionRequest request) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         String response = request.responseText().strip();
         if (response.isEmpty()) {
             throw new BadRequestException("WRITING_RESPONSE_REQUIRED", "Writing response is required");
@@ -78,7 +74,7 @@ class WritingAssessmentService {
                     "Writing responses cannot exceed " + MAX_WORDS + " words");
         }
 
-        ExistingSubmission existing = existing(user.getId(), request.idempotencyKey());
+        ExistingSubmission existing = existing(userId, request.idempotencyKey());
         if (existing != null) {
             if (!existing.taskId().equals(request.taskId()) || !existing.responseText().equals(response)) {
                 throw new ConflictException("WRITING_IDEMPOTENCY_CONFLICT",
@@ -105,7 +101,7 @@ class WritingAssessmentService {
                     (id, user_id, task_id, rubric_id, response_text, word_count, status,
                      prompt_version, idempotency_key)
                 values (?, ?, ?, ?, ?, ?, 'PROCESSING', ?, ?)
-                """, submissionId, user.getId(), task.taskId(), task.rubricId(), response, wordCount, prompt.version(),
+                """, submissionId, userId, task.taskId(), task.rubricId(), response, wordCount, prompt.version(),
                 request.idempotencyKey());
 
         ObjectNode payload = objectMapper.createObjectNode().put("submissionId", submissionId.toString())
@@ -122,7 +118,7 @@ class WritingAssessmentService {
 
     @Transactional(readOnly = true)
     List<WritingDtos.SubmissionSummary> history() {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         return jdbcTemplate.query("""
                 select s.id, s.task_id, s.status, s.word_count, a.overall_score, a.cefr_level,
                        s.created_at, s.completed_at
@@ -138,7 +134,7 @@ class WritingAssessmentService {
 
     @Transactional(readOnly = true)
     WritingDtos.SubmissionResult result(UUID submissionId) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         WritingDtos.SubmissionResult result = jdbcTemplate.query("""
                 select s.id, s.task_id, s.status, s.word_count, s.ai_job_id, s.created_at, s.completed_at,
                        a.overall_score, a.cefr_level, a.summary, a.criterion_scores, a.strengths,
@@ -226,9 +222,8 @@ class WritingAssessmentService {
         return value == null ? null : value.toInstant();
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 
     private record Task(String taskId, String prompt, String rubricId) {

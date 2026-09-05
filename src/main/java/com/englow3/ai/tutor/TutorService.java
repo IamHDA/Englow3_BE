@@ -18,10 +18,8 @@ import com.englow3.ai.foundation.RenderedPrompt;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.entity.User;
 import com.englow3.user.repository.LearnerProfileRepository;
-import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -36,17 +34,16 @@ class TutorService {
     private final PromptInjectionDetector injectionDetector;
     private final AiPromptService promptService;
     private final AiJobService jobService;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
     private final LearnerProfileRepository profileRepository;
-    private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
 
     TutorService(TutorConversationRepository conversationRepository, TutorMessageRepository messageRepository,
             TutorFeedbackRepository feedbackRepository, TutorRetrievalPort retrievalPort,
             PromptInjectionDetector injectionDetector, AiPromptService promptService, AiJobService jobService,
-            UserRepository userRepository, LearnerProfileRepository profileRepository, CurrentUser currentUser,
-            ObjectMapper objectMapper, JdbcTemplate jdbcTemplate) {
+            UserDirectory userDirectory, LearnerProfileRepository profileRepository, ObjectMapper objectMapper,
+            JdbcTemplate jdbcTemplate) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.feedbackRepository = feedbackRepository;
@@ -54,45 +51,44 @@ class TutorService {
         this.injectionDetector = injectionDetector;
         this.promptService = promptService;
         this.jobService = jobService;
-        this.userRepository = userRepository;
         this.profileRepository = profileRepository;
-        this.currentUser = currentUser;
         this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.userDirectory = userDirectory;
     }
 
     @Transactional
     TutorDtos.ConversationResponse create(String requestedTitle) {
-        User user = requireUser();
+        UUID userId = requireUserId();
         String title = requestedTitle == null || requestedTitle.isBlank() ? "New English conversation"
                 : requestedTitle.strip();
-        TutorConversation conversation = conversationRepository.save(TutorConversation.start(user.getId(), title));
+        TutorConversation conversation = conversationRepository.save(TutorConversation.start(userId, title));
         return TutorDtos.ConversationResponse.from(conversation, List.of());
     }
 
     @Transactional(readOnly = true)
     List<TutorDtos.ConversationResponse> list() {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .map(conversation -> TutorDtos.ConversationResponse.from(conversation, List.of())).toList();
     }
 
     @Transactional(readOnly = true)
     TutorDtos.ConversationResponse get(UUID conversationId) {
-        TutorConversation conversation = requireConversation(conversationId, requireUser().getId());
+        TutorConversation conversation = requireConversation(conversationId, requireUserId());
         return TutorDtos.ConversationResponse.from(conversation,
                 messageRepository.findByConversationIdOrderByCreatedAtAscIdAsc(conversationId));
     }
 
     @Transactional
     void archive(UUID conversationId) {
-        requireConversation(conversationId, requireUser().getId()).archive();
+        requireConversation(conversationId, requireUserId()).archive();
     }
 
     @Transactional
     TutorDtos.SendMessageResponse send(UUID conversationId, TutorDtos.SendMessageRequest request) {
-        User user = requireUser();
-        TutorConversation conversation = requireConversation(conversationId, user.getId());
+        UUID userId = requireUserId();
+        TutorConversation conversation = requireConversation(conversationId, userId);
         if (!conversation.active()) {
             throw new ConflictException("TUTOR_CONVERSATION_ARCHIVED", "Archived conversations are read-only");
         }
@@ -119,14 +115,14 @@ class TutorService {
             assistantMessage.refuse("I cannot follow instructions that try to override tutor safety rules.",
                     "LEARNER_PROMPT_INJECTION", "PROMPT_INJECTION");
             messageRepository.save(assistantMessage);
-            auditRetrieval(user.getId(), conversationId, userMessage.getId(), messageText, mode,
+            auditRetrieval(userId, conversationId, userMessage.getId(), messageText, mode,
                     new TutorRetrievalPort.RetrievalResult(List.of(), 0, false, true));
             return response(userMessage, assistantMessage);
         }
 
-        TutorRetrievalPort.RetrievalResult retrieval = retrievalPort.retrieve(user.getId(), messageText, 5);
+        TutorRetrievalPort.RetrievalResult retrieval = retrievalPort.retrieve(userId, messageText, 5);
         List<GroundingReference> references = retrieval.references();
-        auditRetrieval(user.getId(), conversationId, userMessage.getId(), messageText, mode, retrieval);
+        auditRetrieval(userId, conversationId, userMessage.getId(), messageText, mode, retrieval);
         if (mode.groundingRequired() && references.isEmpty()) {
             assistantMessage.refuse(
                     "I do not have enough approved course material to answer that reliably. Please rephrase or ask a staff-reviewed question.",
@@ -136,7 +132,7 @@ class TutorService {
         }
         refreshSummary(conversationId);
         RenderedPrompt prompt = promptService.render("TUTOR_REPLY",
-                Map.of("level", learnerLevel(user.getId()), "mode", mode.name(), "groundingRequired",
+                Map.of("level", learnerLevel(userId), "mode", mode.name(), "groundingRequired",
                         mode.groundingRequired(), "history", history(conversationId), "context",
                         groundingText(references), "message", messageText));
         ObjectNode payload = objectMapper.createObjectNode();
@@ -161,8 +157,8 @@ class TutorService {
 
     @Transactional
     void feedback(UUID conversationId, UUID messageId, TutorDtos.FeedbackRequest request) {
-        User user = requireUser();
-        requireConversation(conversationId, user.getId());
+        UUID userId = requireUserId();
+        requireConversation(conversationId, userId);
         TutorMessage message = messageRepository.findByIdAndConversationId(messageId, conversationId)
                 .orElseThrow(() -> new NotFoundException("TUTOR_MESSAGE_NOT_FOUND", "Tutor message was not found"));
         if (message.getRole() != TutorMessageRole.ASSISTANT || message.getStatus() != TutorMessageStatus.COMPLETED) {
@@ -172,10 +168,10 @@ class TutorService {
         if (request.rating() == null && request.reportReason() == null) {
             throw new BadRequestException("TUTOR_FEEDBACK_EMPTY", "A rating or report reason is required");
         }
-        if (feedbackRepository.findByMessageIdAndUserId(messageId, user.getId()).isPresent()) {
+        if (feedbackRepository.findByMessageIdAndUserId(messageId, userId).isPresent()) {
             throw new ConflictException("TUTOR_FEEDBACK_EXISTS", "Feedback already exists for this message");
         }
-        feedbackRepository.save(TutorFeedback.create(messageId, user.getId(), request.rating(),
+        feedbackRepository.save(TutorFeedback.create(messageId, userId, request.rating(),
                 request.reportReason() == null ? null : request.reportReason().name(), request.comment()));
     }
 
@@ -198,7 +194,7 @@ class TutorService {
 
     @Transactional(readOnly = true)
     List<TutorDtos.CitationResponse> citations(UUID conversationId, UUID messageId) {
-        UUID userId = requireUser().getId();
+        UUID userId = requireUserId();
         requireConversation(conversationId, userId);
         messageRepository.findByIdAndConversationId(messageId, conversationId)
                 .orElseThrow(() -> new NotFoundException("TUTOR_MESSAGE_NOT_FOUND", "Tutor message was not found"));
@@ -265,8 +261,7 @@ class TutorService {
                 () -> new NotFoundException("TUTOR_CONVERSATION_NOT_FOUND", "Tutor conversation was not found"));
     }
 
-    private User requireUser() {
-        return userRepository.findByAuthProviderId(currentUser.authProviderId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No internal user is linked to this token"));
+    private UUID requireUserId() {
+        return userDirectory.requireCurrentUserId();
     }
 }

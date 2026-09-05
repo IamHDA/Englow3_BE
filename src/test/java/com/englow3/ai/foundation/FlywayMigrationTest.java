@@ -9,31 +9,13 @@ import java.sql.SQLException;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 class FlywayMigrationTest {
-
-    @Test
-    void appliesEveryMigrationToAnEmptyPostgresDatabase() {
-        String externalUrl = System.getProperty("it.postgres.url", "");
-        if (!externalUrl.isBlank()) {
-            migrate(externalUrl, System.getProperty("it.postgres.username", "postgres"),
-                    System.getProperty("it.postgres.password", "postgres"));
-            return;
-        }
-        assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
-                "Docker is unavailable and no external integration-test database was configured");
-        DockerImageName image = DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres");
-        try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image).withDatabaseName("englow3")
-                .withUsername("englow3").withPassword("englow3")) {
-            postgres.start();
-            migrate(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-        }
-    }
-
     private void migrate(String url, String username, String password) {
         createSupabaseAuthFixture(url, username, password);
 
@@ -69,4 +51,29 @@ class FlywayMigrationTest {
             throw new IllegalStateException("Could not prepare the Supabase auth fixture", ex);
         }
     }
+
+    @Nested
+    class Success {
+
+        @Test
+        void appliesEveryMigrationToAnEmptyPostgresDatabase() {
+            String externalUrl = System.getProperty("it.postgres.url", "");
+            if (!externalUrl.isBlank()) {
+                migrate(externalUrl, System.getProperty("it.postgres.username", "postgres"),
+                        System.getProperty("it.postgres.password", "postgres"));
+                return;
+            }
+            assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
+                    "Docker is unavailable and no external integration-test database was configured");
+            DockerImageName image = DockerImageName.parse("pgvector/pgvector:pg17")
+                    .asCompatibleSubstituteFor("postgres");
+            try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(image).withDatabaseName("englow3")
+                    .withUsername("englow3").withPassword("englow3")) {
+                postgres.start();
+                migrate(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+            }
+        }
+
+    }
+
 }

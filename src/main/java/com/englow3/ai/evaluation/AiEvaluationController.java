@@ -23,7 +23,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/ai/evaluations")
-@PreAuthorize("@authorization.isAdmin()")
+@PreAuthorize("hasRole('ADMIN')")
 class AiEvaluationController {
 
     private final AiEvaluationService service;

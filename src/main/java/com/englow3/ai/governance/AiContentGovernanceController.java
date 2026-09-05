@@ -19,7 +19,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/staff/ai/content")
-@PreAuthorize("@authorization.isStaff()")
+@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
 class AiContentGovernanceController {
 
     private final AiGovernanceService service;
