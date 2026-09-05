@@ -7,6 +7,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -34,12 +36,22 @@ class FlywayMigrationTest {
 
     private void migrate(String url, String username, String password) {
         createSupabaseAuthFixture(url, username, password);
-        Flyway flyway = Flyway.configure().dataSource(url, username, password).schemas("englow3")
-                .defaultSchema("englow3").locations("classpath:db/migration").load();
 
+        Flyway existingProductionSchema = configureFlyway(url, username, password)
+                .target(MigrationVersion.fromVersion("29")).load();
+        assertThat(existingProductionSchema.migrate().success).isTrue();
+        assertThat(existingProductionSchema.info().current().getVersion())
+                .isEqualTo(MigrationVersion.fromVersion("29"));
+
+        Flyway flyway = configureFlyway(url, username, password).load();
         assertThat(flyway.migrate().success).isTrue();
         flyway.validate();
         assertThat(flyway.info().pending()).isEmpty();
+    }
+
+    private FluentConfiguration configureFlyway(String url, String username, String password) {
+        return Flyway.configure().dataSource(url, username, password).schemas("englow3").defaultSchema("englow3")
+                .locations("classpath:db/migration");
     }
 
     private void createSupabaseAuthFixture(String url, String username, String password) {
