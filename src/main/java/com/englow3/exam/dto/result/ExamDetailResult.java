@@ -20,10 +20,11 @@ import com.englow3.exam.entity.TargetLevel;
 
 /**
  * The whole paper, answer keys and explanations included. This is the admin projection; the sitting's tree load owes
- * the same descent with those left out. The five levels below are nested rather than five files of their own: each is
- * the field type of the level above it and nothing else refers to them, so a file each would only scatter one shape
- * across six places. Nesting also lets the whole tree be read top to bottom here. They stay public - the sitting's
- * response tree will map from these.
+ * the same descent with those left out. The section, part, question-set and question levels below are nested rather
+ * than four files of their own: each is the field type of the level above it and nothing else refers to them. Nesting
+ * also lets the whole tree be read top to bottom here. They stay public - the sitting's response tree will map from
+ * these. {@link QuestionOptionResult} is the exception, in its own file because {@link QuestionBankItemResult} needs
+ * the same shape too.
  */
 public record ExamDetailResult(UUID id, String title, String description, ExamType examType,
         CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
@@ -83,14 +84,6 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
                     question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
                     question.getOrderNo(), question.getMaxRawScore(), question.getExplanation(),
                     question.getSourceQuestionId(), options);
-        }
-    }
-
-    public record QuestionOptionResult(UUID id, String content, int orderNo, boolean correct, String explanation) {
-
-        public static QuestionOptionResult of(com.englow3.exam.entity.QuestionOption option) {
-            return new QuestionOptionResult(option.getId(), option.getContent(), option.getOrderNo(),
-                    option.isCorrect(), option.getExplanation());
         }
     }
 }

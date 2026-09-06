@@ -9,15 +9,15 @@ import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SkillType;
 
-/** Reuses {@link ExamDetailResponse.QuestionOptionResponse} - same shape, same reason as on the result side. */
+/** Reuses {@link QuestionOptionResponse} - same shape, same reason as on the result side. */
 public record QuestionBankItemResponse(UUID id, UUID questionSetId, QuestionType questionType, String content,
         DifficultyLevel difficultyLevel, SkillType skillType, String questionCategory, BigDecimal maxRawScore,
-        String explanation, List<ExamDetailResponse.QuestionOptionResponse> options) {
+        String explanation, List<QuestionOptionResponse> options) {
 
     public static QuestionBankItemResponse from(QuestionBankItemResult result) {
         return new QuestionBankItemResponse(result.id(), result.questionSetId(), result.questionType(),
                 result.content(), result.difficultyLevel(), result.skillType(), result.questionCategory(),
                 result.maxRawScore(), result.explanation(),
-                result.options().stream().map(ExamDetailResponse.QuestionOptionResponse::from).toList());
+                result.options().stream().map(QuestionOptionResponse::from).toList());
     }
 }
