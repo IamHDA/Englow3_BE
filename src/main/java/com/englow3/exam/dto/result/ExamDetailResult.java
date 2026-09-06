@@ -20,10 +20,11 @@ import com.englow3.exam.entity.TargetLevel;
 
 /**
  * The whole paper, answer keys and explanations included. This is the admin projection; the sitting's tree load owes
- * the same descent with those left out. The five levels below are nested rather than five files of their own: each is
- * the field type of the level above it and nothing else refers to them, so a file each would only scatter one shape
- * across six places. Nesting also lets the whole tree be read top to bottom here. They stay public - the sitting's
- * response tree will map from these.
+ * the same descent with those left out. The section, part, question-set and question levels below are nested rather
+ * than four files of their own: each is the field type of the level above it and nothing else refers to them. Nesting
+ * also lets the whole tree be read top to bottom here. They stay public - the sitting's response tree will map from
+ * these. {@link QuestionOptionResult} is the exception, in its own file because {@link QuestionBankItemResult} needs
+ * the same shape too.
  */
 public record ExamDetailResult(UUID id, String title, String description, ExamType examType,
         CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
@@ -57,34 +58,32 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
         }
     }
 
-    /** Carries the raw object keys; turning them into presigned URLs is the response layer's job. */
+    /**
+     * Carries the raw object keys; turning them into presigned URLs is the response layer's job.
+     * {@code sourceQuestionSetId} is surfaced here so an admin who loads a paper, edits it, and saves it back through
+     * {@code PUT /content} does not silently drop the bank provenance the frontend never re-derives on its own.
+     */
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
-            String audioObjectKey, String imageObjectKey, List<QuestionResult> questions) {
+            String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId, List<QuestionResult> questions) {
 
         public static QuestionSetResult of(com.englow3.exam.entity.QuestionSet questionSet,
                 List<QuestionResult> questions) {
             return new QuestionSetResult(questionSet.getId(), questionSet.getTitle(), questionSet.getInstruction(),
                     questionSet.getOrderNo(), questionSet.getContent(), questionSet.getAudioObjectKey(),
-                    questionSet.getImageObjectKey(), questions);
+                    questionSet.getImageObjectKey(), questionSet.getSourceQuestionSetId(), questions);
         }
     }
 
+    /** {@code sourceQuestionId} is surfaced for the same round-trip reason as {@code QuestionSetResult}'s. */
     public record QuestionResult(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            List<QuestionOptionResult> options) {
+            UUID sourceQuestionId, List<QuestionOptionResult> options) {
 
         public static QuestionResult of(com.englow3.exam.entity.Question question, List<QuestionOptionResult> options) {
             return new QuestionResult(question.getId(), question.getQuestionType(), question.getContent(),
                     question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
-                    question.getOrderNo(), question.getMaxRawScore(), question.getExplanation(), options);
-        }
-    }
-
-    public record QuestionOptionResult(UUID id, String content, int orderNo, boolean correct, String explanation) {
-
-        public static QuestionOptionResult of(com.englow3.exam.entity.QuestionOption option) {
-            return new QuestionOptionResult(option.getId(), option.getContent(), option.getOrderNo(),
-                    option.isCorrect(), option.getExplanation());
+                    question.getOrderNo(), question.getMaxRawScore(), question.getExplanation(),
+                    question.getSourceQuestionId(), options);
         }
     }
 }

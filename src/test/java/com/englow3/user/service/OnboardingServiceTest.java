@@ -191,7 +191,7 @@ class OnboardingServiceTest {
         void refusesTheGoalStepBeforeTheLevelIsKnown() {
             when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
 
-            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(null, null, null)))
+            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(null, null, null, null)))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                     .isEqualTo("ONBOARDING_LEVEL_REQUIRED");
         }
@@ -201,9 +201,8 @@ class OnboardingServiceTest {
             when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
             profile.declareCurrentLevel(CertificateLevel.B1);
 
-            assertThatThrownBy(() -> service.setLearningGoal(
-                    new SetLearningGoalCommand(null, new BigDecimal("7.0"), LocalDate.now().plusMonths(6))))
-                            .isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(null, new BigDecimal("5"),
+                    new BigDecimal("7.0"), LocalDate.now().plusMonths(6)))).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
         }

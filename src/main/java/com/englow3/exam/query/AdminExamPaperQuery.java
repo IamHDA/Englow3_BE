@@ -14,10 +14,10 @@ import org.springframework.stereotype.Repository;
 
 import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.dto.result.ExamDetailResult.ExamSectionResult;
-import com.englow3.exam.dto.result.ExamDetailResult.QuestionOptionResult;
 import com.englow3.exam.dto.result.ExamDetailResult.QuestionResult;
 import com.englow3.exam.dto.result.ExamDetailResult.QuestionSetResult;
 import com.englow3.exam.dto.result.ExamDetailResult.SectionPartResult;
+import com.englow3.exam.dto.result.QuestionOptionResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;

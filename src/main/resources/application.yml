@@ -23,8 +23,9 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 2MB
+      # 12MB: the design allows up to 10MB audio for exam listening tracks.
+      max-file-size: 12MB
+      max-request-size: 12MB
 
   security:
     oauth2:
