@@ -4,21 +4,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.englow3.shared.persistence.BasePersistedEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
 @Entity
 @Table(name = "learner_profiles")
 @Getter
-public class LearnerProfile {
-
-    @Id
-    private UUID id;
+public class LearnerProfile extends BasePersistedEntity {
 
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
@@ -58,8 +56,10 @@ public class LearnerProfile {
         this.targetCertificateType = certificateType;
     }
 
-    public void setGoal(CertificateType targetCertificateType, BigDecimal targetScore, LocalDate targetDate) {
+    public void setGoal(CertificateType targetCertificateType, BigDecimal currentScore, BigDecimal targetScore,
+            LocalDate targetDate) {
         this.targetCertificateType = targetCertificateType;
+        this.currentScore = currentScore;
         this.targetScore = targetScore;
         this.targetDate = targetDate;
     }

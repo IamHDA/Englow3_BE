@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,19 +17,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
 import com.englow3.exam.dto.command.ExamDetailCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
+import com.englow3.exam.dto.command.UpdateExamContentCommand;
 import com.englow3.exam.dto.command.SearchExamCommand;
 import com.englow3.exam.dto.command.UpdateExamCommand;
 import com.englow3.exam.dto.request.CreateExamRequest;
+import com.englow3.exam.dto.request.UpdateExamContentRequest;
 import com.englow3.exam.dto.request.SearchExamRequest;
 import com.englow3.exam.dto.request.UpdateExamRequest;
 import com.englow3.exam.dto.response.ExamDetailResponse;
 import com.englow3.exam.dto.response.ExamListItemResponse;
+import com.englow3.exam.dto.response.ExamMediaResponse;
 import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.ExamResponse;
 import com.englow3.exam.dto.result.ExamDetailResult;
@@ -86,6 +92,26 @@ class AdminExamController {
                 request.durationSeconds(), request.maxRawScore(), request.passScore());
 
         return ResponseEntity.ok(ExamResponse.from(adminExamService.update(command)));
+    }
+
+    /**
+     * Storage only - no row changes. The returned key is only real once it lands in a node of {@code PUT /content}'s
+     * payload, which is why this never touches {@code AdminExamPaperQuery} or the exam at all.
+     */
+    @PostMapping(path = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<ExamMediaResponse> uploadMedia(@PathVariable UUID id, @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(ExamMediaResponse.from(adminExamService.uploadMedia(id, file)));
+    }
+
+    /**
+     * Whole-tree replace, draft only - also the wizard's autosave. Returns the tree the same way {@code detail} does.
+     */
+    @PutMapping("/{id}/content")
+    ResponseEntity<ExamDetailResponse> replaceContent(@PathVariable UUID id,
+            @Valid @RequestBody UpdateExamContentRequest request) {
+        ExamDetailResult result = adminExamService.replaceContent(UpdateExamContentCommand.of(id, request));
+
+        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
     }
 
     @PostMapping("/{id}/publish")
