@@ -4,9 +4,13 @@ import java.time.Duration;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +41,7 @@ import com.englow3.exam.dto.response.ExamListItemResponse;
 import com.englow3.exam.dto.response.ExamMediaResponse;
 import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.ExamResponse;
+import com.englow3.exam.dto.response.QuestionImportResponse;
 import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.service.AdminExamService;
 import com.englow3.shared.page.PageResponse;
@@ -101,6 +106,26 @@ class AdminExamController {
     @PostMapping(path = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<ExamMediaResponse> uploadMedia(@PathVariable UUID id, @RequestPart("file") MultipartFile file) {
         return ResponseEntity.ok(ExamMediaResponse.from(adminExamService.uploadMedia(id, file)));
+    }
+
+    /**
+     * Read-only: parses the file and hands back rows, nothing is written. The frontend merges the result into the part
+     * it is composing and saves it the normal way, through {@code PUT /{id}/content}.
+     */
+    @PostMapping(path = "/{id}/content/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<QuestionImportResponse> importQuestions(@PathVariable UUID id,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(QuestionImportResponse.from(adminExamService.importQuestions(id, file)));
+    }
+
+    /** The column contract every import file must follow - see {@code QuestionImportParser}. */
+    @GetMapping("/content/import-template")
+    ResponseEntity<Resource> importTemplate() {
+        Resource template = new ClassPathResource("exam/question-import-template.csv");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("question-import-template.csv").build().toString())
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8")).body(template);
     }
 
     /**

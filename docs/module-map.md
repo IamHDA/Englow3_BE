@@ -29,6 +29,7 @@ in the same module and differ only by controller (`/api/admin/**` with
   - `shared/error`: `DomainException` (code + `HttpStatus`), typed bases `NotFoundException` / `ConflictException` / `BadRequestException` / `ForbiddenException`, `ApiErrorResponse`, `GlobalExceptionHandler` (also maps `OptimisticLockingFailureException` -> 409 `CONCURRENT_UPDATE`).
   - `shared/storage`: `ObjectStorageClient` - generic `upload(bucket, key, stream)` / `presignGet(bucket, key, ttl)` / `delete`, no knowledge of what a key means.
   - `shared/persistence`: `BasePersistedEntity` - a `@MappedSuperclass` implementing `Persistable<UUID>` for any entity that assigns its own id rather than letting the database generate one. Identity only (`@Id UUID id`, the `isNew` flag, nothing else) - the moment a shared column like `createdAt` lands on it, it stops being a technical type. Used by `Exam` and the five authored content entities (`exam`) and `LearnerProfile` (`user`).
+  - `shared/spreadsheet`: `SpreadsheetReader` (CSV via commons-csv, XLSX via Apache POI, BOM stripped, cell reads by index so a blank cell cannot shift later columns out of place) + `SpreadsheetTable` (rows matched to a header by normalized name - accents stripped, case folded - never by position). Neither knows what a column *means*; that is `exam.dto.result.QuestionImportResult.of(...)`'s job, the only caller so far.
 - **Explicitly does NOT contain:**
   - business error codes (e.g. `ATTEMPT_ALREADY_SUBMITTED`) - live in the owning module, exception extends `DomainException`
   - `@PreAuthorize` / "who can do what" rules - declared per module at the controller/service that owns the action
@@ -126,8 +127,8 @@ cross-module read.
 The first admin feature. It is a controller in this module, not a module of its own - role is not
 a boundary. Shell CRUD (list, create, edit-while-draft, publish, archive) shipped first; **authoring
 the content inside a paper** - media upload, whole-tree content replace, and the question bank
-search - shipped in Phase 4/5, see below. Import from CSV/XLSX/DOCX and AI-generated questions are
-still not built.
+search - shipped in Phase 4/5, see below. Import from CSV/XLSX shipped next, see below; DOCX and
+AI-generated questions are still not built.
 
 - **Authorization:** `@PreAuthorize("hasRole('ADMIN')")` on the controller class is the whole gate -
   see `shared + config` for how the role gets from `englow3.users.role` into the JWT and into a
@@ -251,7 +252,39 @@ still not built.
   every question ever authored by skill/difficulty/keyword and returns each with its options; there
   is no copy endpoint; the frontend re-sends a result row's fields inside the same
   `PUT /content` payload with `sourceQuestionId` (or `sourceQuestionSetId`) set, and the backend's
-  only job is storing that provenance column. Import from CSV/XLSX/DOCX is not built.
+  only job is storing that provenance column.
+- **Import from CSV/XLSX, split across two layers, no parser class in `exam` at all.**
+  `POST /{id}/content/import` (multipart, draft only - same `Exam.requireEditable()` gate as
+  `replaceContent`) reads the file and hands back `{questions, errors}` - **it writes no row**. Adding
+  a second content write path beside `replaceContent` is exactly what the read-only `query/` convention
+  above exists to keep out, and the design's own "AI sinh câu hỏi" source already expects a review step
+  before anything is kept, so import matches that shape instead of adding one of its own: the frontend
+  merges `questions` into the part it is composing and saves everything together through the existing
+  `PUT /{id}/content`.
+  - `shared/spreadsheet/SpreadsheetReader` + `SpreadsheetTable` turn the upload into rows matched to a
+    header by normalized name (diacritics stripped, case folded) - column *position* is never assumed,
+    so reordering columns in Excel cannot break an import. This lives in `shared` on purpose: strip the
+    column vocabulary out and what is left (CSV via commons-csv, XLSX via Apache POI, a UTF-8 BOM to
+    strip, cell-by-index reads so a blank middle cell cannot shift every column after it) has no
+    business reason to change and no exam vocabulary in it, the same line `shared/storage
+    /ObjectStorageClient` draws for object keys. `SpreadsheetTable` throws its own generic
+    `SPREADSHEET_*` codes (missing header row, unsupported extension, unreadable file); it has no
+    opinion on which columns matter.
+  - `exam/dto/result/QuestionImportResult.of(SpreadsheetTable)` is where the column contract actually
+    lives: five columns - content, question type, options, correct answer(s), explanation - and every
+    per-row rule. No difficulty/skill/score column, because the composing screen already asks for those
+    per part and guessing them here would silently pick wrong ones. This is a static factory on the
+    record it produces (`implementation-patterns.md`'s "mapping as static factories, no mapper class"),
+    not a separate parser class - the row rules are business logic (a usable answer key, a real option
+    letter), which is exam's to own, and they are small enough now that a dedicated class would only
+    have added a package no one could agree a name for. A row the contract cannot make sense of becomes
+    one entry in `errors` (row number, code, message) rather than failing the whole file, and the
+    "no usable answer key" check it runs per row (no correct option, or more than one on a
+    `SINGLE_CHOICE` row) is the same rule `Exam.publish(...)` enforces at the tree level, just surfaced
+    at import time instead of at publish time.
+  `GET /content/import-template` serves the fixed CSV template
+  (`resources/exam/question-import-template.csv`) that column contract is built around. DOCX is not
+  built - see *Deliberately left open*.
 - **Editing a paper after publish is refused** - `Exam.updateDraft(...)` accepts a `DRAFT` only. That
   settles what this file previously left open: `exam_attempts.exam_version_number` snapshots the
   paper, and refusing the edit is cheaper than bumping `version_number` or letting a sat paper change
@@ -291,13 +324,14 @@ pattern once either table holds real rows.
 ## Deliberately left open
 
 - **Quiz** - tables not designed. It gets its own module when built (own tables, own admin CRUD); the `user` module calls into it. Not folded into `user`, not folded into `exam`.
-- **Exam authoring (tự soạn + question bank) shipped in Phase 4/5** - see *Admin exam management*
-  for the endpoints, and `shared + config` for how the admin gate actually works now
-  (`@PreAuthorize("hasRole('ADMIN')")` reading the JWT directly, not a bean call). What is still
-  open: **importing** questions from CSV/XLSX/DOCX (needs a parsing library, a column contract, and
-  per-row error reporting - its own unit of work), and **AI-generated** questions (the `ai` module
-  that would have owned this was removed from the codebase; nothing calls out to an LLM anywhere
-  now). `metadata jsonb` on the three content tables also stays unmapped - the authoring API does
+- **Exam authoring (tự soạn + question bank) shipped in Phase 4/5, CSV/XLSX import shipped after** -
+  see *Admin exam management* for the endpoints, and `shared + config` for how the admin gate
+  actually works now (`@PreAuthorize("hasRole('ADMIN')")` reading the JWT directly, not a bean call).
+  What is still open: **DOCX** import (`shared/spreadsheet/SpreadsheetReader`'s format dispatch has
+  room for a third branch, but reading a Word table needs its own POI code path, not built), and
+  **AI-generated** questions (the `ai` module that would have owned this was removed from the
+  codebase; nothing calls out to an LLM anywhere now). `metadata jsonb` on the three content tables
+  also stays unmapped - the authoring API does
   not accept the field, and nothing yet needs to read it.
 - **AI grading** remains open, more so than when this was last written: the `ai` module (and its
   planned call from `exam`) **no longer exists in the codebase**. `ai_jobs` is still a real table

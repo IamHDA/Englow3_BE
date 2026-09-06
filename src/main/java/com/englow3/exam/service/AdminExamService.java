@@ -29,6 +29,7 @@ import com.englow3.exam.dto.result.ExamListItemResult;
 import com.englow3.exam.dto.result.ExamMediaResult;
 import com.englow3.exam.dto.result.ExamResult;
 import com.englow3.exam.dto.result.QuestionBankItemResult;
+import com.englow3.exam.dto.result.QuestionImportResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
@@ -44,6 +45,7 @@ import com.englow3.exam.repository.QuestionSetRepository;
 import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.spreadsheet.SpreadsheetReader;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.service.UserDirectory;
 
@@ -64,12 +66,13 @@ public class AdminExamService {
     private final UserDirectory userDirectory;
     private final ObjectStorageClient objectStorage;
     private final String examBucket;
+    private final SpreadsheetReader spreadsheetReader;
 
     AdminExamService(ExamRepository examRepo, ExamSectionRepository examSectionRepo,
             SectionPartRepository sectionPartRepo, QuestionSetRepository questionSetRepo,
             QuestionRepository questionRepo, QuestionOptionRepository questionOptionRepo,
             AdminExamPaperQuery examPaperQuery, UserDirectory userDirectory, ObjectStorageClient objectStorage,
-            @Value("${app.storage.exam-bucket}") String examBucket) {
+            @Value("${app.storage.exam-bucket}") String examBucket, SpreadsheetReader spreadsheetReader) {
         this.examRepo = examRepo;
         this.examSectionRepo = examSectionRepo;
         this.sectionPartRepo = sectionPartRepo;
@@ -80,6 +83,7 @@ public class AdminExamService {
         this.userDirectory = userDirectory;
         this.objectStorage = objectStorage;
         this.examBucket = examBucket;
+        this.spreadsheetReader = spreadsheetReader;
     }
 
     @Transactional
@@ -157,6 +161,20 @@ public class AdminExamService {
             throw new BadRequestException("MEDIA_UNREADABLE", "The uploaded media could not be read");
         }
         return new ExamMediaResult(objectKey);
+    }
+
+    /**
+     * Parses a CSV/XLSX file into questions - draft only, same as every other authoring entry point. Nothing here is
+     * persisted: {@code exam} has one content write path, {@code replaceContent} below, and this stays on the read
+     * side of it deliberately (see {@code QuestionImportParser}). The frontend merges the returned rows into the part
+     * it is composing and saves them the normal way, through {@code PUT /{id}/content}.
+     */
+    @Transactional(readOnly = true)
+    public QuestionImportResult importQuestions(UUID examId, MultipartFile file) {
+        Exam exam = requireExam(examId);
+        exam.requireEditable();
+
+        return QuestionImportResult.of(spreadsheetReader.read(file));
     }
 
     /**
