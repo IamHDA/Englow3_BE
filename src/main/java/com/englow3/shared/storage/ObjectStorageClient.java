@@ -18,8 +18,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 /**
- * Every call names its bucket. There is no default: buckets are one per domain, so a client-level default would only
- * be whichever domain happened to be written first, silently collecting files from the rest.
+ * Every call names its bucket. There is no default: buckets are one per domain, so a client-level default would only be
+ * whichever domain happened to be written first, silently collecting files from the rest.
  */
 @Component
 @RequiredArgsConstructor
