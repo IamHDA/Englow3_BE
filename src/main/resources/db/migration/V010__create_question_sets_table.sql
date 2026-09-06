@@ -9,7 +9,6 @@ create table question_sets (
     -- the passage a group of questions reads from, and free-form delivery data (TOEIC Part 6/7)
     content text,
     metadata jsonb,
-    is_single_use boolean not null default true,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );

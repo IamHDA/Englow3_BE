@@ -200,10 +200,11 @@ content still arrives by SQL seed.
   edit away from serving an answer key into a paper being sat.
   The five content entities (`ExamSection`, `SectionPart`, `QuestionSet`, `Question`,
   `QuestionOption`) hold **plain `UUID` foreign keys, no `@ManyToOne`** - nothing navigates the
-  graph, so an association would only add lazy loading. `metadata jsonb` (three tables) and
-  `question_sets.is_single_use` are **deliberately unmapped**: nothing reads them, and how to map
-  `jsonb` is a decision for whoever first needs its contents. `validate` checks the columns an entity
-  claims, not that it claims every column.
+  graph, so an association would only add lazy loading. `metadata jsonb` (three tables) is
+  **deliberately unmapped**: nothing reads it, and how to map `jsonb` is a decision for whoever
+  first needs its contents. `validate` checks the columns an entity claims, not that it claims
+  every column. `question_sets.is_single_use` **no longer exists** - it implied a question-bank
+  concept nothing here ever decided, so the column was dropped from `V010` rather than left unmapped.
 - **Media is presigned, not public.** `section_parts` / `question_sets` audio and image are returned
   as presigned URLs from the private bucket (`ExamMediaUrls` in `exam/dto/response/`, one hour),
   never as a stable public URL like a `user` avatar: a permanent link to a listening recording is a
@@ -233,11 +234,10 @@ file assumed they could still be rewritten in place; that stopped when the migra
 ## Deliberately left open
 
 - **Quiz** - tables not designed. It gets its own module when built (own tables, own admin CRUD); the `user` module calls into it. Not folded into `user`, not folded into `exam`.
-- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, edit it while it is a draft, read the whole paper back with answer keys, publish it once the seeded content adds up, and archive it - but cannot **fill** it through the API: sections, parts, question sets and questions have no write path yet. So `publish()` is only satisfiable by a paper someone seeded by hand, which is exactly the current workflow. Authoring is also what forces the two decisions parked on the content entities: what `question_sets.is_single_use` means (it is `not null default true`, so an insert that does not map it takes the default), and how `metadata jsonb` should be mapped. **Authorization is settled** (see `shared + config` and the `user` module API): `user.Role` is `LEARNER` / `ADMIN` / `STAFF`, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.Authorization` is the single gate - `requireAdminId()` where the caller's own id is also needed, `isAdmin()` / `isStaff()` behind `@PreAuthorize` where a yes/no answer is enough.
+- **Exam authoring endpoints.** Content is seeded by SQL in this phase. Admin can create a paper shell, edit it while it is a draft, read the whole paper back with answer keys, publish it once the seeded content adds up, and archive it - but cannot **fill** it through the API: sections, parts, question sets and questions have no write path yet. So `publish()` is only satisfiable by a paper someone seeded by hand, which is exactly the current workflow. Authoring is also what forces the one decision still parked on the content entities: how `metadata jsonb` should be mapped. **Authorization is settled** (see `shared + config` and the `user` module API): `user.Role` is `LEARNER` / `ADMIN` / `STAFF`, `User.role` is the enum (not a `String`) via `@Enumerated(EnumType.STRING)`, and `user.Authorization` is the single gate - `requireAdminId()` where the caller's own id is also needed, `isAdmin()` / `isStaff()` behind `@PreAuthorize` where a yes/no answer is enough.
   **`@PreAuthorize` does work, and needs no `PermissionEvaluator`** - an earlier note here claimed otherwise. `@PreAuthorize("@authorization.isAdmin()")` is a SpEL *bean reference*, not `hasRole(...)`, so it never asks the `Authentication` for a `GrantedAuthority`; the bean does the lookup itself. That is why no role claim in the token is needed, and why `CurrentUser` still exposes only `authProviderId` and `email`. `@EnableMethodSecurity` and the `AccessDeniedException` handler were already wired.
   The Supabase-token-hook / role-claim / `JwtAuthenticationConverter` approach previously planned here is dropped - role is resolved per request, so granting or revoking one takes effect immediately, and there is no "token issued before the role was granted" problem. The cost is one uncached read per gated request.
 - **AI grading** remains open. `grading_criteria`, `attempt_answer_criterion_scores` and `exam_sections.is_scored_by_criteria` are exam-owned and unused for the current TOEIC objective-key flow. The `ai` module owns `ai_jobs`; future AI grading must call that module instead of making `exam` a second writer.
-- **`question_sets.is_single_use`** - the column implies a question-bank / reuse concept that no decision covers. Decide what it means before anything reads it.
 - **`spring.servlet.multipart.max-file-size: 2MB`** - too small for speaking recordings. Irrelevant until a 4-skills paper exists; the choice then is raising the limit or presigned direct-to-S3 upload.
 - **`@Version` columns** - the design calls for them on `LearnerProfile` and `ExamAttempt`; neither exists in a migration or an entity yet.
 - Concrete values of the `TargetSkill` enum vs `questions.skill_type`, especially values that exist on only one side (e.g. Pronunciation). The `skill_type -> TargetSkill` mapping lives in the `user` module; the enum is never shared between modules.

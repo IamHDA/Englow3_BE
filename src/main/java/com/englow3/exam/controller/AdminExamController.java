@@ -44,14 +44,13 @@ import jakarta.validation.Valid;
 class AdminExamController {
 
     private final AdminExamService adminExamService;
-    private final ObjectStorageClient objectStorage;
-    private final Duration mediaUrlTtl;
+    private final ExamMediaUrls mediaUrls;
 
     AdminExamController(AdminExamService adminExamService, ObjectStorageClient objectStorage,
+            @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
         this.adminExamService = adminExamService;
-        this.objectStorage = objectStorage;
-        this.mediaUrlTtl = mediaUrlTtl;
+        this.mediaUrls = new ExamMediaUrls(objectStorage, examBucket, mediaUrlTtl);
     }
 
     @PostMapping
@@ -77,7 +76,7 @@ class AdminExamController {
     ResponseEntity<ExamDetailResponse> detail(@PathVariable UUID id) {
         ExamDetailResult result = adminExamService.detail(new ExamDetailCommand(id));
 
-        return ResponseEntity.ok(ExamDetailResponse.from(result, ExamMediaUrls.of(objectStorage, mediaUrlTtl)));
+        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
     }
 
     @PutMapping("/{id}")
