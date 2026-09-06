@@ -40,15 +40,20 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.104.183.3:4000}
 
   storage:
-    public-bucket: ${STORAGE_PUBLIC_BUCKET:images}
-    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/images}
+    # One bucket per domain: the module that owns a file names its own bucket, so shared/storage never has to pick a
+    # default. A third domain is one more line here and no change to ObjectStorageClient.
+    avatar-bucket: ${STORAGE_AVATAR_BUCKET:avatars}
+    exam-bucket: ${STORAGE_EXAM_BUCKET:exams}
+
+    # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
+    # against. On Supabase the two differ in path shape, not just in host.
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/avatars}
 
     s3:
       endpoint: ${S3_ENDPOINT:http://localhost:9000}
       region: ${S3_REGION:us-east-1}
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
-      bucket: ${S3_BUCKET:englow3}
 
   ai:
     enabled: ${AI_ENABLED:false}

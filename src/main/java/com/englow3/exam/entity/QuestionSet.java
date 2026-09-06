@@ -11,10 +11,10 @@ import lombok.Getter;
 /**
  * The group of questions that share one stimulus: a TOEIC Part 3 conversation, or a Part 6/7 passage. {@code content}
  * is that passage text and {@code audioObjectKey} that recording - which is why this level exists at all rather than
- * hanging every question straight off the part. Read-only, see {@link ExamSection}. {@code metadata jsonb} and
- * {@code is_single_use} are deliberately not mapped. The first has no reader yet; the second implies a question-bank
- * concept no decision covers, and it is {@code not null default true}, so authoring has to decide what it means before
- * anything writes this table.
+ * hanging every question straight off the part. Read-only, see {@link ExamSection}. {@code metadata jsonb} is
+ * deliberately not mapped: nothing reads it, and choosing how to map it (String, JsonNode, Map) is a decision for
+ * whoever first needs its contents. {@code is_single_use} was dropped from the table entirely - it implied a
+ * question-bank / reuse concept nothing here decided, so there was no meaning to guard.
  */
 @Entity
 @Table(name = "question_sets")

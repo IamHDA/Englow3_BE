@@ -6,31 +6,27 @@ import java.time.Duration;
 
 import org.springframework.stereotype.Component;
 
-import com.englow3.config.S3Properties;
-
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
+/**
+ * Every call names its bucket. There is no default: buckets are one per domain, so a client-level default would only be
+ * whichever domain happened to be written first, silently collecting files from the rest.
+ */
 @Component
 @RequiredArgsConstructor
 public class ObjectStorageClient {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
-    private final S3Properties properties;
-
-    public String defaultBucket() {
-        return properties.bucket();
-    }
 
     public void upload(String bucket, String key, InputStream content, long contentLength, String contentType) {
         s3Client.putObject(PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
@@ -63,15 +59,6 @@ public class ObjectStorageClient {
 
     public void delete(String bucket, String key) {
         s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
-    }
-
-    public boolean isReachable() {
-        try {
-            s3Client.headBucket(HeadBucketRequest.builder().bucket(properties.bucket()).build());
-            return true;
-        } catch (RuntimeException exception) {
-            return false;
-        }
     }
 
     public record StoredObjectMetadata(long contentLength, String contentType) {

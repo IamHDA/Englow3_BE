@@ -27,14 +27,14 @@ public class UserService {
     private final UserRepository userRepo;
     private final CurrentUser currentUser;
     private final ObjectStorageClient objectStorageClient;
-    private final String publicBucket;
+    private final String avatarBucket;
 
     UserService(UserRepository userRepo, CurrentUser currentUser, ObjectStorageClient objectStorageClient,
-            @Value("${app.storage.public-bucket}") String publicBucket) {
+            @Value("${app.storage.avatar-bucket}") String avatarBucket) {
         this.userRepo = userRepo;
         this.currentUser = currentUser;
         this.objectStorageClient = objectStorageClient;
-        this.publicBucket = publicBucket;
+        this.avatarBucket = avatarBucket;
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +87,7 @@ public class UserService {
 
         String objectKey = "users/%s/%s/%s.%s".formatted(userId, kind, UUID.randomUUID(), extension);
         try {
-            objectStorageClient.upload(publicBucket, objectKey, image.getInputStream(), image.getSize(),
+            objectStorageClient.upload(avatarBucket, objectKey, image.getInputStream(), image.getSize(),
                     image.getContentType());
         } catch (IOException e) {
             throw new BadRequestException("IMAGE_UNREADABLE", "The uploaded image could not be read");

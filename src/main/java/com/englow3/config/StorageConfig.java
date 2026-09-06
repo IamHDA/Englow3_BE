@@ -38,7 +38,11 @@ public class StorageConfig {
         StaticCredentialsProvider credentials = credentials(properties);
         var builder = S3Presigner.builder().region(Region.of(properties.region())).credentialsProvider(credentials);
         if (StringUtils.hasText(properties.endpoint())) {
-            builder.endpointOverride(URI.create(properties.endpoint()));
+            // Same path-style as the client above, and for the same reason: MinIO and Supabase Storage both serve
+            // buckets as a path segment. Without it a presigned URL points at https://{bucket}.{host}/... - a host
+            // that does not resolve, so every signed link 404s while the upload that produced it succeeded.
+            builder.endpointOverride(URI.create(properties.endpoint()))
+                    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
         }
         return builder.build();
     }

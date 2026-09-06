@@ -13,10 +13,6 @@ import com.englow3.shared.storage.ObjectStorageClient;
  */
 public record ExamMediaUrls(ObjectStorageClient objectStorage, String bucket, Duration ttl) {
 
-    public static ExamMediaUrls of(ObjectStorageClient objectStorage, Duration ttl) {
-        return new ExamMediaUrls(objectStorage, objectStorage.defaultBucket(), ttl);
-    }
-
     public String urlFor(String objectKey) {
         return objectKey == null ? null : objectStorage.presignGet(bucket, objectKey, ttl).toString();
     }
