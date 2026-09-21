@@ -14,12 +14,12 @@ import com.englow3.exam.entity.TargetLevel;
 public record LearnerExamResponse(UUID id, String title, String description, ExamType examType,
         CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
         int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, long questionCount, ExamStatus status,
-        Instant publishedAt) {
+        Instant publishedAt, BigDecimal bestScorePercentage, String attemptStatus) {
 
     public static LearnerExamResponse from(LearnerExamListItemResult result) {
         return new LearnerExamResponse(result.id(), result.title(), result.description(), result.examType(),
                 result.certificateType(), result.certificateVariant(), result.targetLevel(), result.durationSeconds(),
-                result.maxRawScore(), result.passScore(), result.questionCount(), result.status(),
-                result.publishedAt());
+                result.maxRawScore(), result.passScore(), result.questionCount(), result.status(), result.publishedAt(),
+                result.bestScorePercentage(), result.attemptStatus());
     }
 }

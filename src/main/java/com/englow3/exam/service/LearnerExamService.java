@@ -73,13 +73,45 @@ public class LearnerExamService {
         Map<UUID, Long> counts = examIds.isEmpty() ? Map.of()
                 : examRepo.countQuestionsForExams(examIds).stream()
                         .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
-        return page.map(exam -> LearnerExamListItemResult.of(exam, counts.getOrDefault(exam.getId(), 0L)));
+
+        UUID userId = userDirectory.requireCurrentUserId();
+        Map<UUID, BigDecimal> bestScores = examIds.isEmpty() ? Map.of()
+                : attemptRepo.findBestScoreByExam(userId, examIds).stream()
+                        .collect(Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));
+        Set<UUID> live = examIds.isEmpty() ? Set.of()
+                : new HashSet<>(attemptRepo.findExamIdsWithLiveAttempt(userId, examIds));
+
+        return page.map(exam -> LearnerExamListItemResult.of(exam, counts.getOrDefault(exam.getId(), 0L),
+                bestScores.get(exam.getId()), live.contains(exam.getId())));
     }
 
     @Transactional(readOnly = true)
     public LearnerExamListItemResult detail(UUID examId) {
         Exam exam = requirePublishedExam(examId);
-        return LearnerExamListItemResult.of(exam, examRepo.countQuestions(examId));
+        UUID userId = userDirectory.requireCurrentUserId();
+        List<UUID> ids = List.of(examId);
+
+        BigDecimal best = attemptRepo.findBestScoreByExam(userId, ids).stream().map(row -> (BigDecimal) row[1])
+                .findFirst().orElse(null);
+
+        return LearnerExamListItemResult.of(exam, examRepo.countQuestions(examId), best,
+                !attemptRepo.findExamIdsWithLiveAttempt(userId, ids).isEmpty());
+    }
+
+    /**
+     * The learner's own attempt history. The exam title is joined in because a list of scores with no paper names is
+     * not a history anyone can read.
+     */
+    @Transactional(readOnly = true)
+    public Page<ExamAttemptResult> attemptHistory(Pageable pageable) {
+        UUID userId = userDirectory.requireCurrentUserId();
+        Page<ExamAttempt> page = attemptRepo.findByUserIdOrderByStartedAtDesc(userId, pageable);
+
+        Map<UUID, String> titles = page.getContent().isEmpty() ? Map.of()
+                : examRepo.findAllById(page.getContent().stream().map(ExamAttempt::getExamId).toList()).stream()
+                        .collect(Collectors.toMap(Exam::getId, Exam::getTitle));
+
+        return page.map(attempt -> ExamAttemptResult.summary(attempt, titles.get(attempt.getExamId())));
     }
 
     @Transactional

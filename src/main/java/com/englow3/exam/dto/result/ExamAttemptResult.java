@@ -10,7 +10,19 @@ import com.englow3.exam.entity.ExamAttemptStatus;
 
 public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, Instant startedAt, Instant expiresAt,
         Instant submittedAt, Instant scoredAt, BigDecimal rawScore, BigDecimal maxRawScore, BigDecimal scorePercentage,
-        Integer correctAnswerCount, int questionCount, boolean resumed, List<QuestionReviewResult> questions) {
+        Integer correctAnswerCount, int questionCount, boolean resumed, String examTitle,
+        List<QuestionReviewResult> questions) {
+
+    /**
+     * An attempt as a history row: everything except the review, which carries the answer key and is not something a
+     * list of past sittings should hand out.
+     */
+    public static ExamAttemptResult summary(ExamAttempt attempt, String examTitle) {
+        return new ExamAttemptResult(attempt.getId(), attempt.getExamId(), attempt.getStatus(), attempt.getStartedAt(),
+                attempt.getExpiresAt(), attempt.getSubmittedAt(), attempt.getScoredAt(), attempt.getRawScore(),
+                attempt.getMaxRawScore(), attempt.getScorePercentage(), attempt.getCorrectAnswerCount(),
+                attempt.getQuestionCount(), false, examTitle, List.of());
+    }
 
     public static ExamAttemptResult started(ExamAttempt attempt, boolean resumed) {
         return from(attempt, resumed, List.of());
@@ -24,7 +36,7 @@ public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, 
         return new ExamAttemptResult(attempt.getId(), attempt.getExamId(), attempt.getStatus(), attempt.getStartedAt(),
                 attempt.getExpiresAt(), attempt.getSubmittedAt(), attempt.getScoredAt(), attempt.getRawScore(),
                 attempt.getMaxRawScore(), attempt.getScorePercentage(), attempt.getCorrectAnswerCount(),
-                attempt.getQuestionCount(), resumed, questions);
+                attempt.getQuestionCount(), resumed, null, questions);
     }
 
     public record QuestionReviewResult(UUID questionId, List<UUID> selectedOptionIds, List<UUID> correctOptionIds,

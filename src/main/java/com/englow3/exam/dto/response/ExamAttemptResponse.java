@@ -10,13 +10,14 @@ import com.englow3.exam.entity.ExamAttemptStatus;
 
 public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status, Instant startedAt, Instant expiresAt,
         Instant submittedAt, Instant scoredAt, BigDecimal rawScore, BigDecimal maxRawScore, BigDecimal scorePercentage,
-        Integer correctAnswerCount, int questionCount, boolean resumed, List<QuestionReviewResponse> questions) {
+        Integer correctAnswerCount, int questionCount, boolean resumed, String examTitle,
+        List<QuestionReviewResponse> questions) {
 
     public static ExamAttemptResponse from(ExamAttemptResult result) {
         return new ExamAttemptResponse(result.id(), result.examId(), result.status(), result.startedAt(),
                 result.expiresAt(), result.submittedAt(), result.scoredAt(), result.rawScore(), result.maxRawScore(),
                 result.scorePercentage(), result.correctAnswerCount(), result.questionCount(), result.resumed(),
-                result.questions().stream().map(QuestionReviewResponse::from).toList());
+                result.examTitle(), result.questions().stream().map(QuestionReviewResponse::from).toList());
     }
 
     public record QuestionReviewResponse(UUID questionId, List<UUID> selectedOptionIds, List<UUID> correctOptionIds,

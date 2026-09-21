@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +19,7 @@ import com.englow3.exam.dto.response.ExamAttemptResponse;
 import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.LearnerExamPaperResponse;
 import com.englow3.exam.service.LearnerExamService;
+import com.englow3.shared.page.PageResponse;
 import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
@@ -33,6 +36,13 @@ public class ExamAttemptController {
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
         this.learnerExamService = learnerExamService;
         this.mediaUrls = new ExamMediaUrls(objectStorage, examBucket, mediaUrlTtl);
+    }
+
+    /** The learner's own history, newest first. No review data - that is the result endpoint's job. */
+    @GetMapping
+    public ResponseEntity<PageResponse<ExamAttemptResponse>> history(@PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity
+                .ok(PageResponse.from(learnerExamService.attemptHistory(pageable).map(ExamAttemptResponse::from)));
     }
 
     @GetMapping("/{id}/paper")
