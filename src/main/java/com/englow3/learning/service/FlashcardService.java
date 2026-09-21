@@ -52,13 +52,15 @@ public class FlashcardService {
         Instant now = Instant.now();
 
         Page<FlashcardSet> page = setRepo.searchByStatus(FlashcardSetStatus.PUBLISHED, topic, title, pageable);
-        Map<UUID, Long> cardCounts = countCardsFor(page.getContent().stream().map(FlashcardSet::getId).toList());
+        List<UUID> setIds = page.getContent().stream().map(FlashcardSet::getId).toList();
+        Map<UUID, Long> cardCounts = countCardsFor(setIds);
+        Map<UUID, Instant> lastStudied = lastStudiedFor(userId, setIds);
 
         // Due and mastered are per learner and per set, so they cost one query each. Batching them the way card counts
         // are batched is worth doing once a page of sets is routinely large; a page of twenty is not that yet.
         return page.map(set -> FlashcardSetSummaryResult.of(set, cardCounts.getOrDefault(set.getId(), 0L),
-                reviewRepo.countDueInSet(userId, set.getId(), now),
-                reviewRepo.countMasteredInSet(userId, set.getId())));
+                reviewRepo.countDueInSet(userId, set.getId(), now), reviewRepo.countMasteredInSet(userId, set.getId()),
+                lastStudied.get(set.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -125,7 +127,16 @@ public class FlashcardService {
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set, UUID userId, long cardCount) {
         return FlashcardSetSummaryResult.of(set, cardCount,
                 reviewRepo.countDueInSet(userId, set.getId(), Instant.now()),
-                reviewRepo.countMasteredInSet(userId, set.getId()));
+                reviewRepo.countMasteredInSet(userId, set.getId()),
+                lastStudiedFor(userId, List.of(set.getId())).get(set.getId()));
+    }
+
+    private Map<UUID, Instant> lastStudiedFor(UUID userId, Collection<UUID> setIds) {
+        if (setIds.isEmpty()) {
+            return Map.of();
+        }
+        return reviewLogRepo.findLastStudiedAtBySet(userId, setIds).stream()
+                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
     }
 
     private Map<UUID, FlashcardReview> reviewsFor(UUID userId, List<Flashcard> cards) {

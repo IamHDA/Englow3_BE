@@ -56,7 +56,7 @@ public class AdminFlashcardService {
     }
 
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set) {
-        return FlashcardSetSummaryResult.of(set, cardRepo.countByFlashcardSetId(set.getId()), 0L, 0L);
+        return FlashcardSetSummaryResult.of(set, cardRepo.countByFlashcardSetId(set.getId()), 0L, 0L, null);
     }
 
     private FlashcardSet requireSet(UUID setId) {
