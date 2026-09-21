@@ -1,0 +1,91 @@
+package com.englow3.learning.service;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.englow3.learning.dto.command.AddDictationSentencesCommand;
+import com.englow3.learning.dto.command.AddDictationSentencesCommand.NewSentence;
+import com.englow3.learning.dto.command.CreateDictationLessonCommand;
+import com.englow3.learning.dto.result.DictationLessonSummaryResult;
+import com.englow3.learning.entity.DictationLesson;
+import com.englow3.learning.entity.DictationSentence;
+import com.englow3.learning.repository.DictationLessonRepository;
+import com.englow3.learning.repository.DictationSentenceRepository;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.NotFoundException;
+import com.englow3.user.service.UserDirectory;
+
+import lombok.RequiredArgsConstructor;
+
+/** Authoring dictation lessons. Per-learner figures are zero here - an author is not practising their own lesson. */
+@Service
+@RequiredArgsConstructor
+public class AdminDictationService {
+
+    private final DictationLessonRepository lessonRepo;
+    private final DictationSentenceRepository sentenceRepo;
+    private final UserDirectory userDirectory;
+
+    @Transactional
+    public DictationLessonSummaryResult create(CreateDictationLessonCommand command) {
+        if (lessonRepo.existsBySlug(command.slug())) {
+            throw new ConflictException("DICTATION_LESSON_SLUG_TAKEN",
+                    "A lesson already uses the slug %s".formatted(command.slug()));
+        }
+
+        DictationLesson lesson = lessonRepo.save(DictationLesson.draft(command.slug(), command.title(), command.topic(),
+                command.targetLevel(), userDirectory.requireCurrentUserId()));
+        return summaryOf(lesson);
+    }
+
+    /**
+     * Appends sentences. Allowed on a published lesson: a new line is simply unpractised, and nothing already recorded
+     * is scored against the lesson as a whole.
+     */
+    @Transactional
+    public DictationLessonSummaryResult addSentences(AddDictationSentencesCommand command) {
+        DictationLesson lesson = requireLesson(command.lessonId());
+        int nextOrderNo = Math.toIntExact(sentenceRepo.countByDictationLessonId(lesson.getId())) + 1;
+
+        List<DictationSentence> sentences = new ArrayList<>();
+        for (NewSentence source : command.sentences()) {
+            // Word count comes from the scorer so the hint agrees with the marking.
+            sentences.add(DictationSentence.of(lesson.getId(), nextOrderNo++, source.text(), source.translationVi(),
+                    source.audioObjectKey(), source.audioDurationSeconds(), DictationScorer.words(source.text()).size(),
+                    source.hintFirstLetters(), source.hintRevealWord(), source.hintPartialTranscript()));
+        }
+        sentenceRepo.saveAll(sentences);
+
+        return summaryOf(lesson);
+    }
+
+    @Transactional
+    public DictationLessonSummaryResult publish(UUID lessonId) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.publish(sentenceRepo.countByDictationLessonId(lessonId), Instant.now());
+        return summaryOf(lesson);
+    }
+
+    @Transactional
+    public DictationLessonSummaryResult archive(UUID lessonId) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.archive();
+        return summaryOf(lesson);
+    }
+
+    private DictationLessonSummaryResult summaryOf(DictationLesson lesson) {
+        List<DictationSentence> sentences = sentenceRepo.findByDictationLessonIdOrderByOrderNo(lesson.getId());
+        return DictationLessonSummaryResult.of(lesson, sentences.size(), 0L,
+                sentences.stream().mapToInt(DictationSentence::getAudioDurationSeconds).sum(), null);
+    }
+
+    private DictationLesson requireLesson(UUID lessonId) {
+        return lessonRepo.findById(lessonId).orElseThrow(() -> new NotFoundException("DICTATION_LESSON_NOT_FOUND",
+                "No dictation lesson with id %s".formatted(lessonId)));
+    }
+}
