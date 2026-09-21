@@ -21,9 +21,11 @@ import com.englow3.learning.dto.command.SubmitDictationCommand;
 import com.englow3.learning.dto.request.SubmitDictationRequest;
 import com.englow3.learning.dto.response.DictationLessonResponse;
 import com.englow3.learning.dto.response.DictationSentenceResponse;
+import com.englow3.learning.dto.response.DictationStatsResponse;
 import com.englow3.learning.dto.response.DictationSubmissionResponse;
 import com.englow3.learning.dto.response.FlashcardMediaUrls;
 import com.englow3.learning.service.DictationService;
+import com.englow3.learning.service.DictationStatsService;
 import com.englow3.shared.page.PageResponse;
 import com.englow3.shared.storage.ObjectStorageClient;
 
@@ -33,13 +35,20 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/dictation")
 class DictationController {
 
+    /** Windows the statistics screen offers. A request outside them is clamped rather than refused. */
+    private static final int MIN_PERIOD_DAYS = 1;
+    private static final int MAX_PERIOD_DAYS = 365;
+    private static final int DEFAULT_PERIOD_DAYS = 7;
+
     private final DictationService dictationService;
+    private final DictationStatsService dictationStatsService;
     private final FlashcardMediaUrls mediaUrls;
 
-    DictationController(DictationService dictationService, ObjectStorageClient objectStorage,
-            @Value("${app.storage.learning-bucket}") String learningBucket,
+    DictationController(DictationService dictationService, DictationStatsService dictationStatsService,
+            ObjectStorageClient objectStorage, @Value("${app.storage.learning-bucket}") String learningBucket,
             @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
         this.dictationService = dictationService;
+        this.dictationStatsService = dictationStatsService;
         this.mediaUrls = new FlashcardMediaUrls(objectStorage, learningBucket, mediaUrlTtl);
     }
 
@@ -56,6 +65,13 @@ class DictationController {
         var detail = dictationService.lessonDetail(id);
         return ResponseEntity.ok(new DictationLessonDetailResponse(DictationLessonResponse.from(detail.lesson()), detail
                 .sentences().stream().map(sentence -> DictationSentenceResponse.from(sentence, mediaUrls)).toList()));
+    }
+
+    @GetMapping("/stats")
+    ResponseEntity<DictationStatsResponse> stats(
+            @RequestParam(defaultValue = "" + DEFAULT_PERIOD_DAYS) int periodDays) {
+        int clamped = Math.min(Math.max(periodDays, MIN_PERIOD_DAYS), MAX_PERIOD_DAYS);
+        return ResponseEntity.ok(DictationStatsResponse.from(dictationStatsService.statsFor(clamped)));
     }
 
     /** The only endpoint that returns a transcript, and only in exchange for an answer. */
