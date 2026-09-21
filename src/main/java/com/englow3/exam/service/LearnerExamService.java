@@ -46,6 +46,7 @@ import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.user.service.PlacementRecorder;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class LearnerExamService {
     private final LearnerExamPaperQuery paperQuery;
     private final ExamGradingQuery gradingQuery;
     private final UserDirectory userDirectory;
+    private final PlacementRecorder placementRecorder;
 
     @Transactional(readOnly = true)
     public Page<LearnerExamListItemResult> search(ExamType examType, CertificateType certificateType,
@@ -156,7 +158,29 @@ public class LearnerExamService {
         answerRepo.saveAll(storedAnswers);
         answerOptionRepo.saveAll(storedOptions);
         attempt.score(rawScore, correctCount, now);
+
+        // A placement paper is scored like any other; what differs is that its score is also an answer to "what level
+        // is this learner". The user module decides what the percentage means - this module only says it happened.
+        Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
+        if (exam.getExamType() == ExamType.PLACEMENT) {
+            placementRecorder.record(attempt.getUserId(), attempt.getId(), attempt.getScorePercentage());
+        }
+
         return ExamAttemptResult.scored(attempt, buildReview(questions, storedAnswers, storedOptions));
+    }
+
+    /**
+     * The placement paper to sit. Newest published one wins; matching it to the learner's target certificate is a
+     * refinement for when there is more than one, and pretending to choose between papers that do not exist yet would
+     * be the more confusing code to read.
+     */
+    @Transactional(readOnly = true)
+    public LearnerExamListItemResult placementExam() {
+        Exam exam = examRepo
+                .findFirstByExamTypeAndStatusOrderByPublishedAtDesc(ExamType.PLACEMENT, ExamStatus.PUBLISHED)
+                .orElseThrow(() -> new NotFoundException("PLACEMENT_EXAM_NOT_FOUND",
+                        "No published placement exam is available"));
+        return LearnerExamListItemResult.of(exam, examRepo.countQuestions(exam.getId()));
     }
 
     @Transactional(readOnly = true)

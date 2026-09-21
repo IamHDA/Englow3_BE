@@ -38,6 +38,7 @@ import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.user.service.PlacementRecorder;
 import com.englow3.user.service.UserDirectory;
 
 class LearnerExamServiceTest {
@@ -49,8 +50,9 @@ class LearnerExamServiceTest {
     private final LearnerExamPaperQuery paperQuery = mock(LearnerExamPaperQuery.class);
     private final ExamGradingQuery gradingQuery = mock(ExamGradingQuery.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
     private final LearnerExamService service = new LearnerExamService(examRepo, attemptRepo, answerRepo,
-            answerOptionRepo, paperQuery, gradingQuery, userDirectory);
+            answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder);
 
     private final UUID userId = UUID.randomUUID();
 
@@ -102,6 +104,7 @@ class LearnerExamServiceTest {
                 "Because it fits the sentence", List.of(new GradingOption(correctOptionId, true, "Correct form"),
                         new GradingOption(wrongOptionId, false, "Wrong tense")));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
         when(gradingQuery.load(exam.getId())).thenReturn(List.of(question));
 
         ExamAttemptResult result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
@@ -128,6 +131,7 @@ class LearnerExamServiceTest {
         GradingQuestion question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(UUID.randomUUID(), true, null)));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
         when(gradingQuery.load(exam.getId())).thenReturn(List.of(question));
 
         assertThatThrownBy(() -> service.submit(new SubmitExamAttemptCommand(attempt.getId(),

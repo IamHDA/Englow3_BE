@@ -3,6 +3,7 @@ package com.englow3.exam.repository;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -77,6 +78,13 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
              group by s.examId
             """)
     List<Object[]> countQuestionsForExams(@Param("examIds") Collection<UUID> examIds);
+
+    /**
+     * The placement paper to hand a learner who does not know their level. Ordered by publication so the newest
+     * published one wins, and {@code Optional} because a deployment with no placement paper is a normal state, not a
+     * broken one.
+     */
+    Optional<Exam> findFirstByExamTypeAndStatusOrderByPublishedAtDesc(ExamType examType, ExamStatus status);
 
     @Query("select coalesce(sum(s.maxRawScore), 0) from ExamSection s where s.examId = :examId")
     BigDecimal sumSectionScores(@Param("examId") UUID examId);

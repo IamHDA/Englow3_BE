@@ -40,6 +40,14 @@ public class LearnerProfile {
     @Column(name = "target_date")
     private LocalDate targetDate;
 
+    /**
+     * The attempt the declared level came from, when it came from a placement test rather than the learner's own
+     * answer. A plain UUID and not a JPA relationship: {@code exam_attempts} belongs to the exam module, and the
+     * database keeps the foreign key so the row cannot point at nothing.
+     */
+    @Column(name = "placement_attempt_id")
+    private UUID placementAttemptId;
+
     protected LearnerProfile() {
     }
 
@@ -52,6 +60,15 @@ public class LearnerProfile {
 
     public void declareCurrentLevel(CertificateLevel level) {
         this.currentLevel = level;
+    }
+
+    /**
+     * Records a level the learner was measured at rather than one they chose. Keeping the attempt id is what makes the
+     * level auditable later - "B1 because of this paper on this date", not "B1 because someone said so".
+     */
+    public void recordPlacement(CertificateLevel level, UUID attemptId) {
+        this.currentLevel = level;
+        this.placementAttemptId = attemptId;
     }
 
     public void aimAtCertificate(CertificateType certificateType) {

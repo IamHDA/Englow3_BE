@@ -45,6 +45,15 @@ public class ExamController {
                         .map(LearnerExamResponse::from)));
     }
 
+    /**
+     * Mapped before {@code /{id}} on purpose: a literal segment and a UUID placeholder both match "placement", and
+     * Spring resolves the more specific pattern first only because this one has no variable.
+     */
+    @GetMapping("/placement")
+    public ResponseEntity<LearnerExamResponse> placement() {
+        return ResponseEntity.ok(LearnerExamResponse.from(learnerExamService.placementExam()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<LearnerExamResponse> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(LearnerExamResponse.from(learnerExamService.detail(id)));
