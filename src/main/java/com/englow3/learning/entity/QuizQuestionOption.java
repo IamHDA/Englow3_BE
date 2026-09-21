@@ -33,4 +33,16 @@ public class QuizQuestionOption {
 
     protected QuizQuestionOption() {
     }
+
+    public static QuizQuestionOption of(UUID quizQuestionId, int orderNo, String label, String content,
+            boolean correct) {
+        QuizQuestionOption option = new QuizQuestionOption();
+        option.id = UUID.randomUUID();
+        option.quizQuestionId = quizQuestionId;
+        option.orderNo = orderNo;
+        option.label = label;
+        option.content = content;
+        option.correct = correct;
+        return option;
+    }
 }

@@ -30,4 +30,14 @@ public class QuizQuestionPair {
 
     protected QuizQuestionPair() {
     }
+
+    public static QuizQuestionPair of(UUID quizQuestionId, int orderNo, String leftText, String rightText) {
+        QuizQuestionPair pair = new QuizQuestionPair();
+        pair.id = UUID.randomUUID();
+        pair.quizQuestionId = quizQuestionId;
+        pair.orderNo = orderNo;
+        pair.leftText = leftText;
+        pair.rightText = rightText;
+        return pair;
+    }
 }

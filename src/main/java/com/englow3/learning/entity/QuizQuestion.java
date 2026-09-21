@@ -54,4 +54,23 @@ public class QuizQuestion {
 
     protected QuizQuestion() {
     }
+
+    public static QuizQuestion of(UUID quizId, int orderNo, QuizQuestionType questionType, String title, String prompt,
+            short points, String explanation, String beforeText, String afterText, String originalSentence,
+            String rewriteKeyword) {
+        QuizQuestion question = new QuizQuestion();
+        question.id = UUID.randomUUID();
+        question.quizId = quizId;
+        question.orderNo = orderNo;
+        question.questionType = questionType;
+        question.title = title;
+        question.prompt = prompt;
+        question.points = points;
+        question.explanation = explanation == null ? "" : explanation;
+        question.beforeText = beforeText;
+        question.afterText = afterText;
+        question.originalSentence = originalSentence;
+        question.rewriteKeyword = rewriteKeyword;
+        return question;
+    }
 }

@@ -34,4 +34,14 @@ public class QuizQuestionToken {
 
     protected QuizQuestionToken() {
     }
+
+    public static QuizQuestionToken of(UUID quizQuestionId, QuizTokenRole role, int orderNo, String value) {
+        QuizQuestionToken token = new QuizQuestionToken();
+        token.id = UUID.randomUUID();
+        token.quizQuestionId = quizQuestionId;
+        token.role = role;
+        token.orderNo = orderNo;
+        token.value = value;
+        return token;
+    }
 }
