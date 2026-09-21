@@ -23,7 +23,9 @@ import com.englow3.learning.dto.response.FlashcardMediaUrls;
 import com.englow3.learning.dto.response.FlashcardResponse;
 import com.englow3.learning.dto.response.FlashcardReviewResponse;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
+import com.englow3.learning.dto.response.FlashcardStatsResponse;
 import com.englow3.learning.service.FlashcardService;
+import com.englow3.learning.service.FlashcardStatsService;
 import com.englow3.shared.page.PageResponse;
 import com.englow3.shared.storage.ObjectStorageClient;
 
@@ -40,13 +42,20 @@ public class FlashcardController {
     private static final int DEFAULT_STUDY_LIMIT = 20;
     private static final int MAX_STUDY_LIMIT = 100;
 
+    /** Windows the statistics screen offers. A request outside them is clamped rather than refused. */
+    private static final int MIN_PERIOD_DAYS = 1;
+    private static final int MAX_PERIOD_DAYS = 365;
+    private static final int DEFAULT_PERIOD_DAYS = 7;
+
     private final FlashcardService flashcardService;
+    private final FlashcardStatsService flashcardStatsService;
     private final FlashcardMediaUrls mediaUrls;
 
-    public FlashcardController(FlashcardService flashcardService, ObjectStorageClient objectStorage,
-            @Value("${app.storage.learning-bucket}") String learningBucket,
+    public FlashcardController(FlashcardService flashcardService, FlashcardStatsService flashcardStatsService,
+            ObjectStorageClient objectStorage, @Value("${app.storage.learning-bucket}") String learningBucket,
             @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
         this.flashcardService = flashcardService;
+        this.flashcardStatsService = flashcardStatsService;
         this.mediaUrls = new FlashcardMediaUrls(objectStorage, learningBucket, mediaUrlTtl);
     }
 
@@ -71,6 +80,13 @@ public class FlashcardController {
             @RequestParam(defaultValue = "" + DEFAULT_STUDY_LIMIT) int limit) {
         return ResponseEntity.ok(flashcardService.studyQueue(id, Math.min(Math.max(limit, 1), MAX_STUDY_LIMIT)).stream()
                 .map(card -> FlashcardResponse.from(card, mediaUrls)).toList());
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<FlashcardStatsResponse> stats(
+            @RequestParam(defaultValue = "" + DEFAULT_PERIOD_DAYS) int periodDays) {
+        int clamped = Math.min(Math.max(periodDays, MIN_PERIOD_DAYS), MAX_PERIOD_DAYS);
+        return ResponseEntity.ok(FlashcardStatsResponse.from(flashcardStatsService.statsFor(clamped)));
     }
 
     @PostMapping("/{id}/reviews")
