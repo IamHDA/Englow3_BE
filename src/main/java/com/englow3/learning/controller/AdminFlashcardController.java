@@ -1,5 +1,6 @@
 package com.englow3.learning.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -11,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.learning.dto.command.AddFlashcardsCommand;
 import com.englow3.learning.dto.command.CreateFlashcardSetCommand;
+import com.englow3.learning.dto.request.AddFlashcardsRequest;
 import com.englow3.learning.dto.request.CreateFlashcardSetRequest;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
 import com.englow3.learning.service.AdminFlashcardService;
@@ -36,6 +39,19 @@ class AdminFlashcardController {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 FlashcardSetResponse.from(adminFlashcardService.createSet(new CreateFlashcardSetCommand(request.slug(),
                         request.name(), request.description(), request.topic(), request.targetLevel()))));
+    }
+
+    @PostMapping("/sets/{id}/cards")
+    ResponseEntity<FlashcardSetResponse> addCards(@PathVariable UUID id,
+            @Valid @RequestBody AddFlashcardsRequest request) {
+        List<AddFlashcardsCommand.NewCard> cards = request.cards().stream()
+                .map(card -> new AddFlashcardsCommand.NewCard(card.lemma(), card.partOfSpeech(), card.senseLabel(),
+                        card.ipaUs(), card.ipaUk(), card.audioUsObjectKey(), card.audioUkObjectKey(),
+                        card.definitionEn(), card.definitionVi(), card.exampleSentence(), card.exampleTranslationVi(),
+                        card.mnemonicTipVi(), card.cefrLevel()))
+                .toList();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(FlashcardSetResponse.from(adminFlashcardService.addCards(new AddFlashcardsCommand(id, cards))));
     }
 
     @PostMapping("/sets/{id}/publish")

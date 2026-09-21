@@ -68,4 +68,32 @@ public class Flashcard {
 
     protected Flashcard() {
     }
+
+    /**
+     * Position is assigned by the caller rather than derived here: a batch is inserted in one go, and having each card
+     * ask the table where it belongs would be one query per card for a number the caller already knows.
+     */
+    public static Flashcard of(UUID flashcardSetId, int orderNo, String lemma, String partOfSpeech, String senseLabel,
+            String ipaUs, String ipaUk, String audioUsObjectKey, String audioUkObjectKey, String definitionEn,
+            String definitionVi, String exampleSentence, String exampleTranslationVi, String mnemonicTipVi,
+            String cefrLevel) {
+        Flashcard card = new Flashcard();
+        card.id = UUID.randomUUID();
+        card.flashcardSetId = flashcardSetId;
+        card.orderNo = orderNo;
+        card.lemma = lemma;
+        card.partOfSpeech = partOfSpeech;
+        card.senseLabel = senseLabel;
+        card.ipaUs = ipaUs;
+        card.ipaUk = ipaUk;
+        card.audioUsObjectKey = audioUsObjectKey;
+        card.audioUkObjectKey = audioUkObjectKey;
+        card.definitionEn = definitionEn;
+        card.definitionVi = definitionVi;
+        card.exampleSentence = exampleSentence;
+        card.exampleTranslationVi = exampleTranslationVi;
+        card.mnemonicTipVi = mnemonicTipVi;
+        card.cefrLevel = cefrLevel;
+        return card;
+    }
 }

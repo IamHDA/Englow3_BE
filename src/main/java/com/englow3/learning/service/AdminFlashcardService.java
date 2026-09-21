@@ -1,13 +1,17 @@
 package com.englow3.learning.service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.learning.dto.command.AddFlashcardsCommand;
 import com.englow3.learning.dto.command.CreateFlashcardSetCommand;
 import com.englow3.learning.dto.result.FlashcardSetSummaryResult;
+import com.englow3.learning.entity.Flashcard;
 import com.englow3.learning.entity.FlashcardSet;
 import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
@@ -38,6 +42,28 @@ public class AdminFlashcardService {
 
         FlashcardSet set = setRepo.save(FlashcardSet.draft(command.slug(), command.name(), command.description(),
                 command.topic(), command.targetLevel(), userDirectory.requireCurrentUserId()));
+        return summaryOf(set);
+    }
+
+    /**
+     * Appends cards. Allowed on a published set as well as a draft: a new card is NEW for every learner and disturbs
+     * nothing already scheduled. Editing or removing one would not be safe in the same way, which is why neither is
+     * offered here.
+     */
+    @Transactional
+    public FlashcardSetSummaryResult addCards(AddFlashcardsCommand command) {
+        FlashcardSet set = requireSet(command.flashcardSetId());
+        int nextOrderNo = cardRepo.findMaxOrderNo(set.getId()).orElse(0) + 1;
+
+        List<Flashcard> cards = new ArrayList<>();
+        for (AddFlashcardsCommand.NewCard card : command.cards()) {
+            cards.add(Flashcard.of(set.getId(), nextOrderNo++, card.lemma(), card.partOfSpeech(), card.senseLabel(),
+                    card.ipaUs(), card.ipaUk(), card.audioUsObjectKey(), card.audioUkObjectKey(), card.definitionEn(),
+                    card.definitionVi(), card.exampleSentence(), card.exampleTranslationVi(), card.mnemonicTipVi(),
+                    card.cefrLevel()));
+        }
+        cardRepo.saveAll(cards);
+
         return summaryOf(set);
     }
 
