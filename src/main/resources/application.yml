@@ -44,6 +44,7 @@ app:
     # default. A third domain is one more line here and no change to ObjectStorageClient.
     avatar-bucket: ${STORAGE_AVATAR_BUCKET:avatars}
     exam-bucket: ${STORAGE_EXAM_BUCKET:exams}
+    exam-media-url-ttl: ${STORAGE_EXAM_MEDIA_URL_TTL:PT3H}
 
     # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
     # against. On Supabase the two differ in path shape, not just in host.

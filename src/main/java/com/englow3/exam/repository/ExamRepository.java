@@ -35,6 +35,21 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     Page<Exam> search(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
             @Param("title") String title, Pageable pageable);
 
+    @Query("""
+            select e from Exam e
+            where (:status is null or e.status = :status)
+              and (:examType is null or e.examType = :examType)
+              and (:certificateType is null or e.certificateType = :certificateType)
+              and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
+              and (:targetLevel is null or e.targetLevel = :targetLevel)
+              and (:title is null or lower(e.title) like lower(concat('%', cast(:title as String), '%')))
+            """)
+    Page<Exam> searchCatalogue(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
+            @Param("certificateType") com.englow3.exam.entity.CertificateType certificateType,
+            @Param("certificateVariant") com.englow3.exam.entity.CertificateVariant certificateVariant,
+            @Param("targetLevel") com.englow3.exam.entity.TargetLevel targetLevel, @Param("title") String title,
+            Pageable pageable);
+
     /**
      * The three figures {@code Exam.publish(...)} weighs, as three plain scalars. They were one projection record and
      * one round trip until the record turned out to be the only reason a persistence type crossed into the service, and
@@ -44,10 +59,6 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     @Query("select count(s) from ExamSection s where s.examId = :examId")
     long countSections(@Param("examId") UUID examId);
 
-    /**
-     * A four-level descent, joined by id rather than by association because the content entities hold plain UUID keys.
-     * Every table is exam-owned, so no cross-module read exception is needed.
-     */
     @Query("""
             select count(q) from Question q, QuestionSet qs, SectionPart sp, ExamSection s
              where q.questionSetId = qs.id and qs.sectionPartId = sp.id
@@ -56,10 +67,17 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     long countQuestions(@Param("examId") UUID examId);
 
     /**
-     * Its own query rather than a column of a join: joining sections to questions multiplies the section rows, so the
-     * sum comes back too large - and {@code sum(distinct ...)} is no fix either, since it would collapse a TOEIC
-     * paper's LISTENING 100 and READING 100 into 100. {@code coalesce} because a paper with no section sums to null.
+     * Batched count across all exams in a page to eliminate N+1 roundtrips.
      */
+    @Query("""
+            select s.examId, count(q)
+              from Question q, QuestionSet qs, SectionPart sp, ExamSection s
+             where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+               and sp.examSectionId = s.id and s.examId in :examIds
+             group by s.examId
+            """)
+    List<Object[]> countQuestionsForExams(@Param("examIds") Collection<UUID> examIds);
+
     @Query("select coalesce(sum(s.maxRawScore), 0) from ExamSection s where s.examId = :examId")
     BigDecimal sumSectionScores(@Param("examId") UUID examId);
 }
