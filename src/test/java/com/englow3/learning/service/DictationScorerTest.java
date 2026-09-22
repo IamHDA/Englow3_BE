@@ -2,6 +2,8 @@ package com.englow3.learning.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -97,6 +99,40 @@ class DictationScorerTest {
         void treatsNullAndBlankAsNoWords() {
             assertThat(DictationScorer.words(null)).isEmpty();
             assertThat(DictationScorer.words("   ")).isEmpty();
+        }
+    }
+
+    /**
+     * Three screens ask whether a sentence is cleared - the lesson's progress, the statistics, and the daily path's
+     * list of unfinished work. They each kept their own copy of the number and agreed only by coincidence, so the
+     * answer lives here now, next to the accuracy it is compared against.
+     */
+    @Nested
+    class Clearing {
+
+        @Test
+        void clearsExactlyAtTheThreshold() {
+            assertThat(DictationScorer.cleared(new BigDecimal("80.00"))).isTrue();
+            assertThat(DictationScorer.cleared(new BigDecimal("79.99"))).isFalse();
+        }
+
+        /** Scale must not change the answer: 80 and 80.00 are the same accuracy, and equals() would disagree. */
+        @Test
+        void ignoresTheScaleOfTheNumber() {
+            assertThat(DictationScorer.cleared(new BigDecimal("80"))).isTrue();
+            assertThat(DictationScorer.cleared(new BigDecimal("80.000"))).isTrue();
+        }
+
+        /** No attempt at all is not a low score - an unattempted sentence stays on the list rather than counting. */
+        @Test
+        void doesNotClearASentenceNobodyHasTried() {
+            assertThat(DictationScorer.cleared(null)).isFalse();
+        }
+
+        @Test
+        void clearsAnythingAbove() {
+            assertThat(DictationScorer.cleared(new BigDecimal("100.00"))).isTrue();
+            assertThat(DictationScorer.cleared(BigDecimal.ZERO)).isFalse();
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.englow3.learning.service;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -22,9 +21,6 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DictationStatsService {
-
-    /** Must match DictationService: two definitions of "cleared" would report two different completion counts. */
-    private static final BigDecimal COMPLETION_THRESHOLD = BigDecimal.valueOf(80);
 
     private static final int DIFFICULT_SENTENCE_LIMIT = 10;
     private static final int MISSED_WORD_LIMIT = 12;
@@ -55,7 +51,8 @@ public class DictationStatsService {
         List<LocalDate> practiceDays = statsQuery.practiceDays(userId,
                 Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS));
 
-        return new DictationStatsResult(periodDays, statsQuery.lessonsCompleted(userId, COMPLETION_THRESHOLD),
+        return new DictationStatsResult(periodDays,
+                statsQuery.lessonsCompleted(userId, DictationScorer.COMPLETION_THRESHOLD),
                 statsQuery.averageAccuracy(userId, from), statsQuery.listeningSeconds(userId, from),
                 statsQuery.sentencesPractised(userId, from),
                 StudyStreak.count(practiceDays, LocalDate.now(ZoneOffset.UTC)), statsQuery.accuracyByDay(userId, from),
@@ -72,6 +69,7 @@ public class DictationStatsService {
     public MistakeQueueResult mistakeQueue() {
         UUID userId = userDirectory.requireCurrentUserId();
 
-        return new MistakeQueueResult(statsQuery.mistakeQueue(userId, COMPLETION_THRESHOLD, MISTAKE_QUEUE_LIMIT));
+        return new MistakeQueueResult(
+                statsQuery.mistakeQueue(userId, DictationScorer.COMPLETION_THRESHOLD, MISTAKE_QUEUE_LIMIT));
     }
 }

@@ -38,12 +38,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DictationService {
 
-    /**
-     * How close counts as having finished a sentence. Not 100: a learner who transcribes nine words of ten has heard
-     * the line, and demanding perfection would leave lessons permanently at 90%.
-     */
-    private static final BigDecimal COMPLETION_THRESHOLD = BigDecimal.valueOf(80);
-
     private final DictationLessonRepository lessonRepo;
     private final DictationSentenceRepository sentenceRepo;
     private final DictationAttemptRepository attemptRepo;
@@ -108,8 +102,7 @@ public class DictationService {
     }
 
     private long completedCount(UUID userId, List<DictationSentence> sentences) {
-        return bestAccuracyFor(userId, sentences).values().stream()
-                .filter(accuracy -> accuracy.compareTo(COMPLETION_THRESHOLD) >= 0).count();
+        return bestAccuracyFor(userId, sentences).values().stream().filter(DictationScorer::cleared).count();
     }
 
     private static int totalDuration(List<DictationSentence> sentences) {

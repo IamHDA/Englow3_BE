@@ -20,7 +20,24 @@ public final class DictationScorer {
      */
     private static final String PUNCTUATION = "[\\p{Punct}‘’“”]";
 
+    /**
+     * The accuracy at which a sentence counts as cleared.
+     * <p>
+     * Here rather than in each service that asks the question. Three of them do - the lesson's own progress, the
+     * statistics screen, and the daily path's "unfinished" list - and while each kept its own copy they agreed only by
+     * coincidence. A sentence that is finished on one screen and outstanding on another is not a rounding difference;
+     * it is the system giving two answers about the same work.
+     * <p>
+     * Eighty leaves room for the odd misheard word without letting a transcription that missed the point through.
+     */
+    public static final BigDecimal COMPLETION_THRESHOLD = BigDecimal.valueOf(80);
+
     private DictationScorer() {
+    }
+
+    /** Null is not cleared: no measurement is not the same as a low one. */
+    public static boolean cleared(BigDecimal accuracyPercent) {
+        return accuracyPercent != null && accuracyPercent.compareTo(COMPLETION_THRESHOLD) >= 0;
     }
 
     public record Score(BigDecimal accuracyPercent, int correctWordCount, int totalWordCount) {

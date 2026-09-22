@@ -1,6 +1,5 @@
 package com.englow3.learning.service;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -30,9 +29,6 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DailyPathService {
-
-    /** Must match {@code DictationService}: two definitions of "cleared" would leave a finished lesson on the list. */
-    private static final BigDecimal DICTATION_COMPLETION_THRESHOLD = BigDecimal.valueOf(80);
 
     /**
      * How many of each kind of outstanding work reach the roadmap. Capped low on purpose - a list of everything the
@@ -94,7 +90,7 @@ public class DailyPathService {
         pathQuery.dueSets(userId, now, TASKS_PER_KIND).forEach(
                 set -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.FLASHCARD_REVIEW, set.setId(), set.name(),
                         set.dueCount(), cardsPerSetToday.getOrDefault(set.setId(), 0L), set.completionPercent())));
-        pathQuery.unfinishedLessons(userId, DICTATION_COMPLETION_THRESHOLD, TASKS_PER_KIND)
+        pathQuery.unfinishedLessons(userId, DictationScorer.COMPLETION_THRESHOLD, TASKS_PER_KIND)
                 .forEach(lesson -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.DICTATION, lesson.lessonId(),
                         lesson.title(), lesson.remainingSentences(),
                         sentencesPerLessonToday.getOrDefault(lesson.lessonId(), 0L), lesson.completionPercent())));
