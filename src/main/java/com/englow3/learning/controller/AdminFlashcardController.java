@@ -1,6 +1,8 @@
 package com.englow3.learning.controller;
 
 import java.util.List;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.learning.entity.FlashcardSetStatus;
@@ -27,6 +32,10 @@ import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
 import com.englow3.shared.page.PageResponse;
 import com.englow3.learning.service.AdminFlashcardService;
+
+import com.englow3.learning.dto.result.FlashcardImportResult;
+
+import com.englow3.shared.error.BadRequestException;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +70,38 @@ class AdminFlashcardController {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 FlashcardSetResponse.from(adminFlashcardService.createSet(new CreateFlashcardSetCommand(request.slug(),
                         request.name(), request.description(), request.topic(), request.targetLevel()))));
+    }
+
+    /**
+     * Says what a generated file would do, and writes nothing.
+     * <p>
+     * Takes the file as an upload rather than a JSON body: a batch is a file on someone's disk, and asking them to
+     * paste three thousand cards into a request body would be asking them to do the upload by hand.
+     */
+    @PostMapping(path = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<FlashcardImportResult> validateImport(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(adminFlashcardService.validateImport(read(file)));
+    }
+
+    /** Imports into a draft set. Generated content is not reviewed content; the workflow still applies. */
+    @PostMapping(path = "/sets/{id}/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<FlashcardImportResult> importCards(@PathVariable UUID id, @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(adminFlashcardService.importCards(id, read(file)));
+    }
+
+    /**
+     * The upload as text. An unreadable upload is refused here rather than reaching the parser, which would report it
+     * as a malformed file when the truth is that nothing arrived.
+     */
+    private static String read(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("FLASHCARD_IMPORT_EMPTY", "No file was uploaded");
+        }
+        try {
+            return new String(file.getBytes(), StandardCharsets.UTF_8);
+        } catch (IOException unreadable) {
+            throw new BadRequestException("FLASHCARD_IMPORT_EMPTY", "The uploaded file could not be read");
+        }
     }
 
     @PostMapping("/sets/{id}/cards")

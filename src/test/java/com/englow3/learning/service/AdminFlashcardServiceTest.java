@@ -26,6 +26,7 @@ import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.user.service.UserDirectory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Orchestration only. The publish and archive rules live in FlashcardSet and are covered there; this asserts which
@@ -37,7 +38,8 @@ class AdminFlashcardServiceTest {
     private final FlashcardRepository cardRepo = mock(FlashcardRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final AdminFlashcardService service = new AdminFlashcardService(setRepo, cardRepo, userDirectory);
+    private final AdminFlashcardService service = new AdminFlashcardService(setRepo, cardRepo, userDirectory,
+            new ObjectMapper());
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;

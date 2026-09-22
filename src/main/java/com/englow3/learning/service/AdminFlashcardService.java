@@ -22,6 +22,8 @@ import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.learning.dto.result.FlashcardImportResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class AdminFlashcardService {
     private final FlashcardSetRepository setRepo;
     private final FlashcardRepository cardRepo;
     private final UserDirectory userDirectory;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public FlashcardSetSummaryResult createSet(CreateFlashcardSetCommand command) {
@@ -70,6 +73,45 @@ public class AdminFlashcardService {
         cardRepo.saveAll(cards);
 
         return summaryOf(set);
+    }
+
+    /**
+     * Reads a generated file and says what it would do. Writes nothing.
+     * <p>
+     * Offered separately from the import because the scope asks for the check to be shown before anything is saved, and
+     * because a three-thousand-card file is exactly the kind of thing nobody wants to discover is wrong after it has
+     * landed in a set.
+     */
+    @Transactional(readOnly = true)
+    public FlashcardImportResult validateImport(String json) {
+        return FlashcardImportResult.of(FlashcardImport.read(objectMapper, json), false);
+    }
+
+    /**
+     * Reads the file and stores what can be stored.
+     * <p>
+     * Into a draft set only. Generated content is not reviewed content, and the review workflow exists precisely so
+     * that a person signs off before learners see it - an import that could write into a published set would be a way
+     * around that.
+     * <p>
+     * Rows that cannot be read are skipped rather than failing the whole file. A batch of three thousand with four bad
+     * rows is worth importing; the four come back in the report with their positions so they can be fixed and sent
+     * again.
+     */
+    @Transactional
+    public FlashcardImportResult importCards(UUID setId, String json) {
+        FlashcardSet set = requireSet(setId);
+        if (set.getStatus() != FlashcardSetStatus.DRAFT) {
+            throw new ConflictException("FLASHCARD_SET_NOT_DRAFT",
+                    "Cards can only be imported into a draft set; this one is %s".formatted(set.getStatus()));
+        }
+
+        FlashcardImport.Report report = FlashcardImport.read(objectMapper, json);
+        if (!report.isEmpty()) {
+            addCards(new AddFlashcardsCommand(setId, report.cards()));
+        }
+
+        return FlashcardImportResult.of(report, true);
     }
 
     /**
