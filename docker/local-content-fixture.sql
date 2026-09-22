@@ -24,6 +24,10 @@
 --
 -- Exams are not seeded here; the ten mock papers come from the data pipeline.
 
+-- The application's tables live in the englow3 schema, not public - psql
+-- connects with the default search_path and would not find one of them.
+set search_path to englow3;
+
 do $$
 declare
     author_id uuid;
@@ -32,6 +36,8 @@ declare
     lesson_id uuid;
     question_id uuid;
 begin
+    perform set_config('search_path', 'englow3', true);
+
     -- Every content row records who wrote it. Any account will do for a
     -- fixture, but one has to exist: signing in through Supabase once creates
     -- it. Failing loudly beats inserting a user row that Supabase does not know

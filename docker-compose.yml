@@ -78,9 +78,13 @@ services:
       done;
       mc mb --ignore-existing local/images;
       mc mb --ignore-existing local/audio;
-      mc mb --ignore-existing local/englow3;
+      mc mb --ignore-existing local/avatars;
+      mc mb --ignore-existing local/exams;
+      mc mb --ignore-existing local/learning;
+      mc mb --ignore-existing local/speaking;
       mc anonymous set download local/images;
       mc anonymous set download local/audio;
+      mc anonymous set download local/avatars;
       "
 
 volumes:
