@@ -132,12 +132,9 @@ public class DictationService {
                 .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
     }
 
+    /** The empty-input guard and the row mapping moved into the repository, where the admin list needs them too. */
     private Map<UUID, Long> countSentencesFor(Collection<UUID> lessonIds) {
-        if (lessonIds.isEmpty()) {
-            return Map.of();
-        }
-        return sentenceRepo.countByLessonIds(lessonIds).stream()
-                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+        return sentenceRepo.countByLessonIds(lessonIds);
     }
 
     private DictationLesson requirePublished(UUID lessonId) {

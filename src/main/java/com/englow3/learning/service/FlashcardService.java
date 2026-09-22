@@ -147,12 +147,9 @@ public class FlashcardService {
                 .collect(Collectors.toMap(FlashcardReview::getFlashcardId, Function.identity()));
     }
 
+    /** The empty-input guard and the row mapping moved into the repository, where the admin list needs them too. */
     private Map<UUID, Long> countCardsFor(Collection<UUID> setIds) {
-        if (setIds.isEmpty()) {
-            return Map.of();
-        }
-        return cardRepo.countBySetIds(setIds).stream()
-                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+        return cardRepo.countBySetIds(setIds);
     }
 
     private FlashcardSet requirePublishedSet(UUID setId) {

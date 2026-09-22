@@ -5,12 +5,18 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.learning.entity.DictationLessonStatus;
 import com.englow3.learning.dto.command.AddDictationSentencesCommand;
 import com.englow3.learning.dto.command.CreateDictationLessonCommand;
 import com.englow3.learning.dto.request.AddDictationSentencesRequest;
@@ -18,6 +24,7 @@ import com.englow3.learning.dto.request.CreateDictationLessonRequest;
 import com.englow3.learning.dto.request.RejectContentRequest;
 import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.DictationLessonResponse;
+import com.englow3.shared.page.PageResponse;
 import com.englow3.learning.service.AdminDictationService;
 
 import jakarta.validation.Valid;
@@ -30,6 +37,19 @@ import lombok.RequiredArgsConstructor;
 class AdminDictationController {
 
     private final AdminDictationService adminDictationService;
+
+    /**
+     * The authoring list. Separate from the learner catalogue because that one shows published lessons only - an
+     * administrator with no way to see a draft has no way to review one. A null status means every status, so the same
+     * endpoint serves the full list and the review queue.
+     */
+    @GetMapping("/lessons")
+    ResponseEntity<PageResponse<ContentReviewResponse>> search(
+            @RequestParam(required = false) DictationLessonStatus status, @RequestParam(required = false) String title,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                adminDictationService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+    }
 
     @PostMapping("/lessons")
     ResponseEntity<DictationLessonResponse> create(@Valid @RequestBody CreateDictationLessonRequest request) {

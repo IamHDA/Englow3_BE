@@ -3,8 +3,11 @@ package com.englow3.learning.service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,7 @@ import com.englow3.learning.dto.command.CreateDictationLessonCommand;
 import com.englow3.learning.dto.result.ContentReviewResult;
 import com.englow3.learning.dto.result.DictationLessonSummaryResult;
 import com.englow3.learning.entity.DictationLesson;
+import com.englow3.learning.entity.DictationLessonStatus;
 import com.englow3.learning.entity.DictationSentence;
 import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
@@ -63,6 +67,19 @@ public class AdminDictationService {
         sentenceRepo.saveAll(sentences);
 
         return summaryOf(lesson);
+    }
+
+    /**
+     * Every lesson, whatever its status - the catalogue shows published ones only, and an administrator with no way to
+     * see a draft has no way to review one. Sentence counts arrive in one grouped query, not one per row.
+     */
+    @Transactional(readOnly = true)
+    public Page<ContentReviewResult> searchForAuthoring(DictationLessonStatus status, String title, Pageable pageable) {
+        Page<DictationLesson> page = lessonRepo.searchForAuthoring(status, title, pageable);
+        Map<UUID, Long> counts = sentenceRepo
+                .countByLessonIds(page.getContent().stream().map(DictationLesson::getId).toList());
+
+        return page.map(lesson -> ContentReviewResult.of(lesson, counts.getOrDefault(lesson.getId(), 0L)));
     }
 
     @Transactional

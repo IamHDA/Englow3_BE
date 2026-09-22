@@ -44,6 +44,10 @@ public class DictationLesson {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    /** Filled by the column default, never by this application - hence not insertable. */
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private Instant createdAt;
+
     @Embedded
     private ReviewTrail review = new ReviewTrail();
 

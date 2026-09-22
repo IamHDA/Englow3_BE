@@ -22,27 +22,28 @@ import com.englow3.learning.entity.Quiz;
  * @param itemCount
  *            cards, questions or sentences - whatever the type is made of
  */
-public record ContentReviewResult(UUID id, String slug, String title, String status, long itemCount,
+public record ContentReviewResult(UUID id, String slug, String title, String status, long itemCount, Instant createdAt,
         Instant publishedAt, Instant submittedForReviewAt, UUID reviewedByUserId, Instant reviewedAt,
         String reviewNote) {
 
     public static ContentReviewResult of(FlashcardSet set, long cardCount) {
         return new ContentReviewResult(set.getId(), set.getSlug(), set.getName(), set.getStatus().name(), cardCount,
-                set.getPublishedAt(), set.getReview().getSubmittedForReviewAt(), set.getReview().getReviewedByUserId(),
-                set.getReview().getReviewedAt(), set.getReview().getReviewNote());
+                set.getCreatedAt(), set.getPublishedAt(), set.getReview().getSubmittedForReviewAt(),
+                set.getReview().getReviewedByUserId(), set.getReview().getReviewedAt(),
+                set.getReview().getReviewNote());
     }
 
     public static ContentReviewResult of(Quiz quiz, long questionCount) {
         return new ContentReviewResult(quiz.getId(), quiz.getSlug(), quiz.getTitle(), quiz.getStatus().name(),
-                questionCount, quiz.getPublishedAt(), quiz.getReview().getSubmittedForReviewAt(),
+                questionCount, quiz.getCreatedAt(), quiz.getPublishedAt(), quiz.getReview().getSubmittedForReviewAt(),
                 quiz.getReview().getReviewedByUserId(), quiz.getReview().getReviewedAt(),
                 quiz.getReview().getReviewNote());
     }
 
     public static ContentReviewResult of(DictationLesson lesson, long sentenceCount) {
         return new ContentReviewResult(lesson.getId(), lesson.getSlug(), lesson.getTitle(), lesson.getStatus().name(),
-                sentenceCount, lesson.getPublishedAt(), lesson.getReview().getSubmittedForReviewAt(),
-                lesson.getReview().getReviewedByUserId(), lesson.getReview().getReviewedAt(),
-                lesson.getReview().getReviewNote());
+                sentenceCount, lesson.getCreatedAt(), lesson.getPublishedAt(),
+                lesson.getReview().getSubmittedForReviewAt(), lesson.getReview().getReviewedByUserId(),
+                lesson.getReview().getReviewedAt(), lesson.getReview().getReviewNote());
     }
 }

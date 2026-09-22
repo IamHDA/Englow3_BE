@@ -5,12 +5,18 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.learning.entity.QuizStatus;
 import com.englow3.learning.dto.command.AddQuizQuestionsCommand;
 import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewOption;
 import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewPair;
@@ -21,6 +27,7 @@ import com.englow3.learning.dto.request.CreateQuizRequest;
 import com.englow3.learning.dto.request.RejectContentRequest;
 import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.QuizSummaryResponse;
+import com.englow3.shared.page.PageResponse;
 import com.englow3.learning.service.AdminQuizService;
 
 import jakarta.validation.Valid;

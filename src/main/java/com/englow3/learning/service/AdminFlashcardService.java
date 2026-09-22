@@ -3,8 +3,11 @@ package com.englow3.learning.service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,7 @@ import com.englow3.learning.dto.result.ContentReviewResult;
 import com.englow3.learning.dto.result.FlashcardSetSummaryResult;
 import com.englow3.learning.entity.Flashcard;
 import com.englow3.learning.entity.FlashcardSet;
+import com.englow3.learning.entity.FlashcardSetStatus;
 import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.ConflictException;
@@ -66,6 +70,19 @@ public class AdminFlashcardService {
         cardRepo.saveAll(cards);
 
         return summaryOf(set);
+    }
+
+    /**
+     * Every set, whatever its status - the catalogue shows published ones only, and an administrator with no way to see
+     * a draft has no way to review one. A null status means all of them, so one query serves both the full list and the
+     * review queue. Card counts come from one grouped query rather than one per row.
+     */
+    @Transactional(readOnly = true)
+    public Page<ContentReviewResult> searchForAuthoring(FlashcardSetStatus status, String title, Pageable pageable) {
+        Page<FlashcardSet> page = setRepo.searchForAuthoring(status, title, pageable);
+        Map<UUID, Long> counts = cardRepo.countBySetIds(page.getContent().stream().map(FlashcardSet::getId).toList());
+
+        return page.map(set -> ContentReviewResult.of(set, counts.getOrDefault(set.getId(), 0L)));
     }
 
     @Transactional

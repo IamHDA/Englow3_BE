@@ -6,12 +6,18 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.learning.entity.FlashcardSetStatus;
 import com.englow3.learning.dto.command.AddFlashcardsCommand;
 import com.englow3.learning.dto.command.CreateFlashcardSetCommand;
 import com.englow3.learning.dto.request.AddFlashcardsRequest;
@@ -19,6 +25,7 @@ import com.englow3.learning.dto.request.CreateFlashcardSetRequest;
 import com.englow3.learning.dto.request.RejectContentRequest;
 import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
+import com.englow3.shared.page.PageResponse;
 import com.englow3.learning.service.AdminFlashcardService;
 
 import jakarta.validation.Valid;
@@ -35,6 +42,19 @@ import lombok.RequiredArgsConstructor;
 class AdminFlashcardController {
 
     private final AdminFlashcardService adminFlashcardService;
+
+    /**
+     * The authoring list. Separate from the learner catalogue because that one shows published sets only - an
+     * administrator with no way to see a draft has no way to review one. A null status means every status, so the same
+     * endpoint serves the full list and the review queue.
+     */
+    @GetMapping("/sets")
+    ResponseEntity<PageResponse<ContentReviewResponse>> search(
+            @RequestParam(required = false) FlashcardSetStatus status, @RequestParam(required = false) String title,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                adminFlashcardService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+    }
 
     @PostMapping("/sets")
     ResponseEntity<FlashcardSetResponse> createSet(@Valid @RequestBody CreateFlashcardSetRequest request) {

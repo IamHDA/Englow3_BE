@@ -2,6 +2,7 @@ package com.englow3.learning.repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,7 +17,22 @@ public interface DictationSentenceRepository extends JpaRepository<DictationSent
 
     long countByDictationLessonId(UUID dictationLessonId);
 
-    /** Batched so a page of lessons costs one query for all their counts rather than one each. */
-    @Query("select s.dictationLessonId, count(s) from DictationSentence s where s.dictationLessonId in :lessonIds group by s.dictationLessonId")
-    List<Object[]> countByLessonIds(@Param("lessonIds") Collection<UUID> lessonIds);
+    /**
+     * Counts for a page of parents in one query. One count per row would make a page of twenty into twenty-one round
+     * trips to fill a single column.
+     */
+    @Query("""
+            select c.dictationLessonId, count(c) from DictationSentence c
+            where c.dictationLessonId in :lessonIds
+            group by c.dictationLessonId
+            """)
+    List<Object[]> countByLessonIdsRaw(@Param("lessonIds") Collection<UUID> lessonIds);
+
+    default Map<UUID, Long> countByLessonIds(Collection<UUID> lessonIds) {
+        if (lessonIds.isEmpty()) {
+            return Map.of();
+        }
+        return countByLessonIdsRaw(lessonIds).stream()
+                .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+    }
 }
