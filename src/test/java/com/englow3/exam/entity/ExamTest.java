@@ -1,10 +1,12 @@
 package com.englow3.exam.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Nested;
@@ -59,7 +61,7 @@ class ExamTest {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
             Instant now = Instant.parse("2026-09-01T10:00:00Z");
 
-            exam.publish(2, 200, DECLARED_SCORE, now);
+            exam.publish(2, 200, DECLARED_SCORE, List.of(), now);
 
             assertThat(exam.getStatus()).isEqualTo(ExamStatus.PUBLISHED);
             assertThat(exam.getPublishedAt()).isEqualTo(now);
@@ -70,9 +72,16 @@ class ExamTest {
         void acceptsTheSameTotalWrittenWithADifferentScale() {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
 
-            exam.publish(2, 200, new BigDecimal("200.0"), Instant.now());
+            exam.publish(2, 200, new BigDecimal("200.0"), List.of(), Instant.now());
 
             assertThat(exam.getStatus()).isEqualTo(ExamStatus.PUBLISHED);
+        }
+
+        @Test
+        void replacesContentOnADraftPaper() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+
+            assertThatCode(exam::requireEditable).doesNotThrowAnyException();
         }
 
         @Test
@@ -135,32 +144,38 @@ class ExamTest {
 
         @Test
         void refusesToPublishAPaperWithNoSection() {
-            assertThatThrownBy(
-                    () -> buildToeicDraft(CertificateVariant.LR).publish(0, 0, BigDecimal.ZERO, Instant.now()))
-                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
-                            .isEqualTo("EXAM_HAS_NO_SECTION");
+            assertThatThrownBy(() -> buildToeicDraft(CertificateVariant.LR).publish(0, 0, BigDecimal.ZERO, List.of(),
+                    Instant.now())).isInstanceOf(ConflictException.class)
+                            .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_HAS_NO_SECTION");
         }
 
         @Test
         void refusesToPublishAPaperWithNoQuestion() {
-            assertThatThrownBy(
-                    () -> buildToeicDraft(CertificateVariant.LR).publish(2, 0, DECLARED_SCORE, Instant.now()))
-                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
-                            .isEqualTo("EXAM_HAS_NO_QUESTION");
+            assertThatThrownBy(() -> buildToeicDraft(CertificateVariant.LR).publish(2, 0, DECLARED_SCORE, List.of(),
+                    Instant.now())).isInstanceOf(ConflictException.class)
+                            .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_HAS_NO_QUESTION");
         }
 
         @Test
         void refusesToPublishWhenTheSectionsDoNotAddUpToTheDeclaredScore() {
             assertThatThrownBy(() -> buildToeicDraft(CertificateVariant.LR).publish(2, 200, new BigDecimal("195.00"),
-                    Instant.now())).isInstanceOf(ConflictException.class)
+                    List.of(), Instant.now())).isInstanceOf(ConflictException.class)
                             .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_SCORE_MISMATCH");
+        }
+
+        @Test
+        void refusesToPublishAPaperWithAnIncompleteQuestion() {
+            assertThatThrownBy(() -> buildToeicDraft(CertificateVariant.LR).publish(2, 200, DECLARED_SCORE,
+                    List.of(17, 42), Instant.now())).isInstanceOf(ConflictException.class)
+                            .extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("EXAM_HAS_INCOMPLETE_QUESTION");
         }
 
         @Test
         void refusesToPublishAPaperTwice() {
             Exam exam = buildPublishedExam();
 
-            assertThatThrownBy(() -> exam.publish(2, 200, DECLARED_SCORE, Instant.now()))
+            assertThatThrownBy(() -> exam.publish(2, 200, DECLARED_SCORE, List.of(), Instant.now()))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                     .isEqualTo("EXAM_NOT_DRAFT");
         }
@@ -170,7 +185,7 @@ class ExamTest {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
             exam.archive();
 
-            assertThatThrownBy(() -> exam.publish(2, 200, DECLARED_SCORE, Instant.now()))
+            assertThatThrownBy(() -> exam.publish(2, 200, DECLARED_SCORE, List.of(), Instant.now()))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                     .isEqualTo("EXAM_NOT_DRAFT");
         }
@@ -183,6 +198,27 @@ class ExamTest {
             assertThatThrownBy(exam::archive).isInstanceOf(ConflictException.class)
                     .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_ALREADY_ARCHIVED");
         }
+
+        @Test
+        void refusesToReplaceContentOnAPublishedPaper() {
+            Exam exam = buildPublishedExam();
+
+            assertThatThrownBy(exam::requireEditable).isInstanceOf(ConflictException.class)
+                    .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_NOT_EDITABLE");
+        }
+
+        /**
+         * A rejected paper is deliberately not in this list: it has to stay editable, or the reviewer's note is
+         * unanswerable and the rejection a dead end. See {@code Review} for the other half.
+         */
+        @Test
+        void refusesToReplaceContentOnAnArchivedPaper() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+            exam.archive();
+
+            assertThatThrownBy(exam::requireEditable).isInstanceOf(ConflictException.class)
+                    .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_NOT_EDITABLE");
+        }
     }
 
     @Nested
@@ -190,12 +226,35 @@ class ExamTest {
 
         private static final UUID REVIEWER_ID = UUID.randomUUID();
 
+        /**
+         * The reason a rejected paper stays editable. A note saying what is wrong is only useful if the author can act
+         * on it; refusing the edit would make the rejection a dead end and the note unanswerable.
+         */
+        @Test
+        void letsTheAuthorFixAPaperThatCameBack() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now());
+            exam.reject(REVIEWER_ID, "Section 2 has no audio.", Instant.now());
+
+            assertThatCode(exam::requireEditable).doesNotThrowAnyException();
+        }
+
+        /** A paper still waiting on a reviewer is not editable - it would change under the person reading it. */
+        @Test
+        void refusesAnEditWhileAPaperIsWaitingOnReview() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now());
+
+            assertThatThrownBy(exam::requireEditable).isInstanceOf(ConflictException.class)
+                    .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_NOT_EDITABLE");
+        }
+
         @Test
         void sendsADraftToTheQueue() {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
             Instant submittedAt = Instant.now();
 
-            exam.submitForReview(2, 200, DECLARED_SCORE, submittedAt);
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), submittedAt);
 
             assertThat(exam.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
             assertThat(exam.getSubmittedForReviewAt()).isEqualTo(submittedAt);
@@ -208,17 +267,16 @@ class ExamTest {
          */
         @Test
         void refusesToSubmitAPaperThatCouldNotBePublished() {
-            assertThatThrownBy(
-                    () -> buildToeicDraft(CertificateVariant.LR).submitForReview(2, 0, DECLARED_SCORE, Instant.now()))
-                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
-                            .isEqualTo("EXAM_HAS_NO_QUESTION");
+            assertThatThrownBy(() -> buildToeicDraft(CertificateVariant.LR).submitForReview(2, 0, DECLARED_SCORE,
+                    List.of(), Instant.now())).isInstanceOf(ConflictException.class)
+                            .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_HAS_NO_QUESTION");
         }
 
         @Test
         void refusesToSubmitAPaperAlreadyWaiting() {
             Exam exam = buildPendingExam();
 
-            assertThatThrownBy(() -> exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now()))
+            assertThatThrownBy(() -> exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now()))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                     .isEqualTo("EXAM_NOT_SUBMITTABLE");
         }
@@ -228,7 +286,7 @@ class ExamTest {
             Exam exam = buildPendingExam();
             Instant approvedAt = Instant.now();
 
-            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, approvedAt);
+            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, List.of(), approvedAt);
 
             assertThat(exam.getStatus()).isEqualTo(ExamStatus.PUBLISHED);
             assertThat(exam.getPublishedAt()).isEqualTo(approvedAt);
@@ -241,16 +299,17 @@ class ExamTest {
         void refusesToApproveAPaperThatHasSinceStoppedAddingUp() {
             Exam exam = buildPendingExam();
 
-            assertThatThrownBy(() -> exam.approve(REVIEWER_ID, 2, 200, new BigDecimal("195.00"), Instant.now()))
-                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
-                    .isEqualTo("EXAM_SCORE_MISMATCH");
+            assertThatThrownBy(
+                    () -> exam.approve(REVIEWER_ID, 2, 200, new BigDecimal("195.00"), List.of(), Instant.now()))
+                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("EXAM_SCORE_MISMATCH");
         }
 
         @Test
         void refusesToApproveAPaperNobodySubmitted() {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
 
-            assertThatThrownBy(() -> exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, Instant.now()))
+            assertThatThrownBy(() -> exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, List.of(), Instant.now()))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                     .isEqualTo("EXAM_NOT_PENDING_REVIEW");
         }
@@ -287,7 +346,7 @@ class ExamTest {
 
             exam.updateDraft("TOEIC Practice Test 1b", "Fixed", ExamType.MOCK, CertificateType.TOEIC,
                     CertificateVariant.LR, TargetLevel.B1, 7200, DECLARED_SCORE, null);
-            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now());
 
             assertThat(exam.getTitle()).isEqualTo("TOEIC Practice Test 1b");
             assertThat(exam.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
@@ -298,9 +357,9 @@ class ExamTest {
         void dropsAStaleNoteOnApproval() {
             Exam exam = buildPendingExam();
             exam.reject(REVIEWER_ID, "Part 3 has no audio.", Instant.now());
-            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now());
 
-            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, Instant.now());
+            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, List.of(), Instant.now());
 
             assertThat(exam.getReviewNote()).isNull();
         }
@@ -316,14 +375,14 @@ class ExamTest {
 
         private static Exam buildPendingExam() {
             Exam exam = buildToeicDraft(CertificateVariant.LR);
-            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+            exam.submitForReview(2, 200, DECLARED_SCORE, List.of(), Instant.now());
             return exam;
         }
     }
 
     private static Exam buildPublishedExam() {
         Exam exam = buildToeicDraft(CertificateVariant.LR);
-        exam.publish(2, 200, DECLARED_SCORE, Instant.now());
+        exam.publish(2, 200, DECLARED_SCORE, List.of(), Instant.now());
         return exam;
     }
 

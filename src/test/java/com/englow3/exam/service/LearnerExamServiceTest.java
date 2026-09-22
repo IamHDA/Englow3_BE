@@ -156,7 +156,7 @@ class LearnerExamServiceTest {
     private static Exam publishedExam() {
         Exam exam = Exam.draft("TOEIC Practice Test", "Listening and reading", ExamType.MOCK, CertificateType.TOEIC,
                 CertificateVariant.LR, TargetLevel.B1, 7200, new BigDecimal("2.00"), null, UUID.randomUUID());
-        exam.publish(1, 2, new BigDecimal("2.00"), Instant.now());
+        exam.publish(1, 2, new BigDecimal("2.00"), List.of(), Instant.now());
         return exam;
     }
 }
