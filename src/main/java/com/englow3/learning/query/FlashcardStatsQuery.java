@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.englow3.shared.persistence.SqlTime;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +28,7 @@ public class FlashcardStatsQuery {
         return jdbcClient.sql("""
                 select count(distinct flashcard_id) from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
     }
 
     /**
@@ -42,7 +43,7 @@ public class FlashcardStatsQuery {
                        ) as integer)
                   from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", from).query(Integer.class).optional().orElse(0);
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Integer.class).optional().orElse(0);
         return percent == null ? 0 : percent;
     }
 
@@ -50,7 +51,7 @@ public class FlashcardStatsQuery {
         Long seconds = jdbcClient.sql("""
                 select coalesce(sum(time_spent_seconds), 0) from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
         return seconds == null ? 0 : seconds;
     }
 
@@ -62,7 +63,7 @@ public class FlashcardStatsQuery {
                  where user_id = :userId and reviewed_at >= :from
                  group by day
                  order by day
-                """).param("userId", userId).param("from", from)
+                """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new DailyActivity(rs.getObject("day", LocalDate.class), rs.getLong("cards")))
                 .list();
     }
@@ -122,7 +123,7 @@ public class FlashcardStatsQuery {
                   from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
                  order by day desc
-                """).param("userId", userId).param("from", from).query(LocalDate.class).list();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
     }
 
     public record DailyActivity(LocalDate day, long cardCount) {

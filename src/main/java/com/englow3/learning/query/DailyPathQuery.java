@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.englow3.shared.persistence.SqlTime;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -49,7 +50,7 @@ public class DailyPathQuery {
                    where user_id = :userId and submitted_at >= :from and status = 'SCORED'
                 ) activity
                  order by day desc
-                """).param("userId", userId).param("from", from).query(LocalDate.class).list();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
     }
 
     /**
@@ -67,7 +68,7 @@ public class DailyPathQuery {
                     where user_id = :userId and submitted_at >= :from and status = 'SCORED') as quiz_attempts,
                   (select count(*) from exam_attempts
                     where user_id = :userId and submitted_at >= :from and status = 'SCORED') as exam_attempts
-                """).param("userId", userId).param("from", from)
+                """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new ActivityTotals(rs.getLong("flashcard_reviews"),
                         rs.getLong("dictation_sentences"), rs.getLong("quiz_attempts"), rs.getLong("exam_attempts")))
                 .single();
@@ -77,21 +78,21 @@ public class DailyPathQuery {
         return jdbcClient.sql("""
                 select count(*) from flashcard_reviews
                  where user_id = :userId and due_at <= :now
-                """).param("userId", userId).param("now", now).query(Long.class).single();
+                """).param("userId", userId).param("now", SqlTime.at(now)).query(Long.class).single();
     }
 
     public long cardsReviewedSince(UUID userId, Instant from) {
         return jdbcClient.sql("""
                 select count(*) from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
     }
 
     public long sentencesTypedSince(UUID userId, Instant from) {
         return jdbcClient.sql("""
                 select count(*) from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
     }
 
     /** Attempts that reached the quiz's own pass mark - the mark is per quiz, so it is compared per row. */
@@ -100,7 +101,7 @@ public class DailyPathQuery {
                 select count(*) from quiz_attempts
                  where user_id = :userId and submitted_at >= :from
                    and status = 'SCORED' and passed is true
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
     }
 
     /**
@@ -122,7 +123,7 @@ public class DailyPathQuery {
                 having count(*) filter (where r.due_at <= :now) > 0
                  order by due_count desc, s.name
                  limit :limit
-                """).param("userId", userId).param("now", now).param("limit", limit)
+                """).param("userId", userId).param("now", SqlTime.at(now)).param("limit", limit)
                 .query((rs, rowNum) -> new DueSet(rs.getObject("id", UUID.class), rs.getString("name"),
                         rs.getLong("due_count"), rs.getInt("completion_percent")))
                 .list();
@@ -140,7 +141,7 @@ public class DailyPathQuery {
                  where l.user_id = :userId and l.reviewed_at >= :from
                  group by s.id, s.name
                  order by card_count desc
-                """).param("userId", userId).param("from", from)
+                """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new StudiedSet(rs.getObject("id", UUID.class), rs.getString("name"),
                         rs.getLong("card_count"), rs.getInt("recall_percent")))
                 .list();
@@ -180,7 +181,7 @@ public class DailyPathQuery {
                   join quizzes q on q.id = a.quiz_id
                  where a.user_id = :userId and a.submitted_at >= :from and a.status = 'SCORED'
                  order by a.submitted_at desc
-                """).param("userId", userId).param("from", from).query((rs, rowNum) -> {
+                """).param("userId", userId).param("from", SqlTime.at(from)).query((rs, rowNum) -> {
             BigDecimal score = rs.getObject("score_percentage", BigDecimal.class);
             return new AttemptedQuiz(rs.getObject("id", UUID.class), rs.getString("title"),
                     score == null ? null : score.intValue());
@@ -230,7 +231,7 @@ public class DailyPathQuery {
                  where a.user_id = :userId and a.attempted_at >= :from
                  group by l.id, l.title
                  order by sentence_count desc
-                """).param("userId", userId).param("from", from)
+                """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new PractisedLesson(rs.getObject("id", UUID.class), rs.getString("title"),
                         rs.getLong("sentence_count"), rs.getInt("accuracy_percent")))
                 .list();

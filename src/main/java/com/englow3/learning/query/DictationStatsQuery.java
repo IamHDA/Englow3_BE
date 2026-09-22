@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.englow3.shared.persistence.SqlTime;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -46,7 +47,7 @@ public class DictationStatsQuery {
                 select cast(round(coalesce(avg(accuracy_percent), 0)) as integer)
                   from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
-                """).param("userId", userId).param("from", from).query(Integer.class).optional().orElse(0);
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Integer.class).optional().orElse(0);
         return average == null ? 0 : average;
     }
 
@@ -60,7 +61,7 @@ public class DictationStatsQuery {
                   from dictation_attempts a
                   join dictation_sentences s on s.id = a.dictation_sentence_id
                  where a.user_id = :userId and a.attempted_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
         return seconds == null ? 0 : seconds;
     }
 
@@ -68,7 +69,7 @@ public class DictationStatsQuery {
         return jdbcClient.sql("""
                 select count(distinct dictation_sentence_id) from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
-                """).param("userId", userId).param("from", from).query(Long.class).single();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
     }
 
     public List<DailyAccuracy> accuracyByDay(UUID userId, Instant from) {
@@ -80,7 +81,7 @@ public class DictationStatsQuery {
                  where user_id = :userId and attempted_at >= :from
                  group by day
                  order by day
-                """).param("userId", userId).param("from", from)
+                """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new DailyAccuracy(rs.getObject("day", LocalDate.class), rs.getInt("accuracy"),
                         rs.getLong("attempts")))
                 .list();
@@ -142,7 +143,7 @@ public class DictationStatsQuery {
                  where a.user_id = :userId and a.attempted_at >= :from
                  order by a.attempted_at desc
                  limit :limit
-                """).param("userId", userId).param("from", from).param("limit", limit)
+                """).param("userId", userId).param("from", SqlTime.at(from)).param("limit", limit)
                 .query((rs, rowNum) -> new AttemptText(rs.getObject("sentence_id", UUID.class),
                         rs.getString("expected"), rs.getString("actual")))
                 .list();
@@ -154,7 +155,7 @@ public class DictationStatsQuery {
                   from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
                  order by day desc
-                """).param("userId", userId).param("from", from).query(LocalDate.class).list();
+                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
     }
 
     /**
