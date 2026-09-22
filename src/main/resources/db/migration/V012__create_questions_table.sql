@@ -10,12 +10,15 @@ create table questions (
     max_raw_score numeric(8, 2) not null,
     explanation text,
     metadata jsonb,
+    -- set only when this row is a copy made from the question bank (Phase 5); names the original that was copied
+    source_question_id uuid references questions (id) on delete set null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
 
 create index idx_questions_question_set_id_order_no on questions (question_set_id, order_no);
 create index idx_questions_skill_type_question_category on questions (skill_type, question_category);
+create index idx_questions_source_question_id on questions (source_question_id);
 
 create trigger trg_questions_set_updated_at
 before update on questions

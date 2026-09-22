@@ -103,7 +103,7 @@ public class OnboardingService {
                     "Only a certificate learner has a score to aim at");
         }
 
-        profile.setGoal(command.certificateType(), command.targetScore(), command.targetDate());
+        profile.setGoal(command.certificateType(), command.targetScore(), command.currentScore(), command.targetDate());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
 
         return state(user, profile);
