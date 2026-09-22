@@ -25,11 +25,14 @@ import com.englow3.support.PostgresIntegrationTest;
  */
 class FlashcardImportIntegrationTest extends PostgresIntegrationTest {
 
+    /** The shape the pipeline writes, not a guess at it - see FlashcardImportTest for why that distinction matters. */
     private static final String TWO_CARDS = """
             [{"lemma":"agenda","pos":"noun","ipa_us":"/əˈdʒendə/","sense_label_en":"agenda (meeting)",
-              "definition":"A list of items to discuss.","definition_vi":"Chuong trinh nghi su.","examples":["Send the agenda."]},
+              "definition":{"en":"A list of items to discuss.","vi":"Chuong trinh nghi su."},
+              "examples":[{"sentence":"Send the agenda.","translation":"Gui chuong trinh di."}]},
              {"lemma":"brief","pos":"adjective","ipa_us":"/briːf/","sense_label_en":"brief (short)",
-              "definition":"Lasting a short time.","definition_vi":"Ngan gon.","examples":["A brief meeting."]}]
+              "definition":{"en":"Lasting a short time.","vi":"Ngan gon."},
+              "examples":[{"sentence":"A brief meeting.","translation":"Mot cuoc hop ngan."}]}]
             """;
 
     @Autowired
@@ -76,7 +79,8 @@ class FlashcardImportIntegrationTest extends PostgresIntegrationTest {
         service.importCards(setId, TWO_CARDS);
         service.importCards(setId, """
                 [{"lemma":"concur","pos":"verb","ipa_us":"/kənˈkɜːr/","sense_label_en":"concur",
-                  "definition":"To agree.","definition_vi":"Dong y.","examples":["I concur."]}]
+                  "definition":{"en":"To agree.","vi":"Dong y."},
+                  "examples":[{"sentence":"I concur.","translation":"Toi dong y."}]}]
                 """);
 
         assertThat(cardRepo.findMaxOrderNo(setId)).contains(3);
@@ -85,12 +89,12 @@ class FlashcardImportIntegrationTest extends PostgresIntegrationTest {
     /** A file with some bad rows still imports the good ones, and the report says which were left out. */
     @Test
     void importsWhatItCanAndReportsTheRest() {
-        var report = service.importCards(setId,
-                """
-                        [{"lemma":"agenda","pos":"noun","ipa_us":"/a/","sense_label_en":"agenda","definition":"A list.","definition_vi":"Danh sach.",
-                          "examples":["Send it."]},
-                         {"sense_label_en":"x","definition":"No lemma.","examples":["An example."]}]
-                        """);
+        var report = service.importCards(setId, """
+                [{"lemma":"agenda","pos":"noun","ipa_us":"/a/","sense_label_en":"agenda",
+                  "definition":{"en":"A list.","vi":"Danh sach."},
+                  "examples":[{"sentence":"Send it.","translation":"Gui di."}]},
+                 {"sense_label_en":"x"}]
+                """);
 
         assertThat(report.acceptedCount()).isEqualTo(1);
         assertThat(report.rejectedCount()).isEqualTo(1);

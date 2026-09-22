@@ -114,25 +114,21 @@ public final class FlashcardImport {
         if (lemma == null) {
             return "No lemma";
         }
-        if (text(row, "definition") == null) {
+        if (definition(row, "en") == null) {
             return "No English definition";
         }
-        // Both are not-null columns. Letting them through would turn a bad row into a failed insert, which fails the
-        // whole batch and reports as a server error rather than as the one card that needs fixing.
+        // Every one of these is a not-null column. Letting one through would turn a bad row into a failed insert,
+        // which fails the whole batch and reports as a server error rather than as the one card that needs fixing.
         if (text(row, "pos") == null) {
             return "No part of speech";
         }
         if (text(row, "ipa_us") == null) {
             return "No US pronunciation";
         }
-        // The one field the pipeline does not produce, and a not-null column here. Rejected rather than stored empty:
-        // this platform teaches Vietnamese speakers, and a card with no Vietnamese definition is half a card. A
-        // generated batch therefore needs translating before it can be imported, and this says so per row rather than
-        // letting three thousand blanks reach learners.
-        if (text(row, "definition_vi") == null) {
+        if (definition(row, "vi") == null) {
             return "No Vietnamese definition";
         }
-        if (firstExample(row) == null) {
+        if (example(row, "sentence") == null) {
             return "No example sentence";
         }
         // A sense label is what separates two entries for the same word. Without it, two senses of "bank" are one
@@ -148,22 +144,31 @@ public final class FlashcardImport {
 
     private static NewCard cardFrom(JsonNode row, String lemma) {
         return new NewCard(lemma, text(row, "pos"), text(row, "sense_label_en"), text(row, "ipa_us"),
-                text(row, "ipa_uk"), text(row, "audio_url_us"), text(row, "audio_url_uk"), text(row, "definition"),
-                text(row, "definition_vi"), firstExample(row), text(row, "example_translation_vi"),
+                text(row, "ipa_uk"), text(row, "audio_url_us"), text(row, "audio_url_uk"), definition(row, "en"),
+                definition(row, "vi"), example(row, "sentence"), example(row, "translation"),
                 text(row, "mnemonic_tip_vi"), text(row, "cefr_level"));
     }
 
     /**
-     * The pipeline writes examples as a list. Only the first is stored: a card shows one sentence, and keeping the rest
-     * in a column nothing reads would be storage pretending to be a feature.
+     * One side of the English-Vietnamese pair the pipeline stores a definition as.
+     * <p>
+     * An object rather than two fields, and both sides are required there - so a card arriving with a bare string where
+     * the pair should be is a file from somewhere else, and is rejected as having no definition rather than being read
+     * half-way.
      */
-    private static String firstExample(JsonNode row) {
+    private static String definition(JsonNode row, String side) {
+        return text(row.path("definition"), side);
+    }
+
+    /**
+     * The first example, in the shape the pipeline writes: a list of {@code {sentence, translation}}.
+     * <p>
+     * Only the first is stored. The pipeline produces two to four; a card shows one sentence, and keeping the rest in a
+     * column nothing reads would be storage pretending to be a feature.
+     */
+    private static String example(JsonNode row, String side) {
         JsonNode examples = row.path("examples");
-        if (examples.isArray() && !examples.isEmpty()) {
-            JsonNode first = examples.get(0);
-            return first.isObject() ? text(first, "text") : blankToNull(first.asText(null));
-        }
-        return text(row, "example_sentence");
+        return examples.isArray() && !examples.isEmpty() ? text(examples.get(0), side) : null;
     }
 
     private static String key(String lemma, String senseLabel) {

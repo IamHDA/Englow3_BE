@@ -1,15 +1,20 @@
 name: Backend CI
 
 on:
+  # testing is where work lands before dev, so it is the branch where a break
+  # is cheapest to find. It was not watched at all, which made it the one
+  # branch people push to and nothing checks.
   push:
     branches:
       - main
       - dev
+      - testing
 
   pull_request:
     branches:
       - main
       - dev
+      - testing
 
 jobs:
   java:

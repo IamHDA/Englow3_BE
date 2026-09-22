@@ -12,10 +12,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * Reading a generated batch.
  * <p>
- * The pipeline checks its own output against a schema before writing it, so this is the second check rather than the
- * first. It exists because a file that reached someone's disk is a file that could have been edited, and because the
- * two sides disagree about what a card needs: the pipeline requires fields with no column here, and a card is no use to
- * a learner without an example the pipeline treats as optional.
+ * The fixtures below are the shape {@code data_pipeline/schemas/json/flashcard.schema.json} actually defines, not a
+ * guess at it: a definition is an English-Vietnamese pair, and an example is a sentence with its translation. Written
+ * from a guess once already, and the test then agreed with the parser because both were wrong in the same way.
+ * <p>
+ * The pipeline validates its own output against that schema before writing it, so this is the second check rather than
+ * the first. It exists because a file that reached someone's disk is a file that could have been edited, and because
+ * the two sides do not require the same things - the pipeline demands fields this module has no column for.
  */
 class FlashcardImportTest {
 
@@ -23,15 +26,18 @@ class FlashcardImportTest {
 
     private static final String ONE_GOOD_CARD = """
             [{"lemma":"agenda","pos":"noun","sense_label_en":"agenda (meeting)","ipa_us":"/əˈdʒendə/",
-              "definition":"A list of items to discuss.","definition_vi":"Chuong trinh nghi su.","cefr_level":"B1",
-              "examples":[{"text":"Send the agenda."},{"text":"A second example."}]}]
+              "ipa_uk":"/əˈdʒendə/","cefr_level":"B1","mnemonic_tip_vi":"Nho la lich hop.",
+              "definition":{"en":"A list of items to discuss.","vi":"Chuong trinh nghi su."},
+              "examples":[{"sentence":"Send the agenda.","translation":"Gui chuong trinh di.","source":"generated"},
+                          {"sentence":"A second example.","translation":"Vi du thu hai."}]}]
             """;
 
     /** Everything a storable card needs, so each test below varies only the one field it is about. */
     private static String card(String lemma, String senseLabel) {
         return """
                 {"lemma":"%s","pos":"noun","ipa_us":"/x/","sense_label_en":"%s",
-                 "definition":"A definition.","definition_vi":"Mot dinh nghia.","examples":["An example."]}
+                 "definition":{"en":"A definition.","vi":"Mot dinh nghia."},
+                 "examples":[{"sentence":"An example.","translation":"Mot vi du."}]}
                 """.formatted(lemma, senseLabel);
     }
 
@@ -60,18 +66,46 @@ class FlashcardImportTest {
             assertThat(report.cards().get(0).exampleSentence()).isEqualTo("Send the agenda.");
         }
 
+        /** Both sides of the pair. A card with only the English half is half a card to a Vietnamese learner. */
         @Test
-        void keepsTheVietnameseDefinition() {
+        void keepsBothSidesOfTheDefinition() {
             var report = FlashcardImport.read(MAPPER, ONE_GOOD_CARD);
 
+            assertThat(report.cards().get(0).definitionEn()).isEqualTo("A list of items to discuss.");
             assertThat(report.cards().get(0).definitionVi()).isEqualTo("Chuong trinh nghi su.");
+        }
+
+        /** And both sides of the example, for the same reason. */
+        @Test
+        void keepsTheExampleWithItsTranslation() {
+            var report = FlashcardImport.read(MAPPER, ONE_GOOD_CARD);
+
+            assertThat(report.cards().get(0).exampleSentence()).isEqualTo("Send the agenda.");
+            assertThat(report.cards().get(0).exampleTranslationVi()).isEqualTo("Gui chuong trinh di.");
+        }
+
+        /**
+         * A definition written as a bare string is a file from somewhere else. Rejected rather than read half-way:
+         * taking the string as the English side would store a card with no Vietnamese at all.
+         */
+        @Test
+        void refusesADefinitionThatIsNotThePair() {
+            var report = FlashcardImport.read(MAPPER, """
+                    [{"lemma":"agenda","pos":"noun","ipa_us":"/x/","sense_label_en":"agenda",
+                      "definition":"A list of items to discuss.",
+                      "examples":[{"sentence":"Send it.","translation":"Gui di."}]}]
+                    """);
+
+            assertThat(report.rejections()).singleElement()
+                    .satisfies(rejection -> assertThat(rejection.reason()).isEqualTo("No English definition"));
         }
 
         @Test
         void trimsSurroundingSpace() {
             var report = FlashcardImport.read(MAPPER, """
                     [{"lemma":"  brief  ","pos":"noun","ipa_us":"/x/","sense_label_en":"brief",
-                      "definition":" A short account. ","definition_vi":" Ngan. ","examples":["  A brief note.  "]}]
+                      "definition":{"en":" A short account. ","vi":" Ngan. "},
+                      "examples":[{"sentence":"  A brief note.  ","translation":" Mot ghi chu. "}]}]
                     """);
 
             assertThat(report.cards()).singleElement().satisfies(card -> {
@@ -103,8 +137,9 @@ class FlashcardImportTest {
         @Test
         void refusesACardWithNoSenseLabel() {
             var report = FlashcardImport.read(MAPPER, """
-                    [{"lemma":"bank","pos":"noun","ipa_us":"/x/","definition":"A financial institution.",
-                      "definition_vi":"Ngan hang.","examples":["At the bank."]}]
+                    [{"lemma":"bank","pos":"noun","ipa_us":"/x/",
+                      "definition":{"en":"A financial institution.","vi":"Ngan hang."},
+                      "examples":[{"sentence":"At the bank.","translation":"O ngan hang."}]}]
                     """);
 
             assertThat(report.rejections()).singleElement()
@@ -115,8 +150,8 @@ class FlashcardImportTest {
         @Test
         void refusesACardWithNoExample() {
             var report = FlashcardImport.read(MAPPER, """
-                    [{"lemma":"agenda","pos":"noun","ipa_us":"/x/","sense_label_en":"agenda","definition":"A list.",
-                      "definition_vi":"Danh sach.","examples":[]}]
+                    [{"lemma":"agenda","pos":"noun","ipa_us":"/x/","sense_label_en":"agenda",
+                      "definition":{"en":"A list.","vi":"Danh sach."},"examples":[]}]
                     """);
 
             assertThat(report.rejections()).singleElement()
