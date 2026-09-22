@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.englow3.shared.error.ConflictException;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -52,6 +53,9 @@ public class Quiz {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Embedded
+    private ReviewTrail review = new ReviewTrail();
+
     protected Quiz() {
     }
 
@@ -89,6 +93,48 @@ public class Quiz {
         }
         this.status = QuizStatus.PUBLISHED;
         this.publishedAt = now;
+    }
+
+    /** Hands the quiz to an administrator, held to the same two rules so the reviewer is not sent a broken one. */
+    public void submitForReview(long questionCount, long totalPoints, Instant now) {
+        if (status != QuizStatus.DRAFT && status != QuizStatus.REJECTED) {
+            throw new ConflictException("QUIZ_NOT_SUBMITTABLE",
+                    "Only a draft or rejected quiz can be submitted; this one is %s".formatted(status));
+        }
+        requireScoreable(questionCount, totalPoints);
+        this.status = QuizStatus.PENDING_REVIEW;
+        review.markSubmitted(now);
+    }
+
+    public void approve(UUID reviewerId, long questionCount, long totalPoints, Instant now) {
+        requirePendingReview("approved");
+        requireScoreable(questionCount, totalPoints);
+        this.status = QuizStatus.PUBLISHED;
+        this.publishedAt = now;
+        review.markApproved(reviewerId, now);
+    }
+
+    public void reject(UUID reviewerId, String note, Instant now) {
+        requirePendingReview("rejected");
+        review.markRejected(reviewerId, note, now);
+        this.status = QuizStatus.REJECTED;
+    }
+
+    private void requirePendingReview(String verb) {
+        if (status != QuizStatus.PENDING_REVIEW) {
+            throw new ConflictException("QUIZ_NOT_PENDING_REVIEW",
+                    "Only a quiz waiting on review can be %s; this one is %s".formatted(verb, status));
+        }
+    }
+
+    private static void requireScoreable(long questionCount, long totalPoints) {
+        if (questionCount == 0) {
+            throw new ConflictException("QUIZ_EMPTY", "A quiz with no questions cannot be published");
+        }
+        if (totalPoints == 0) {
+            throw new ConflictException("QUIZ_ZERO_POINTS",
+                    "A quiz whose questions are all worth zero cannot be scored");
+        }
     }
 
     public void archive() {

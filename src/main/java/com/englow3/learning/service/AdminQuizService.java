@@ -13,9 +13,11 @@ import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewOption;
 import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewPair;
 import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewQuestion;
 import com.englow3.learning.dto.command.CreateQuizCommand;
+import com.englow3.learning.dto.result.ContentReviewResult;
 import com.englow3.learning.dto.result.QuizSummaryResult;
 import com.englow3.learning.entity.Quiz;
 import com.englow3.learning.entity.QuizQuestion;
+import com.englow3.learning.entity.QuizStatus;
 import com.englow3.learning.entity.QuizQuestionOption;
 import com.englow3.learning.entity.QuizQuestionPair;
 import com.englow3.learning.entity.QuizQuestionToken;
@@ -61,15 +63,19 @@ public class AdminQuizService {
     }
 
     /**
-     * Appends questions. Draft only, unlike flashcards: adding a question to a live quiz would change what every
+     * Appends questions. Not on a live quiz, unlike flashcards: adding a question to one would change what every
      * attempt in flight is being scored out of, and the attempts already recorded would be out of a different total.
+     * <p>
+     * A rejected quiz is open to questions as well as a draft. It has to be: "add a question about the passive" is the
+     * commonest thing a reviewer will ask for, and a gate on DRAFT alone would leave the author unable to do it.
      */
     @Transactional
     public QuizSummaryResult addQuestions(AddQuizQuestionsCommand command) {
         Quiz quiz = requireQuiz(command.quizId());
-        if (quiz.getStatus() != com.englow3.learning.entity.QuizStatus.DRAFT) {
-            throw new ConflictException("QUIZ_NOT_DRAFT",
-                    "Questions can only be added to a draft quiz; this one is %s".formatted(quiz.getStatus()));
+        if (quiz.getStatus() != QuizStatus.DRAFT && quiz.getStatus() != QuizStatus.REJECTED) {
+            throw new ConflictException("QUIZ_NOT_EDITABLE",
+                    "Questions can only be added to a draft or rejected quiz; this one is %s"
+                            .formatted(quiz.getStatus()));
         }
 
         int nextOrderNo = Math.toIntExact(questionRepo.countByQuizId(quiz.getId())) + 1;
@@ -95,17 +101,45 @@ public class AdminQuizService {
     }
 
     @Transactional
-    public QuizSummaryResult publish(UUID quizId) {
+    public ContentReviewResult publish(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
         quiz.publish(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), Instant.now());
-        return summaryOf(quiz);
+        return reviewStateOf(quiz);
     }
 
     @Transactional
-    public QuizSummaryResult archive(UUID quizId) {
+    public ContentReviewResult submitForReview(UUID quizId) {
+        Quiz quiz = requireQuiz(quizId);
+        quiz.submitForReview(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), Instant.now());
+        return reviewStateOf(quiz);
+    }
+
+    /** The reviewer's id comes from the token, not the request - nobody credits an approval to someone else. */
+    @Transactional
+    public ContentReviewResult approve(UUID quizId) {
+        Quiz quiz = requireQuiz(quizId);
+        quiz.approve(userDirectory.requireCurrentUserId(), questionRepo.countByQuizId(quizId),
+                questionRepo.sumPoints(quizId), Instant.now());
+        return reviewStateOf(quiz);
+    }
+
+    @Transactional
+    public ContentReviewResult reject(UUID quizId, String note) {
+        Quiz quiz = requireQuiz(quizId);
+        quiz.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+        return reviewStateOf(quiz);
+    }
+
+    @Transactional
+    public ContentReviewResult archive(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
         quiz.archive();
-        return summaryOf(quiz);
+        return reviewStateOf(quiz);
+    }
+
+    /** The review state is what an authoring action changed, so it is what an authoring action returns. */
+    private ContentReviewResult reviewStateOf(Quiz quiz) {
+        return ContentReviewResult.of(quiz, questionRepo.countByQuizId(quiz.getId()));
     }
 
     private void collectPayload(QuizQuestion question, NewQuestion source, List<QuizQuestionOption> options,

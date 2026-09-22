@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.learning.dto.command.AddFlashcardsCommand;
 import com.englow3.learning.dto.command.CreateFlashcardSetCommand;
+import com.englow3.learning.dto.result.ContentReviewResult;
 import com.englow3.learning.dto.result.FlashcardSetSummaryResult;
 import com.englow3.learning.entity.Flashcard;
 import com.englow3.learning.entity.FlashcardSet;
@@ -68,17 +69,53 @@ public class AdminFlashcardService {
     }
 
     @Transactional
-    public FlashcardSetSummaryResult publish(UUID setId) {
+    public ContentReviewResult publish(UUID setId) {
         FlashcardSet set = requireSet(setId);
         set.publish(cardRepo.countByFlashcardSetId(setId), Instant.now());
-        return summaryOf(set);
+        return reviewStateOf(set);
     }
 
     @Transactional
-    public FlashcardSetSummaryResult archive(UUID setId) {
+    public ContentReviewResult submitForReview(UUID setId) {
+        FlashcardSet set = requireSet(setId);
+        set.submitForReview(cardRepo.countByFlashcardSetId(setId), Instant.now());
+
+        return reviewStateOf(set);
+    }
+
+    /**
+     * The reviewer's id is resolved here rather than taken from the request: a caller that could name its own reviewer
+     * could credit the approval to someone else.
+     */
+    @Transactional
+    public ContentReviewResult approve(UUID setId) {
+        FlashcardSet set = requireSet(setId);
+        set.approve(userDirectory.requireCurrentUserId(), cardRepo.countByFlashcardSetId(setId), Instant.now());
+
+        return reviewStateOf(set);
+    }
+
+    @Transactional
+    public ContentReviewResult reject(UUID setId, String note) {
+        FlashcardSet set = requireSet(setId);
+        set.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+
+        return reviewStateOf(set);
+    }
+
+    @Transactional
+    public ContentReviewResult archive(UUID setId) {
         FlashcardSet set = requireSet(setId);
         set.archive();
-        return summaryOf(set);
+        return reviewStateOf(set);
+    }
+
+    /**
+     * The catalogue summary carries three per-learner numbers that mean nothing to an author and would be zero here
+     * anyway. The review state is what an authoring action changed, so it is what an authoring action returns.
+     */
+    private ContentReviewResult reviewStateOf(FlashcardSet set) {
+        return ContentReviewResult.of(set, cardRepo.countByFlashcardSetId(set.getId()));
     }
 
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set) {

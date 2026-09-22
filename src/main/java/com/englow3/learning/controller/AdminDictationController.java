@@ -15,6 +15,8 @@ import com.englow3.learning.dto.command.AddDictationSentencesCommand;
 import com.englow3.learning.dto.command.CreateDictationLessonCommand;
 import com.englow3.learning.dto.request.AddDictationSentencesRequest;
 import com.englow3.learning.dto.request.CreateDictationLessonRequest;
+import com.englow3.learning.dto.request.RejectContentRequest;
+import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.DictationLessonResponse;
 import com.englow3.learning.service.AdminDictationService;
 
@@ -23,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/admin/dictation")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
 @RequiredArgsConstructor
 class AdminDictationController {
 
@@ -49,13 +51,34 @@ class AdminDictationController {
                 .from(adminDictationService.addSentences(new AddDictationSentencesCommand(id, sentences))));
     }
 
+    /** Staff hand a lesson over for review. Available from a draft or from one that came back. */
+    @PostMapping("/lessons/{id}/submit-for-review")
+    ResponseEntity<ContentReviewResponse> submitForReview(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.submitForReview(id)));
+    }
+
+    @PostMapping("/lessons/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.approve(id)));
+    }
+
+    @PostMapping("/lessons/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> reject(@PathVariable UUID id,
+            @Valid @RequestBody RejectContentRequest request) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.reject(id, request.note())));
+    }
+
     @PostMapping("/lessons/{id}/publish")
-    ResponseEntity<DictationLessonResponse> publish(@PathVariable UUID id) {
-        return ResponseEntity.ok(DictationLessonResponse.from(adminDictationService.publish(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> publish(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.publish(id)));
     }
 
     @PostMapping("/lessons/{id}/archive")
-    ResponseEntity<DictationLessonResponse> archive(@PathVariable UUID id) {
-        return ResponseEntity.ok(DictationLessonResponse.from(adminDictationService.archive(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.archive(id)));
     }
 }

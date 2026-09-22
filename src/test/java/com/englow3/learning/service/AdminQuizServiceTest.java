@@ -138,7 +138,21 @@ class AdminQuizServiceTest {
             assertThatThrownBy(() -> add(
                     question(QuizQuestionType.MATCHING, null, null, null, null, List.of(new NewPair("a", "b")))))
                             .isInstanceOf(ConflictException.class)
-                            .hasFieldOrPropertyWithValue("code", "QUIZ_NOT_DRAFT");
+                            .hasFieldOrPropertyWithValue("code", "QUIZ_NOT_EDITABLE");
+        }
+
+        /**
+         * "Add a question about the passive" is the commonest thing a reviewer will ask for, so a quiz that came back
+         * has to accept one. A gate on DRAFT alone would leave the author unable to answer the note.
+         */
+        @Test
+        void acceptsQuestionsOnAQuizThatCameBackFromReview() {
+            quiz.submitForReview(1, 1, Instant.now());
+            quiz.reject(UUID.randomUUID(), "Add a question about the passive.", Instant.now());
+
+            add(question(QuizQuestionType.MATCHING, null, null, null, null, List.of(new NewPair("a", "b"))));
+
+            verify(questionRepo).saveAll(any());
         }
 
         @Test

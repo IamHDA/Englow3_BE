@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.learning.dto.command.AddDictationSentencesCommand;
 import com.englow3.learning.dto.command.AddDictationSentencesCommand.NewSentence;
 import com.englow3.learning.dto.command.CreateDictationLessonCommand;
+import com.englow3.learning.dto.result.ContentReviewResult;
 import com.englow3.learning.dto.result.DictationLessonSummaryResult;
 import com.englow3.learning.entity.DictationLesson;
 import com.englow3.learning.entity.DictationSentence;
@@ -65,17 +66,51 @@ public class AdminDictationService {
     }
 
     @Transactional
-    public DictationLessonSummaryResult publish(UUID lessonId) {
+    public ContentReviewResult publish(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
         lesson.publish(sentenceRepo.countByDictationLessonId(lessonId), Instant.now());
-        return summaryOf(lesson);
+        return reviewStateOf(lesson);
     }
 
     @Transactional
-    public DictationLessonSummaryResult archive(UUID lessonId) {
+    public ContentReviewResult submitForReview(UUID lessonId) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.submitForReview(sentenceRepo.countByDictationLessonId(lessonId), Instant.now());
+
+        return reviewStateOf(lesson);
+    }
+
+    /** The reviewer's id comes from the token, not the request - nobody credits an approval to someone else. */
+    @Transactional
+    public ContentReviewResult approve(UUID lessonId) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.approve(userDirectory.requireCurrentUserId(), sentenceRepo.countByDictationLessonId(lessonId),
+                Instant.now());
+
+        return reviewStateOf(lesson);
+    }
+
+    @Transactional
+    public ContentReviewResult reject(UUID lessonId, String note) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+
+        return reviewStateOf(lesson);
+    }
+
+    @Transactional
+    public ContentReviewResult archive(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
         lesson.archive();
-        return summaryOf(lesson);
+        return reviewStateOf(lesson);
+    }
+
+    /**
+     * The review state is what an authoring action changed, so it is what an authoring action returns - and unlike the
+     * catalogue summary, it does not load every sentence to build a figure the author did not ask for.
+     */
+    private ContentReviewResult reviewStateOf(DictationLesson lesson) {
+        return ContentReviewResult.of(lesson, sentenceRepo.countByDictationLessonId(lesson.getId()));
     }
 
     private DictationLessonSummaryResult summaryOf(DictationLesson lesson) {

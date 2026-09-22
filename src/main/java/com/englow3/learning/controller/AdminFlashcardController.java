@@ -16,6 +16,8 @@ import com.englow3.learning.dto.command.AddFlashcardsCommand;
 import com.englow3.learning.dto.command.CreateFlashcardSetCommand;
 import com.englow3.learning.dto.request.AddFlashcardsRequest;
 import com.englow3.learning.dto.request.CreateFlashcardSetRequest;
+import com.englow3.learning.dto.request.RejectContentRequest;
+import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
 import com.englow3.learning.service.AdminFlashcardService;
 
@@ -28,7 +30,7 @@ import lombok.RequiredArgsConstructor;
  */
 @RestController
 @RequestMapping("/api/admin/flashcards")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
 @RequiredArgsConstructor
 class AdminFlashcardController {
 
@@ -54,13 +56,34 @@ class AdminFlashcardController {
                 .body(FlashcardSetResponse.from(adminFlashcardService.addCards(new AddFlashcardsCommand(id, cards))));
     }
 
+    /** Staff hand a set over for review. Available from a draft or from one that came back. */
+    @PostMapping("/sets/{id}/submit-for-review")
+    ResponseEntity<ContentReviewResponse> submitForReview(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.submitForReview(id)));
+    }
+
+    @PostMapping("/sets/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.approve(id)));
+    }
+
+    @PostMapping("/sets/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> reject(@PathVariable UUID id,
+            @Valid @RequestBody RejectContentRequest request) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.reject(id, request.note())));
+    }
+
     @PostMapping("/sets/{id}/publish")
-    ResponseEntity<FlashcardSetResponse> publish(@PathVariable UUID id) {
-        return ResponseEntity.ok(FlashcardSetResponse.from(adminFlashcardService.publish(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> publish(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.publish(id)));
     }
 
     @PostMapping("/sets/{id}/archive")
-    ResponseEntity<FlashcardSetResponse> archive(@PathVariable UUID id) {
-        return ResponseEntity.ok(FlashcardSetResponse.from(adminFlashcardService.archive(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.archive(id)));
     }
 }

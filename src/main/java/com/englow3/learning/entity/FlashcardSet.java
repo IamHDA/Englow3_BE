@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.englow3.shared.error.ConflictException;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -46,6 +47,9 @@ public class FlashcardSet {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Embedded
+    private ReviewTrail review = new ReviewTrail();
+
     protected FlashcardSet() {
     }
 
@@ -77,6 +81,46 @@ public class FlashcardSet {
         }
         this.status = FlashcardSetStatus.PUBLISHED;
         this.publishedAt = now;
+    }
+
+    /**
+     * Hands the set to an administrator. Checked against the publication rule as well, and deliberately at this end: a
+     * reviewer opening an empty set learns nothing they can act on, while the author is the one who can fill it.
+     */
+    public void submitForReview(long cardCount, Instant now) {
+        if (status != FlashcardSetStatus.DRAFT && status != FlashcardSetStatus.REJECTED) {
+            throw new ConflictException("FLASHCARD_SET_NOT_SUBMITTABLE",
+                    "Only a draft or rejected set can be submitted; this one is %s".formatted(status));
+        }
+        if (cardCount == 0) {
+            throw new ConflictException("FLASHCARD_SET_EMPTY", "A set with no cards cannot be published");
+        }
+        this.status = FlashcardSetStatus.PENDING_REVIEW;
+        review.markSubmitted(now);
+    }
+
+    /** Approval publishes in the same step: an approved-but-unpublished set would be a state nobody asked for. */
+    public void approve(UUID reviewerId, long cardCount, Instant now) {
+        requirePendingReview("approved");
+        if (cardCount == 0) {
+            throw new ConflictException("FLASHCARD_SET_EMPTY", "A set with no cards cannot be published");
+        }
+        this.status = FlashcardSetStatus.PUBLISHED;
+        this.publishedAt = now;
+        review.markApproved(reviewerId, now);
+    }
+
+    public void reject(UUID reviewerId, String note, Instant now) {
+        requirePendingReview("rejected");
+        review.markRejected(reviewerId, note, now);
+        this.status = FlashcardSetStatus.REJECTED;
+    }
+
+    private void requirePendingReview(String verb) {
+        if (status != FlashcardSetStatus.PENDING_REVIEW) {
+            throw new ConflictException("FLASHCARD_SET_NOT_PENDING_REVIEW",
+                    "Only a set waiting on review can be %s; this one is %s".formatted(verb, status));
+        }
     }
 
     public void archive() {

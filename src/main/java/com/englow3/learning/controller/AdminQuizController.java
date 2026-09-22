@@ -18,6 +18,8 @@ import com.englow3.learning.dto.command.AddQuizQuestionsCommand.NewQuestion;
 import com.englow3.learning.dto.command.CreateQuizCommand;
 import com.englow3.learning.dto.request.AddQuizQuestionsRequest;
 import com.englow3.learning.dto.request.CreateQuizRequest;
+import com.englow3.learning.dto.request.RejectContentRequest;
+import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.QuizSummaryResponse;
 import com.englow3.learning.service.AdminQuizService;
 
@@ -26,7 +28,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/admin/quizzes")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
 @RequiredArgsConstructor
 class AdminQuizController {
 
@@ -61,13 +63,34 @@ class AdminQuizController {
                 QuizSummaryResponse.from(adminQuizService.addQuestions(new AddQuizQuestionsCommand(id, questions))));
     }
 
+    /** Staff hand a quiz over for review. Available from a draft or from one that came back. */
+    @PostMapping("/{id}/submit-for-review")
+    ResponseEntity<ContentReviewResponse> submitForReview(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminQuizService.submitForReview(id)));
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminQuizService.approve(id)));
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> reject(@PathVariable UUID id,
+            @Valid @RequestBody RejectContentRequest request) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminQuizService.reject(id, request.note())));
+    }
+
     @PostMapping("/{id}/publish")
-    ResponseEntity<QuizSummaryResponse> publish(@PathVariable UUID id) {
-        return ResponseEntity.ok(QuizSummaryResponse.from(adminQuizService.publish(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> publish(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminQuizService.publish(id)));
     }
 
     @PostMapping("/{id}/archive")
-    ResponseEntity<QuizSummaryResponse> archive(@PathVariable UUID id) {
-        return ResponseEntity.ok(QuizSummaryResponse.from(adminQuizService.archive(id)));
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> archive(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminQuizService.archive(id)));
     }
 }
