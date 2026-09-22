@@ -47,6 +47,10 @@ app:
     exam-media-url-ttl: ${STORAGE_EXAM_MEDIA_URL_TTL:PT3H}
     learning-bucket: ${STORAGE_LEARNING_BUCKET:learning}
     learning-media-url-ttl: ${STORAGE_LEARNING_MEDIA_URL_TTL:PT3H}
+    speaking-bucket: ${STORAGE_SPEAKING_BUCKET:speaking}
+    # Long enough to finish one upload, short enough that a leaked URL is worth little.
+    speaking-upload-url-ttl: ${STORAGE_SPEAKING_UPLOAD_URL_TTL:PT15M}
+    speaking-media-url-ttl: ${STORAGE_SPEAKING_MEDIA_URL_TTL:PT3H}
 
     # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
     # against. On Supabase the two differ in path shape, not just in host.
