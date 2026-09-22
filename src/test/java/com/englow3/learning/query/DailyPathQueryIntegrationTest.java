@@ -307,7 +307,7 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
         jdbc.sql("""
                 insert into exams (id, title, description, exam_type, target_level, duration_seconds,
                                    max_raw_score, pass_score, status, version_number, created_by_user_id)
-                values (:id, 'Mock paper', '', 'PRACTICE', 'B1', 3600, 200, 100, 'PUBLISHED', 1, :authorId)
+                values (:id, 'Mock paper', '', 'MOCK', 'B1', 3600, 200, 100, 'PUBLISHED', 1, :authorId)
                 """).param("id", examId).param("authorId", userId).update();
 
         jdbc.sql("""
