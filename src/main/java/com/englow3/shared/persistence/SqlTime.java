@@ -1,5 +1,7 @@
 package com.englow3.shared.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -23,5 +25,17 @@ public final class SqlTime {
 
     public static OffsetDateTime at(Instant instant) {
         return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
+    }
+
+    /**
+     * Reads a {@code timestamptz} back.
+     * <p>
+     * The refusal runs both ways - {@code getObject(column, Instant.class)} fails with "conversion to class
+     * java.time.Instant from timestamptz not supported" - so a read goes through {@link OffsetDateTime} the same way a
+     * write does. Null stays null: a column that has not been set is not the epoch.
+     */
+    public static Instant read(ResultSet rs, String column) throws SQLException {
+        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
     }
 }

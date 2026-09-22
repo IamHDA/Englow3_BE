@@ -71,12 +71,21 @@ public final class LearnerFixture {
 
     /** A card on the learner's schedule. {@code dueAt} in the past is what makes it due. */
     public void review(UUID userId, UUID cardId, String status, Instant dueAt) {
+        review(userId, cardId, status, dueAt, 0);
+    }
+
+    /**
+     * The same, with a lapse count. Lapses live on the schedule rather than being counted from the log, which is what
+     * the difficult-cards list reads - a card is hard because the schedule has had to reset it, not because one answer
+     * went badly.
+     */
+    public void review(UUID userId, UUID cardId, String status, Instant dueAt, int lapseCount) {
         jdbc.sql("""
                 insert into flashcard_reviews (id, user_id, flashcard_id, status, repetitions, ease_factor,
-                                               interval_days, due_at, lapse_count)
-                values (:id, :userId, :cardId, :status, 1, 2.50, 1, :dueAt, 0)
+                                               interval_days, due_at, lapse_count, last_reviewed_at)
+                values (:id, :userId, :cardId, :status, 1, 2.50, 1, :dueAt, :lapseCount, :dueAt)
                 """).param("id", UUID.randomUUID()).param("userId", userId).param("cardId", cardId)
-                .param("status", status).param("dueAt", SqlTime.at(dueAt)).update();
+                .param("status", status).param("dueAt", SqlTime.at(dueAt)).param("lapseCount", lapseCount).update();
     }
 
     /** One answer, as the log records it. The log is what the streak and the experience counter read. */

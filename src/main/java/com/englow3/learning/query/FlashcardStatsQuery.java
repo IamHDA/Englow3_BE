@@ -84,8 +84,7 @@ public class FlashcardStatsQuery {
                  limit :limit
                 """).param("userId", userId).param("limit", limit)
                 .query((rs, rowNum) -> new DifficultCard(rs.getObject("id", UUID.class), rs.getString("lemma"),
-                        rs.getString("set_name"), rs.getInt("lapse_count"),
-                        rs.getObject("last_reviewed_at", Instant.class)))
+                        rs.getString("set_name"), rs.getInt("lapse_count"), SqlTime.read(rs, "last_reviewed_at")))
                 .list();
     }
 
