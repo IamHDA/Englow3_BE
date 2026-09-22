@@ -1,5 +1,7 @@
 package com.englow3.learning.controller;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.learning.entity.DictationLessonStatus;
@@ -25,6 +30,8 @@ import com.englow3.learning.dto.request.RejectContentRequest;
 import com.englow3.learning.dto.response.ContentReviewResponse;
 import com.englow3.learning.dto.response.DictationLessonResponse;
 import com.englow3.shared.page.PageResponse;
+import com.englow3.learning.dto.result.DictationImportResult;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.learning.service.AdminDictationService;
 
 import jakarta.validation.Valid;
@@ -49,6 +56,29 @@ class AdminDictationController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(
                 adminDictationService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+    }
+
+    /** Says what a generated shadowing batch would do, and writes nothing. */
+    @PostMapping(path = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<DictationImportResult> validateImport(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(adminDictationService.validateImport(readUpload(file)));
+    }
+
+    /** One draft lesson per clip. A clip already imported is skipped, so re-running a batch is safe. */
+    @PostMapping(path = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<DictationImportResult> importLessons(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(adminDictationService.importLessons(readUpload(file)));
+    }
+
+    private static String readUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("DICTATION_IMPORT_EMPTY", "No file was uploaded");
+        }
+        try {
+            return new String(file.getBytes(), StandardCharsets.UTF_8);
+        } catch (IOException unreadable) {
+            throw new BadRequestException("DICTATION_IMPORT_EMPTY", "The uploaded file could not be read");
+        }
     }
 
     @PostMapping("/lessons")

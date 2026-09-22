@@ -23,6 +23,8 @@ import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.learning.dto.result.DictationImportResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class AdminDictationService {
     private final DictationLessonRepository lessonRepo;
     private final DictationSentenceRepository sentenceRepo;
     private final UserDirectory userDirectory;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public DictationLessonSummaryResult create(CreateDictationLessonCommand command) {
@@ -67,6 +70,56 @@ public class AdminDictationService {
         sentenceRepo.saveAll(sentences);
 
         return summaryOf(lesson);
+    }
+
+    /** Reads a generated shadowing batch and says what it would do. Writes nothing. */
+    @Transactional(readOnly = true)
+    public DictationImportResult validateImport(String json) {
+        return DictationImportResult.of(DictationImport.read(objectMapper, json), false);
+    }
+
+    /**
+     * Turns a shadowing batch into draft lessons.
+     * <p>
+     * One lesson per clip, one sentence per segment, every sentence pointing at the clip's own recording and differing
+     * only by where it starts. Draft, like every import: generated content is not reviewed content.
+     * <p>
+     * A clip whose slug is already taken is skipped rather than failing the batch - re-running an import should be
+     * safe, and the alternative is an author deleting thirty lessons to retry one.
+     */
+    @Transactional
+    public DictationImportResult importLessons(String json) {
+        DictationImport.Report report = DictationImport.read(objectMapper, json);
+        UUID authorId = userDirectory.requireCurrentUserId();
+        List<DictationImport.Rejection> skipped = new ArrayList<>(report.rejections());
+        List<DictationImport.Lesson> stored = new ArrayList<>();
+
+        int index = 0;
+        for (DictationImport.Lesson lesson : report.lessons()) {
+            index++;
+            if (lessonRepo.existsBySlug(lesson.slug())) {
+                skipped.add(new DictationImport.Rejection(index, lesson.slug(), "Already imported"));
+                continue;
+            }
+            store(lesson, authorId);
+            stored.add(lesson);
+        }
+
+        return DictationImportResult.of(new DictationImport.Report(List.copyOf(stored), List.copyOf(skipped)), true);
+    }
+
+    private void store(DictationImport.Lesson lesson, UUID authorId) {
+        DictationLesson saved = lessonRepo.save(
+                DictationLesson.draft(lesson.slug(), lesson.title(), "shadowing", lesson.targetLevel(), authorId));
+
+        List<DictationSentence> sentences = new ArrayList<>();
+        int orderNo = 1;
+        for (DictationImport.Segment segment : lesson.segments()) {
+            sentences.add(DictationSentence.of(saved.getId(), orderNo++, segment.text(), null, lesson.audioObjectKey(),
+                    lesson.durationSeconds(), DictationScorer.words(segment.text()).size(), null, null, null,
+                    segment.startMs(), segment.endMs()));
+        }
+        sentenceRepo.saveAll(sentences);
     }
 
     /**

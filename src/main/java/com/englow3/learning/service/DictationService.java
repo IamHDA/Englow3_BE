@@ -73,10 +73,13 @@ public class DictationService {
         return new DictationLessonDetailResult(
                 DictationLessonSummaryResult.of(lesson, sentences.size(), completedCount(userId, sentences),
                         totalDuration(sentences), lastPractisedFor(userId, List.of(lessonId)).get(lessonId)),
-                sentences.stream().map(sentence -> new DictationSentenceResult(sentence.getId(), sentence.getOrderNo(),
-                        sentence.getAudioObjectKey(), sentence.getAudioDurationSeconds(), sentence.getHintWordCount(),
-                        sentence.getHintFirstLetters(), sentence.getHintRevealWord(),
-                        sentence.getHintPartialTranscript(), best.get(sentence.getId()))).toList());
+                sentences.stream()
+                        .map(sentence -> new DictationSentenceResult(sentence.getId(), sentence.getOrderNo(),
+                                sentence.getAudioObjectKey(), sentence.getAudioDurationSeconds(),
+                                sentence.getHintWordCount(), sentence.getHintFirstLetters(),
+                                sentence.getHintRevealWord(), sentence.getHintPartialTranscript(),
+                                sentence.getAudioStartMs(), sentence.getAudioEndMs(), best.get(sentence.getId())))
+                        .toList());
     }
 
     /**

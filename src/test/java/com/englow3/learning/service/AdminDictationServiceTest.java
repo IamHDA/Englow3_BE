@@ -30,6 +30,7 @@ import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.service.UserDirectory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Authoring dictation lessons. The flashcard and quiz equivalents were already covered; this is the third of the three,
@@ -41,7 +42,8 @@ class AdminDictationServiceTest {
     private final DictationSentenceRepository sentenceRepo = mock(DictationSentenceRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final AdminDictationService service = new AdminDictationService(lessonRepo, sentenceRepo, userDirectory);
+    private final AdminDictationService service = new AdminDictationService(lessonRepo, sentenceRepo, userDirectory,
+            new ObjectMapper());
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;
