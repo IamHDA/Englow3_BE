@@ -21,10 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
 import com.englow3.exam.dto.command.ExamDetailCommand;
+import com.englow3.exam.dto.command.ApproveExamCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
+import com.englow3.exam.dto.command.RejectExamCommand;
+import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
 import com.englow3.exam.dto.command.SearchExamCommand;
 import com.englow3.exam.dto.command.UpdateExamCommand;
 import com.englow3.exam.dto.request.CreateExamRequest;
+import com.englow3.exam.dto.request.RejectExamRequest;
 import com.englow3.exam.dto.request.SearchExamRequest;
 import com.englow3.exam.dto.request.UpdateExamRequest;
 import com.englow3.exam.dto.response.ExamDetailResponse;
@@ -38,9 +42,17 @@ import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
+/**
+ * Authoring and review.
+ * <p>
+ * The class gate admits staff as well as administrators, because writing papers is the staff role's whole job. The
+ * three decisions that put a paper in front of learners - publish, approve, reject - carry their own {@code ADMIN}
+ * gate. A method-level rule replaces the class-level one, so each of those is an explicit narrowing and not an accident
+ * of ordering.
+ */
 @RestController
 @RequestMapping("/api/admin/exams")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
 class AdminExamController {
 
     private final AdminExamService adminExamService;
@@ -88,12 +100,35 @@ class AdminExamController {
         return ResponseEntity.ok(ExamResponse.from(adminExamService.update(command)));
     }
 
+    /** Staff hand a paper over for review. Available from a draft or from one that came back. */
+    @PostMapping("/{id}/submit-for-review")
+    ResponseEntity<ExamResponse> submitForReview(@PathVariable UUID id) {
+        return ResponseEntity
+                .ok(ExamResponse.from(adminExamService.submitForReview(new SubmitExamForReviewCommand(id))));
+    }
+
+    /** Approving publishes in the same step - they are one decision, so there is no approved-but-unpublished state. */
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ExamResponse> approve(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamResponse.from(adminExamService.approve(new ApproveExamCommand(id))));
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ExamResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectExamRequest request) {
+        return ResponseEntity.ok(ExamResponse.from(adminExamService.reject(new RejectExamCommand(id, request.note()))));
+    }
+
+    /** Publishing a draft outright, skipping review. An administrator holds the approval power either way. */
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> publish(@PathVariable UUID id) {
         return ResponseEntity.ok(ExamResponse.from(adminExamService.publish(new PublishExamCommand(id))));
     }
 
     @PostMapping("/{id}/archive")
+    @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> archive(@PathVariable UUID id) {
         return ResponseEntity.ok(ExamResponse.from(adminExamService.archive(new ArchiveExamCommand(id))));
     }

@@ -75,6 +75,20 @@ public class Exam {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "submitted_for_review_at")
+    private Instant submittedForReviewAt;
+
+    /** Who approved or turned the paper back. A plain UUID: {@code users} belongs to the user module. */
+    @Column(name = "reviewed_by_user_id")
+    private UUID reviewedByUserId;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    /** Why it was turned back. Kept after approval too, so a resubmission's history is still readable. */
+    @Column(name = "review_note")
+    private String reviewNote;
+
     /** Filled by the column default, never by this application - hence not insertable. */
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
@@ -117,9 +131,11 @@ public class Exam {
     public void updateDraft(String title, String description, ExamType examType, CertificateType certificateType,
             CertificateVariant certificateVariant, TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
             BigDecimal passScore) {
-        if (status != ExamStatus.DRAFT) {
-            throw new ConflictException("EXAM_NOT_DRAFT",
-                    "Only a draft paper can be edited; this one is %s".formatted(status));
+        // REJECTED is editable as well, and has to be: turning a paper back into a state its author cannot change
+        // would make the note unanswerable and the rejection a dead end.
+        if (status != ExamStatus.DRAFT && status != ExamStatus.REJECTED) {
+            throw new ConflictException("EXAM_NOT_EDITABLE",
+                    "Only a draft or rejected paper can be edited; this one is %s".formatted(status));
         }
         requireCoherentCertificate(certificateType, certificateVariant);
 
@@ -144,6 +160,67 @@ public class Exam {
             throw new ConflictException("EXAM_NOT_DRAFT",
                     "Only a draft paper can be published; this one is %s".formatted(status));
         }
+        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        this.status = ExamStatus.PUBLISHED;
+        this.publishedAt = now;
+    }
+
+    /**
+     * Sends the paper to an administrator. Checked against the same rules as publication, and deliberately at this end
+     * of the workflow: a reviewer asked to read a paper with no questions learns nothing they can act on, while the
+     * author is the one who can fix it. Allowed from REJECTED so a corrected paper goes back into the queue.
+     */
+    public void submitForReview(long sectionCount, long questionCount, BigDecimal sectionsRawTotal, Instant now) {
+        if (status != ExamStatus.DRAFT && status != ExamStatus.REJECTED) {
+            throw new ConflictException("EXAM_NOT_SUBMITTABLE",
+                    "Only a draft or rejected paper can be submitted; this one is %s".formatted(status));
+        }
+        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        this.status = ExamStatus.PENDING_REVIEW;
+        this.submittedForReviewAt = now;
+    }
+
+    /**
+     * Approval publishes in the same step, because they are one decision: a paper an administrator has approved and not
+     * published would be a fifth state nobody asked for. The completeness rules are checked again rather than trusted
+     * from submission time - the paper's sections live in other tables that this row cannot see.
+     */
+    public void approve(UUID reviewerId, long sectionCount, long questionCount, BigDecimal sectionsRawTotal,
+            Instant now) {
+        requirePendingReview("approved");
+        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        this.status = ExamStatus.PUBLISHED;
+        this.publishedAt = now;
+        this.reviewedByUserId = reviewerId;
+        this.reviewedAt = now;
+        this.reviewNote = null;
+    }
+
+    /**
+     * @param note
+     *            why, in the reviewer's words. Required: "rejected" on its own gives the author nothing to change, and
+     *            the next submission would be a guess.
+     */
+    public void reject(UUID reviewerId, String note, Instant now) {
+        requirePendingReview("rejected");
+        if (note == null || note.isBlank()) {
+            throw new BadRequestException("EXAM_REVIEW_NOTE_REQUIRED", "A rejection must say why");
+        }
+        this.status = ExamStatus.REJECTED;
+        this.reviewedByUserId = reviewerId;
+        this.reviewedAt = now;
+        this.reviewNote = note.strip();
+    }
+
+    private void requirePendingReview(String verb) {
+        if (status != ExamStatus.PENDING_REVIEW) {
+            throw new ConflictException("EXAM_NOT_PENDING_REVIEW",
+                    "Only a paper waiting on review can be %s; this one is %s".formatted(verb, status));
+        }
+    }
+
+    /** What makes a paper usable once learners can sit it: something to sit, and a scale that adds up. */
+    private void requireSittable(long sectionCount, long questionCount, BigDecimal sectionsRawTotal) {
         if (sectionCount == 0) {
             throw new ConflictException("EXAM_HAS_NO_SECTION", "A paper with no section cannot be published");
         }
@@ -155,8 +232,6 @@ public class Exam {
             throw new ConflictException("EXAM_SCORE_MISMATCH",
                     "Section scores total %s but the paper declares %s".formatted(sectionsRawTotal, maxRawScore));
         }
-        this.status = ExamStatus.PUBLISHED;
-        this.publishedAt = now;
     }
 
     /**

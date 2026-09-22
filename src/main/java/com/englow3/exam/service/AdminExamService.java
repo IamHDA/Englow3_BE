@@ -11,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
 import com.englow3.exam.dto.command.ExamDetailCommand;
+import com.englow3.exam.dto.command.ApproveExamCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
+import com.englow3.exam.dto.command.RejectExamCommand;
+import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
 import com.englow3.exam.dto.command.SearchExamCommand;
 import com.englow3.exam.dto.command.UpdateExamCommand;
 import com.englow3.exam.dto.result.ExamDetailResult;
@@ -69,6 +72,36 @@ public class AdminExamService {
         Exam exam = requireExam(command.examId());
         exam.publish(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), Instant.now());
+
+        return ExamResult.of(exam);
+    }
+
+    @Transactional
+    public ExamResult submitForReview(SubmitExamForReviewCommand command) {
+        Exam exam = requireExam(command.examId());
+        exam.submitForReview(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
+                examRepo.sumSectionScores(exam.getId()), Instant.now());
+
+        return ExamResult.of(exam);
+    }
+
+    /**
+     * Approval records who decided. The reviewer's id is resolved here rather than taken from the request: a caller
+     * that could name its own reviewer could credit the approval to someone else.
+     */
+    @Transactional
+    public ExamResult approve(ApproveExamCommand command) {
+        Exam exam = requireExam(command.examId());
+        exam.approve(userDirectory.requireCurrentUserId(), examRepo.countSections(exam.getId()),
+                examRepo.countQuestions(exam.getId()), examRepo.sumSectionScores(exam.getId()), Instant.now());
+
+        return ExamResult.of(exam);
+    }
+
+    @Transactional
+    public ExamResult reject(RejectExamCommand command) {
+        Exam exam = requireExam(command.examId());
+        exam.reject(userDirectory.requireCurrentUserId(), command.note(), Instant.now());
 
         return ExamResult.of(exam);
     }

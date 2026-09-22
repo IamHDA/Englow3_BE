@@ -118,7 +118,7 @@ class ExamTest {
             assertThatThrownBy(() -> exam.updateDraft("New title", "d", ExamType.MOCK, CertificateType.TOEIC,
                     CertificateVariant.LR, TargetLevel.B1, 7200, DECLARED_SCORE, null))
                             .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
-                            .isEqualTo("EXAM_NOT_DRAFT");
+                            .isEqualTo("EXAM_NOT_EDITABLE");
         }
 
         /** The same coherence rule as draft(), through the other door - an edit must not smuggle IELTS + LR in. */
@@ -182,6 +182,142 @@ class ExamTest {
 
             assertThatThrownBy(exam::archive).isInstanceOf(ConflictException.class)
                     .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("EXAM_ALREADY_ARCHIVED");
+        }
+    }
+
+    @Nested
+    class Review {
+
+        private static final UUID REVIEWER_ID = UUID.randomUUID();
+
+        @Test
+        void sendsADraftToTheQueue() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+            Instant submittedAt = Instant.now();
+
+            exam.submitForReview(2, 200, DECLARED_SCORE, submittedAt);
+
+            assertThat(exam.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
+            assertThat(exam.getSubmittedForReviewAt()).isEqualTo(submittedAt);
+            assertThat(exam.getPublishedAt()).isNull();
+        }
+
+        /**
+         * Checked on the way in, not only on the way out. A reviewer handed a paper with no questions learns nothing
+         * they can act on, while the author is the one who can fix it.
+         */
+        @Test
+        void refusesToSubmitAPaperThatCouldNotBePublished() {
+            assertThatThrownBy(
+                    () -> buildToeicDraft(CertificateVariant.LR).submitForReview(2, 0, DECLARED_SCORE, Instant.now()))
+                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("EXAM_HAS_NO_QUESTION");
+        }
+
+        @Test
+        void refusesToSubmitAPaperAlreadyWaiting() {
+            Exam exam = buildPendingExam();
+
+            assertThatThrownBy(() -> exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now()))
+                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                    .isEqualTo("EXAM_NOT_SUBMITTABLE");
+        }
+
+        @Test
+        void publishesOnApprovalAndRecordsWhoDecided() {
+            Exam exam = buildPendingExam();
+            Instant approvedAt = Instant.now();
+
+            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, approvedAt);
+
+            assertThat(exam.getStatus()).isEqualTo(ExamStatus.PUBLISHED);
+            assertThat(exam.getPublishedAt()).isEqualTo(approvedAt);
+            assertThat(exam.getReviewedByUserId()).isEqualTo(REVIEWER_ID);
+            assertThat(exam.getReviewedAt()).isEqualTo(approvedAt);
+        }
+
+        /** The paper's sections live in other tables, so approval re-checks rather than trusting submission time. */
+        @Test
+        void refusesToApproveAPaperThatHasSinceStoppedAddingUp() {
+            Exam exam = buildPendingExam();
+
+            assertThatThrownBy(() -> exam.approve(REVIEWER_ID, 2, 200, new BigDecimal("195.00"), Instant.now()))
+                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                    .isEqualTo("EXAM_SCORE_MISMATCH");
+        }
+
+        @Test
+        void refusesToApproveAPaperNobodySubmitted() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+
+            assertThatThrownBy(() -> exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, Instant.now()))
+                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                    .isEqualTo("EXAM_NOT_PENDING_REVIEW");
+        }
+
+        @Test
+        void keepsTheReasonWhenTurningAPaperBack() {
+            Exam exam = buildPendingExam();
+
+            exam.reject(REVIEWER_ID, "  Part 3 has no audio.  ", Instant.now());
+
+            assertThat(exam.getStatus()).isEqualTo(ExamStatus.REJECTED);
+            assertThat(exam.getReviewNote()).isEqualTo("Part 3 has no audio.");
+            assertThat(exam.getReviewedByUserId()).isEqualTo(REVIEWER_ID);
+        }
+
+        /** "Rejected" on its own gives the author nothing to change, so the next submission would be a guess. */
+        @Test
+        void refusesARejectionWithNoReason() {
+            Exam exam = buildPendingExam();
+
+            assertThatThrownBy(() -> exam.reject(REVIEWER_ID, "   ", Instant.now()))
+                    .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                    .isEqualTo("EXAM_REVIEW_NOTE_REQUIRED");
+        }
+
+        /**
+         * The case that decides whether a rejection is a dead end. A paper turned back has to be editable, or its
+         * author can never answer the note.
+         */
+        @Test
+        void letsARejectedPaperBeCorrectedAndResubmitted() {
+            Exam exam = buildPendingExam();
+            exam.reject(REVIEWER_ID, "Part 3 has no audio.", Instant.now());
+
+            exam.updateDraft("TOEIC Practice Test 1b", "Fixed", ExamType.MOCK, CertificateType.TOEIC,
+                    CertificateVariant.LR, TargetLevel.B1, 7200, DECLARED_SCORE, null);
+            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+
+            assertThat(exam.getTitle()).isEqualTo("TOEIC Practice Test 1b");
+            assertThat(exam.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
+        }
+
+        /** Approval clears the old note: it described a paper that no longer exists. */
+        @Test
+        void dropsAStaleNoteOnApproval() {
+            Exam exam = buildPendingExam();
+            exam.reject(REVIEWER_ID, "Part 3 has no audio.", Instant.now());
+            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+
+            exam.approve(REVIEWER_ID, 2, 200, DECLARED_SCORE, Instant.now());
+
+            assertThat(exam.getReviewNote()).isNull();
+        }
+
+        @Test
+        void retiresAPaperWaitingOnReview() {
+            Exam exam = buildPendingExam();
+
+            exam.archive();
+
+            assertThat(exam.getStatus()).isEqualTo(ExamStatus.ARCHIVED);
+        }
+
+        private static Exam buildPendingExam() {
+            Exam exam = buildToeicDraft(CertificateVariant.LR);
+            exam.submitForReview(2, 200, DECLARED_SCORE, Instant.now());
+            return exam;
         }
     }
 

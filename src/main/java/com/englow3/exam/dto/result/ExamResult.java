@@ -13,12 +13,14 @@ import com.englow3.exam.entity.TargetLevel;
 
 public record ExamResult(UUID id, String title, String description, ExamType examType, CertificateType certificateType,
         CertificateVariant certificateVariant, TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
-        BigDecimal passScore, ExamStatus status, int versionNumber, UUID createdByUserId, Instant publishedAt) {
+        BigDecimal passScore, ExamStatus status, int versionNumber, UUID createdByUserId, Instant publishedAt,
+        Instant submittedForReviewAt, UUID reviewedByUserId, Instant reviewedAt, String reviewNote) {
 
     public static ExamResult of(Exam exam) {
         return new ExamResult(exam.getId(), exam.getTitle(), exam.getDescription(), exam.getExamType(),
                 exam.getCertificateType(), exam.getCertificateVariant(), exam.getTargetLevel(),
                 exam.getDurationSeconds(), exam.getMaxRawScore(), exam.getPassScore(), exam.getStatus(),
-                exam.getVersionNumber(), exam.getCreatedByUserId(), exam.getPublishedAt());
+                exam.getVersionNumber(), exam.getCreatedByUserId(), exam.getPublishedAt(),
+                exam.getSubmittedForReviewAt(), exam.getReviewedByUserId(), exam.getReviewedAt(), exam.getReviewNote());
     }
 }
