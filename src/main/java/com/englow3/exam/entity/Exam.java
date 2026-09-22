@@ -2,16 +2,17 @@ package com.englow3.exam.entity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.persistence.BasePersistedEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
@@ -22,10 +23,7 @@ import lombok.Getter;
 @Entity
 @Table(name = "exams")
 @Getter
-public class Exam {
-
-    @Id
-    private UUID id;
+public class Exam extends BasePersistedEntity {
 
     @Column(nullable = false)
     private String title;
@@ -123,6 +121,22 @@ public class Exam {
     }
 
     /**
+     * The shared guard behind both {@code updateDraft(...)} and content authoring ({@code AdminExamService
+     * .replaceContent}): a published paper is immutable, attempts snapshot it. One method rather than the same check
+     * copied into each caller.
+     */
+    /**
+     * REJECTED is editable as well, and has to be: turning a paper back into a state its author cannot change would
+     * make the note unanswerable and the rejection a dead end.
+     */
+    public void requireEditable() {
+        if (status != ExamStatus.DRAFT && status != ExamStatus.REJECTED) {
+            throw new ConflictException("EXAM_NOT_EDITABLE",
+                    "Only a draft or rejected paper can be edited; this one is %s".formatted(status));
+        }
+    }
+
+    /**
      * Correcting the shell, draft only. A published paper is immutable on purpose: attempts snapshot it through
      * {@code exam_attempts.exam_version_number}, so allowing an edit afterwards would mean either bumping that version
      * or letting a sat paper change underneath its own results. Refusing is the cheaper of the three, and it can be
@@ -131,12 +145,7 @@ public class Exam {
     public void updateDraft(String title, String description, ExamType examType, CertificateType certificateType,
             CertificateVariant certificateVariant, TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
             BigDecimal passScore) {
-        // REJECTED is editable as well, and has to be: turning a paper back into a state its author cannot change
-        // would make the note unanswerable and the rejection a dead end.
-        if (status != ExamStatus.DRAFT && status != ExamStatus.REJECTED) {
-            throw new ConflictException("EXAM_NOT_EDITABLE",
-                    "Only a draft or rejected paper can be edited; this one is %s".formatted(status));
-        }
+        requireEditable();
         requireCoherentCertificate(certificateType, certificateVariant);
 
         this.title = title;
@@ -151,16 +160,20 @@ public class Exam {
     }
 
     /**
-     * The only thing that sets {@code status} to PUBLISHED and stamps {@code publishedAt}. It weighs plain numbers the
-     * service counted for it - the entity touches no repository - and refuses a paper that would be unusable once
-     * learners can sit it: nothing to sit, or a scoring scale that does not add up.
+     * The only thing that sets {@code status} to PUBLISHED and stamps {@code publishedAt}. It weighs plain numbers and
+     * a plain list the service read for it - the entity touches no repository - and refuses a paper that would be
+     * unusable once learners can sit it: nothing to sit, a scoring scale that does not add up, or a question that
+     * cannot be graded. {@code incompleteQuestionOrderNos} covers three shapes at once - no option, no correct option,
+     * or (SINGLE_CHOICE only) more than one correct option - because none of the three has a passable answer key, and a
+     * paper can carry many of them at once, so the caller needs the list, not just a yes/no.
      */
-    public void publish(long sectionCount, long questionCount, BigDecimal sectionsRawTotal, Instant now) {
+    public void publish(long sectionCount, long questionCount, BigDecimal sectionsRawTotal,
+            List<Integer> incompleteQuestionOrderNos, Instant now) {
         if (status != ExamStatus.DRAFT) {
             throw new ConflictException("EXAM_NOT_DRAFT",
                     "Only a draft paper can be published; this one is %s".formatted(status));
         }
-        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        requireSittable(sectionCount, questionCount, sectionsRawTotal, incompleteQuestionOrderNos);
         this.status = ExamStatus.PUBLISHED;
         this.publishedAt = now;
     }
@@ -170,12 +183,13 @@ public class Exam {
      * of the workflow: a reviewer asked to read a paper with no questions learns nothing they can act on, while the
      * author is the one who can fix it. Allowed from REJECTED so a corrected paper goes back into the queue.
      */
-    public void submitForReview(long sectionCount, long questionCount, BigDecimal sectionsRawTotal, Instant now) {
+    public void submitForReview(long sectionCount, long questionCount, BigDecimal sectionsRawTotal,
+            List<Integer> incompleteQuestionOrderNos, Instant now) {
         if (status != ExamStatus.DRAFT && status != ExamStatus.REJECTED) {
             throw new ConflictException("EXAM_NOT_SUBMITTABLE",
                     "Only a draft or rejected paper can be submitted; this one is %s".formatted(status));
         }
-        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        requireSittable(sectionCount, questionCount, sectionsRawTotal, incompleteQuestionOrderNos);
         this.status = ExamStatus.PENDING_REVIEW;
         this.submittedForReviewAt = now;
     }
@@ -186,9 +200,9 @@ public class Exam {
      * from submission time - the paper's sections live in other tables that this row cannot see.
      */
     public void approve(UUID reviewerId, long sectionCount, long questionCount, BigDecimal sectionsRawTotal,
-            Instant now) {
+            List<Integer> incompleteQuestionOrderNos, Instant now) {
         requirePendingReview("approved");
-        requireSittable(sectionCount, questionCount, sectionsRawTotal);
+        requireSittable(sectionCount, questionCount, sectionsRawTotal, incompleteQuestionOrderNos);
         this.status = ExamStatus.PUBLISHED;
         this.publishedAt = now;
         this.reviewedByUserId = reviewerId;
@@ -220,7 +234,8 @@ public class Exam {
     }
 
     /** What makes a paper usable once learners can sit it: something to sit, and a scale that adds up. */
-    private void requireSittable(long sectionCount, long questionCount, BigDecimal sectionsRawTotal) {
+    private void requireSittable(long sectionCount, long questionCount, BigDecimal sectionsRawTotal,
+            List<Integer> incompleteQuestionOrderNos) {
         if (sectionCount == 0) {
             throw new ConflictException("EXAM_HAS_NO_SECTION", "A paper with no section cannot be published");
         }
@@ -231,6 +246,11 @@ public class Exam {
         if (sectionsRawTotal.compareTo(maxRawScore) != 0) {
             throw new ConflictException("EXAM_SCORE_MISMATCH",
                     "Section scores total %s but the paper declares %s".formatted(sectionsRawTotal, maxRawScore));
+        }
+        if (!incompleteQuestionOrderNos.isEmpty()) {
+            throw new ConflictException("EXAM_HAS_INCOMPLETE_QUESTION",
+                    "Question(s) at order_no %s have no option, no correct option, or more than one correct option on a single-choice question"
+                            .formatted(incompleteQuestionOrderNos));
         }
     }
 
