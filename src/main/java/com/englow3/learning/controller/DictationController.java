@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.englow3.learning.dto.command.SubmitDictationCommand;
 import com.englow3.learning.dto.request.SubmitDictationRequest;
 import com.englow3.learning.dto.response.DictationLessonResponse;
+import com.englow3.learning.dto.response.MistakeSentenceResponse;
 import com.englow3.learning.dto.response.DictationSentenceResponse;
 import com.englow3.learning.dto.response.DictationStatsResponse;
 import com.englow3.learning.dto.response.DictationSubmissionResponse;
@@ -83,5 +84,15 @@ class DictationController {
     }
 
     record DictationLessonDetailResponse(DictationLessonResponse lesson, List<DictationSentenceResponse> sentences) {
+    }
+
+    /**
+     * Lines this learner keeps getting wrong, with the audio to practise them again. Across every lesson: "what do I
+     * keep getting wrong" is a question about the learner, not about a lesson.
+     */
+    @GetMapping("/mistakes")
+    public ResponseEntity<List<MistakeSentenceResponse>> mistakes() {
+        return ResponseEntity.ok(dictationStatsService.mistakeQueue().sentences().stream()
+                .map(sentence -> MistakeSentenceResponse.from(sentence, mediaUrls)).toList());
     }
 }

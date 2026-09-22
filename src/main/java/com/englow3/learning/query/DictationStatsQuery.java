@@ -157,6 +157,43 @@ public class DictationStatsQuery {
                 """).param("userId", userId).param("from", from).query(LocalDate.class).list();
     }
 
+    /**
+     * The lines this learner keeps getting wrong, with everything needed to practise them again: the clip, how long it
+     * runs, and the last thing they typed.
+     * <p>
+     * Ordered by best accuracy rather than by average. A line whose best attempt is still 60% is one they have never
+     * got right; averaging in early failures would push a sentence they have since mastered back to the top.
+     * <p>
+     * The correct text is here because this screen shows the answer after the learner commits one, exactly as a normal
+     * attempt does - it is the review screen for lines already answered, not a way to read the key in advance.
+     */
+    public List<MistakeSentence> mistakeQueue(UUID userId, BigDecimal threshold, int limit) {
+        return jdbcClient.sql("""
+                select s.id, s.text, s.audio_object_key, s.audio_duration_seconds,
+                       l.id as lesson_id, l.title as lesson_title,
+                       cast(round(max(a.accuracy_percent)) as integer) as best_accuracy,
+                       count(*) as attempts,
+                       (array_agg(a.response order by a.attempted_at desc))[1] as last_response
+                  from dictation_attempts a
+                  join dictation_sentences s on s.id = a.dictation_sentence_id
+                  join dictation_lessons l on l.id = s.dictation_lesson_id
+                 where a.user_id = :userId
+                 group by s.id, s.text, s.audio_object_key, s.audio_duration_seconds, l.id, l.title
+                having max(a.accuracy_percent) < :threshold
+                 order by max(a.accuracy_percent) asc, count(*) desc
+                 limit :limit
+                """).param("userId", userId).param("threshold", threshold).param("limit", limit)
+                .query((rs, rowNum) -> new MistakeSentence(rs.getObject("id", UUID.class), rs.getString("text"),
+                        rs.getString("audio_object_key"), rs.getInt("audio_duration_seconds"),
+                        rs.getObject("lesson_id", UUID.class), rs.getString("lesson_title"), rs.getInt("best_accuracy"),
+                        rs.getLong("attempts"), rs.getString("last_response")))
+                .list();
+    }
+
+    public record MistakeSentence(UUID sentenceId, String text, String audioObjectKey, int audioDurationSeconds,
+            UUID lessonId, String lessonTitle, int bestAccuracyPercent, long attemptCount, String lastResponse) {
+    }
+
     public record DailyAccuracy(LocalDate day, int accuracyPercent, long attemptCount) {
     }
 
