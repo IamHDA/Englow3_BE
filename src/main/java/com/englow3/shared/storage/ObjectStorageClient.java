@@ -39,9 +39,19 @@ public class ObjectStorageClient {
         return s3Presigner.presignGetObject(presignRequest).url();
     }
 
-    public URL presignPut(String bucket, String key, String contentType, Duration ttl) {
+    /**
+     * A presigned upload bound to one exact size.
+     * <p>
+     * {@code contentLength} goes into the signature, so the URL will not accept a body of any other length. Without it
+     * a presigned PUT is an open door: whoever holds the link can push a file of any size straight into the bucket, and
+     * no limit anywhere else in the application applies - the request never touches this server.
+     * <p>
+     * The caller must therefore know the size before asking, which every caller does: the bytes exist before the URL is
+     * requested.
+     */
+    public URL presignPut(String bucket, String key, String contentType, long contentLength, Duration ttl) {
         PutObjectRequest putRequest = PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType)
-                .build();
+                .contentLength(contentLength).build();
         return s3Presigner
                 .presignPutObject(
                         PutObjectPresignRequest.builder().signatureDuration(ttl).putObjectRequest(putRequest).build())

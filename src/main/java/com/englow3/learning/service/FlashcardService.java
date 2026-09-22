@@ -111,6 +111,10 @@ public class FlashcardService {
         Flashcard card = cardRepo.findById(command.flashcardId())
                 .orElseThrow(() -> new NotFoundException("FLASHCARD_NOT_FOUND",
                         "No flashcard with id %s".formatted(command.flashcardId())));
+        // The set has to be published, not just the card to exist. Without this a guessed id puts a card from someone
+        // else's draft into this learner's review schedule, and the same refusal for "not yours" and "not there" is
+        // what stops an id being a way to find out which drafts exist.
+        requirePublishedSet(card.getFlashcardSetId());
         Instant now = Instant.now();
 
         FlashcardReview review = reviewRepo.findByUserIdAndFlashcardId(userId, card.getId())

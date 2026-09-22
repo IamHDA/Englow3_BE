@@ -57,8 +57,8 @@ public class SpeakingController {
     @PostMapping("/prompts/{id}/attempts")
     public ResponseEntity<SpeakingUploadTicketResponse> startAttempt(@PathVariable UUID id,
             @Valid @RequestBody StartSpeakingAttemptRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(SpeakingUploadTicketResponse.from(speakingService.startAttempt(id, request.contentType())));
+        return ResponseEntity.status(HttpStatus.CREATED).body(SpeakingUploadTicketResponse
+                .from(speakingService.startAttempt(id, request.contentType(), request.contentLength())));
     }
 
     /** The upload is done; queue the assessment. Refused if the recording is not actually in storage. */

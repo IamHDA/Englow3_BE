@@ -58,4 +58,34 @@ class SpeakingAudioKeysTest {
                 .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                 .isEqualTo("SPEAKING_UNSUPPORTED_AUDIO_TYPE");
     }
+
+    @Test
+    void acceptsARecordingOfAnOrdinarySize() {
+        assertThatCode(() -> SpeakingAudioKeys.requireAcceptedSize(480_000)).doesNotThrowAnyException();
+    }
+
+    /**
+     * The gap this closes. A presigned PUT goes straight to storage and never touches this application, so a size that
+     * is not refused here and not bound into the signature is not refused anywhere at all.
+     */
+    @Test
+    void refusesARecordingLargerThanTheAssessmentCouldEverRead() {
+        assertThatThrownBy(() -> SpeakingAudioKeys.requireAcceptedSize(SpeakingAudioKeys.MAX_AUDIO_BYTES + 1))
+                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                .isEqualTo("SPEAKING_RECORDING_TOO_LARGE");
+    }
+
+    @Test
+    void acceptsExactlyTheLimit() {
+        assertThatCode(() -> SpeakingAudioKeys.requireAcceptedSize(SpeakingAudioKeys.MAX_AUDIO_BYTES))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void refusesAnEmptyOrNegativeRecording() {
+        assertThatThrownBy(() -> SpeakingAudioKeys.requireAcceptedSize(0)).isInstanceOf(BadRequestException.class)
+                .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("SPEAKING_EMPTY_RECORDING");
+        assertThatThrownBy(() -> SpeakingAudioKeys.requireAcceptedSize(-1)).isInstanceOf(BadRequestException.class)
+                .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("SPEAKING_EMPTY_RECORDING");
+    }
 }

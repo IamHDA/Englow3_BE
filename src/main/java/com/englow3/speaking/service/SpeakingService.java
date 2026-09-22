@@ -2,6 +2,9 @@ package com.englow3.speaking.service;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,6 +71,16 @@ public class SpeakingService {
     @Value("${app.speech.locale:en-US}")
     private String locale;
 
+    /**
+     * How many assessments one learner may ask for in a day.
+     * <p>
+     * The setting has existed since the AI configuration was written and nothing read it, which left the number of paid
+     * provider calls per account unbounded. This is a cost ceiling rather than an abuse defence: generous enough that
+     * ordinary practice never meets it, low enough that a script left running overnight stops.
+     */
+    @Value("${app.ai.daily-request-limit:100}")
+    private int dailyAssessmentLimit;
+
     @Transactional(readOnly = true)
     public Page<SpeakingPromptResult> searchPublished(String category, String title, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
@@ -95,8 +108,9 @@ public class SpeakingService {
      * thread for the length of the learner's connection and buy nothing, since the file is going to storage either way.
      */
     @Transactional
-    public SpeakingUploadTicket startAttempt(UUID promptId, String contentType) {
+    public SpeakingUploadTicket startAttempt(UUID promptId, String contentType, long contentLength) {
         SpeakingAudioKeys.requireAcceptedContentType(contentType);
+        SpeakingAudioKeys.requireAcceptedSize(contentLength);
 
         UUID userId = userDirectory.requireCurrentUserId();
         requirePublishedPrompt(promptId);
@@ -106,8 +120,10 @@ public class SpeakingService {
         SpeakingAttempt attempt = attemptRepo
                 .save(SpeakingAttempt.awaitingUpload(userId, promptId, objectKey, contentType));
 
-        // Short-lived: long enough to finish one upload, not long enough to be worth passing around.
-        String uploadUrl = objectStorage.presignPut(speakingBucket, objectKey, contentType, uploadUrlTtl).toString();
+        // Short-lived, and bound to this exact size. A presigned PUT never reaches this application, so once the URL
+        // is out the signature is the only thing standing between it and a file of any size at all.
+        String uploadUrl = objectStorage.presignPut(speakingBucket, objectKey, contentType, contentLength, uploadUrlTtl)
+                .toString();
 
         return new SpeakingUploadTicket(attempt.getId(), uploadUrl, contentType, uploadUrlTtl.getSeconds());
     }
@@ -127,6 +143,7 @@ public class SpeakingService {
                 .orElseThrow(() -> promptNotFound(attempt.getSpeakingPromptId()));
 
         requireUploadedAudio(attempt);
+        requireQuotaRemaining(userId);
         attempt.markQueued();
 
         aiJobQueue.enqueue(AiJobType.SPEECH_ASSESSMENT, ATTEMPT_TARGET_TYPE, attempt.getId(),
@@ -204,6 +221,18 @@ public class SpeakingService {
     private SpeakingPrompt requirePublishedPrompt(UUID promptId) {
         return promptRepo.findById(promptId).filter(prompt -> prompt.getStatus() == SpeakingPromptStatus.PUBLISHED)
                 .orElseThrow(() -> promptNotFound(promptId));
+    }
+
+    /**
+     * Checked at submission rather than when the attempt opens. Opening one costs nothing, and refusing a learner
+     * before they have recorded anything would spend their effort only to tell them no.
+     */
+    private void requireQuotaRemaining(UUID userId) {
+        Instant since = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+        if (attemptRepo.countSubmittedSince(userId, since) >= dailyAssessmentLimit) {
+            throw new ConflictException("SPEAKING_DAILY_LIMIT_REACHED",
+                    "You have reached today's limit of %d assessments".formatted(dailyAssessmentLimit));
+        }
     }
 
     private static NotFoundException promptNotFound(UUID promptId) {

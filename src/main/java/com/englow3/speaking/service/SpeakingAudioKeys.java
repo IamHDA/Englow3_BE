@@ -20,6 +20,15 @@ public final class SpeakingAudioKeys {
      */
     private static final Set<String> ACCEPTED_CONTENT_TYPES = Set.of("audio/wav", "audio/x-wav", "audio/ogg");
 
+    /**
+     * The largest recording that will be accepted, checked before a URL is issued and bound into the signature after.
+     * <p>
+     * Ten megabytes is what {@code ai_service} reads before refusing, so anything larger could never be scored. At 16
+     * kHz mono WAV that is roughly five minutes - far longer than any prompt, and short of making the bucket a cheap
+     * place to park files.
+     */
+    static final long MAX_AUDIO_BYTES = 10L * 1024 * 1024;
+
     private SpeakingAudioKeys() {
     }
 
@@ -38,6 +47,20 @@ public final class SpeakingAudioKeys {
         if (contentType == null || !ACCEPTED_CONTENT_TYPES.contains(contentType)) {
             throw new BadRequestException("SPEAKING_UNSUPPORTED_AUDIO_TYPE",
                     "Recordings must be WAV or OGG; %s is not accepted".formatted(contentType));
+        }
+    }
+
+    /**
+     * Refused here rather than at the bucket. A presigned PUT bypasses this application entirely, so the only moments a
+     * size can be checked are before the URL exists and inside the signature - the request itself is never seen.
+     */
+    public static void requireAcceptedSize(long contentLength) {
+        if (contentLength <= 0) {
+            throw new BadRequestException("SPEAKING_EMPTY_RECORDING", "A recording cannot be empty");
+        }
+        if (contentLength > MAX_AUDIO_BYTES) {
+            throw new BadRequestException("SPEAKING_RECORDING_TOO_LARGE",
+                    "A recording may be at most %d MB".formatted(MAX_AUDIO_BYTES / (1024 * 1024)));
         }
     }
 

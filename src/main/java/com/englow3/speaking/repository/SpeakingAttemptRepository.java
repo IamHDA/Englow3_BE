@@ -1,6 +1,7 @@
 package com.englow3.speaking.repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -39,4 +40,17 @@ public interface SpeakingAttemptRepository extends JpaRepository<SpeakingAttempt
         return bestScoresRaw(userId, promptIds).stream().filter(row -> row[1] != null)
                 .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));
     }
+
+    /**
+     * Assessments this learner has asked for since {@code from}.
+     * <p>
+     * Counts attempts that were actually submitted - an AWAITING_UPLOAD row is a URL nobody used and costs nothing. A
+     * failed one still counts: the provider was called, so it was still spent.
+     */
+    @Query("""
+            select count(a) from SpeakingAttempt a
+             where a.userId = :userId and a.createdAt >= :from
+               and a.status <> com.englow3.speaking.entity.SpeakingAttemptStatus.AWAITING_UPLOAD
+            """)
+    long countSubmittedSince(@Param("userId") UUID userId, @Param("from") Instant from);
 }
