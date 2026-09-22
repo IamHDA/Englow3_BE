@@ -13,8 +13,12 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 
 /**
- * The three content types run the same review workflow through three separate status enums. Tested together so the
- * three stay in step: if one of them ever grows a rule the others do not have, this file is where it shows.
+ * This module's three content types run the same review workflow through three separate status enums. Tested together
+ * so the three stay in step: if one of them ever grows a rule the others do not have, this file is where it shows.
+ * <p>
+ * A fourth type runs the same workflow outside this module - see {@code speaking.entity.SpeakingPromptTest}. It is
+ * tested there rather than here because a learning-module test importing a speaking entity would cross the boundary the
+ * module map exists to hold.
  */
 class ContentReviewLifecycleTest {
 
