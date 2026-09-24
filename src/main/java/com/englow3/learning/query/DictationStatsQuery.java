@@ -170,7 +170,7 @@ public class DictationStatsQuery {
      */
     public List<MistakeSentence> mistakeQueue(UUID userId, BigDecimal threshold, int limit) {
         return jdbcClient.sql("""
-                select s.id, s.text, s.audio_object_key, s.audio_duration_seconds,
+                select s.id, s.audio_object_key, s.audio_duration_seconds, s.audio_start_ms, s.audio_end_ms,
                        l.id as lesson_id, l.title as lesson_title,
                        cast(round(max(a.accuracy_percent)) as integer) as best_accuracy,
                        count(*) as attempts,
@@ -179,20 +179,23 @@ public class DictationStatsQuery {
                   join dictation_sentences s on s.id = a.dictation_sentence_id
                   join dictation_lessons l on l.id = s.dictation_lesson_id
                  where a.user_id = :userId
-                 group by s.id, s.text, s.audio_object_key, s.audio_duration_seconds, l.id, l.title
+                 group by s.id, s.audio_object_key, s.audio_duration_seconds, s.audio_start_ms, s.audio_end_ms,
+                          l.id, l.title
                 having max(a.accuracy_percent) < :threshold
                  order by max(a.accuracy_percent) asc, count(*) desc
                  limit :limit
                 """).param("userId", userId).param("threshold", threshold).param("limit", limit)
-                .query((rs, rowNum) -> new MistakeSentence(rs.getObject("id", UUID.class), rs.getString("text"),
+                .query((rs, rowNum) -> new MistakeSentence(rs.getObject("id", UUID.class),
                         rs.getString("audio_object_key"), rs.getInt("audio_duration_seconds"),
+                        rs.getObject("audio_start_ms", Integer.class), rs.getObject("audio_end_ms", Integer.class),
                         rs.getObject("lesson_id", UUID.class), rs.getString("lesson_title"), rs.getInt("best_accuracy"),
                         rs.getLong("attempts"), rs.getString("last_response")))
                 .list();
     }
 
-    public record MistakeSentence(UUID sentenceId, String text, String audioObjectKey, int audioDurationSeconds,
-            UUID lessonId, String lessonTitle, int bestAccuracyPercent, long attemptCount, String lastResponse) {
+    public record MistakeSentence(UUID sentenceId, String audioObjectKey, int audioDurationSeconds,
+            Integer audioStartMs, Integer audioEndMs, UUID lessonId, String lessonTitle, int bestAccuracyPercent,
+            long attemptCount, String lastResponse) {
     }
 
     public record DailyAccuracy(LocalDate day, int accuracyPercent, long attemptCount) {

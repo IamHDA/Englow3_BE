@@ -101,7 +101,8 @@ public class DictationService {
                 score.accuracyPercent(), score.correctWordCount(), score.totalWordCount(), Instant.now()));
 
         return new DictationSubmissionResult(sentence.getId(), sentence.getText(), sentence.getTranslationVi(),
-                response, score.accuracyPercent(), score.correctWordCount(), score.totalWordCount());
+                response, score.accuracyPercent(), score.correctWordCount(), score.totalWordCount(),
+                DictationScorer.cleared(score.accuracyPercent()));
     }
 
     private long completedCount(UUID userId, List<DictationSentence> sentences) {

@@ -135,6 +135,22 @@ class DictationServiceTest {
             assertThat(saved.getValue().getAccuracyPercent()).isEqualByComparingTo("100.00");
         }
 
+        /**
+         * The server says whether the line is cleared, by the one rule that decides it. Before this the review screen
+         * compared the accuracy to its own number - 100, where everything else says 80.
+         */
+        @Test
+        void saysWhetherTheLineIsNowCleared() {
+            lessonIsPublished();
+
+            assertThat(service.submit(new SubmitDictationCommand(sentence.getId(), "The cat sat on the mat")).cleared())
+                    .isTrue();
+            // Five words of six is 83%: cleared, though not perfect. The review screen used to call this wrong.
+            assertThat(service.submit(new SubmitDictationCommand(sentence.getId(), "The cat sat on the")).cleared())
+                    .isTrue();
+            assertThat(service.submit(new SubmitDictationCommand(sentence.getId(), "The dog")).cleared()).isFalse();
+        }
+
         /** A learner who submits having typed nothing scores zero rather than crashing the request. */
         @Test
         void scoresAnEmptyAnswerAsNothingRatherThanFailing() {

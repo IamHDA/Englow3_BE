@@ -229,6 +229,44 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
                     .doesNotContain(sentence);
         }
 
+        /**
+         * The review queue carries no transcript. It used to, and the screen graded against it in the browser without
+         * telling the server - so a reviewed line was never recorded and came back on the next visit.
+         */
+        @Test
+        void queuesALineWithoutItsAnswer() {
+            fixture.dictationAttempt(learner, lesson, sentence, "wrong", new BigDecimal("20.00"), daysAgo(1));
+
+            var line = dictationStats.mistakeQueue(learner, new BigDecimal("80"), 50).stream()
+                    .filter(queued -> queued.sentenceId().equals(sentence)).findFirst().orElseThrow();
+
+            for (var component : DictationStatsQuery.MistakeSentence.class.getRecordComponents()) {
+                Object value;
+                try {
+                    value = component.getAccessor().invoke(line);
+                } catch (ReflectiveOperationException unreachable) {
+                    throw new IllegalStateException(unreachable);
+                }
+                if (value instanceof String text) {
+                    assertThat(text).as(component.getName()).doesNotContain("The cat sat on the mat");
+                }
+            }
+        }
+
+        /** A line cut from a longer recording keeps its window, or the review plays the whole passage. */
+        @Test
+        void carriesTheLinesWindowIntoItsRecording() {
+            jdbc.sql("update dictation_sentences set audio_start_ms = 1200, audio_end_ms = 3400 where id = :id")
+                    .param("id", sentence).update();
+            fixture.dictationAttempt(learner, lesson, sentence, "wrong", new BigDecimal("20.00"), daysAgo(1));
+
+            var line = dictationStats.mistakeQueue(learner, new BigDecimal("80"), 50).stream()
+                    .filter(queued -> queued.sentenceId().equals(sentence)).findFirst().orElseThrow();
+
+            assertThat(line.audioStartMs()).isEqualTo(1200);
+            assertThat(line.audioEndMs()).isEqualTo(3400);
+        }
+
         /** A line the learner later got right leaves the queue - the queue is work outstanding, not a history. */
         @Test
         void dropsALineOnceItsBestAttemptClears() {
