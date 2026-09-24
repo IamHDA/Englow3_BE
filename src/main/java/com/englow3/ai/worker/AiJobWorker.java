@@ -52,7 +52,10 @@ public class AiJobWorker {
         List<AiJob> claimed = queue.claimBatch(batchSize);
 
         for (AiJob job : claimed) {
-            queue.record(job.getId(), attempt(job));
+            AiJobHandler.Outcome outcome = attempt(job);
+            if (queue.record(job.getId(), outcome)) {
+                gaveUp(job, outcome.errorCode());
+            }
         }
     }
 
@@ -62,9 +65,26 @@ public class AiJobWorker {
      */
     @Scheduled(fixedDelayString = "${app.ai.worker.reconcile-delay:1m}")
     public void reclaimStalled() {
-        int reclaimed = queue.reclaimStalled(lockTimeout);
-        if (reclaimed > 0) {
-            log.warn("Reclaimed {} AI job(s) whose worker stopped responding", reclaimed);
+        List<AiJob> reclaimed = queue.reclaimStalled(lockTimeout);
+        if (!reclaimed.isEmpty()) {
+            log.warn("Reclaimed {} AI job(s) whose worker stopped responding", reclaimed.size());
+        }
+        reclaimed.stream().filter(AiJob::finished).forEach(job -> gaveUp(job, "AI_JOB_STALLED"));
+    }
+
+    /**
+     * Tells the job's module nothing more is coming. Guarded, because this runs after the job is already recorded as
+     * failed: a handler that throws here must not undo that, or take the rest of the batch down with it.
+     */
+    private void gaveUp(AiJob job, String errorCode) {
+        AiJobHandler handler = handlers.get(job.getJobType());
+        if (handler == null) {
+            return;
+        }
+        try {
+            handler.onGaveUp(job, errorCode);
+        } catch (RuntimeException failure) {
+            log.error("AI job {} gave up, and its handler could not record that", job.getId(), failure);
         }
     }
 

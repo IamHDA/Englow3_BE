@@ -77,27 +77,30 @@ public class TutorReplyHandler implements AiJobHandler {
 
             return Outcome.succeeded(response);
         } catch (LlmException providerFailure) {
-            return finish(messageId, providerFailure.getCode(), providerFailure.getMessage(),
-                    providerFailure.isRetryable());
+            return finish(providerFailure.getCode(), providerFailure.getMessage(), providerFailure.isRetryable());
         } catch (DomainException unusable) {
             // The provider answered with something that is not a usable reply. Asking again produces the same
             // answer, so this ends here rather than three attempts later.
-            return finish(messageId, unusable.getCode(), unusable.getMessage(), false);
+            return finish(unusable.getCode(), unusable.getMessage(), false);
         }
     }
 
     /**
-     * A retryable failure leaves the turn PENDING. The learner is still waiting and the answer is still coming; showing
-     * them "that failed" only to succeed twenty seconds later tells them something untrue. Only a final failure is
-     * written where they can see it.
+     * Says what kind of failure this was, and nothing more. Whether the learner is told is decided once the queue has
+     * recorded it - see {@link #onGaveUp} - because only the queue knows whether a retry is still coming. Deciding it
+     * here covered one of the four ways a job can end and left the turn waiting on the other three.
      */
-    private Outcome finish(UUID messageId, String code, String message, boolean retryable) {
-        if (retryable) {
-            return Outcome.transientFailure(code, message);
-        }
-        writer.markFailed(messageId, code);
+    private static Outcome finish(String code, String message, boolean retryable) {
+        return retryable ? Outcome.transientFailure(code, message) : Outcome.permanentFailure(code, message);
+    }
 
-        return Outcome.permanentFailure(code, message);
+    /**
+     * Nothing more is coming, so the learner is told. Read from the job's own target rather than its payload, which is
+     * what lets this work even for a payload that could not be read.
+     */
+    @Override
+    public void onGaveUp(AiJob job, String errorCode) {
+        writer.markFailed(job.getTargetId(), errorCode);
     }
 
     /** What the adapter returned, reduced to the parts worth keeping on the message. */

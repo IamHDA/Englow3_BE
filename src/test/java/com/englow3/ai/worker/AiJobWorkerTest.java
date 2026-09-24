@@ -133,10 +133,132 @@ class AiJobWorkerTest {
 
     @Test
     void handsStalledJobsBackUsingTheConfiguredLockTimeout() {
-        when(queue.reclaimStalled(Duration.ofMinutes(5))).thenReturn(2);
+        when(queue.reclaimStalled(Duration.ofMinutes(5))).thenReturn(List.of(job(), job()));
 
         workerWith().reclaimStalled();
 
         verify(queue).reclaimStalled(Duration.ofMinutes(5));
+    }
+
+    /** A handler that only records calls to onGaveUp, so the tests can say who was told what. */
+    private static final class Recording implements AiJobHandler {
+
+        final java.util.List<String> gaveUp = new java.util.ArrayList<>();
+        private final java.util.function.Function<AiJob, Outcome> behaviour;
+
+        Recording(java.util.function.Function<AiJob, Outcome> behaviour) {
+            this.behaviour = behaviour;
+        }
+
+        @Override
+        public AiJobType handles() {
+            return AiJobType.SPEECH_ASSESSMENT;
+        }
+
+        @Override
+        public Outcome run(AiJob job) {
+            return behaviour.apply(job);
+        }
+
+        @Override
+        public void onGaveUp(AiJob job, String errorCode) {
+            gaveUp.add(errorCode);
+        }
+    }
+
+    /**
+     * The reason the hook exists. When the queue says this attempt was the last, the job's module is told - otherwise a
+     * learner is left waiting on work that has already stopped.
+     */
+    @Test
+    void tellsTheHandlerWhenAJobHasGivenUp() {
+        AiJob job = job();
+        when(queue.claimBatch(5)).thenReturn(List.of(job));
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
+
+        workerWith(handler).drain();
+
+        assertThat(handler.gaveUp).containsExactly("PROVIDER_DOWN");
+    }
+
+    /** While a retry is still coming, nobody is told anything - the answer may yet arrive. */
+    @Test
+    void saysNothingWhileARetryIsStillComing() {
+        AiJob job = job();
+        when(queue.claimBatch(5)).thenReturn(List.of(job));
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
+
+        workerWith(handler).drain();
+
+        assertThat(handler.gaveUp).isEmpty();
+    }
+
+    /** A handler that throws on its last attempt still gets told, with the code the worker recorded. */
+    @Test
+    void tellsTheHandlerEvenWhenItsLastAttemptThrew() {
+        AiJob job = job();
+        when(queue.claimBatch(5)).thenReturn(List.of(job));
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        Recording handler = new Recording(ignored -> {
+            throw new IllegalStateException("boom");
+        });
+
+        workerWith(handler).drain();
+
+        assertThat(handler.gaveUp).containsExactly("AI_JOB_HANDLER_ERROR");
+    }
+
+    /**
+     * A stall reclaim costs a retry, so it can be the thing that ends a job. The worker tells the module then too - the
+     * one path that never passes through a handler's run at all.
+     */
+    @Test
+    void tellsTheHandlerWhenAReclaimUsedTheLastRetry() {
+        AiJob finished = job();
+        finished.claim(java.time.Instant.now());
+        for (int i = 0; i < 3; i++) {
+            finished.fail("X", "x", true, java.time.Instant.now());
+            if (!finished.finished()) {
+                finished.claim(java.time.Instant.now());
+            }
+        }
+        AiJob stillGoing = job();
+        when(queue.reclaimStalled(Duration.ofMinutes(5))).thenReturn(List.of(finished, stillGoing));
+        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.succeeded("{}"));
+
+        workerWith(handler).reclaimStalled();
+
+        assertThat(handler.gaveUp).containsExactly("AI_JOB_STALLED");
+    }
+
+    /** Telling the module happens after the job is recorded; a handler failing at it must not take the batch down. */
+    @Test
+    void keepsGoingWhenTellingTheHandlerFails() {
+        AiJob first = job();
+        AiJob second = job();
+        when(queue.claimBatch(5)).thenReturn(List.of(first, second));
+        when(queue.record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        AiJobHandler throwingOnGiveUp = new AiJobHandler() {
+            @Override
+            public AiJobType handles() {
+                return AiJobType.SPEECH_ASSESSMENT;
+            }
+
+            @Override
+            public Outcome run(AiJob job) {
+                return Outcome.permanentFailure("BAD", "x");
+            }
+
+            @Override
+            public void onGaveUp(AiJob job, String errorCode) {
+                throw new IllegalStateException("could not write");
+            }
+        };
+
+        workerWith(throwingOnGiveUp).drain();
+
+        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any());
     }
 }

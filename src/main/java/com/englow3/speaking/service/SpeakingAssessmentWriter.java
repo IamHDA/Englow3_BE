@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.speaking.entity.SpeakingAttempt;
 import com.englow3.speaking.entity.SpeakingAttemptWord;
+import com.englow3.speaking.entity.SpeakingAttemptStatus;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
 import com.englow3.speaking.service.SpeechAssessmentParser.Assessment;
@@ -42,9 +43,14 @@ public class SpeakingAssessmentWriter {
         });
     }
 
+    /**
+     * Only an attempt still waiting becomes failed. Called once a job has given up, which can follow a run that already
+     * stored a score - a scored attempt is not turned into a failed one after the fact.
+     */
     @Transactional
     public void markFailed(UUID attemptId, String errorCode) {
-        attemptRepo.findById(attemptId).ifPresent(attempt -> attempt.recordFailure(errorCode, Instant.now()));
+        attemptRepo.findById(attemptId).filter(attempt -> attempt.getStatus() == SpeakingAttemptStatus.QUEUED)
+                .ifPresent(attempt -> attempt.recordFailure(errorCode, Instant.now()));
     }
 
     /**

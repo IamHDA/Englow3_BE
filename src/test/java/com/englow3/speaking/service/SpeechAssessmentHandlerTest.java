@@ -83,16 +83,19 @@ class SpeechAssessmentHandlerTest {
         verify(writer, never()).markFailed(any(), anyString());
     }
 
-    /** A final failure is the only one written where the learner can see it. */
+    /**
+     * A refusal is reported as final. Telling the learner waits for the queue, which alone knows the job is over - see
+     * {@code tellsTheLearnerOnceTheJobHasGivenUp}.
+     */
     @Test
-    void tellsTheLearnerOnlyWhenNoRetryIsComing() {
+    void reportsARefusalAsFinalWithoutTellingTheLearnerYet() {
         when(speechClient.assess(any(), anyString(), anyString(), anyString()))
                 .thenThrow(new SpeechAssessmentException("SPEECH_ASSESSMENT_REJECTED", "415", false));
 
         Outcome outcome = handler.run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
-        verify(writer).markFailed(attemptId, "SPEECH_ASSESSMENT_REJECTED");
+        verify(writer, never()).markFailed(any(), anyString());
     }
 
     /**
@@ -107,7 +110,7 @@ class SpeechAssessmentHandlerTest {
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_ASSESSMENT_UNREADABLE");
-        verify(writer).markFailed(attemptId, "SPEECH_ASSESSMENT_UNREADABLE");
+        verify(writer, never()).markFailed(any(), anyString());
     }
 
     /** Storage being unreachable says nothing about the recording, so it is always worth another go. */
@@ -152,6 +155,28 @@ class SpeechAssessmentHandlerTest {
         Outcome outcome = handler.run(validJob());
 
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_ASSESSMENT_EMPTY");
-        verify(writer).markFailed(attemptId, "SPEECH_ASSESSMENT_EMPTY");
+        verify(writer, never()).markFailed(any(), anyString());
+    }
+
+    /**
+     * Telling the learner is not {@code run}'s job any more: it knew about one of the four ways a job ends. The worker
+     * calls this once the queue has recorded the job as over, whichever way it got there.
+     */
+    @Test
+    void tellsTheLearnerOnceTheJobHasGivenUp() {
+        handler.onGaveUp(validJob(), "PROVIDER_DOWN");
+
+        verify(writer).markFailed(attemptId, "PROVIDER_DOWN");
+    }
+
+    /**
+     * Read from the job's own target, not its payload - so even a job whose payload could not be read still reaches the
+     * learner it belongs to. That case used to leave them waiting with no way to be told.
+     */
+    @Test
+    void reachesTheLearnerEvenWhenThePayloadWasUnreadable() {
+        handler.onGaveUp(jobFor("not json at all"), "PAYLOAD_UNREADABLE");
+
+        verify(writer).markFailed(attemptId, "PAYLOAD_UNREADABLE");
     }
 }

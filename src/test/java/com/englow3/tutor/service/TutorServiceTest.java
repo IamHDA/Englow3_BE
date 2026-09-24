@@ -56,7 +56,6 @@ class TutorServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(service, "dailyRequestLimit", DAILY_LIMIT);
         conversation = TutorConversation.start(userId, "What is a gerund?", "grammar", Instant.now());
 
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
@@ -64,7 +63,9 @@ class TutorServiceTest {
         when(conversationRepo.findByIdAndUserId(conversation.getId(), userId)).thenReturn(Optional.of(conversation));
         when(messageRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(messageRepo.findByTutorConversationIdOrderByOrderNo(any())).thenReturn(List.of());
-        when(messageRepo.countAskedSince(eq(userId), any())).thenReturn(0L);
+        // The budget is the queue's to count now; by default there is room left.
+        when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(true);
+        when(aiJobQueue.dailyRequestLimit()).thenReturn(DAILY_LIMIT);
     }
 
     private List<TutorMessage> savedMessages() {
@@ -108,7 +109,7 @@ class TutorServiceTest {
 
             UUID pendingId = savedMessages().get(1).getId();
             verify(aiJobQueue).enqueue(eq(AiJobType.TUTOR_REPLY), eq("TUTOR_MESSAGE"), eq(pendingId), anyString(),
-                    anyString(), eq(TutorPrompt.VERSION));
+                    anyString(), eq(TutorPrompt.VERSION), eq(userId));
         }
 
         /** Continuing a thread numbers the new turns after the ones already in it, not from one. */
@@ -134,7 +135,7 @@ class TutorServiceTest {
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
             ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(aiJobQueue).enqueue(any(), anyString(), any(), payload.capture(), anyString(), anyString());
+            verify(aiJobQueue).enqueue(any(), anyString(), any(), payload.capture(), anyString(), anyString(), any());
             assertThat(payload.getValue()).contains("What is a gerund?").contains("A verb used as a noun.")
                     .contains("Give me an example.");
         }
@@ -160,7 +161,7 @@ class TutorServiceTest {
          */
         @Test
         void refusesOnceTodaysQuestionsAreSpent() {
-            when(messageRepo.countAskedSince(eq(userId), any())).thenReturn((long) DAILY_LIMIT);
+            when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(false);
 
             assertThatThrownBy(() -> service.send(new SendTutorMessageCommand(null, "What is a gerund?", null)))
                     .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
@@ -170,14 +171,15 @@ class TutorServiceTest {
         /** Nothing is written on the way to the refusal - no thread, no turn, no job. */
         @Test
         void leavesNothingBehindWhenItRefuses() {
-            when(messageRepo.countAskedSince(eq(userId), any())).thenReturn((long) DAILY_LIMIT);
+            when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(false);
 
             assertThatThrownBy(() -> service.send(new SendTutorMessageCommand(null, "What is a gerund?", null)))
                     .isInstanceOf(ConflictException.class);
 
             verify(conversationRepo, never()).save(any());
             verify(messageRepo, never()).save(any());
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString());
+            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
+                    any());
         }
     }
 
@@ -205,7 +207,8 @@ class TutorServiceTest {
             assertThatThrownBy(() -> service.send(new SendTutorMessageCommand(other, "hello", null)))
                     .isInstanceOf(NotFoundException.class);
 
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString());
+            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
+                    any());
         }
 
         @Test

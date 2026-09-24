@@ -49,4 +49,12 @@ public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
                and j.startedAt <= :threshold
             """)
     List<AiJob> findStalled(@Param("threshold") Instant threshold);
+
+    /**
+     * Jobs a learner has caused since {@code from}, across every feature. Retries are not counted - a retry is the same
+     * job again, not a new request - and neither is a second submit of the same work, which idempotency collapses into
+     * the first job.
+     */
+    @Query("select count(j) from AiJob j where j.requestedByUserId = :userId and j.createdAt >= :from")
+    long countRequestedSince(@Param("userId") UUID userId, @Param("from") Instant from);
 }

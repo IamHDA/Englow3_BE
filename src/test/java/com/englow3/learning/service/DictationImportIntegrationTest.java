@@ -5,17 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.englow3.learning.entity.DictationSentence;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.support.SignedIn;
 
 /**
  * Importing a shadowing batch into real lessons.
@@ -44,13 +44,16 @@ class DictationImportIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        UUID author = new LearnerFixture(jdbc).learner();
-        // The service reads the author from the token; there is no request here, so it is supplied directly.
-        UserDirectory directory = org.mockito.Mockito.mock(UserDirectory.class);
-        org.mockito.Mockito.when(directory.requireCurrentUserId()).thenReturn(author);
-        ReflectionTestUtils.setField(service, "userDirectory", directory);
+        // Signed in the way a request is, so the author is resolved through the real directory. This used to swap a
+        // mocked directory into the service bean - a singleton the whole suite shares - and never put it back.
+        SignedIn.as(jdbc, new LearnerFixture(jdbc).learner());
 
         clipId = "clip-" + UUID.randomUUID();
+    }
+
+    @AfterEach
+    void signOut() {
+        SignedIn.out();
     }
 
     private long sentenceCount(String slug) {

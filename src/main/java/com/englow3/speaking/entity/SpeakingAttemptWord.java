@@ -3,6 +3,8 @@ package com.englow3.speaking.entity;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -46,6 +48,7 @@ public class SpeakingAttemptWord {
     private Integer durationMs;
 
     /** A JSON array of per-phoneme scores, read as a unit with the word. */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private String phonemes;
 

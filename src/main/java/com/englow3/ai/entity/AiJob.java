@@ -6,6 +6,8 @@ import java.util.UUID;
 import com.englow3.ai.service.RetryBackoff;
 import com.englow3.shared.error.ConflictException;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -46,6 +48,10 @@ public class AiJob {
     @Column(name = "target_id", nullable = false, updatable = false)
     private UUID targetId;
 
+    /** Who asked. Null on rows from before this was recorded, and on work the system raises for itself. */
+    @Column(name = "requested_by_user_id", updatable = false)
+    private UUID requestedByUserId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AiJobStatus status;
@@ -60,9 +66,11 @@ public class AiJob {
     private String promptVersion;
 
     /** JSON, as text. The queue never reads inside it - only the handler for this job type knows the shape. */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "input_payload", nullable = false, updatable = false, columnDefinition = "jsonb")
     private String inputPayload;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output_payload", columnDefinition = "jsonb")
     private String outputPayload;
 
@@ -103,7 +111,19 @@ public class AiJob {
 
     public static AiJob pending(AiJobType jobType, String targetType, UUID targetId, String providerName,
             String modelName, String promptVersion, String inputPayload, String idempotencyKey, short maxRetryCount) {
+        return pending(jobType, targetType, targetId, providerName, modelName, promptVersion, inputPayload,
+                idempotencyKey, maxRetryCount, null);
+    }
+
+    /**
+     * The same, attributed to the learner whose request it is. The attribution is what the daily provider budget
+     * counts, so a job a learner caused and did not carry this would be free.
+     */
+    public static AiJob pending(AiJobType jobType, String targetType, UUID targetId, String providerName,
+            String modelName, String promptVersion, String inputPayload, String idempotencyKey, short maxRetryCount,
+            UUID requestedByUserId) {
         AiJob job = new AiJob();
+        job.requestedByUserId = requestedByUserId;
         job.id = UUID.randomUUID();
         job.jobType = jobType;
         job.targetType = targetType;

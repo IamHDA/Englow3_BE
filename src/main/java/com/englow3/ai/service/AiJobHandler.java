@@ -25,6 +25,18 @@ public interface AiJobHandler {
     Outcome run(AiJob job);
 
     /**
+     * Called once, when the queue has recorded this job as finished without a result - whatever the reason: a failure
+     * the handler called permanent, the last retry of a transient one, a stall reclaimed one time too many, or the
+     * handler throwing.
+     * <p>
+     * This is the one place a handler tells its own module that nothing more is coming. A handler that also did so from
+     * {@code run} would do it for only one of those four paths, and the learner behind the other three would be left
+     * waiting for work that has already stopped. Must be safe to call for a target already marked failed.
+     */
+    default void onGaveUp(AiJob job, String errorCode) {
+    }
+
+    /**
      * @param outputPayload
      *            JSON to store on success, ignored otherwise
      * @param retryable

@@ -49,15 +49,6 @@ public class TutorService {
     private final ObjectMapper objectMapper;
 
     /**
-     * How many questions one learner may ask in a day.
-     * <p>
-     * Shares the setting with speaking assessment rather than having one of its own: both spend the same provider
-     * budget, and two ceilings that have to be reasoned about together are worse than one that bounds the total.
-     */
-    @Value("${app.ai.daily-request-limit:100}")
-    private int dailyRequestLimit;
-
-    /**
      * Stores the question, queues the answer, and hands back both turns.
      * <p>
      * The learner's message is written before anything is asked of a provider. A question lost because the provider was
@@ -90,7 +81,7 @@ public class TutorService {
                 generationRequest(answer.getId(), existing, command.message()),
                 // One job per pending turn, whatever the client does. A double send loses at the unique index
                 // rather than paying the provider twice for the same question.
-                MESSAGE_TARGET_TYPE + ":" + answer.getId(), TutorPrompt.VERSION);
+                MESSAGE_TARGET_TYPE + ":" + answer.getId(), TutorPrompt.VERSION, userId);
 
         return new TutorConversationResult(TutorConversationSummaryResult.of(conversation),
                 List.of(TutorMessageResult.of(question), TutorMessageResult.of(answer)));
@@ -180,10 +171,11 @@ public class TutorService {
      * turn that will never be answered is the kinder failure.
      */
     private void requireQuotaRemaining(UUID userId) {
-        Instant since = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
-        if (messageRepo.countAskedSince(userId, since) >= dailyRequestLimit) {
+        // Counted by the queue across every feature. Counting only tutor messages here is what let speaking and the
+        // tutor each spend the whole budget.
+        if (!aiJobQueue.hasDailyAllowance(userId)) {
             throw new ConflictException("TUTOR_DAILY_LIMIT_REACHED",
-                    "You have reached today's limit of %d questions".formatted(dailyRequestLimit));
+                    "You have reached today's limit of %d AI requests".formatted(aiJobQueue.dailyRequestLimit()));
         }
     }
 }

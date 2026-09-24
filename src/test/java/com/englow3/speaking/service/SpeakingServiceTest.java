@@ -58,7 +58,6 @@ class SpeakingServiceTest {
         ReflectionTestUtils.setField(service, "uploadUrlTtl", Duration.ofMinutes(15));
         ReflectionTestUtils.setField(service, "playbackUrlTtl", Duration.ofHours(3));
         ReflectionTestUtils.setField(service, "locale", "en-US");
-        ReflectionTestUtils.setField(service, "dailyAssessmentLimit", DAILY_LIMIT);
 
         prompt = SpeakingPrompt.draft("seat-sit", "Seat vs sit", "Minimal Pairs", "A2", "Please sit on this seat.",
                 null, null, "/iː/ vs /ɪ/", "[]", UUID.randomUUID());
@@ -67,6 +66,9 @@ class SpeakingServiceTest {
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(promptRepo.findById(prompt.getId())).thenReturn(Optional.of(prompt));
         when(attemptRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        // The budget is the queue's to count now; by default there is room left.
+        when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(true);
+        when(aiJobQueue.dailyRequestLimit()).thenReturn(DAILY_LIMIT);
         when(objectStorage.presignPut(anyString(), anyString(), anyString(), anyLong(), any()))
                 .thenReturn(URI.create("https://storage.example/put").toURL());
         when(objectStorage.presignGet(anyString(), anyString(), any()))
@@ -108,12 +110,13 @@ class SpeakingServiceTest {
     @Test
     void queuesAnAssessmentOnceTheRecordingHasArrived() {
         SpeakingAttempt attempt = uploadedAttempt();
-        when(attemptRepo.countSubmittedSince(eq(userId), any())).thenReturn(0L);
 
         service.submitAttempt(attempt.getId());
 
+        // Attributed to the learner: the attribution is what the daily budget counts, so an unattributed job would
+        // be free.
         verify(aiJobQueue).enqueue(any(), eq("SPEAKING_ATTEMPT"), eq(attempt.getId()), anyString(), anyString(),
-                anyString());
+                anyString(), eq(userId));
     }
 
     /**
@@ -123,12 +126,12 @@ class SpeakingServiceTest {
     @Test
     void refusesOnceTodaysAssessmentsAreSpent() {
         SpeakingAttempt attempt = uploadedAttempt();
-        when(attemptRepo.countSubmittedSince(eq(userId), any())).thenReturn((long) DAILY_LIMIT);
+        when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(false);
 
         assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_DAILY_LIMIT_REACHED");
 
-        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString());
+        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
     }
 
     /** A client that failed its upload and submitted anyway is told what actually went wrong. */
@@ -140,7 +143,7 @@ class SpeakingServiceTest {
         assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_RECORDING_MISSING");
 
-        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString());
+        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
     }
 
     /**

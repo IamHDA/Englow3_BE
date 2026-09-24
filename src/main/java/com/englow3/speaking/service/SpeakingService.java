@@ -71,16 +71,6 @@ public class SpeakingService {
     @Value("${app.speech.locale:en-US}")
     private String locale;
 
-    /**
-     * How many assessments one learner may ask for in a day.
-     * <p>
-     * The setting has existed since the AI configuration was written and nothing read it, which left the number of paid
-     * provider calls per account unbounded. This is a cost ceiling rather than an abuse defence: generous enough that
-     * ordinary practice never meets it, low enough that a script left running overnight stops.
-     */
-    @Value("${app.ai.daily-request-limit:100}")
-    private int dailyAssessmentLimit;
-
     @Transactional(readOnly = true)
     public Page<SpeakingPromptResult> searchPublished(String category, String title, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
@@ -150,7 +140,7 @@ public class SpeakingService {
                 assessmentRequest(attempt, prompt),
                 // One job per attempt, whatever the client does. A double submit loses at the unique index rather
                 // than paying the provider twice for the same recording.
-                ATTEMPT_TARGET_TYPE + ":" + attempt.getId(), ASSESSMENT_VERSION);
+                ATTEMPT_TARGET_TYPE + ":" + attempt.getId(), ASSESSMENT_VERSION, userId);
 
         return result(attempt, prompt, List.of());
     }
@@ -228,10 +218,11 @@ public class SpeakingService {
      * before they have recorded anything would spend their effort only to tell them no.
      */
     private void requireQuotaRemaining(UUID userId) {
-        Instant since = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
-        if (attemptRepo.countSubmittedSince(userId, since) >= dailyAssessmentLimit) {
+        // The budget is counted by the queue, across every feature that spends it - not here, where only this
+        // module's own work would show and the tutor's would not.
+        if (!aiJobQueue.hasDailyAllowance(userId)) {
             throw new ConflictException("SPEAKING_DAILY_LIMIT_REACHED",
-                    "You have reached today's limit of %d assessments".formatted(dailyAssessmentLimit));
+                    "You have reached today's limit of %d AI requests".formatted(aiJobQueue.dailyRequestLimit()));
         }
     }
 

@@ -73,16 +73,19 @@ class TutorReplyHandlerTest {
         verify(writer, never()).markFailed(any(), anyString());
     }
 
-    /** A final failure is the only one written where the learner can see it. */
+    /**
+     * A refusal is reported as final. Telling the learner waits for the queue, which alone knows the job is over - see
+     * {@code tellsTheLearnerOnceTheJobHasGivenUp}.
+     */
     @Test
-    void tellsTheLearnerOnlyWhenNoRetryIsComing() {
+    void reportsARefusalAsFinalWithoutTellingTheLearnerYet() {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt()))
                 .thenThrow(new LlmException("TUTOR_GENERATION_REJECTED", "400", false));
 
         Outcome outcome = handler.run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
-        verify(writer).markFailed(messageId, "TUTOR_GENERATION_REJECTED");
+        verify(writer, never()).markFailed(any(), anyString());
     }
 
     /** The provider answered with something that is not a reply. Asking again gives the same answer. */
@@ -94,7 +97,7 @@ class TutorReplyHandlerTest {
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_REPLY_UNREADABLE");
-        verify(writer).markFailed(messageId, "TUTOR_REPLY_UNREADABLE");
+        verify(writer, never()).markFailed(any(), anyString());
     }
 
     /** An empty answer is not an answer - storing it would leave the learner reading a blank bubble. */
@@ -105,7 +108,7 @@ class TutorReplyHandlerTest {
         Outcome outcome = handler.run(validJob());
 
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_REPLY_EMPTY");
-        verify(writer).markFailed(messageId, "TUTOR_REPLY_EMPTY");
+        verify(writer, never()).markFailed(any(), anyString());
     }
 
     /**
@@ -147,5 +150,27 @@ class TutorReplyHandlerTest {
     @Test
     void handlesOnlyTutorReplies() {
         assertThat(handler.handles()).isEqualTo(AiJobType.TUTOR_REPLY);
+    }
+
+    /**
+     * Telling the learner is not {@code run}'s job any more: it knew about one of the four ways a job ends. The worker
+     * calls this once the queue has recorded the job as over, whichever way it got there.
+     */
+    @Test
+    void tellsTheLearnerOnceTheJobHasGivenUp() {
+        handler.onGaveUp(validJob(), "PROVIDER_DOWN");
+
+        verify(writer).markFailed(messageId, "PROVIDER_DOWN");
+    }
+
+    /**
+     * Read from the job's own target, not its payload - so even a job whose payload could not be read still reaches the
+     * learner it belongs to. That case used to leave them waiting with no way to be told.
+     */
+    @Test
+    void reachesTheLearnerEvenWhenThePayloadWasUnreadable() {
+        handler.onGaveUp(jobFor("not json at all"), "PAYLOAD_UNREADABLE");
+
+        verify(writer).markFailed(messageId, "PAYLOAD_UNREADABLE");
     }
 }

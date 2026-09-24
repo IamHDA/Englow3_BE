@@ -6,6 +6,8 @@ import java.util.UUID;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,6 +59,7 @@ public class SpeakingPrompt {
     private String phonemeTarget;
 
     /** A JSON array of coaching notes, stored and returned as text - nothing here reads inside it. */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private String tips;
 

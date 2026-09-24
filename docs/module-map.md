@@ -82,6 +82,15 @@ and nothing about what any of those mean.
   reports which kind it was. A transient failure is left pending rather than shown
   to the learner as failed.
 - **Claiming:** `for update skip locked`, so two workers never take the same row.
+- **Daily budget:** owned here, because every provider call passes through this
+  table. Each job records who asked (`requested_by_user_id`), and speaking and the
+  tutor both ask the queue rather than counting their own work - which is what they
+  used to do, each against the full limit, letting a learner spend it twice.
+- **Giving up:** when a job ends without a result - a refusal, the last retry, a
+  stall reclaimed once too often, or the handler throwing - the worker calls the
+  handler's `onGaveUp`, and that is the only place the learner is told. Telling
+  them from inside a handler's run covered one of those four and left the other
+  three waiting forever.
 
 ## `speaking`
 
@@ -107,9 +116,9 @@ Owns the AI tutor conversation.
 - **Asking is synchronous, answering is not:** the question is stored and queued,
   and the screen polls the turn it created. A question is written before anything
   is asked of a provider, so a provider outage never loses what the learner typed.
-- **Quota:** shares `learning`'s daily provider limit rather than holding its own.
-  Both spend the same budget, and two ceilings that have to be reasoned about
-  together are worse than one that bounds the total.
+- **Quota:** asks `ai` whether the learner has allowance left, and says no in its
+  own words if not. It does not count its own work: the budget is shared with
+  speaking, and only the queue sees both.
 - **AI:** enqueues through `ai`. It never calls a provider itself.
 
 ## `shared` and `config`
