@@ -16,9 +16,18 @@ on:
       - dev
       - testing
 
+concurrency:
+  # One run per branch. A validation run superseded by a newer commit is
+  # worthless, and these now start a database container each.
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   java:
     runs-on: ubuntu-latest
+    # The suite starts a PostgreSQL container. A container that never becomes
+    # ready would otherwise hold a runner for six hours, which is the default.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout source
@@ -34,11 +43,15 @@ jobs:
       - name: Check format
         run: mvn formatter:validate
 
+      # Testcontainers starts a real PostgreSQL and runs the migrations against
+      # it, so the integration tests need Docker. ubuntu-latest provides it;
+      # a self-hosted runner would have to as well.
       - name: Build and test
         run: mvn --batch-mode clean verify
 
   ai-service:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout source
@@ -68,6 +81,7 @@ jobs:
 
   data-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout source

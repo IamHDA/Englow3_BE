@@ -1,9 +1,12 @@
 package com.englow3.support;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
@@ -16,32 +19,67 @@ import org.testcontainers.utility.MountableFile;
  * <p>
  * One container for the whole suite: starting Postgres costs seconds, and paying that per test class would make the
  * integration tests slow enough that someone turns them off. Each test is responsible for the rows it creates.
+ * <p>
+ * Skipped where there is no Docker, rather than failed. CI has one, so these always run there; a developer who has not
+ * started Docker gets the rest of the suite and a line saying which tests did not run. Failing instead would mean
+ * nobody could build the project at all without a container runtime, which is too high a price for tests that are about
+ * the database.
  */
 @SpringBootTest
 @Tag("integration")
 public abstract class PostgresIntegrationTest {
 
-    /**
-     * Started once and deliberately never stopped - Ryuk removes it when the JVM exits. {@code static} is what makes it
-     * shared; a non-static container would be a fresh database per test class.
-     */
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("englow3").withUsername("englow3").withPassword("englow3")
-            // The migrations put triggers on auth.users, which Supabase owns in production. Creating the slice they
-            // touch before Flyway runs is what lets the real migration files run here unchanged - the alternative is
-            // a test-only copy of the schema, which would stop being the schema the first time one changed.
-            .withCopyFileToContainer(MountableFile.forClasspathResource("db/supabase-auth-stub.sql"),
-                    "/docker-entrypoint-initdb.d/00-auth.sql");
+    private static PostgreSQLContainer<?> postgres;
 
-    static {
-        POSTGRES.start();
+    /**
+     * Skips rather than fails where there is no container runtime.
+     * <p>
+     * An assumption in {@code @BeforeAll} rather than {@code @EnabledIf} on the class: a class-level condition is not
+     * picked up through this abstract parent, and would have to be repeated on every integration test and every nested
+     * class inside them. This runs before the Spring context is built, which is where the absence would otherwise
+     * surface as sixty unrelated-looking context failures.
+     */
+    @BeforeAll
+    static void requireDocker() {
+        Assumptions.assumeTrue(dockerIsAvailable(),
+                "No Docker environment - skipping the tests that need a real database");
+    }
+
+    /** Asked once per class, and cheap: Testcontainers caches the answer after the first probe. */
+    public static boolean dockerIsAvailable() {
+        try {
+            return DockerClientFactory.instance().isDockerAvailable();
+        } catch (RuntimeException noDocker) {
+            return false;
+        }
+    }
+
+    /**
+     * Started on first use and deliberately never stopped - Ryuk removes it when the JVM exits.
+     * <p>
+     * Lazy rather than a static initialiser: the class is loaded to evaluate the condition above, so starting a
+     * container there would start one even on a machine that has just said it has no Docker.
+     */
+    private static synchronized PostgreSQLContainer<?> container() {
+        if (postgres == null) {
+            postgres = new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("englow3")
+                    .withUsername("englow3").withPassword("englow3")
+                    // The migrations put triggers on auth.users, which Supabase owns in production. Creating the slice
+                    // they touch before Flyway runs is what lets the real migration files run here unchanged - the
+                    // alternative is a test-only copy of the schema, which stops being the schema the first time one
+                    // of them changes.
+                    .withCopyFileToContainer(MountableFile.forClasspathResource("db/supabase-auth-stub.sql"),
+                            "/docker-entrypoint-initdb.d/00-auth.sql");
+            postgres.start();
+        }
+        return postgres;
     }
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.datasource.url", () -> container().getJdbcUrl());
+        registry.add("spring.datasource.username", () -> container().getUsername());
+        registry.add("spring.datasource.password", () -> container().getPassword());
 
         // Flyway builds the schema; Hibernate must not also try. `validate` would be the stricter choice but fails on
         // details Flyway is allowed to differ on, and `none` keeps one owner of the schema.
