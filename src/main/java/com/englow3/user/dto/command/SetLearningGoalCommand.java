@@ -5,5 +5,6 @@ import java.time.LocalDate;
 
 import com.englow3.user.entity.CertificateType;
 
-public record SetLearningGoalCommand(CertificateType certificateType, BigDecimal targetScore, LocalDate targetDate) {
+public record SetLearningGoalCommand(CertificateType certificateType, BigDecimal currentScore, BigDecimal targetScore,
+        LocalDate targetDate) {
 }

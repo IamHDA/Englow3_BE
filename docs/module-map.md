@@ -176,3 +176,33 @@ Before introducing a table or module:
    environment. Check `flyway_schema_history`, not the migrations folder, for what
    has actually run.
 5. Keep runtime provider integration behind the AI boundary described above.
+
+## Still open
+
+Carried from the longer version of this file. Entries it held that described the
+`ai` module as removed, `ai_jobs` as unowned, or quiz tables as undesigned are
+gone rather than kept: all three describe a state that no longer exists.
+
+- **Importing exam questions** from CSV/XLSX/DOCX. Flashcards and shadowing clips
+  now have importers; questions do not, and they are the larger job - a parsing
+  library, a column contract, and per-row error reporting.
+- **AI-generated exam questions.** The `ai` module that would carry them exists
+  now, so this is a handler and a prompt rather than a module.
+- **AI grading** of anything the objective answer key cannot mark.
+  `grading_criteria`, `attempt_answer_criterion_scores` and
+  `exam_sections.is_scored_by_criteria` are exam-owned and unused by the current
+  flow.
+- **`@Version` columns** on `LearnerProfile` and `ExamAttempt`. The design calls
+  for them; neither a migration nor an entity has one.
+- **`spring.servlet.multipart.max-file-size`** is 12MB, raised for exam listening
+  audio. Speaking no longer needs it raised further - recordings go straight to
+  object storage through a presigned PUT and never pass through this application -
+  but a 4-skills paper authored through the admin API still would.
+- **`TargetSkill` against `questions.skill_type`**, where a value exists on only
+  one side. The mapping lives in `user`; the enum is never shared across modules.
+- **Unknown values in `user_target_skills.skill`** once the foreign key is gone:
+  ignore on read, or a cleanup migration. Decide when a value is actually removed.
+- **Snapshotting `skill_type` into `attempt_answers`** - not done. The
+  recommendation is consumed during onboarding, so later reclassification is
+  harmless today. Revisit when per-skill progress over time has to keep its
+  meaning.

@@ -3,27 +3,26 @@ package com.englow3.exam.entity;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import com.englow3.shared.persistence.BasePersistedEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
 /**
- * Read-only: authoring has no write path yet, content arrives by SQL seed. No setter, no factory, no rule - the only
- * rule about a section lives one level up, in {@code Exam.publish(...)}, which is where the scores have to add up.
- * {@code examId} is a plain UUID rather than a {@code @ManyToOne}: nothing navigates the graph, the paper query
- * descends by parent-id set instead, so an association would only buy lazy loading nobody asked for.
+ * No rule of its own - the only rule about a section lives one level up, in {@code Exam.publish(...)}, which is where
+ * the scores have to add up. {@code examId} is a plain UUID rather than a {@code @ManyToOne}: nothing navigates the
+ * graph, the paper query descends by parent-id set instead, so an association would only buy lazy loading nobody asked
+ * for. {@code create(...)} assigns its own id the same way {@code Exam.draft(...)} does. There is still no setter:
+ * content authoring always replaces the whole tree ({@code AdminExamContentWriter}), never edits one row in place.
  */
 @Entity
 @Table(name = "exam_sections")
 @Getter
-public class ExamSection {
-
-    @Id
-    private UUID id;
+public class ExamSection extends BasePersistedEntity {
 
     @Column(name = "exam_id", nullable = false)
     private UUID examId;
@@ -46,5 +45,18 @@ public class ExamSection {
     private Integer timeLimitSeconds;
 
     protected ExamSection() {
+    }
+
+    public static ExamSection create(UUID examId, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
+            boolean scoredByCriteria, Integer timeLimitSeconds) {
+        ExamSection section = new ExamSection();
+        section.id = UUID.randomUUID();
+        section.examId = examId;
+        section.sectionType = sectionType;
+        section.orderNo = orderNo;
+        section.maxRawScore = maxRawScore;
+        section.scoredByCriteria = scoredByCriteria;
+        section.timeLimitSeconds = timeLimitSeconds;
+        return section;
     }
 }
