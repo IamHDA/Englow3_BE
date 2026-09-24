@@ -75,9 +75,10 @@ public final class FlashcardImport {
      *             three thousand rejections would bury the one thing the person needs to know
      */
     public static Report read(ObjectMapper objectMapper, String json) {
-        JsonNode root = parse(objectMapper, json);
-        if (!root.isArray()) {
-            throw new BadRequestException("FLASHCARD_IMPORT_NOT_A_LIST", "The file must be a JSON array of cards");
+        JsonNode root = cardsOf(parse(objectMapper, json));
+        if (root == null) {
+            throw new BadRequestException("FLASHCARD_IMPORT_NOT_A_LIST",
+                    "The file must be a flashcard batch, or a JSON array of cards");
         }
         if (root.size() > MAX_CARDS) {
             throw new BadRequestException("FLASHCARD_IMPORT_TOO_LARGE",
@@ -99,11 +100,27 @@ public final class FlashcardImport {
                 rejections.add(new Rejection(i + 1, lemma == null ? "" : lemma, reason));
                 continue;
             }
-            seen.add(key(lemma, text(row, "sense_label_en")));
+            seen.add(key(row, lemma));
             cards.add(cardFrom(row, lemma));
         }
 
         return new Report(List.copyOf(cards), List.copyOf(rejections));
+    }
+
+    /**
+     * The cards in a file, in either shape.
+     * <p>
+     * The pipeline writes a batch - {@code {batch_metadata, flashcards: [...]}}, per
+     * {@code flashcard_batch.schema.json}. This importer was first written to take a bare array, and would have refused
+     * every file the pipeline has ever produced as "not a list". A bare array is still accepted, because it is what a
+     * person trimming a batch by hand is likely to save.
+     */
+    private static JsonNode cardsOf(JsonNode root) {
+        if (root.isArray()) {
+            return root;
+        }
+        JsonNode cards = root.path("flashcards");
+        return cards.isArray() ? cards : null;
     }
 
     /** The first thing wrong with a row, or null if nothing is. One reason, because a list of five is not read. */
@@ -136,7 +153,7 @@ public final class FlashcardImport {
         if (text(row, "sense_label_en") == null) {
             return "No sense label";
         }
-        if (seen.contains(key(lemma, text(row, "sense_label_en")))) {
+        if (seen.contains(key(row, lemma))) {
             return "Already in this file";
         }
         return null;
@@ -144,9 +161,10 @@ public final class FlashcardImport {
 
     private static NewCard cardFrom(JsonNode row, String lemma) {
         return new NewCard(lemma, text(row, "pos"), text(row, "sense_label_en"), text(row, "ipa_us"),
-                text(row, "ipa_uk"), text(row, "audio_url_us"), text(row, "audio_url_uk"), definition(row, "en"),
-                definition(row, "vi"), example(row, "sentence"), example(row, "translation"),
-                text(row, "mnemonic_tip_vi"), text(row, "cefr_level"));
+                text(row, "ipa_uk"), PipelineMedia.objectKey(text(row, "audio_url_us")),
+                PipelineMedia.objectKey(text(row, "audio_url_uk")), definition(row, "en"), definition(row, "vi"),
+                example(row, "sentence"), example(row, "translation"), text(row, "mnemonic_tip_vi"),
+                text(row, "cefr_level"));
     }
 
     /**
@@ -171,9 +189,21 @@ public final class FlashcardImport {
         return examples.isArray() && !examples.isEmpty() ? text(examples.get(0), side) : null;
     }
 
-    private static String key(String lemma, String senseLabel) {
-        return lemma.strip().toLowerCase(Locale.ROOT) + "|"
-                + (senseLabel == null ? "" : senseLabel.strip().toLowerCase(Locale.ROOT));
+    /**
+     * What makes two rows the same card: the word, its part of speech, which sense of it, and the label.
+     * <p>
+     * The pipeline identifies an entry by lemma, part of speech and sense index. The first version of this key used the
+     * word and the label only, and on the real batches it threw away two of every three entries for words like "that"
+     * and "same" - one card each as conjunction, determiner and pronoun, all sharing a label. The label stays in the
+     * key so a hand-trimmed file with no sense index still keeps two senses of one word apart.
+     */
+    private static String key(JsonNode row, String lemma) {
+        return String.join("|", lemma.strip().toLowerCase(Locale.ROOT), normalised(text(row, "pos")),
+                String.valueOf(row.path("sense_index").asInt(1)), normalised(text(row, "sense_label_en")));
+    }
+
+    private static String normalised(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 
     private static String text(JsonNode row, String field) {

@@ -115,7 +115,8 @@ public final class DictationImport {
     }
 
     private static Lesson lessonFrom(JsonNode clip, String clipId) {
-        return new Lesson(clipId, title(clip, clipId), text(clip, "cefr_level"), text(clip, "audio_url"),
+        return new Lesson(clipId, title(clip, clipId), text(clip, "cefr_level"),
+                PipelineMedia.objectKey(text(clip, "audio_url")),
                 // Milliseconds on the wire, seconds in the column. Rounded up: a clip of 4.2 seconds reported as 4
                 // would have the player stop before the last word.
                 ceilSeconds(clip.path("duration_ms").asInt(0)), segments(clip));

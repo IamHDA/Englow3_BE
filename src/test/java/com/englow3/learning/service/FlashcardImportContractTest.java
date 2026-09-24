@@ -98,4 +98,22 @@ class FlashcardImportContractTest {
     void alwaysHasAtLeastOneExampleToKeep() {
         assertThat(schema.path("properties").path("examples").path("minItems").asInt()).isGreaterThanOrEqualTo(1);
     }
+
+    private static final Path BATCH_SCHEMA = Path.of("data_pipeline", "schemas", "json", "flashcard_batch.schema.json");
+
+    static boolean batchSchemaIsPresent() {
+        return Files.exists(BATCH_SCHEMA);
+    }
+
+    /**
+     * The file around the cards, not just the cards. The card schema above was checked from the start and the file
+     * schema was not, which is how the importer came to refuse every real batch as "not a list".
+     */
+    @Test
+    @EnabledIf("batchSchemaIsPresent")
+    void readsTheCardsOutOfTheArrayTheBatchSchemaNames() throws Exception {
+        JsonNode batch = new ObjectMapper().readTree(Files.readString(BATCH_SCHEMA));
+
+        assertThat(batch.path("properties").path("flashcards").path("type").asText()).isEqualTo("array");
+    }
 }

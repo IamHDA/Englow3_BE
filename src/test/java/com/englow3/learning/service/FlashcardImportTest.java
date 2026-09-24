@@ -115,6 +115,56 @@ class FlashcardImportTest {
         }
     }
 
+    /**
+     * The shape the pipeline actually writes. The importer first took only a bare array and would have refused every
+     * batch the pipeline has produced as "not a list".
+     */
+    @Nested
+    class ReadingABatchFile {
+
+        @Test
+        void readsTheCardsOutOfABatch() {
+            var report = FlashcardImport.read(MAPPER, """
+                    {"batch_metadata":{"batch_id":"b1","module_type":"flashcard","total_records":2},
+                     "flashcards":[%s,%s]}
+                    """.formatted(card("agenda", "agenda"), card("brief", "brief")));
+
+            assertThat(report.acceptedCount()).isEqualTo(2);
+        }
+
+        /**
+         * One word, three parts of speech, three cards. Found in the real batches: keyed on the word and its label
+         * alone, the importer kept "that" as a conjunction and dropped it as a determiner and as a pronoun.
+         */
+        @Test
+        void keepsOneCardPerPartOfSpeech() {
+            String that = """
+                    {"lemma":"that","pos":"%s","sense_index":1,"ipa_us":"/ðæt/","sense_label_en":"that",
+                     "definition":{"en":"Used to identify something.","vi":"do, kia"},
+                     "examples":[{"sentence":"That is mine.","translation":"Cai do la cua toi."}]}
+                    """;
+
+            var report = FlashcardImport.read(MAPPER, "{\"flashcards\":[" + that.formatted("conjunction") + ","
+                    + that.formatted("determiner") + "," + that.formatted("pronoun") + "]}");
+
+            assertThat(report.acceptedCount()).isEqualTo(3);
+            assertThat(report.rejections()).isEmpty();
+        }
+
+        /** Audio arrives as a URL into wherever the pipeline ran; it is stored as a key this application can sign. */
+        @Test
+        void storesAudioAsAKeyRatherThanTheUrlItArrivedAs() {
+            var report = FlashcardImport.read(MAPPER, """
+                    [{"lemma":"agenda","pos":"noun","ipa_us":"/x/","sense_label_en":"agenda",
+                      "audio_url_us":"http://localhost:9000/audio/flashcards/vocab_1_us.mp3",
+                      "definition":{"en":"A list.","vi":"Danh sach."},
+                      "examples":[{"sentence":"Send it.","translation":"Gui di."}]}]
+                    """);
+
+            assertThat(report.cards().get(0).audioUsObjectKey()).isEqualTo("audio/flashcards/vocab_1_us.mp3");
+        }
+    }
+
     @Nested
     class Rejecting {
 
