@@ -1,34 +1,25 @@
-# Tài liệu — Englow3 BE
+# Tài liệu Englow3 BE
 
-Toàn bộ tài liệu viết tay của dự án nằm trong thư mục này.
-
-## Data pipeline (A1–C1 + luyện thi định dạng TOEIC)
+## Phát triển backend
 
 | Tài liệu | Nội dung |
 |---|---|
-| [AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) | **Nguồn chân lý.** Nguyên tắc vận hành, 13 phase, spec schema, danh sách lỗi P0/P1 phải sửa |
-| [decisions.md](decisions.md) | **Quyết định đã chốt** — dữ liệu local, embedding 1024 chiều, cấu trúc bộ đề, sản lượng item |
-| [TODO.md](TODO.md) | Checklist tiến độ từng phase + bảng blocker cần Owner quyết |
-| [data-pipeline.md](data-pipeline.md) | Layout thư mục `data_pipeline/`, lệnh chạy, ràng buộc bất di bất dịch |
-| [storage-layout.md](storage-layout.md) | Bố cục trên đĩa: tầng batch vs tầng staging `_db/`, 21 bảng và thứ tự nạp |
-| [exam-quality-bar.md](exam-quality-bar.md) | Chuẩn chất lượng bộ đề: thiết kế distractor, evidence_span, 3 kiểm tra thiên lệch thống kê |
-| [exam-set-structure.md](exam-set-structure.md) | Cấu trúc bộ đề: ngân hàng câu tách khỏi manifest, thành phần 200 câu, cần bao nhiêu bộ |
-| [phase0-recon.md](phase0-recon.md) | Báo cáo Phase 0: hiện trạng repo, migration tool, toolchain, blocker |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Nguồn duy nhất về cấu trúc code, coding convention, migration, kiểm thử và quy trình hoàn thành thay đổi |
+| [`module-map.md`](module-map.md) | Module hiện tại, bảng do từng module sở hữu và ranh giới AI/data pipeline |
+| [`product-scope.md`](product-scope.md) | Phạm vi sản phẩm mục tiêu; không phải báo cáo trạng thái triển khai |
+| [`../ai_service/README.md`](../ai_service/README.md) | Contract và cách chạy FastAPI AI service hiện tại |
 
-## Trạng thái hiện tại
+## Data pipeline
 
-**STOP GATE 1** — Phase 0 và 1 xong, chờ Owner gõ `APPROVE PHASE 1`.
+| Tài liệu | Nội dung |
+|---|---|
+| [`data-pipeline.md`](data-pipeline.md) | Cấu trúc, thiết lập và lệnh vận hành pipeline |
+| [`decisions.md`](decisions.md) | Các quyết định hiện hành về dữ liệu, nguồn và quy trình sinh |
+| [`TODO.md`](TODO.md) | Việc vận hành hoặc quyết định của owner còn mở |
+| [`storage-layout.md`](storage-layout.md) | Bố cục batch/staging và thứ tự dữ liệu |
+| [`exam-quality-bar.md`](exam-quality-bar.md) | Chuẩn chất lượng nội dung và kiểm tra thiên lệch |
+| [`exam-set-structure.md`](exam-set-structure.md) | Cấu trúc ngân hàng câu hỏi và bộ đề |
+| [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) | Đặc tả gốc để tra cứu; các phase gate lịch sử không còn điều khiển công việc hiện tại |
 
-Mỗi phase kết thúc bằng một STOP GATE. Không gộp phase, không chạy trước.
-Chi tiết luật: §0 của work order.
-
-## Chưa có nhưng sẽ cần
-
-- `module-map.md` — module nào sở hữu bảng nào. Cần trước Phase 11 (ingest),
-  dùng skill `design-backend-module` để quyết.
-
-## Không nằm ở đây
-
-- `data_pipeline/reports/` — báo cáo **do script sinh ra** (validation, QA, coverage).
-  Work order tham chiếu đường dẫn đó trực tiếp nên giữ nguyên vị trí.
-- `.claude/skills/` — luật kiến trúc cho agent, không phải tài liệu người đọc.
+Các báo cáo sinh tự động nằm trong `data_pipeline/reports/`. Không đưa cache, môi
+trường ảo, nguồn dữ liệu lớn hoặc output sinh tự động vào `docs/`.

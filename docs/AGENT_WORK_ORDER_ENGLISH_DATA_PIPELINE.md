@@ -3,7 +3,7 @@
 **Version:** 1.0.0
 **Owner:** Quang Anh
 **Ngày phát hành:** 2026-08-04
-**Trạng thái:** ACTIVE — chờ Phase 0
+**Trạng thái:** REFERENCE — đặc tả gốc đã được triển khai; các phase gate bên dưới không còn điều khiển công việc hiện tại
 **Phạm vi:** Xây dựng toàn bộ data pipeline (schema → validation → sinh dữ liệu → ingest) cho hệ thống học tiếng Anh A1–C1 + luyện thi định dạng TOEIC (L&R, S&W), tích hợp với knowledge tracing BKT/Elo/IRT và pgvector.
 
 ---

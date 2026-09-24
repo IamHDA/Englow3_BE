@@ -1,7 +1,7 @@
 # TODO — Englow3 Data Pipeline
 
 **Cập nhật:** 2026-08-24 · **Nhánh:** `feat/english-data-pipeline-completion`
-Nguồn chân lý: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) · Quyết định đã chốt: [decisions.md](decisions.md) (D1–D8)
+Đặc tả gốc: [AGENT_WORK_ORDER](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md) · Quyết định đã chốt: [decisions.md](decisions.md) (D1–D8)
 
 ---
 

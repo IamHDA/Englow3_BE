@@ -1,5 +1,8 @@
 # Phạm vi chức năng ứng dụng học tiếng Anh
 
+> Đây là phạm vi sản phẩm mục tiêu, không phải danh sách chức năng đã triển khai.
+> Trạng thái thực tế được xác định từ source code, migration và test hiện tại.
+
 ## 1. Người dùng
 
 ### 1.1. Đăng ký và đăng nhập
@@ -7,8 +10,8 @@
 - Đăng ký bằng email hoặc tài khoản Google/Facebook.
 - Đăng nhập, đăng xuất và duy trì phiên đăng nhập.
 - Xác minh email, quên mật khẩu và đặt lại mật khẩu.
-- Clerk quản lý tài khoản, session và phát token; backend xác minh token trước khi xử lý request.
-- Hệ thống tạo hồ sơ người học nội bộ liên kết với `clerkUserId`.
+- Supabase quản lý tài khoản, session và phát token; backend xác minh token trước khi xử lý request.
+- Hệ thống tạo hồ sơ người học nội bộ liên kết với `authProviderId` từ Supabase.
 
 ### 1.2. Onboarding và hồ sơ học tập
 
@@ -177,7 +180,7 @@
 
 - Xem, tìm kiếm, khóa/mở khóa tài khoản.
 - Quản lý role và permission cho admin/nhân viên.
-- Không tự sửa password của người dùng; các thao tác authentication thực hiện qua Clerk.
+- Không tự sửa password của người dùng; các thao tác authentication thực hiện qua Supabase.
 - Xem audit log đối với các thao tác quản trị quan trọng.
 
 ### 3.2. Quản lý nội dung toàn hệ thống
@@ -220,7 +223,7 @@
 
 ### 4.3. Bảo mật và giám sát
 
-- Backend xác minh Clerk token cho mọi API cần đăng nhập.
+- Backend xác minh Supabase token cho mọi API cần đăng nhập.
 - Authorization được kiểm tra tại backend theo chủ sở hữu, role và permission.
 - Audit log cho thao tác admin/nhân viên.
 - Logging, monitoring, cảnh báo lỗi và theo dõi hiệu năng.
@@ -230,7 +233,7 @@
 
 Để tránh làm hệ thống quá rộng ngay từ đầu, MVP nên tập trung vào:
 
-1. Clerk authentication và hồ sơ người học.
+1. Supabase authentication và hồ sơ người học.
 2. Onboarding: mục tiêu, level và chứng chỉ nếu cần.
 3. Kiểm tra đầu vào.
 4. Flashcard, Quiz và Dictation cơ bản.

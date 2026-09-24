@@ -67,7 +67,7 @@ mvn spring-boot:run
 Ứng dụng sẽ khởi chạy tại: `http://localhost:8080`
 * **Swagger UI Local**: `http://localhost:8080/swagger-ui/index.html`
 * **Actuator Health**: `http://localhost:8080/actuator/health`
-* **AI production runbook**: [`docs/ai-production.md`](docs/ai-production.md)
+* **AI service contract**: [`ai_service/README.md`](ai_service/README.md)
 
 ---
 
@@ -112,6 +112,9 @@ Englow3_BE/
 ---
 
 ## 👥 Đóng góp & Quy chuẩn phát triển (Git Flow)
+
+Toàn bộ quy chuẩn cấu trúc, cách viết code, migration và kiểm thử nằm tại
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Đây là nguồn quy chuẩn duy nhất của repository.
 
 1. Mọi tính năng/sửa lỗi mới được tạo từ nhánh `dev`: `git checkout -b feat/<ten-tinh-nang>`
 2. Viết code, kiểm tra format (`mvn formatter:validate`) và chạy test (`mvn test`).
