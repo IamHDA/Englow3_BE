@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
 
+// Only where there is a web server to protect. The filter chain and CORS are both about HTTP requests, and a one-shot
+// tool such as the pipeline importer runs without a server at all - where this would fail for want of an HttpSecurity
+// rather than being skipped. The running API is always a servlet application, so nothing about it changes.
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableMethodSecurity
 public class SecurityConfig {
 
