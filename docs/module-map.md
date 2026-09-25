@@ -64,6 +64,12 @@ daily path that assembles all three into a plan.
   and experience points. Read-only, declared here, and deliberate: a streak that
   ignored exams would tell a learner who spent two hours on a mock paper that they
   had not studied. No `learning` code writes an exam table.
+- **Cross-module read:** `AdminOverviewQuery`, behind `GET /api/admin/overview`,
+  counts `speaking_prompts`, `exams`, `exam_attempts` and `users` alongside this
+  module's own tables - drafts, items waiting on review and published items per
+  kind of content, and learner activity over the last week. It lives here
+  because content review does; it writes nothing, and each count is one it
+  could not get through another module's service without twenty calls.
 - **Derived, not stored:** the experience counter and level are computed from the
   activity tables on every read. There is no points ledger to drift out of step
   with the work it counts.
