@@ -16,6 +16,10 @@ spring:
       minimum-idle: ${DB_POOL_MIN_IDLE:1}
       # Give idle connections back rather than holding the pooler's slots.
       idle-timeout: 120000
+      # Something between here and the pooler drops a connection left idle
+      # for under a minute; the next request then failed on it or waited for a
+      # new one. A ping every 30s keeps the ones we hold alive.
+      keepalive-time: 30000
       # Report "no connection" after 10s instead of the 30s default, so a
       # starved pool shows up as an error rather than as a page that hangs.
       connection-timeout: 10000
