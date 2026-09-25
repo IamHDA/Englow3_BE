@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +41,13 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
         return countBySetIdsRaw(setIds).stream()
                 .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     }
+
+    /** Cards in a set the learner has never reviewed, in the set's order, only as many as asked for. */
+    @Query("""
+            select c from Flashcard c
+            where c.flashcardSetId = :setId
+              and not exists (select r.id from FlashcardReview r where r.flashcardId = c.id and r.userId = :userId)
+            order by c.orderNo
+            """)
+    List<Flashcard> findUnseenInSet(@Param("userId") UUID userId, @Param("setId") UUID setId, Limit limit);
 }

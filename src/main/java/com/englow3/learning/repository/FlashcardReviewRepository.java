@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -67,4 +68,17 @@ public interface FlashcardReviewRepository extends JpaRepository<FlashcardReview
         return countDueAndMasteredBySetRaw(userId, setIds, now).stream().collect(Collectors.toMap(row -> (UUID) row[0],
                 row -> new long[] { ((Number) row[1]).longValue(), ((Number) row[2]).longValue() }));
     }
+
+    /**
+     * The learner's due cards in one set, in the set's order, with their reviews, as
+     * {@code [Flashcard, FlashcardReview]} rows - only as many as a session takes, rather than every card in the set to
+     * pick twenty from.
+     */
+    @Query("""
+            select c, r from Flashcard c, FlashcardReview r
+            where r.flashcardId = c.id and c.flashcardSetId = :setId and r.userId = :userId and r.dueAt <= :now
+            order by c.orderNo
+            """)
+    List<Object[]> findDueCardsInSet(@Param("userId") UUID userId, @Param("setId") UUID setId,
+            @Param("now") Instant now, Limit limit);
 }

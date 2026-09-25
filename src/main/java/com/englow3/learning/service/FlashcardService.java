@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -88,19 +89,17 @@ public class FlashcardService {
         UUID userId = userDirectory.requireCurrentUserId();
         requirePublishedSet(setId);
 
-        List<Flashcard> cards = cardRepo.findByFlashcardSetIdOrderByOrderNo(setId);
-        Map<UUID, FlashcardReview> reviews = reviewsFor(userId, cards);
-        Instant now = Instant.now();
-
-        List<FlashcardResult> due = cards.stream().filter(card -> {
-            FlashcardReview review = reviews.get(card.getId());
-            return review != null && !review.getDueAt().isAfter(now);
-        }).map(card -> FlashcardResult.of(card, reviews.get(card.getId()))).toList();
-
-        List<FlashcardResult> unseen = cards.stream().filter(card -> !reviews.containsKey(card.getId()))
+        // Due cards first, then ones never seen, each asked of the database with the session's limit rather than
+        // by loading the whole set: a set of four hundred cards was a quarter of a megabyte read to keep twenty.
+        List<FlashcardResult> due = reviewRepo.findDueCardsInSet(userId, setId, Instant.now(), Limit.of(limit)).stream()
+                .map(row -> FlashcardResult.of((Flashcard) row[0], (FlashcardReview) row[1])).toList();
+        if (due.size() >= limit) {
+            return due;
+        }
+        List<FlashcardResult> unseen = cardRepo.findUnseenInSet(userId, setId, Limit.of(limit - due.size())).stream()
                 .map(card -> FlashcardResult.of(card, null)).toList();
 
-        return java.util.stream.Stream.concat(due.stream(), unseen.stream()).limit(limit).toList();
+        return java.util.stream.Stream.concat(due.stream(), unseen.stream()).toList();
     }
 
     /**

@@ -10,20 +10,27 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import com.englow3.learning.entity.Flashcard;
+import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardReviewRepository;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 
 /**
- * The set list's due and mastered counts, batched for a page of sets. They have to agree with the per-set counts the
- * set's own page still uses, or a set would show one number in the list and another once opened.
+ * The flashcard queries that answer for a page or a session in one go instead of one card or one set at a time. The set
+ * list's batched due and mastered counts have to agree with the per-set counts the set's own page still uses, or a set
+ * would show one number in the list and another once opened.
  */
-class FlashcardProgressCountsIntegrationTest extends PostgresIntegrationTest {
+class FlashcardQueriesIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private FlashcardReviewRepository reviews;
+
+    @Autowired
+    private FlashcardRepository cards;
 
     @Autowired
     private JdbcClient jdbc;
@@ -68,5 +75,37 @@ class FlashcardProgressCountsIntegrationTest extends PostgresIntegrationTest {
     @Test
     void asksNothingForAnEmptyPage() {
         assertThat(reviews.countDueAndMasteredBySet(UUID.randomUUID(), List.of(), Instant.now())).isEmpty();
+    }
+
+    /**
+     * The study queue asks only for the cards a session takes: due ones in the set's order, then ones this learner has
+     * never seen. Loading the whole set to pick them out was a quarter of a megabyte for a set of four hundred.
+     */
+    @Test
+    void picksTheSessionsCardsWithoutLoadingTheWholeSet() {
+        LearnerFixture fixture = new LearnerFixture(jdbc);
+        UUID learner = fixture.learner();
+        UUID other = fixture.learner();
+        Instant now = Instant.now();
+        UUID setId = fixture.publishedFlashcardSet("Queue", learner);
+        UUID dueFirst = fixture.flashcard(setId, 1, "acquire");
+        UUID notDue = fixture.flashcard(setId, 2, "borrow");
+        UUID unseen = fixture.flashcard(setId, 3, "carry");
+        UUID dueLater = fixture.flashcard(setId, 4, "deliver");
+        UUID seenByOthersOnly = fixture.flashcard(setId, 5, "earn");
+        fixture.review(learner, dueFirst, "LEARNING", now.minus(Duration.ofDays(1)));
+        fixture.review(learner, notDue, "REVIEW", now.plus(Duration.ofDays(2)));
+        fixture.review(learner, dueLater, "LEARNING", now.minus(Duration.ofDays(5)));
+        fixture.review(other, seenByOthersOnly, "MASTERED", now.minus(Duration.ofDays(1)));
+
+        List<UUID> due = reviews.findDueCardsInSet(learner, setId, now, Limit.of(10)).stream()
+                .map(row -> ((Flashcard) row[0]).getId()).toList();
+        List<UUID> neverSeen = cards.findUnseenInSet(learner, setId, Limit.of(10)).stream().map(Flashcard::getId)
+                .toList();
+
+        assertThat(due).containsExactly(dueFirst, dueLater);
+        assertThat(neverSeen).containsExactly(unseen, seenByOthersOnly);
+        assertThat(cards.findUnseenInSet(learner, setId, Limit.of(1))).extracting(Flashcard::getId)
+                .containsExactly(unseen);
     }
 }
