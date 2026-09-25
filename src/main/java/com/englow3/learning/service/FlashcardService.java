@@ -56,11 +56,14 @@ public class FlashcardService {
         Map<UUID, Long> cardCounts = countCardsFor(setIds);
         Map<UUID, Instant> lastStudied = lastStudiedFor(userId, setIds);
 
-        // Due and mastered are per learner and per set, so they cost one query each. Batching them the way card counts
-        // are batched is worth doing once a page of sets is routinely large; a page of twenty is not that yet.
-        return page.map(set -> FlashcardSetSummaryResult.of(set, cardCounts.getOrDefault(set.getId(), 0L),
-                reviewRepo.countDueInSet(userId, set.getId(), now), reviewRepo.countMasteredInSet(userId, set.getId()),
-                lastStudied.get(set.getId())));
+        // Due and mastered for the whole page in one query: per set it was two round trips each, and with the
+        // database a region away a page of twenty took seconds.
+        Map<UUID, long[]> progress = reviewRepo.countDueAndMasteredBySet(userId, setIds, now);
+        return page.map(set -> {
+            long[] dueAndMastered = progress.getOrDefault(set.getId(), new long[2]);
+            return FlashcardSetSummaryResult.of(set, cardCounts.getOrDefault(set.getId(), 0L), dueAndMastered[0],
+                    dueAndMastered[1], lastStudied.get(set.getId()));
+        });
     }
 
     @Transactional(readOnly = true)

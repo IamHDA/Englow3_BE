@@ -49,13 +49,22 @@ public class DictationService {
         Page<DictationLesson> page = lessonRepo.searchByStatus(DictationLessonStatus.PUBLISHED, topic, title, pageable);
 
         List<UUID> lessonIds = page.getContent().stream().map(DictationLesson::getId).toList();
-        Map<UUID, Long> counts = countSentencesFor(lessonIds);
+        // Three queries for the whole page, not two per lesson: every sentence at once, then the learner's best on
+        // every sentence at once. Per lesson it was a round trip to the database each, which on a page of twenty is
+        // seconds.
+        List<DictationSentence> allSentences = lessonIds.isEmpty() ? List.of()
+                : sentenceRepo.findByDictationLessonIdInOrderByOrderNo(lessonIds);
+        Map<UUID, List<DictationSentence>> sentencesByLesson = allSentences.stream()
+                .collect(Collectors.groupingBy(DictationSentence::getDictationLessonId));
+        Map<UUID, BigDecimal> best = bestAccuracyFor(userId, allSentences);
         Map<UUID, Instant> lastPractised = lastPractisedFor(userId, lessonIds);
 
         return page.map(lesson -> {
-            List<DictationSentence> sentences = sentenceRepo.findByDictationLessonIdOrderByOrderNo(lesson.getId());
-            return DictationLessonSummaryResult.of(lesson, counts.getOrDefault(lesson.getId(), 0L),
-                    completedCount(userId, sentences), totalDuration(sentences), lastPractised.get(lesson.getId()));
+            List<DictationSentence> sentences = sentencesByLesson.getOrDefault(lesson.getId(), List.of());
+            long completed = sentences.stream().map(sentence -> best.get(sentence.getId()))
+                    .filter(DictationScorer::cleared).count();
+            return DictationLessonSummaryResult.of(lesson, sentences.size(), completed, totalDuration(sentences),
+                    lastPractised.get(lesson.getId()));
         });
     }
 
@@ -127,11 +136,6 @@ public class DictationService {
         }
         return attemptRepo.findLastPractisedAtByLesson(userId, lessonIds).stream()
                 .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
-    }
-
-    /** The empty-input guard and the row mapping moved into the repository, where the admin list needs them too. */
-    private Map<UUID, Long> countSentencesFor(Collection<UUID> lessonIds) {
-        return sentenceRepo.countByLessonIds(lessonIds);
     }
 
     private DictationLesson requirePublished(UUID lessonId) {

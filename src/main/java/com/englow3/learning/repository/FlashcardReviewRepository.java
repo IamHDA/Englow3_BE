@@ -3,8 +3,10 @@ package com.englow3.learning.repository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,4 +43,28 @@ public interface FlashcardReviewRepository extends JpaRepository<FlashcardReview
               and r.flashcardId in (select c.id from Flashcard c where c.flashcardSetId = :setId)
             """)
     long countMasteredInSet(@Param("userId") UUID userId, @Param("setId") UUID setId);
+
+    /**
+     * Due and mastered for a page of sets in one query, as {@code [setId, due, mastered]} rows. One pair of counts per
+     * set made a page of twenty sets into forty round trips.
+     */
+    @Query("""
+            select c.flashcardSetId,
+                   sum(case when r.dueAt <= :now then 1 else 0 end),
+                   sum(case when r.status = com.englow3.learning.entity.FlashcardReviewStatus.MASTERED then 1 else 0 end)
+            from FlashcardReview r, Flashcard c
+            where r.flashcardId = c.id and r.userId = :userId and c.flashcardSetId in :setIds
+            group by c.flashcardSetId
+            """)
+    List<Object[]> countDueAndMasteredBySetRaw(@Param("userId") UUID userId, @Param("setIds") Collection<UUID> setIds,
+            @Param("now") Instant now);
+
+    /** Sets the learner has no reviews in are absent; read them as zero. */
+    default Map<UUID, long[]> countDueAndMasteredBySet(UUID userId, Collection<UUID> setIds, Instant now) {
+        if (setIds.isEmpty()) {
+            return Map.of();
+        }
+        return countDueAndMasteredBySetRaw(userId, setIds, now).stream().collect(Collectors.toMap(row -> (UUID) row[0],
+                row -> new long[] { ((Number) row[1]).longValue(), ((Number) row[2]).longValue() }));
+    }
 }

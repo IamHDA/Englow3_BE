@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.learning.dto.result.DictationStatsResult;
 import com.englow3.learning.dto.result.MistakeQueueResult;
 import com.englow3.learning.query.DictationStatsQuery;
+import com.englow3.shared.persistence.ParallelReads;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -39,26 +40,32 @@ public class DictationStatsService {
 
     private final DictationStatsQuery statsQuery;
     private final UserDirectory userDirectory;
+    private final ParallelReads reads;
 
-    @Transactional(readOnly = true)
+    /** Not transactional: the nine reads are independent and run side by side, see {@link ParallelReads}. */
     public DictationStatsResult statsFor(int periodDays) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant from = Instant.now().minus(periodDays, ChronoUnit.DAYS);
 
-        List<String[]> attemptPairs = statsQuery.recentAttemptTexts(userId, from, MISSED_WORD_SAMPLE).stream()
+        var attempts = reads.fork(() -> statsQuery.recentAttemptTexts(userId, from, MISSED_WORD_SAMPLE));
+        var practiceDays = reads.fork(
+                () -> statsQuery.practiceDays(userId, Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
+        var lessonsCompleted = reads
+                .fork(() -> statsQuery.lessonsCompleted(userId, DictationScorer.COMPLETION_THRESHOLD));
+        var averageAccuracy = reads.fork(() -> statsQuery.averageAccuracy(userId, from));
+        var listeningSeconds = reads.fork(() -> statsQuery.listeningSeconds(userId, from));
+        var sentencesPractised = reads.fork(() -> statsQuery.sentencesPractised(userId, from));
+        var accuracyByDay = reads.fork(() -> statsQuery.accuracyByDay(userId, from));
+        var difficultSentences = reads.fork(() -> statsQuery.difficultSentences(userId, DIFFICULT_SENTENCE_LIMIT));
+        var history = reads.fork(() -> statsQuery.history(userId, HISTORY_LIMIT));
+
+        List<String[]> attemptPairs = attempts.get().stream()
                 .map(attempt -> new String[] { attempt.expected(), attempt.actual() }).toList();
 
-        List<LocalDate> practiceDays = statsQuery.practiceDays(userId,
-                Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS));
-
-        return new DictationStatsResult(periodDays,
-                statsQuery.lessonsCompleted(userId, DictationScorer.COMPLETION_THRESHOLD),
-                statsQuery.averageAccuracy(userId, from), statsQuery.listeningSeconds(userId, from),
-                statsQuery.sentencesPractised(userId, from),
-                StudyStreak.count(practiceDays, LocalDate.now(ZoneOffset.UTC)), statsQuery.accuracyByDay(userId, from),
-                MissedWordCounter.count(attemptPairs, MISSED_WORD_LIMIT),
-                statsQuery.difficultSentences(userId, DIFFICULT_SENTENCE_LIMIT),
-                statsQuery.history(userId, HISTORY_LIMIT));
+        return new DictationStatsResult(periodDays, lessonsCompleted.get(), averageAccuracy.get(),
+                listeningSeconds.get(), sentencesPractised.get(),
+                StudyStreak.count(practiceDays.get(), LocalDate.now(ZoneOffset.UTC)), accuracyByDay.get(),
+                MissedWordCounter.count(attemptPairs, MISSED_WORD_LIMIT), difficultSentences.get(), history.get());
     }
 
     /**

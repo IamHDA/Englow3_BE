@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.learning.dto.result.FlashcardStatsResult;
 import com.englow3.learning.query.FlashcardStatsQuery;
+import com.englow3.shared.persistence.ParallelReads;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -37,19 +37,23 @@ public class FlashcardStatsService {
 
     private final FlashcardStatsQuery statsQuery;
     private final UserDirectory userDirectory;
+    private final ParallelReads reads;
 
-    @Transactional(readOnly = true)
+    /** Not transactional: the five reads are independent and run side by side, see {@link ParallelReads}. */
     public FlashcardStatsResult statsFor(int periodDays) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant from = Instant.now().minus(periodDays, ChronoUnit.DAYS);
 
-        List<LocalDate> studyDays = statsQuery.studyDays(userId,
-                Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS));
+        var studyDays = reads
+                .fork(() -> statsQuery.studyDays(userId, Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
+        var summaryRead = reads.fork(() -> statsQuery.periodSummary(userId, from));
+        var activityByDay = reads.fork(() -> statsQuery.activityByDay(userId, from));
+        var difficultCards = reads.fork(() -> statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT));
+        var history = reads.fork(() -> statsQuery.history(userId, HISTORY_LIMIT));
 
-        FlashcardStatsQuery.PeriodSummary summary = statsQuery.periodSummary(userId, from);
+        FlashcardStatsQuery.PeriodSummary summary = summaryRead.get();
         return new FlashcardStatsResult(periodDays, summary.cardsStudied(), summary.retentionPercent(),
-                summary.studySeconds(), StudyStreak.count(studyDays, LocalDate.now(ZoneOffset.UTC)),
-                statsQuery.activityByDay(userId, from), statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT),
-                statsQuery.history(userId, HISTORY_LIMIT));
+                summary.studySeconds(), StudyStreak.count(studyDays.get(), LocalDate.now(ZoneOffset.UTC)),
+                activityByDay.get(), difficultCards.get(), history.get());
     }
 }

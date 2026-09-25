@@ -12,11 +12,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.learning.dto.result.DailyPathResult;
 import com.englow3.learning.entity.DailyTaskKind;
 import com.englow3.learning.query.DailyPathQuery;
+import com.englow3.shared.persistence.ParallelReads;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -41,33 +41,48 @@ public class DailyPathService {
 
     private final DailyPathQuery pathQuery;
     private final UserDirectory userDirectory;
+    private final ParallelReads reads;
 
-    @Transactional(readOnly = true)
+    /**
+     * Not transactional: the nine reads below are independent and run side by side through {@link ParallelReads}, each
+     * on its own connection. In sequence they were most of two seconds of round trips.
+     */
     public DailyPathResult dailyPath() {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = Instant.now();
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         Instant startOfToday = today.atStartOfDay(ZoneOffset.UTC).toInstant();
 
-        List<LocalDate> studyDays = pathQuery.studyDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS));
-
+        var studyDaysRead = reads
+                .fork(() -> pathQuery.studyDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
         // Points are lifetime, so the window starts at the epoch rather than at the streak lookback: a learner who
         // took three months off has not un-earned the work they did before it.
-        DailyPathQuery.ActivityTotals totals = pathQuery.activityTotals(userId, Instant.EPOCH);
+        var totalsRead = reads.fork(() -> pathQuery.activityTotals(userId, Instant.EPOCH));
+        var setsToday = reads.fork(() -> pathQuery.setsStudiedSince(userId, startOfToday));
+        var lessonsToday = reads.fork(() -> pathQuery.lessonsPractisedSince(userId, startOfToday));
+        var quizzesToday = reads.fork(() -> pathQuery.quizzesAttemptedSince(userId, startOfToday));
+        var dueSets = reads.fork(() -> pathQuery.dueSets(userId, now, TASKS_PER_KIND));
+        var unfinishedLessons = reads
+                .fork(() -> pathQuery.unfinishedLessons(userId, DictationScorer.COMPLETION_THRESHOLD, TASKS_PER_KIND));
+        var unpassedQuizzes = reads.fork(() -> pathQuery.unpassedQuizzes(userId, TASKS_PER_KIND));
+        var questCounts = reads.fork(() -> pathQuery.questCounts(userId, startOfToday, now));
+
+        List<LocalDate> studyDays = studyDaysRead.get();
+        DailyPathQuery.ActivityTotals totals = totalsRead.get();
         long totalXp = ExperiencePoints.totalXp(new ExperiencePoints.Activity(totals.flashcardReviews(),
                 totals.dictationSentences(), totals.quizAttempts(), totals.examAttempts()));
         ExperiencePoints.Level level = ExperiencePoints.levelFor(totalXp);
 
         return new DailyPathResult(StudyStreak.count(studyDays, today), level.totalXp(), level.level(),
-                level.xpIntoLevel(), level.levelCostXp(), nodes(userId, now, startOfToday),
-                quests(userId, now, startOfToday, studyDays, today));
+                level.xpIntoLevel(), level.levelCostXp(), nodes(setsToday.get(), lessonsToday.get(), quizzesToday.get(),
+                        dueSets.get(), unfinishedLessons.get(), unpassedQuizzes.get()),
+                quests(questCounts.get(), studyDays, today));
     }
 
-    private List<DailyPlan.Node> nodes(UUID userId, Instant now, Instant startOfToday) {
-        List<DailyPathQuery.StudiedSet> setsToday = pathQuery.setsStudiedSince(userId, startOfToday);
-        List<DailyPathQuery.PractisedLesson> lessonsToday = pathQuery.lessonsPractisedSince(userId, startOfToday);
-        List<DailyPathQuery.AttemptedQuiz> quizzesToday = pathQuery.quizzesAttemptedSince(userId, startOfToday);
-
+    private static List<DailyPlan.Node> nodes(List<DailyPathQuery.StudiedSet> setsToday,
+            List<DailyPathQuery.PractisedLesson> lessonsToday, List<DailyPathQuery.AttemptedQuiz> quizzesToday,
+            List<DailyPathQuery.DueSet> dueSets, List<DailyPathQuery.PendingLesson> unfinishedLessons,
+            List<DailyPathQuery.PendingQuiz> unpassedQuizzes) {
         Map<UUID, Long> cardsPerSetToday = setsToday.stream().collect(
                 Collectors.toMap(DailyPathQuery.StudiedSet::setId, DailyPathQuery.StudiedSet::cardCount, Long::sum));
         Map<UUID, Long> sentencesPerLessonToday = lessonsToday.stream().collect(Collectors.toMap(
@@ -87,27 +102,23 @@ public class DailyPathService {
                         quiz.title(), 1, quiz.scorePercent())));
 
         List<DailyPlan.Candidate> candidates = new ArrayList<>();
-        pathQuery.dueSets(userId, now, TASKS_PER_KIND).forEach(
-                set -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.FLASHCARD_REVIEW, set.setId(), set.name(),
-                        set.dueCount(), cardsPerSetToday.getOrDefault(set.setId(), 0L), set.completionPercent())));
-        pathQuery.unfinishedLessons(userId, DictationScorer.COMPLETION_THRESHOLD, TASKS_PER_KIND)
-                .forEach(lesson -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.DICTATION, lesson.lessonId(),
-                        lesson.title(), lesson.remainingSentences(),
-                        sentencesPerLessonToday.getOrDefault(lesson.lessonId(), 0L), lesson.completionPercent())));
-        pathQuery.unpassedQuizzes(userId, TASKS_PER_KIND)
-                .forEach(quiz -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.QUIZ, quiz.quizId(), quiz.title(),
-                        quiz.questionCount(), 0, quiz.bestScorePercent())));
+        dueSets.forEach(set -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.FLASHCARD_REVIEW, set.setId(),
+                set.name(), set.dueCount(), cardsPerSetToday.getOrDefault(set.setId(), 0L), set.completionPercent())));
+        unfinishedLessons.forEach(lesson -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.DICTATION,
+                lesson.lessonId(), lesson.title(), lesson.remainingSentences(),
+                sentencesPerLessonToday.getOrDefault(lesson.lessonId(), 0L), lesson.completionPercent())));
+        unpassedQuizzes.forEach(quiz -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.QUIZ, quiz.quizId(),
+                quiz.title(), quiz.questionCount(), 0, quiz.bestScorePercent())));
 
         return DailyPlan.build(finished, candidates);
     }
 
-    private List<DailyQuests.Quest> quests(UUID userId, Instant now, Instant startOfToday, List<LocalDate> studyDays,
+    private static List<DailyQuests.Quest> quests(DailyPathQuery.QuestCounts counts, List<LocalDate> studyDays,
             LocalDate today) {
         // Counted from the list already fetched for the streak rather than with another query.
         LocalDate weekStart = today.minusDays(DailyQuests.WEEK_DAYS - 1L);
         long studyDaysThisWeek = studyDays.stream().filter(day -> !day.isBefore(weekStart)).count();
 
-        DailyPathQuery.QuestCounts counts = pathQuery.questCounts(userId, startOfToday, now);
         return DailyQuests.forToday(new DailyQuests.TodayActivity(counts.cardsReviewedToday(), counts.cardsDueNow(),
                 counts.quizzesPassedToday(), counts.sentencesTypedToday(), studyDaysThisWeek));
     }

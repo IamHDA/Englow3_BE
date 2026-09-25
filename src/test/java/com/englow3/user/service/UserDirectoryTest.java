@@ -3,6 +3,8 @@ package com.englow3.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -45,6 +47,19 @@ class UserDirectoryTest {
             assertThat(userDirectory.requireCurrentUserId()).isEqualTo(userId);
         }
 
+        /** The pair never changes, so the second request of the same learner costs no query. */
+        @Test
+        void looksTheSameLearnerUpOnlyOnce() {
+            User user = mock(User.class);
+            when(user.getId()).thenReturn(userId);
+            when(userRepo.findByAuthProviderId(authProviderId)).thenReturn(Optional.of(user));
+
+            userDirectory.requireCurrentUserId();
+            assertThat(userDirectory.requireCurrentUserId()).isEqualTo(userId);
+
+            verify(userRepo, times(1)).findByAuthProviderId(authProviderId);
+        }
+
     }
 
     @Nested
@@ -57,6 +72,17 @@ class UserDirectoryTest {
 
             assertThatThrownBy(userDirectory::requireCurrentUserId).isInstanceOf(NotFoundException.class)
                     .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("USER_NOT_FOUND");
+        }
+
+        /** The sync trigger may simply be late; a miss is asked again rather than remembered. */
+        @Test
+        void findsTheRowOnceItArrivesAfterAMiss() {
+            User user = mock(User.class);
+            when(user.getId()).thenReturn(userId);
+            when(userRepo.findByAuthProviderId(authProviderId)).thenReturn(Optional.empty(), Optional.of(user));
+
+            assertThatThrownBy(userDirectory::requireCurrentUserId).isInstanceOf(NotFoundException.class);
+            assertThat(userDirectory.requireCurrentUserId()).isEqualTo(userId);
         }
 
     }

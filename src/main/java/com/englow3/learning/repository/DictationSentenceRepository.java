@@ -15,6 +15,9 @@ public interface DictationSentenceRepository extends JpaRepository<DictationSent
 
     List<DictationSentence> findByDictationLessonIdOrderByOrderNo(UUID dictationLessonId);
 
+    /** Every sentence of a page of lessons in one query, for a list that needs them all. */
+    List<DictationSentence> findByDictationLessonIdInOrderByOrderNo(Collection<UUID> dictationLessonIds);
+
     long countByDictationLessonId(UUID dictationLessonId);
 
     /**
