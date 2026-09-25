@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +26,8 @@ import com.englow3.learning.entity.FlashcardSetStatus;
 import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.error.ForbiddenException;
 import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,9 +40,10 @@ class AdminFlashcardServiceTest {
     private final FlashcardSetRepository setRepo = mock(FlashcardSetRepository.class);
     private final FlashcardRepository cardRepo = mock(FlashcardRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminFlashcardService service = new AdminFlashcardService(setRepo, cardRepo, userDirectory,
-            new ObjectMapper());
+            currentUser, new ObjectMapper());
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;
@@ -96,14 +100,48 @@ class AdminFlashcardServiceTest {
 
         /** Appending is additive - a new card is simply unseen by every learner, so a live set can still grow. */
         @Test
-        void allowsAppendingToAPublishedSet() {
+        void letsAnAdministratorAppendToAPublishedSet() {
             set.publish(1L, java.time.Instant.now());
+            when(currentUser.hasRole("ADMIN")).thenReturn(true);
             when(cardRepo.findMaxOrderNo(set.getId())).thenReturn(Optional.of(1));
 
             service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta"))));
 
             assertThat(set.getStatus()).isEqualTo(FlashcardSetStatus.PUBLISHED);
             assertThat(savedCards()).hasSize(1);
+        }
+
+        /** Staff adding to a live set would put cards in front of learners that no reviewer has seen. */
+        @Test
+        void refusesStaffAppendingToAPublishedSet() {
+            set.publish(1L, java.time.Instant.now());
+            when(currentUser.hasRole("ADMIN")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta")))))
+                    .isInstanceOf(ForbiddenException.class).extracting(e -> ((ForbiddenException) e).getCode())
+                    .isEqualTo("FLASHCARD_SET_LIVE_ADMIN_ONLY");
+            verify(cardRepo, never()).saveAll(any());
+        }
+
+        /** What is approved has to be what was reviewed, so a set under review is frozen - for everyone. */
+        @Test
+        void refusesAppendingToASetUnderReview() {
+            set.submitForReview(1L, java.time.Instant.now());
+            when(currentUser.hasRole("ADMIN")).thenReturn(true);
+
+            assertThatThrownBy(() -> service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta")))))
+                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                    .isEqualTo("FLASHCARD_SET_NOT_EDITABLE");
+            verify(cardRepo, never()).saveAll(any());
+        }
+
+        @Test
+        void refusesAppendingToAnArchivedSet() {
+            set.archive();
+            when(currentUser.hasRole("ADMIN")).thenReturn(true);
+
+            assertThatThrownBy(() -> service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta")))))
+                    .isInstanceOf(ConflictException.class);
         }
 
         @SuppressWarnings("unchecked")

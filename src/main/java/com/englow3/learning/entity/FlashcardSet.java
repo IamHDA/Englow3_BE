@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.ForbiddenException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -135,6 +136,27 @@ public class FlashcardSet {
         if (status != FlashcardSetStatus.PENDING_REVIEW) {
             throw new ConflictException("FLASHCARD_SET_NOT_PENDING_REVIEW",
                     "Only a set waiting on review can be %s; this one is %s".formatted(verb, status));
+        }
+    }
+
+    /**
+     * Whether more cards may be added. A draft or rejected set is still being written. A published one may still grow -
+     * a new item is simply unseen by every learner - but only by an administrator: the reviewer is the one who would
+     * otherwise have to sign off, so staff adding to a live set would put unreviewed content in front of learners. One
+     * under review is frozen, so that what is approved is what was reviewed; an archived one is done.
+     */
+    public void requireAppendable(boolean callerIsAdministrator) {
+        switch (status) {
+            case DRAFT, REJECTED -> {
+            }
+            case PUBLISHED -> {
+                if (!callerIsAdministrator) {
+                    throw new ForbiddenException("FLASHCARD_SET_LIVE_ADMIN_ONLY",
+                            "Only an administrator can add to a published set");
+                }
+            }
+            case PENDING_REVIEW, ARCHIVED -> throw new ConflictException("FLASHCARD_SET_NOT_EDITABLE",
+                    "Nothing can be added to a set that is %s".formatted(status));
         }
     }
 

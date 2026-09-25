@@ -140,7 +140,8 @@ public final class DictationImport {
      */
     private static String title(JsonNode clip, String clipId) {
         Matcher number = TRAILING_NUMBER.matcher(clipId);
-        String name = number.find() ? "Bài nghe " + Integer.parseInt(number.group(1)) : clipId;
+        // Leading zeros dropped as text, not by parsing: an id may end in more digits than an int holds.
+        String name = number.find() ? "Bài nghe " + number.group(1).replaceFirst("^0+(?=\\d)", "") : clipId;
         String accent = ACCENTS.get(String.valueOf(text(clip, "accent")).toLowerCase(Locale.ROOT));
         return accent == null ? name : name + " · giọng " + accent;
     }

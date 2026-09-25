@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -13,7 +14,7 @@ import jakarta.validation.constraints.Size;
  * would be hundreds of transactions for one logical act. Field names follow {@code data_pipeline/schemas/flashcard.py}
  * so a generated file maps across without renaming.
  */
-public record AddFlashcardsRequest(@NotEmpty @Size(max = 500) List<@Valid CardRequest> cards) {
+public record AddFlashcardsRequest(@NotEmpty @Size(max = 500) List<@NotNull @Valid CardRequest> cards) {
 
     public record CardRequest(@NotBlank @Size(max = 120) String lemma, @NotBlank @Size(max = 20) String partOfSpeech,
             @NotBlank @Size(max = 200) String senseLabel, @NotBlank @Size(max = 120) String ipaUs,

@@ -71,6 +71,14 @@ class DictationImportTest {
             assertThat(title).doesNotContain("airport");
         }
 
+        /** An id can end in more digits than an int holds; that once failed the whole import with a 500. */
+        @Test
+        void titlesAClipWhoseNumberIsLongerThanAnInt() {
+            String json = ONE_CLIP.replace("\"clip_id\":\"airport-01\"", "\"clip_id\":\"clip-000368347456064\"");
+
+            assertThat(DictationImport.read(MAPPER, json).lessons().get(0).title()).startsWith("Bài nghe 368347456064");
+        }
+
         /** A clip of 8.4 seconds reported as 8 would have the player stop before the last word. */
         @Test
         void roundsTheDurationUpRatherThanDown() {

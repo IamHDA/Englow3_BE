@@ -24,6 +24,7 @@ import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.learning.dto.result.FlashcardImportResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class AdminFlashcardService {
     private final FlashcardSetRepository setRepo;
     private final FlashcardRepository cardRepo;
     private final UserDirectory userDirectory;
+    private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -54,13 +56,15 @@ public class AdminFlashcardService {
     }
 
     /**
-     * Appends cards. Allowed on a published set as well as a draft: a new card is NEW for every learner and disturbs
-     * nothing already scheduled. Editing or removing one would not be safe in the same way, which is why neither is
-     * offered here.
+     * Appends cards. Allowed on a published set as well as a draft, for an administrator: a new card is NEW for every
+     * learner and disturbs nothing already scheduled. Editing or removing one would not be safe in the same way, which
+     * is why neither is offered here. Who may add, and when, is the set's rule - see
+     * {@link FlashcardSet#requireAppendable}.
      */
     @Transactional
     public FlashcardSetSummaryResult addCards(AddFlashcardsCommand command) {
         FlashcardSet set = requireSet(command.flashcardSetId());
+        set.requireAppendable(currentUser.hasRole("ADMIN"));
         int nextOrderNo = cardRepo.findMaxOrderNo(set.getId()).orElse(0) + 1;
 
         List<Flashcard> cards = new ArrayList<>();

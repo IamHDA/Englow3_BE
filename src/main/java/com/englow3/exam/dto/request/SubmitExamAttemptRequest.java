@@ -9,7 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record SubmitExamAttemptRequest(@NotNull @Size(max = 500) List<@Valid AnswerRequest> answers) {
+public record SubmitExamAttemptRequest(@NotNull @Size(max = 500) List<@NotNull @Valid AnswerRequest> answers) {
 
     public record AnswerRequest(@NotNull UUID questionId,
             @NotNull @Size(max = 20) List<@NotNull UUID> selectedOptionIds) {

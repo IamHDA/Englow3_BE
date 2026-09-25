@@ -6,6 +6,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.hibernate.query.sqm.UnknownPathException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.data.util.TypeInformation;
@@ -48,6 +50,29 @@ class GlobalExceptionHandlerTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(response.getBody().code()).isEqualTo("INVALID_SORT_PROPERTY");
             assertThat(response.getBody().message()).contains("nonsense");
+        }
+
+        /**
+         * The same mistake on an endpoint with a hand-written query surfaces from Hibernate, wrapped by Spring - it
+         * used to fall through to the catch-all and answer 500 on eleven list endpoints.
+         */
+        @Test
+        void mapsAnUnknownSortPropertyInAHandWrittenQueryTo400() {
+            // Wrapped twice, as it arrives: Hibernate's exception inside JPA's inside Spring's.
+            var ex = new InvalidDataAccessApiUsageException("wrapped",
+                    new IllegalArgumentException(new UnknownPathException("Could not resolve attribute 'nope'")));
+
+            ResponseEntity<ApiErrorResponse> response = handler.onInvalidDataAccess(ex);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody().code()).isEqualTo("INVALID_SORT_PROPERTY");
+        }
+
+        @Test
+        void leavesOtherDataAccessMisuseAsAServerFault() {
+            var ex = new InvalidDataAccessApiUsageException("wrapped", new IllegalStateException("bug"));
+
+            assertThat(handler.onInvalidDataAccess(ex).getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         @Test

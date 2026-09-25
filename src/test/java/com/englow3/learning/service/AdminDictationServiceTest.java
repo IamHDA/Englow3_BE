@@ -29,6 +29,8 @@ import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.error.ForbiddenException;
 import com.englow3.user.service.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -41,9 +43,10 @@ class AdminDictationServiceTest {
     private final DictationLessonRepository lessonRepo = mock(DictationLessonRepository.class);
     private final DictationSentenceRepository sentenceRepo = mock(DictationSentenceRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminDictationService service = new AdminDictationService(lessonRepo, sentenceRepo, userDirectory,
-            new ObjectMapper());
+            currentUser, new ObjectMapper());
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;
@@ -148,6 +151,29 @@ class AdminDictationServiceTest {
             List<DictationSentence> saved = addOneSentence("The cat sat on the mat.");
 
             assertThat(saved.get(0).getOrderNo()).isEqualTo(1);
+        }
+
+        /** Staff adding to a live lesson would put lines in front of learners that no reviewer has heard. */
+        @Test
+        void refusesStaffAppendingToAPublishedLesson() {
+            lesson.publish(1L, java.time.Instant.now());
+            when(currentUser.hasRole("ADMIN")).thenReturn(false);
+
+            assertThatThrownBy(() -> service.addSentences(new AddDictationSentencesCommand(lesson.getId(),
+                    List.of(new NewSentence("One.", null, "a.mp3", 2, null, null, null)))))
+                            .isInstanceOf(ForbiddenException.class).extracting(e -> ((ForbiddenException) e).getCode())
+                            .isEqualTo("DICTATION_LESSON_LIVE_ADMIN_ONLY");
+        }
+
+        @Test
+        void refusesAppendingToALessonUnderReview() {
+            lesson.submitForReview(1L, java.time.Instant.now());
+            when(currentUser.hasRole("ADMIN")).thenReturn(true);
+
+            assertThatThrownBy(() -> service.addSentences(new AddDictationSentencesCommand(lesson.getId(),
+                    List.of(new NewSentence("One.", null, "a.mp3", 2, null, null, null)))))
+                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("DICTATION_LESSON_NOT_EDITABLE");
         }
 
         @Test

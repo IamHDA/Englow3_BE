@@ -25,6 +25,7 @@ import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.learning.dto.result.DictationImportResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class AdminDictationService {
     private final DictationLessonRepository lessonRepo;
     private final DictationSentenceRepository sentenceRepo;
     private final UserDirectory userDirectory;
+    private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -52,12 +54,14 @@ public class AdminDictationService {
     }
 
     /**
-     * Appends sentences. Allowed on a published lesson: a new line is simply unpractised, and nothing already recorded
-     * is scored against the lesson as a whole.
+     * Appends sentences. Allowed on a published lesson for an administrator: a new line is simply unpractised, and
+     * nothing already recorded is scored against the lesson as a whole. Who may add, and when, is the lesson's rule -
+     * see {@link DictationLesson#requireAppendable}.
      */
     @Transactional
     public DictationLessonSummaryResult addSentences(AddDictationSentencesCommand command) {
         DictationLesson lesson = requireLesson(command.lessonId());
+        lesson.requireAppendable(currentUser.hasRole("ADMIN"));
         int nextOrderNo = Math.toIntExact(sentenceRepo.countByDictationLessonId(lesson.getId())) + 1;
 
         List<DictationSentence> sentences = new ArrayList<>();

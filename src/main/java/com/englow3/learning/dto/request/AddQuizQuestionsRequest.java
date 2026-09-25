@@ -16,15 +16,16 @@ import jakarta.validation.constraints.Size;
  * type is known. Bean validation cannot express "required when questionType is REORDER" without a custom validator that
  * would say the same thing twice.
  */
-public record AddQuizQuestionsRequest(@NotEmpty @Size(max = 100) List<@Valid QuestionRequest> questions) {
+public record AddQuizQuestionsRequest(@NotEmpty @Size(max = 100) List<@NotNull @Valid QuestionRequest> questions) {
 
     public record QuestionRequest(@NotNull QuizQuestionType questionType, @NotBlank @Size(max = 200) String title,
             @NotBlank String prompt, @Positive short points, @Size(max = 2000) String explanation, String beforeText,
             String afterText, String originalSentence, @Size(max = 100) String rewriteKeyword,
-            @Size(max = 10) List<@Valid OptionRequest> options, @Size(max = 10) List<String> acceptedAnswers,
-            @Size(max = 30) List<String> wordBank, @Size(max = 30) List<String> correctWords,
-            @Size(max = 30) List<String> scrambledWords, @Size(max = 30) List<String> correctOrder,
-            @Size(max = 10) List<@Valid PairRequest> pairs) {
+            @Size(max = 10) List<@NotNull @Valid OptionRequest> options,
+            @Size(max = 10) List<@NotNull String> acceptedAnswers, @Size(max = 30) List<@NotNull String> wordBank,
+            @Size(max = 30) List<@NotNull String> correctWords, @Size(max = 30) List<@NotNull String> scrambledWords,
+            @Size(max = 30) List<@NotNull String> correctOrder,
+            @Size(max = 10) List<@NotNull @Valid PairRequest> pairs) {
     }
 
     public record OptionRequest(@NotBlank @Size(max = 4) String label, @NotBlank String content, boolean correct) {

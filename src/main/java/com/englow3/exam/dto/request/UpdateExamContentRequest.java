@@ -27,26 +27,27 @@ import jakarta.validation.constraints.PositiveOrZero;
  * <em>complete</em> - every question graded, every set of options resolved - is answered once, at
  * {@code Exam.publish(...)}, not here.
  */
-public record UpdateExamContentRequest(@NotNull @Valid List<SectionRequest> sections) {
+public record UpdateExamContentRequest(@NotNull List<@NotNull @Valid SectionRequest> sections) {
 
     public record SectionRequest(@NotNull SectionType sectionType, @PositiveOrZero int orderNo,
             @NotNull BigDecimal maxRawScore, boolean scoredByCriteria, Integer timeLimitSeconds,
-            @NotNull @Valid List<PartRequest> parts) {
+            @NotNull List<@NotNull @Valid PartRequest> parts) {
     }
 
     public record PartRequest(@PositiveOrZero int orderNo, @NotBlank String title, String instruction, String content,
-            String audioObjectKey, String imageObjectKey, @NotNull @Valid List<QuestionSetRequest> questionSets) {
+            String audioObjectKey, String imageObjectKey,
+            @NotNull List<@NotNull @Valid QuestionSetRequest> questionSets) {
     }
 
     public record QuestionSetRequest(String title, String instruction, @PositiveOrZero int orderNo, String content,
             String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId,
-            @NotNull @Valid List<QuestionRequest> questions) {
+            @NotNull List<@NotNull @Valid QuestionRequest> questions) {
     }
 
     public record QuestionRequest(@NotNull QuestionType questionType, @NotBlank String content,
             @NotNull DifficultyLevel difficultyLevel, @NotNull SkillType skillType, String questionCategory,
             @PositiveOrZero int orderNo, @NotNull BigDecimal maxRawScore, String explanation, UUID sourceQuestionId,
-            @NotNull @Valid List<OptionRequest> options) {
+            @NotNull List<@NotNull @Valid OptionRequest> options) {
     }
 
     public record OptionRequest(@NotBlank String content, @PositiveOrZero int orderNo, boolean correct,
