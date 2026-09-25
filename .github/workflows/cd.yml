@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - dev
+      # Its own image (:testing) and its own Render service, so the testing
+      # frontend can run against the backend it was built with - without
+      # touching dev, which the rest of the team works against.
+      - testing
   pull_request:
     branches:
       - main
@@ -71,7 +75,8 @@ jobs:
     name: Trigger Render Deploy Hook
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    # testing has a hook of its own below; the shared one redeploys dev/main.
+    if: ${{ github.event_name == 'push' && github.ref_name != 'testing' }}
     steps:
       - name: Trigger backend deployment
         shell: bash
@@ -107,11 +112,34 @@ jobs:
           curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
           echo "AI service Render deployment triggered."
 
+  deploy-render-testing:
+    name: Trigger Render Testing Deploy Hook
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && github.ref_name == 'testing' }}
+    steps:
+      - name: Trigger testing backend deployment
+        shell: bash
+        env:
+          HOOK_SECRET: ${{ secrets.RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL }}
+          HOOK_VAR: ${{ vars.RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL }}
+        run: |
+          DEPLOY_HOOK="$HOOK_SECRET"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$HOOK_VAR"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "No testing Render deploy hook configured; the :testing image is pushed but nothing redeploys it."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
+          echo "Testing backend Render deployment triggered."
+
   deploy-vps:
     name: Deploy to VPS via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    # The VPS runs a single backend container. A testing push must never
+    # replace it.
+    if: ${{ github.event_name == 'push' && github.ref_name != 'testing' }}
     steps:
       - name: Check VPS deployment configuration
         id: vps

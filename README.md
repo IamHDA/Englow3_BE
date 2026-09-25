@@ -12,6 +12,7 @@ Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipelin
 | :--- | :--- | :--- | :--- | :--- |
 | **Production** | `main` | [englow3-backend-main.onrender.com](https://englow3-backend-main.onrender.com) | [/swagger-ui/index.html](https://englow3-backend-main.onrender.com/swagger-ui/index.html) | [/actuator/health](https://englow3-backend-main.onrender.com/actuator/health) |
 | **Development** | `dev` | [englow3-backend-dev.onrender.com](https://englow3-backend-dev.onrender.com) | [/swagger-ui/index.html](https://englow3-backend-dev.onrender.com/swagger-ui/index.html) | [/actuator/health](https://englow3-backend-dev.onrender.com/actuator/health) |
+| **Testing** | `testing` | `englow3-backend-testing.onrender.com` (cần tạo service trên Render) | `/swagger-ui/index.html` | `/actuator/health` |
 
 > [!NOTE]
 > Do chạy trên gói Render Free, các service sẽ tạm ngủ khi không có lượt truy cập trong 15 phút. Lần truy cập đầu tiên sau khi ngủ có thể mất khoảng 30–45 giây để server khởi động lại.
@@ -80,12 +81,15 @@ Push code / Merge PR
        │
        ├──► Nhánh `dev` ──► Build Docker Image (:dev)  ──► Trigger Render Dev Hook  ──► Deploy https://englow3-backend-dev.onrender.com
        │
+       ├──► Nhánh `testing` ► Build Docker Image (:testing) ► Trigger Render Testing Hook ► Deploy https://englow3-backend-testing.onrender.com
+       │
        └──► Nhánh `main` ─► Build Docker Image (:main) ──► Trigger Render Prod Hook ──► Deploy https://englow3-backend-main.onrender.com
 ```
 
 ### GitHub Secrets cần thiết:
 * `RENDER_DEPLOY_HOOK_URL_DEV`: Webhook URL của Web Service Dev trên Render.
 * `RENDER_DEPLOY_HOOK_URL_PROD`: Webhook URL của Web Service Prod trên Render.
+* `RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL`: Webhook URL của Web Service Testing trên Render. Nhánh `testing` chỉ gọi hook này, không bao giờ gọi hook của dev/prod hay deploy lên VPS.
 
 ---
 
