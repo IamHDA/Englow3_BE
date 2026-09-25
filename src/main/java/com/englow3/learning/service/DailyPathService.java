@@ -107,9 +107,9 @@ public class DailyPathService {
         LocalDate weekStart = today.minusDays(DailyQuests.WEEK_DAYS - 1L);
         long studyDaysThisWeek = studyDays.stream().filter(day -> !day.isBefore(weekStart)).count();
 
-        return DailyQuests.forToday(new DailyQuests.TodayActivity(pathQuery.cardsReviewedSince(userId, startOfToday),
-                pathQuery.cardsDue(userId, now), pathQuery.quizzesPassedSince(userId, startOfToday),
-                pathQuery.sentencesTypedSince(userId, startOfToday), studyDaysThisWeek));
+        DailyPathQuery.QuestCounts counts = pathQuery.questCounts(userId, startOfToday, now);
+        return DailyQuests.forToday(new DailyQuests.TodayActivity(counts.cardsReviewedToday(), counts.cardsDueNow(),
+                counts.quizzesPassedToday(), counts.sentencesTypedToday(), studyDaysThisWeek));
     }
 
     private static int score(DailyPathQuery.AttemptedQuiz quiz) {

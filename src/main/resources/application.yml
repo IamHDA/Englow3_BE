@@ -6,6 +6,19 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/englow3}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
+    hikari:
+      # Supabase's pooler in session mode admits 15 clients in total, for every
+      # backend sharing the database. Hikari's default of 10, held open from the
+      # start, let two deployments take 20 - so whichever came second waited on
+      # connections it could not get, or failed to start at all. Five covers
+      # this application's load; raise it only alongside the pooler's limit.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      # Give idle connections back rather than holding the pooler's slots.
+      idle-timeout: 120000
+      # Report "no connection" after 10s instead of the 30s default, so a
+      # starved pool shows up as an error rather than as a page that hangs.
+      connection-timeout: 10000
 
   jpa:
     open-in-view: false

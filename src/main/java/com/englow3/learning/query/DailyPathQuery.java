@@ -74,34 +74,29 @@ public class DailyPathQuery {
                 .single();
     }
 
-    public long cardsDue(UUID userId, Instant now) {
+    /**
+     * The four counts today's quests are measured against, in one round trip rather than four. Each query is a network
+     * round trip to the database, and on the daily path those add up to most of the time the page takes.
+     * <p>
+     * Quizzes count only attempts that reached the quiz's own pass mark - the mark is per quiz, so it is read from the
+     * row rather than compared to one global number.
+     */
+    public QuestCounts questCounts(UUID userId, Instant startOfToday, Instant now) {
         return jdbcClient.sql("""
-                select count(*) from flashcard_reviews
-                 where user_id = :userId and due_at <= :now
-                """).param("userId", userId).param("now", SqlTime.at(now)).query(Long.class).single();
-    }
-
-    public long cardsReviewedSince(UUID userId, Instant from) {
-        return jdbcClient.sql("""
-                select count(*) from flashcard_review_logs
-                 where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
-    }
-
-    public long sentencesTypedSince(UUID userId, Instant from) {
-        return jdbcClient.sql("""
-                select count(*) from dictation_attempts
-                 where user_id = :userId and attempted_at >= :from
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
-    }
-
-    /** Attempts that reached the quiz's own pass mark - the mark is per quiz, so it is compared per row. */
-    public long quizzesPassedSince(UUID userId, Instant from) {
-        return jdbcClient.sql("""
-                select count(*) from quiz_attempts
-                 where user_id = :userId and submitted_at >= :from
-                   and status = 'SCORED' and passed is true
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
+                select
+                  (select count(*) from flashcard_review_logs
+                    where user_id = :userId and reviewed_at >= :from) as cards_reviewed,
+                  (select count(*) from flashcard_reviews
+                    where user_id = :userId and due_at <= :now) as cards_due,
+                  (select count(*) from quiz_attempts
+                    where user_id = :userId and submitted_at >= :from
+                      and status = 'SCORED' and passed is true) as quizzes_passed,
+                  (select count(*) from dictation_attempts
+                    where user_id = :userId and attempted_at >= :from) as sentences_typed
+                """).param("userId", userId).param("from", SqlTime.at(startOfToday)).param("now", SqlTime.at(now))
+                .query((rs, rowNum) -> new QuestCounts(rs.getLong("cards_reviewed"), rs.getLong("cards_due"),
+                        rs.getLong("quizzes_passed"), rs.getLong("sentences_typed")))
+                .single();
     }
 
     /**
@@ -238,6 +233,10 @@ public class DailyPathQuery {
     }
 
     public record ActivityTotals(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts) {
+    }
+
+    public record QuestCounts(long cardsReviewedToday, long cardsDueNow, long quizzesPassedToday,
+            long sentencesTypedToday) {
     }
 
     public record DueSet(UUID setId, String name, long dueCount, int completionPercent) {

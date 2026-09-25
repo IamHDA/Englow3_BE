@@ -24,35 +24,26 @@ public class FlashcardStatsQuery {
     private final JdbcClient jdbcClient;
 
     /** How many distinct cards the learner has answered at least once. */
-    public long cardsStudied(UUID userId, Instant from) {
-        return jdbcClient.sql("""
-                select count(distinct flashcard_id) from flashcard_review_logs
-                 where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
-    }
-
     /**
-     * Share of answers that were not failures. "Retention" in the interface sense: how often a card the learner met
-     * came back to them, counted over answers rather than over cards, so a word they keep failing weighs as often as
-     * they meet it.
+     * The three headline figures for a period, in one pass over the log rather than three round trips.
+     * <p>
+     * Retention is the share of answers that were not failures - "retention" in the interface sense: how often a card
+     * the learner met came back to them, counted over answers rather than over cards, so a word they keep failing
+     * weighs as often as they meet it. Zero when there were no answers at all.
      */
-    public int retentionPercent(UUID userId, Instant from) {
-        Integer percent = jdbcClient.sql("""
-                select cast(round(
+    public PeriodSummary periodSummary(UUID userId, Instant from) {
+        return jdbcClient.sql("""
+                select count(distinct flashcard_id) as cards_studied,
+                       coalesce(cast(round(
                          100.0 * count(*) filter (where rating <> 'AGAIN') / nullif(count(*), 0)
-                       ) as integer)
+                       ) as integer), 0) as retention_percent,
+                       coalesce(sum(time_spent_seconds), 0) as study_seconds
                   from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Integer.class).optional().orElse(0);
-        return percent == null ? 0 : percent;
-    }
-
-    public long studySeconds(UUID userId, Instant from) {
-        Long seconds = jdbcClient.sql("""
-                select coalesce(sum(time_spent_seconds), 0) from flashcard_review_logs
-                 where user_id = :userId and reviewed_at >= :from
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(Long.class).single();
-        return seconds == null ? 0 : seconds;
+                """).param("userId", userId).param("from", SqlTime.at(from))
+                .query((rs, rowNum) -> new PeriodSummary(rs.getLong("cards_studied"), rs.getInt("retention_percent"),
+                        rs.getLong("study_seconds")))
+                .single();
     }
 
     /** One row per day the learner answered anything, newest last so a chart can plot it straight. */
@@ -123,6 +114,9 @@ public class FlashcardStatsQuery {
                  where user_id = :userId and reviewed_at >= :from
                  order by day desc
                 """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
+    }
+
+    public record PeriodSummary(long cardsStudied, int retentionPercent, long studySeconds) {
     }
 
     public record DailyActivity(LocalDate day, long cardCount) {

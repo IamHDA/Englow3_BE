@@ -46,8 +46,9 @@ public class FlashcardStatsService {
         List<LocalDate> studyDays = statsQuery.studyDays(userId,
                 Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS));
 
-        return new FlashcardStatsResult(periodDays, statsQuery.cardsStudied(userId, from),
-                statsQuery.retentionPercent(userId, from), statsQuery.studySeconds(userId, from),
+        FlashcardStatsQuery.PeriodSummary summary = statsQuery.periodSummary(userId, from);
+        return new FlashcardStatsResult(periodDays, summary.cardsStudied(), summary.retentionPercent(),
+                summary.studySeconds(),
                 StudyStreak.count(studyDays, LocalDate.now(ZoneOffset.UTC)), statsQuery.activityByDay(userId, from),
                 statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT), statsQuery.history(userId, HISTORY_LIMIT));
     }

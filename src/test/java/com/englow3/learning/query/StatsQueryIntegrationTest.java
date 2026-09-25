@@ -67,7 +67,7 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.reviewLog(learner, card, set, "AGAIN", daysAgo(2));
             fixture.reviewLog(learner, second, set, "GOOD", daysAgo(1));
 
-            assertThat(flashcardStats.cardsStudied(learner, EPOCH)).isEqualTo(2);
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).cardsStudied()).isEqualTo(2);
         }
 
         /** The window is a window: work older than it belongs to a different period's figures. */
@@ -78,7 +78,7 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.reviewLog(learner, card, set, "GOOD", daysAgo(1));
             fixture.reviewLog(learner, card, set, "GOOD", daysAgo(40));
 
-            assertThat(flashcardStats.cardsStudied(learner, daysAgo(7))).isEqualTo(1);
+            assertThat(flashcardStats.periodSummary(learner, daysAgo(7)).cardsStudied()).isEqualTo(1);
         }
 
         /** Anything but AGAIN counts as recalled - the question is whether they knew it, not how comfortably. */
@@ -91,7 +91,7 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.reviewLog(learner, card, set, "HARD", daysAgo(1));
             fixture.reviewLog(learner, card, set, "AGAIN", daysAgo(1));
 
-            assertThat(flashcardStats.retentionPercent(learner, EPOCH)).isEqualTo(75);
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).retentionPercent()).isEqualTo(75);
         }
 
         /**
@@ -101,9 +101,9 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
          */
         @Test
         void doesNotDivideByZeroForALearnerWhoHasAnsweredNothing() {
-            assertThat(flashcardStats.retentionPercent(learner, EPOCH)).isZero();
-            assertThat(flashcardStats.cardsStudied(learner, EPOCH)).isZero();
-            assertThat(flashcardStats.studySeconds(learner, EPOCH)).isZero();
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).retentionPercent()).isZero();
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).cardsStudied()).isZero();
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).studySeconds()).isZero();
         }
 
         @Test
@@ -143,7 +143,7 @@ class StatsQueryIntegrationTest extends PostgresIntegrationTest {
             UUID card = fixture.flashcard(set, 1, "agenda");
             fixture.reviewLog(other, card, set, "GOOD", daysAgo(1));
 
-            assertThat(flashcardStats.cardsStudied(learner, EPOCH)).isZero();
+            assertThat(flashcardStats.periodSummary(learner, EPOCH).cardsStudied()).isZero();
         }
     }
 

@@ -170,7 +170,7 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.review(learner, fixture.flashcard(set, 1, "agenda"), "LEARNING", daysAgo(1));
             fixture.review(learner, fixture.flashcard(set, 2, "brief"), "LEARNING", NOW.plusSeconds(3_600));
 
-            assertThat(query.cardsDue(learner, NOW)).isEqualTo(1);
+            assertThat(query.questCounts(learner, EPOCH, NOW).cardsDueNow()).isEqualTo(1);
         }
 
         /** A set with nothing due does not appear at all - the roadmap lists work, not everything owned. */
@@ -233,7 +233,7 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.quizAttempt(learner, quiz, 80, true, daysAgo(1));
             fixture.quizAttempt(learner, quiz, 40, false, daysAgo(1));
 
-            assertThat(query.quizzesPassedSince(learner, EPOCH)).isEqualTo(1);
+            assertThat(query.questCounts(learner, EPOCH, NOW).quizzesPassedToday()).isEqualTo(1);
         }
 
         /** A quiz already passed is not outstanding work, whatever else the learner did on it. */
