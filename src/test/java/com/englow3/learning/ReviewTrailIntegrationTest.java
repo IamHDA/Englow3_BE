@@ -59,10 +59,12 @@ class ReviewTrailIntegrationTest extends PostgresIntegrationTest {
         UUID setId = fixture.draftFlashcardSet("Ready for review", fixture.learner());
         fixture.flashcard(setId, 1, "acquire");
 
-        transactions.executeWithoutResult(status -> sets.findById(setId).orElseThrow().submitForReview(1, Instant.now()));
+        transactions
+                .executeWithoutResult(status -> sets.findById(setId).orElseThrow().submitForReview(1, Instant.now()));
 
-        transactions.executeWithoutResult(status -> assertThat(
-                sets.findById(setId).orElseThrow().getReview().getSubmittedForReviewAt()).isNotNull());
+        transactions.executeWithoutResult(
+                status -> assertThat(sets.findById(setId).orElseThrow().getReview().getSubmittedForReviewAt())
+                        .isNotNull());
     }
 
     @Test

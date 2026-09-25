@@ -50,8 +50,8 @@ class AdminQuizController {
     ResponseEntity<PageResponse<ContentReviewResponse>> search(@RequestParam(required = false) QuizStatus status,
             @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                adminQuizService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+        return ResponseEntity.ok(PageResponse
+                .from(adminQuizService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
     }
 
     @PostMapping

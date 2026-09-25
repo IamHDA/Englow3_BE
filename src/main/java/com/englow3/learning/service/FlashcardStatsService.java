@@ -48,8 +48,8 @@ public class FlashcardStatsService {
 
         FlashcardStatsQuery.PeriodSummary summary = statsQuery.periodSummary(userId, from);
         return new FlashcardStatsResult(periodDays, summary.cardsStudied(), summary.retentionPercent(),
-                summary.studySeconds(),
-                StudyStreak.count(studyDays, LocalDate.now(ZoneOffset.UTC)), statsQuery.activityByDay(userId, from),
-                statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT), statsQuery.history(userId, HISTORY_LIMIT));
+                summary.studySeconds(), StudyStreak.count(studyDays, LocalDate.now(ZoneOffset.UTC)),
+                statsQuery.activityByDay(userId, from), statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT),
+                statsQuery.history(userId, HISTORY_LIMIT));
     }
 }

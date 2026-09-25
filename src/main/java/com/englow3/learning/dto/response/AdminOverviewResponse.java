@@ -13,8 +13,10 @@ public record AdminOverviewResponse(List<ContentKindCounts> content, long pendin
 
     public static AdminOverviewResponse from(AdminOverviewResult result) {
         return new AdminOverviewResponse(
-                result.content().stream().map(row -> new ContentKindCounts(row.kind(), row.drafts(),
-                        row.pendingReview(), row.published())).toList(),
+                result.content().stream()
+                        .map(row -> new ContentKindCounts(row.kind(), row.drafts(), row.pendingReview(),
+                                row.published()))
+                        .toList(),
                 result.pendingReviewTotal(), result.learners(), result.newLearners(), result.activeLearners(),
                 result.cardReviews(), result.dictationSentences(), result.quizzesSubmitted(), result.examsSubmitted(),
                 result.periodDays());

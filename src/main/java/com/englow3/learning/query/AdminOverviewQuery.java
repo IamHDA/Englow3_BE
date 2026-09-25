@@ -11,8 +11,8 @@ import com.englow3.shared.persistence.SqlTime;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The figures on the administrator's overview: what is waiting on review, how much is live, and whether anyone is
- * using it.
+ * The figures on the administrator's overview: what is waiting on review, how much is live, and whether anyone is using
+ * it.
  * <p>
  * A declared cross-module read (see {@code docs/module-map.md}): it counts {@code speaking_prompts}, {@code exams},
  * {@code exam_attempts} and {@code users} alongside this module's own tables. Read-only, and in two round trips rather

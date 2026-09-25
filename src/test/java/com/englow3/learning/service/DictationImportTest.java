@@ -62,10 +62,13 @@ class DictationImportTest {
             assertThat(lesson.segments()).extracting(DictationImport.Segment::endMs).containsExactly(2100, 4300);
         }
 
-        /** A list of "shadow-0043" is a list nobody can read, so the script's first line becomes the title. */
+        /** The script is the answer to the dictation, so the title names the clip without quoting it. */
         @Test
-        void titlesTheLessonFromTheFirstLineOfTheScript() {
-            assertThat(DictationImport.read(MAPPER, ONE_CLIP).lessons().get(0).title()).isEqualTo("At the airport.");
+        void titlesTheLessonWithoutGivingAwayTheScript() {
+            String title = DictationImport.read(MAPPER, ONE_CLIP).lessons().get(0).title();
+
+            assertThat(title).isEqualTo("Bài nghe 1 · giọng Mỹ");
+            assertThat(title).doesNotContain("airport");
         }
 
         /** A clip of 8.4 seconds reported as 8 would have the player stop before the last word. */

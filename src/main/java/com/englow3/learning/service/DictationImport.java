@@ -2,6 +2,10 @@ package com.englow3.learning.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.englow3.shared.error.BadRequestException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,6 +27,11 @@ public final class DictationImport {
 
     /** A generated batch is thirty clips. This takes a large one and refuses a file that is not a batch at all. */
     static final int MAX_CLIPS = 500;
+
+    private static final Pattern TRAILING_NUMBER = Pattern.compile("(\\d+)$");
+
+    private static final Map<String, String> ACCENTS = Map.of("us", "Mỹ", "uk", "Anh", "gb", "Anh", "au", "Úc", "ca",
+            "Canada");
 
     private DictationImport() {
     }
@@ -123,17 +132,17 @@ public final class DictationImport {
     }
 
     /**
-     * The clip's script as a title, cut to something a list can show.
+     * A title that names the clip without saying what is in it.
      * <p>
-     * The pipeline gives clips an id and a script but no title, and a list of "shadow-0043" is a list nobody can read.
+     * The pipeline gives clips an id and a script but no title. The script is the answer to a dictation, so a list
+     * titled with it hands the learner the answer before they press play; the id alone ("shadow_043") is a list nobody
+     * can read. The number from the id and the accent say which clip it is and nothing more.
      */
     private static String title(JsonNode clip, String clipId) {
-        String script = text(clip, "script");
-        if (script == null) {
-            return clipId;
-        }
-        String firstLine = script.strip().lines().findFirst().orElse(clipId).strip();
-        return firstLine.length() <= 120 ? firstLine : firstLine.substring(0, 119).stripTrailing() + "…";
+        Matcher number = TRAILING_NUMBER.matcher(clipId);
+        String name = number.find() ? "Bài nghe " + Integer.parseInt(number.group(1)) : clipId;
+        String accent = ACCENTS.get(String.valueOf(text(clip, "accent")).toLowerCase(Locale.ROOT));
+        return accent == null ? name : name + " · giọng " + accent;
     }
 
     /**
