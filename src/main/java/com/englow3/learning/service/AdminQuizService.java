@@ -103,6 +103,18 @@ public class AdminQuizService {
         return summaryOf(quiz);
     }
 
+    /**
+     * Every quiz in any status, for the authoring list. The question counts come in one query for the page rather than
+     * one per row.
+     */
+    @Transactional(readOnly = true)
+    public Page<ContentReviewResult> searchForAuthoring(QuizStatus status, String title, Pageable pageable) {
+        Page<Quiz> page = quizRepo.searchForAuthoring(status, title, pageable);
+        Map<UUID, Long> counts = questionRepo.countByQuizIds(page.getContent().stream().map(Quiz::getId).toList());
+
+        return page.map(quiz -> ContentReviewResult.of(quiz, counts.getOrDefault(quiz.getId(), 0L)));
+    }
+
     @Transactional
     public ContentReviewResult publish(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);

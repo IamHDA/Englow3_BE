@@ -41,6 +41,19 @@ class AdminQuizController {
 
     private final AdminQuizService adminQuizService;
 
+    /**
+     * The authoring list. Separate from the learner catalogue because that one shows published quizzes only - an
+     * administrator with no way to see a draft has no way to review one. A null status means every status, so the same
+     * endpoint serves the full list and the review queue.
+     */
+    @GetMapping
+    ResponseEntity<PageResponse<ContentReviewResponse>> search(@RequestParam(required = false) QuizStatus status,
+            @RequestParam(required = false) String title,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                adminQuizService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+    }
+
     @PostMapping
     ResponseEntity<QuizSummaryResponse> create(@Valid @RequestBody CreateQuizRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
