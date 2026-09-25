@@ -54,6 +54,17 @@ public class FlashcardSet {
     @Embedded
     private ReviewTrail review = new ReviewTrail();
 
+    /**
+     * Never null. Hibernate loads an embeddable whose columns are all null as {@code null}, which overrides the
+     * initializer above - so every draft read back before its first review had no trail, and submitting it failed.
+     */
+    public ReviewTrail getReview() {
+        if (review == null) {
+            review = new ReviewTrail();
+        }
+        return review;
+    }
+
     protected FlashcardSet() {
     }
 
@@ -100,7 +111,7 @@ public class FlashcardSet {
             throw new ConflictException("FLASHCARD_SET_EMPTY", "A set with no cards cannot be published");
         }
         this.status = FlashcardSetStatus.PENDING_REVIEW;
-        review.markSubmitted(now);
+        getReview().markSubmitted(now);
     }
 
     /** Approval publishes in the same step: an approved-but-unpublished set would be a state nobody asked for. */
@@ -111,12 +122,12 @@ public class FlashcardSet {
         }
         this.status = FlashcardSetStatus.PUBLISHED;
         this.publishedAt = now;
-        review.markApproved(reviewerId, now);
+        getReview().markApproved(reviewerId, now);
     }
 
     public void reject(UUID reviewerId, String note, Instant now) {
         requirePendingReview("rejected");
-        review.markRejected(reviewerId, note, now);
+        getReview().markRejected(reviewerId, note, now);
         this.status = FlashcardSetStatus.REJECTED;
     }
 

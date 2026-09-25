@@ -51,6 +51,17 @@ public class DictationLesson {
     @Embedded
     private ReviewTrail review = new ReviewTrail();
 
+    /**
+     * Never null. Hibernate loads an embeddable whose columns are all null as {@code null}, which overrides the
+     * initializer above - so every draft read back before its first review had no trail, and submitting it failed.
+     */
+    public ReviewTrail getReview() {
+        if (review == null) {
+            review = new ReviewTrail();
+        }
+        return review;
+    }
+
     protected DictationLesson() {
     }
 
@@ -87,7 +98,7 @@ public class DictationLesson {
         }
         requireNotEmpty(sentenceCount);
         this.status = DictationLessonStatus.PENDING_REVIEW;
-        review.markSubmitted(now);
+        getReview().markSubmitted(now);
     }
 
     public void approve(UUID reviewerId, long sentenceCount, Instant now) {
@@ -95,12 +106,12 @@ public class DictationLesson {
         requireNotEmpty(sentenceCount);
         this.status = DictationLessonStatus.PUBLISHED;
         this.publishedAt = now;
-        review.markApproved(reviewerId, now);
+        getReview().markApproved(reviewerId, now);
     }
 
     public void reject(UUID reviewerId, String note, Instant now) {
         requirePendingReview("rejected");
-        review.markRejected(reviewerId, note, now);
+        getReview().markRejected(reviewerId, note, now);
         this.status = DictationLessonStatus.REJECTED;
     }
 
