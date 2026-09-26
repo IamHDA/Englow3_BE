@@ -1,7 +1,6 @@
-package com.englow3.ai.service;
+package com.englow3.ai.api;
 
-import com.englow3.ai.entity.AiJob;
-import com.englow3.ai.entity.AiJobType;
+import java.util.UUID;
 
 /**
  * What a module plugs in to have its own kind of job run.
@@ -12,7 +11,7 @@ import com.englow3.ai.entity.AiJobType;
  */
 public interface AiJobHandler {
 
-    AiJobType handles();
+    String handles();
 
     /**
      * Runs one attempt. Called outside any transaction, deliberately: this is where the provider is called, and holding
@@ -22,7 +21,7 @@ public interface AiJobHandler {
      * retrying, which an exception cannot say. The worker treats a thrown exception as a retryable failure, because
      * that is the safer reading of a bug.
      */
-    Outcome run(AiJob job);
+    Outcome run(UUID jobId, UUID targetId, String inputPayload);
 
     /**
      * Called once, when the queue has recorded this job as finished without a result - whatever the reason: a failure
@@ -33,7 +32,7 @@ public interface AiJobHandler {
      * {@code run} would do it for only one of those four paths, and the learner behind the other three would be left
      * waiting for work that has already stopped. Must be safe to call for a target already marked failed.
      */
-    default void onGaveUp(AiJob job, String errorCode) {
+    default void onGaveUp(UUID targetId, String errorCode) {
     }
 
     /**

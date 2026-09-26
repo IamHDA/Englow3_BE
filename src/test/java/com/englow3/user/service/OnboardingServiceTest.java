@@ -54,7 +54,8 @@ class OnboardingServiceTest {
 
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final OnboardingService service = new OnboardingService(userRepo, learnerProfileRepo, learningPurposeRepo,
+    private final OnboardingService service = new com.englow3.user.service.impl.OnboardingServiceImpl(userRepo,
+            learnerProfileRepo, learningPurposeRepo,
 
             currentUser);
 

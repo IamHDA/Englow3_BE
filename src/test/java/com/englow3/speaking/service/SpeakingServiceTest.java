@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
@@ -31,7 +31,7 @@ import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /** What has to be true before a recording is accepted, and before anyone is charged for scoring it. */
@@ -46,8 +46,8 @@ class SpeakingServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
 
-    private final SpeakingService service = new SpeakingService(promptRepo, attemptRepo, wordRepo, aiJobQueue,
-            userDirectory, objectStorage, new ObjectMapper());
+    private final SpeakingService service = new com.englow3.speaking.service.impl.SpeakingServiceImpl(promptRepo,
+            attemptRepo, wordRepo, aiJobQueue, userDirectory, objectStorage, new ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
     private SpeakingPrompt prompt;
@@ -115,8 +115,8 @@ class SpeakingServiceTest {
 
         // Attributed to the learner: the attribution is what the daily budget counts, so an unattributed job would
         // be free.
-        verify(aiJobQueue).enqueue(any(), eq("SPEAKING_ATTEMPT"), eq(attempt.getId()), anyString(), anyString(),
-                anyString(), eq(userId));
+        verify(aiJobQueue).enqueueSpeechAssessment(eq(attempt.getId()), anyString(), anyString(), anyString(),
+                eq(userId));
     }
 
     /**
@@ -131,7 +131,7 @@ class SpeakingServiceTest {
         assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_DAILY_LIMIT_REACHED");
 
-        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
+        verify(aiJobQueue, never()).enqueueSpeechAssessment(any(), anyString(), anyString(), anyString(), any());
     }
 
     /** A client that failed its upload and submitted anyway is told what actually went wrong. */
@@ -143,7 +143,7 @@ class SpeakingServiceTest {
         assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_RECORDING_MISSING");
 
-        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
+        verify(aiJobQueue, never()).enqueueSpeechAssessment(any(), anyString(), anyString(), anyString(), any());
     }
 
     /**

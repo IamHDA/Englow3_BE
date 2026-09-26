@@ -46,7 +46,7 @@ import com.englow3.exam.repository.QuestionSetRepository;
 import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 
 class AdminExamServiceTest {
     private static final String EXAM_BUCKET = "exams";
@@ -69,9 +69,9 @@ class AdminExamServiceTest {
 
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
 
-    private final AdminExamService service = new AdminExamService(examRepo, examSectionRepo, sectionPartRepo,
-            questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery, userDirectory, objectStorage,
-            EXAM_BUCKET);
+    private final AdminExamService service = new com.englow3.exam.service.impl.AdminExamServiceImpl(examRepo,
+            examSectionRepo, sectionPartRepo, questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery,
+            userDirectory, objectStorage, EXAM_BUCKET);
 
     private final UUID adminId = UUID.randomUUID();
 

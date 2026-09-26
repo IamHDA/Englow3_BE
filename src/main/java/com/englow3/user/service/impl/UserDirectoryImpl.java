@@ -1,4 +1,4 @@
-package com.englow3.user.service;
+package com.englow3.user.service.impl;
 
 import java.util.Map;
 import java.util.UUID;
@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.api.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,7 +23,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class UserDirectory {
+public class UserDirectoryImpl implements UserDirectory {
 
     /** Far above the learners one instance serves; only there so a flood of distinct tokens cannot grow it forever. */
     private static final int MAX_CACHED_IDS = 10_000;

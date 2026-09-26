@@ -21,7 +21,7 @@ public final class DailyQuests {
     static final int DAILY_SENTENCE_GOAL = 10;
 
     /** Length of the window the practise-every-day goal looks at. */
-    static final int WEEK_DAYS = 7;
+    public static final int WEEK_DAYS = 7;
 
     private DailyQuests() {
     }

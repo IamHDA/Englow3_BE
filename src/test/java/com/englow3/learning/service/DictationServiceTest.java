@@ -31,7 +31,7 @@ import com.englow3.learning.repository.DictationAttemptRepository;
 import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 
 /**
  * The rule this service exists to enforce is that the transcript does not leave the server until the learner has
@@ -47,7 +47,8 @@ class DictationServiceTest {
     private final DictationAttemptRepository attemptRepo = mock(DictationAttemptRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final DictationService service = new DictationService(lessonRepo, sentenceRepo, attemptRepo, userDirectory);
+    private final DictationService service = new com.englow3.learning.service.impl.DictationServiceImpl(lessonRepo,
+            sentenceRepo, attemptRepo, userDirectory);
 
     private final UUID userId = UUID.randomUUID();
     private DictationLesson lesson;

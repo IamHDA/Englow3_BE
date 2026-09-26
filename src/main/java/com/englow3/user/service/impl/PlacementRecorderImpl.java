@@ -1,4 +1,4 @@
-package com.englow3.user.service;
+package com.englow3.user.service.impl;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -12,6 +12,7 @@ import com.englow3.user.entity.OnboardingStep;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.LearnerProfileRepository;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.api.PlacementRecorder;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,7 +24,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class PlacementRecorder {
+public class PlacementRecorderImpl implements PlacementRecorder {
 
     private final UserRepository userRepo;
     private final LearnerProfileRepository learnerProfileRepo;
@@ -70,7 +71,7 @@ public class PlacementRecorder {
         }
     }
 
-    static CertificateLevel levelFor(BigDecimal scorePercentage) {
+    public static CertificateLevel levelFor(BigDecimal scorePercentage) {
         if (scorePercentage == null) {
             return LOWEST_LEVEL;
         }

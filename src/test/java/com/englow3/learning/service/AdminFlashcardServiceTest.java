@@ -25,7 +25,7 @@ import com.englow3.learning.entity.FlashcardSetStatus;
 import com.englow3.learning.repository.FlashcardRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.ConflictException;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -38,8 +38,8 @@ class AdminFlashcardServiceTest {
     private final FlashcardRepository cardRepo = mock(FlashcardRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final AdminFlashcardService service = new AdminFlashcardService(setRepo, cardRepo, userDirectory,
-            new ObjectMapper());
+    private final AdminFlashcardService service = new com.englow3.learning.service.impl.AdminFlashcardServiceImpl(
+            setRepo, cardRepo, userDirectory, new ObjectMapper());
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;

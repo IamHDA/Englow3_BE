@@ -29,7 +29,7 @@ import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -42,8 +42,8 @@ class AdminDictationServiceTest {
     private final DictationSentenceRepository sentenceRepo = mock(DictationSentenceRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final AdminDictationService service = new AdminDictationService(lessonRepo, sentenceRepo, userDirectory,
-            new ObjectMapper());
+    private final AdminDictationService service = new com.englow3.learning.service.impl.AdminDictationServiceImpl(
+            lessonRepo, sentenceRepo, userDirectory, new ObjectMapper());
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;

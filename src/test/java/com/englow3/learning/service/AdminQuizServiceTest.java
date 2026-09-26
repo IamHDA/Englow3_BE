@@ -44,11 +44,10 @@ class AdminQuizServiceTest {
     private final QuizQuestionOptionRepository optionRepo = mock(QuizQuestionOptionRepository.class);
     private final QuizQuestionTokenRepository tokenRepo = mock(QuizQuestionTokenRepository.class);
     private final QuizQuestionPairRepository pairRepo = mock(QuizQuestionPairRepository.class);
-    private final com.englow3.user.service.UserDirectory userDirectory = mock(
-            com.englow3.user.service.UserDirectory.class);
+    private final com.englow3.user.api.UserDirectory userDirectory = mock(com.englow3.user.api.UserDirectory.class);
 
-    private final AdminQuizService service = new AdminQuizService(quizRepo, questionRepo, optionRepo, tokenRepo,
-            pairRepo, userDirectory);
+    private final AdminQuizService service = new com.englow3.learning.service.impl.AdminQuizServiceImpl(quizRepo,
+            questionRepo, optionRepo, tokenRepo, pairRepo, userDirectory);
 
     private Quiz quiz;
 

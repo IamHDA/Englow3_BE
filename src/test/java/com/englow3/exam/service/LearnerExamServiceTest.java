@@ -38,8 +38,8 @@ import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.PlacementRecorder;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.PlacementRecorder;
+import com.englow3.user.api.UserDirectory;
 
 class LearnerExamServiceTest {
 
@@ -51,8 +51,8 @@ class LearnerExamServiceTest {
     private final ExamGradingQuery gradingQuery = mock(ExamGradingQuery.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
-    private final LearnerExamService service = new LearnerExamService(examRepo, attemptRepo, answerRepo,
-            answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder);
+    private final LearnerExamService service = new com.englow3.exam.service.impl.LearnerExamServiceImpl(examRepo,
+            attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder);
 
     private final UUID userId = UUID.randomUUID();
 

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import com.englow3.user.entity.CertificateLevel;
+import com.englow3.user.api.PlacementRecorder;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.OnboardingStep;
 import com.englow3.user.entity.User;
@@ -31,7 +32,8 @@ class PlacementRecorderTest {
     private final LearnerProfileRepository learnerProfileRepo = mock(LearnerProfileRepository.class);
     private final User user = mock(User.class);
 
-    private final PlacementRecorder recorder = new PlacementRecorder(userRepo, learnerProfileRepo);
+    private final PlacementRecorder recorder = new com.englow3.user.service.impl.PlacementRecorderImpl(userRepo,
+            learnerProfileRepo);
 
     private final UUID userId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
@@ -49,21 +51,31 @@ class PlacementRecorderTest {
 
         @Test
         void mapsEachPercentageToItsBand() {
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("100"))).isEqualTo(CertificateLevel.C2);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("90"))).isEqualTo(CertificateLevel.C2);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("89.9"))).isEqualTo(CertificateLevel.C1);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("75"))).isEqualTo(CertificateLevel.C1);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("60"))).isEqualTo(CertificateLevel.B2);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("45"))).isEqualTo(CertificateLevel.B1);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("25"))).isEqualTo(CertificateLevel.A2);
-            assertThat(PlacementRecorder.levelFor(new BigDecimal("24.9"))).isEqualTo(CertificateLevel.A1);
-            assertThat(PlacementRecorder.levelFor(BigDecimal.ZERO)).isEqualTo(CertificateLevel.A1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("100")))
+                    .isEqualTo(CertificateLevel.C2);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("90")))
+                    .isEqualTo(CertificateLevel.C2);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("89.9")))
+                    .isEqualTo(CertificateLevel.C1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("75")))
+                    .isEqualTo(CertificateLevel.C1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("60")))
+                    .isEqualTo(CertificateLevel.B2);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("45")))
+                    .isEqualTo(CertificateLevel.B1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("25")))
+                    .isEqualTo(CertificateLevel.A2);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(new BigDecimal("24.9")))
+                    .isEqualTo(CertificateLevel.A1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(BigDecimal.ZERO))
+                    .isEqualTo(CertificateLevel.A1);
         }
 
         /** A paper with no gradeable question scores null rather than zero - it must not crash the hand-off. */
         @Test
         void treatsAnUnscoredAttemptAsTheLowestLevel() {
-            assertThat(PlacementRecorder.levelFor(null)).isEqualTo(CertificateLevel.A1);
+            assertThat(com.englow3.user.service.impl.PlacementRecorderImpl.levelFor(null))
+                    .isEqualTo(CertificateLevel.A1);
         }
     }
 

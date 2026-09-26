@@ -35,7 +35,7 @@ import com.englow3.learning.repository.QuizQuestionRepository;
 import com.englow3.learning.repository.QuizQuestionTokenRepository;
 import com.englow3.learning.repository.QuizRepository;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 
 /**
  * What this class can get wrong that the grader cannot: handing the answer key to a learner who is still sitting, and
@@ -52,8 +52,8 @@ class QuizServiceTest {
     private final QuizAttemptAnswerRepository attemptAnswerRepo = mock(QuizAttemptAnswerRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final QuizService service = new QuizService(quizRepo, questionRepo, optionRepo, tokenRepo, pairRepo,
-            attemptRepo, attemptAnswerRepo, userDirectory);
+    private final QuizService service = new com.englow3.learning.service.impl.QuizServiceImpl(quizRepo, questionRepo,
+            optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory);
 
     private final UUID userId = UUID.randomUUID();
     private Quiz quiz;

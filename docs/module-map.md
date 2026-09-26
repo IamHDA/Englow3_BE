@@ -15,6 +15,9 @@ skills, and onboarding.
   `users.auth_provider_id`; application code does not manage passwords or sessions.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam
   attempt UUID. It is not a JPA relationship to the exam module.
+- **Public API:** `user.api.UserDirectory` and `user.api.PlacementRecorder` are the
+  contracts for cross-module identity lookup and placement recording. User entities,
+  repositories, and service implementations remain internal.
 - **Files:** profile images use the shared storage client, while object-key meaning
   remains owned by this module.
 
@@ -82,8 +85,11 @@ and nothing about what any of those mean.
 
 - **Tables:** `ai_jobs`.
 - **Entry points:** none. Other modules enqueue; nothing outside the worker reads.
-- **Dispatch:** a handler registers for one `AiJobType` and never sees the others,
-  which is what let a second kind of work be added without touching the worker.
+- **Public API:** `ai.api.AiJobQueue` exposes enqueue/quota capabilities and
+  `ai.api.AiJobHandler` is the handler contract. `AiJob`, `AiJobType`, and
+  `AiJobStatus` are internal AI models; they do not cross module boundaries.
+- **Dispatch:** the worker maps internal `AiJobType` values to a handler's stable
+  job-type string; handlers do not see the internal enum.
 - **Retry:** the queue decides whether a failure is worth repeating; the handler
   reports which kind it was. A transient failure is left pending rather than shown
   to the learner as failed.

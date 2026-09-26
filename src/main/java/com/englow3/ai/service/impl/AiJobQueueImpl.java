@@ -1,4 +1,4 @@
-package com.englow3.ai.service;
+package com.englow3.ai.service.impl;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -12,10 +12,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.ai.api.AiJobHandler;
+import com.englow3.ai.api.AiJobQueue;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobStatus;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.repository.AiJobRepository;
+import com.englow3.ai.service.AiJobWorkerQueue;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,7 +31,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class AiJobQueue {
+public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
 
     private final AiJobRepository jobRepo;
 
@@ -80,8 +83,7 @@ public class AiJobQueue {
      * - the unique index is what actually enforces it, and this only turns the resulting error into the answer the
      * caller wanted.
      */
-    @Transactional
-    public AiJob enqueue(AiJobType jobType, String targetType, UUID targetId, String inputPayload,
+    private AiJob enqueue(AiJobType jobType, String targetType, UUID targetId, String inputPayload,
             String idempotencyKey, String promptVersion, UUID requestedByUserId) {
         return jobRepo.findByIdempotencyKey(idempotencyKey).orElseGet(() -> {
             AiJob job = AiJob.pending(jobType, targetType, targetId, providerName, defaultModel, promptVersion,
@@ -92,6 +94,22 @@ public class AiJobQueue {
                 return jobRepo.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> raced);
             }
         });
+    }
+
+    @Override
+    @Transactional
+    public void enqueueSpeechAssessment(UUID attemptId, String inputPayload, String idempotencyKey,
+            String promptVersion, UUID requestedByUserId) {
+        enqueue(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", attemptId, inputPayload, idempotencyKey, promptVersion,
+                requestedByUserId);
+    }
+
+    @Override
+    @Transactional
+    public void enqueueTutorReply(UUID messageId, String inputPayload, String idempotencyKey, String promptVersion,
+            UUID requestedByUserId) {
+        enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", messageId, inputPayload, idempotencyKey, promptVersion,
+                requestedByUserId);
     }
 
     /**

@@ -22,7 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.tutor.dto.command.ReportTutorMessageCommand;
@@ -32,7 +32,7 @@ import com.englow3.tutor.entity.TutorMessage;
 import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -48,8 +48,8 @@ class TutorServiceTest {
     private final AiJobQueue aiJobQueue = mock(AiJobQueue.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final TutorService service = new TutorService(conversationRepo, messageRepo, aiJobQueue, userDirectory,
-            new ObjectMapper());
+    private final TutorService service = new com.englow3.tutor.service.impl.TutorServiceImpl(conversationRepo,
+            messageRepo, aiJobQueue, userDirectory, new ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
     private TutorConversation conversation;
@@ -108,8 +108,8 @@ class TutorServiceTest {
             service.send(new SendTutorMessageCommand(null, "What is a gerund?", null));
 
             UUID pendingId = savedMessages().get(1).getId();
-            verify(aiJobQueue).enqueue(eq(AiJobType.TUTOR_REPLY), eq("TUTOR_MESSAGE"), eq(pendingId), anyString(),
-                    anyString(), eq(TutorPrompt.VERSION), eq(userId));
+            verify(aiJobQueue).enqueueTutorReply(eq(pendingId), anyString(), anyString(), eq(TutorPrompt.VERSION),
+                    eq(userId));
         }
 
         /** Continuing a thread numbers the new turns after the ones already in it, not from one. */
@@ -135,7 +135,7 @@ class TutorServiceTest {
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
             ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(aiJobQueue).enqueue(any(), anyString(), any(), payload.capture(), anyString(), anyString(), any());
+            verify(aiJobQueue).enqueueTutorReply(any(), payload.capture(), anyString(), anyString(), any());
             assertThat(payload.getValue()).contains("What is a gerund?").contains("A verb used as a noun.")
                     .contains("Give me an example.");
         }
@@ -178,8 +178,7 @@ class TutorServiceTest {
 
             verify(conversationRepo, never()).save(any());
             verify(messageRepo, never()).save(any());
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
-                    any());
+            verify(aiJobQueue, never()).enqueueTutorReply(any(), anyString(), anyString(), anyString(), any());
         }
     }
 
@@ -207,8 +206,7 @@ class TutorServiceTest {
             assertThatThrownBy(() -> service.send(new SendTutorMessageCommand(other, "hello", null)))
                     .isInstanceOf(NotFoundException.class);
 
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
-                    any());
+            verify(aiJobQueue, never()).enqueueTutorReply(any(), anyString(), anyString(), anyString(), any());
         }
 
         @Test

@@ -23,7 +23,7 @@ import com.englow3.learning.repository.FlashcardReviewLogRepository;
 import com.englow3.learning.repository.FlashcardReviewRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 
 /**
  * Rating a card is the one write a learner can aim at an arbitrary id, so what it refuses is the part worth pinning
@@ -37,8 +37,8 @@ class FlashcardServiceTest {
     private final FlashcardReviewLogRepository reviewLogRepo = mock(FlashcardReviewLogRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final FlashcardService service = new FlashcardService(setRepo, cardRepo, reviewRepo, reviewLogRepo,
-            userDirectory);
+    private final FlashcardService service = new com.englow3.learning.service.impl.FlashcardServiceImpl(setRepo,
+            cardRepo, reviewRepo, reviewLogRepo, userDirectory);
 
     private final UUID userId = UUID.randomUUID();
     private Flashcard card;

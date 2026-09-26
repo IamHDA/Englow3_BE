@@ -9,9 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.englow3.ai.client.LlmClient;
 import com.englow3.ai.client.LlmException;
-import com.englow3.ai.entity.AiJob;
-import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobHandler;
+import com.englow3.ai.api.AiJobHandler;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.DomainException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -50,8 +48,8 @@ public class TutorReplyHandler implements AiJobHandler {
     private final ObjectMapper objectMapper;
 
     @Override
-    public AiJobType handles() {
-        return AiJobType.TUTOR_REPLY;
+    public String handles() {
+        return "TUTOR_REPLY";
     }
 
     /**
@@ -60,8 +58,8 @@ public class TutorReplyHandler implements AiJobHandler {
      * lasts as long as a write.
      */
     @Override
-    public Outcome run(AiJob job) {
-        JsonNode request = readRequest(job);
+    public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
+        JsonNode request = readRequest(jobId, inputPayload);
         if (request == null) {
             return Outcome.permanentFailure("TUTOR_JOB_PAYLOAD_UNREADABLE",
                     "The job payload is not the shape this handler writes");
@@ -99,8 +97,8 @@ public class TutorReplyHandler implements AiJobHandler {
      * what lets this work even for a payload that could not be read.
      */
     @Override
-    public void onGaveUp(AiJob job, String errorCode) {
-        writer.markFailed(job.getTargetId(), errorCode);
+    public void onGaveUp(UUID targetId, String errorCode) {
+        writer.markFailed(targetId, errorCode);
     }
 
     /** What the adapter returned, reduced to the parts worth keeping on the message. */
@@ -130,12 +128,12 @@ public class TutorReplyHandler implements AiJobHandler {
                 answer.hasNonNull("output_tokens") ? answer.get("output_tokens").asInt() : null);
     }
 
-    private JsonNode readRequest(AiJob job) {
+    private JsonNode readRequest(UUID jobId, String inputPayload) {
         try {
-            JsonNode request = objectMapper.readTree(job.getInputPayload());
+            JsonNode request = objectMapper.readTree(inputPayload);
             return request.hasNonNull("messageId") ? request : null;
         } catch (JsonProcessingException malformed) {
-            log.error("AI job {} carries an unreadable payload", job.getId(), malformed);
+            log.error("AI job {} carries an unreadable payload", jobId, malformed);
             return null;
         }
     }

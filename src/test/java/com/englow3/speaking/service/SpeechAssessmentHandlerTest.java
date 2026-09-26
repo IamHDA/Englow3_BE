@@ -19,7 +19,7 @@ import com.englow3.ai.client.SpeechAssessmentClient;
 import com.englow3.ai.client.SpeechAssessmentException;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobHandler.Outcome;
+import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -56,12 +56,16 @@ class SpeechAssessmentHandlerTest {
                 """.formatted(attemptId));
     }
 
+    private Outcome run(AiJob job) {
+        return handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
+    }
+
     @Test
     void storesTheAssessmentAndReportsSuccess() {
         when(speechClient.assess(any(), eq("audio/wav"), eq("en-US"), eq("Hello there")))
                 .thenReturn("{\"recognized_text\":\"Hello there\",\"accuracy\":88}");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.success()).isTrue();
         verify(writer).storeAssessment(eq(attemptId), any());
@@ -77,7 +81,7 @@ class SpeechAssessmentHandlerTest {
         when(speechClient.assess(any(), anyString(), anyString(), anyString()))
                 .thenThrow(new SpeechAssessmentException("SPEECH_SERVICE_UNREACHABLE", "timeout", true));
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isTrue();
         verify(writer, never()).markFailed(any(), anyString());
@@ -92,7 +96,7 @@ class SpeechAssessmentHandlerTest {
         when(speechClient.assess(any(), anyString(), anyString(), anyString()))
                 .thenThrow(new SpeechAssessmentException("SPEECH_ASSESSMENT_REJECTED", "415", false));
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
         verify(writer, never()).markFailed(any(), anyString());
@@ -106,7 +110,7 @@ class SpeechAssessmentHandlerTest {
     void givesUpOnAnAnswerThatCannotBeRead() {
         when(speechClient.assess(any(), anyString(), anyString(), anyString())).thenReturn("<html>502</html>");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_ASSESSMENT_UNREADABLE");
@@ -118,7 +122,7 @@ class SpeechAssessmentHandlerTest {
     void retriesWhenTheRecordingCannotBeRead() {
         when(objectStorage.download(anyString(), anyString())).thenThrow(new RuntimeException("connection reset"));
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isTrue();
         assertThat(outcome.errorCode()).isEqualTo("SPEAKING_RECORDING_UNREADABLE");
@@ -131,7 +135,7 @@ class SpeechAssessmentHandlerTest {
      */
     @Test
     void failsPermanentlyOnAPayloadItDoesNotRecognise() {
-        Outcome outcome = handler.run(jobFor("{\"somethingElse\":true}"));
+        Outcome outcome = run(jobFor("{\"somethingElse\":true}"));
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_JOB_PAYLOAD_UNREADABLE");
@@ -140,7 +144,7 @@ class SpeechAssessmentHandlerTest {
 
     @Test
     void failsPermanentlyOnAPayloadThatIsNotJson() {
-        Outcome outcome = handler.run(jobFor("not json at all"));
+        Outcome outcome = run(jobFor("not json at all"));
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_JOB_PAYLOAD_UNREADABLE");
@@ -152,7 +156,7 @@ class SpeechAssessmentHandlerTest {
         when(speechClient.assess(any(), anyString(), anyString(), anyString()))
                 .thenReturn("{\"recognized_text\":\"   \"}");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.errorCode()).isEqualTo("SPEECH_ASSESSMENT_EMPTY");
         verify(writer, never()).markFailed(any(), anyString());
@@ -164,7 +168,7 @@ class SpeechAssessmentHandlerTest {
      */
     @Test
     void tellsTheLearnerOnceTheJobHasGivenUp() {
-        handler.onGaveUp(validJob(), "PROVIDER_DOWN");
+        handler.onGaveUp(validJob().getTargetId(), "PROVIDER_DOWN");
 
         verify(writer).markFailed(attemptId, "PROVIDER_DOWN");
     }
@@ -175,7 +179,7 @@ class SpeechAssessmentHandlerTest {
      */
     @Test
     void reachesTheLearnerEvenWhenThePayloadWasUnreadable() {
-        handler.onGaveUp(jobFor("not json at all"), "PAYLOAD_UNREADABLE");
+        handler.onGaveUp(jobFor("not json at all").getTargetId(), "PAYLOAD_UNREADABLE");
 
         verify(writer).markFailed(attemptId, "PAYLOAD_UNREADABLE");
     }

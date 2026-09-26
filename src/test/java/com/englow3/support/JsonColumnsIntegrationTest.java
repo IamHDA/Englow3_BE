@@ -10,10 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.englow3.ai.entity.AiJob;
-import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.repository.AiJobRepository;
-import com.englow3.ai.service.AiJobHandler;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobHandler;
+import com.englow3.ai.api.AiJobQueue;
+import com.englow3.ai.service.AiJobWorkerQueue;
 import com.englow3.speaking.entity.SpeakingAttempt;
 import com.englow3.speaking.entity.SpeakingAttemptWord;
 import com.englow3.speaking.entity.SpeakingPrompt;
@@ -39,6 +39,9 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
     private AiJobQueue queue;
 
     @Autowired
+    private AiJobWorkerQueue workerQueue;
+
+    @Autowired
     private AiJobRepository jobRepo;
 
     @Autowired
@@ -59,8 +62,8 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
         UUID learner = new LearnerFixture(jdbc).learner();
         UUID target = UUID.randomUUID();
 
-        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target,
-                "{\"question\":\"What is a gerund?\"}", "tutor:" + target, "v1", learner);
+        queue.enqueueTutorReply(target, "{\"question\":\"What is a gerund?\"}", "tutor:" + target, "v1", learner);
+        AiJob job = jobRepo.findByIdempotencyKey("tutor:" + target).orElseThrow();
 
         assertThat(jobRepo.findById(job.getId())).get().extracting(AiJob::getInputPayload).asString()
                 .contains("gerund");
@@ -71,11 +74,11 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
     void recordsTheOutputOfAFinishedJob() {
         UUID learner = new LearnerFixture(jdbc).learner();
         UUID target = UUID.randomUUID();
-        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1",
-                learner);
-        queue.claimBatch(50);
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        AiJob job = jobRepo.findByIdempotencyKey("tutor:" + target).orElseThrow();
+        workerQueue.claimBatch(50);
 
-        queue.record(job.getId(), AiJobHandler.Outcome.succeeded("{\"content\":\"A verb used as a noun.\"}"));
+        workerQueue.record(job.getId(), AiJobHandler.Outcome.succeeded("{\"content\":\"A verb used as a noun.\"}"));
 
         assertThat(jobRepo.findById(job.getId())).get().extracting(AiJob::getOutputPayload).asString()
                 .contains("A verb used as a noun.");
@@ -118,8 +121,7 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
     void storesTheValueAsJsonRatherThanAsText() {
         UUID learner = new LearnerFixture(jdbc).learner();
         UUID target = UUID.randomUUID();
-        queue.enqueue(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", target, "{ \"a\" :   1 }", "speech:" + target,
-                "v1", learner);
+        queue.enqueueSpeechAssessment(target, "{ \"a\" :   1 }", "speech:" + target, "v1", learner);
 
         String type = jdbc.sql("select jsonb_typeof(input_payload) from ai_jobs where target_id = :target")
                 .param("target", target).query(String.class).single();

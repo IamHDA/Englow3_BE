@@ -57,6 +57,17 @@ Never introduce generic `utils`, `helpers`, `misc`, `manager`, `common`, or
 `CommonService` packages. Keep `shared` limited to technical concerns such as base
 errors, security context, paging, logging, and storage clients.
 
+## Service contracts
+
+Every Spring application service must implement an explicit contract. Controllers
+and other consumers depend on the contract, never on the `*Impl` class.
+
+Concrete Spring services live under `service/impl` and are named `*Impl`.
+
+Cross-module synchronous calls must target the owning module's `api/` contract.
+Public module APIs must not expose persistence entities or move internal enums/types
+outward solely to satisfy callers.
+
 ## Layer responsibilities
 
 Dependencies flow in one direction:
