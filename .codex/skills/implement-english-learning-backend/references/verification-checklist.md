@@ -21,6 +21,9 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 
 - Cross-module references are `UUID` fields; no `@ManyToOne` crosses a module.
 - Other modules' data arrives through their service as a record, fetched for the whole ID set rather than per row.
+- Every `@Service` implements an explicit contract; consumers do not depend on `service.impl` classes.
+- Cross-module calls use the owning module's `api/` contract; no cross-module `service.impl` imports exist.
+- Public module APIs do not expose entities, repositories, or internal persistence enums/types.
 - No module writes another module's tables.
 - No new cycle between modules; if one was unavoidable, it goes through an event and is noted.
 - Any cross-module read query is recorded as a declared exception.
@@ -45,6 +48,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 ## Async specifics
 
 - The record is persisted and committed before the job is enqueued.
+- Request-side AI callers use `ai.api.AiJobQueue`; worker internals use `ai.service.AiJobWorkerQueue`; handlers do not receive `AiJob` entities.
 - Redelivery of the same job is harmless.
 - Failures are terminal, visible, and time-bounded.
 

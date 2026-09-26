@@ -19,7 +19,8 @@
 `controller -> service -> repository`. Dependencies point one way only.
 
 - **Controller** - HTTP only. Maps the request DTO to a command, calls one service method, maps the returned result to a response record. No business logic, no transaction, no repository access.
-- **Service** - orchestration and the transaction boundary. Takes a command (or nothing, when the use case has no input), loads entities, calls their methods, coordinates with other modules' services, and returns a result. Never takes a request DTO or returns a response record directly.
+- **Service contract** - the callable use-case surface. Internal contracts live in `service/`; cross-module contracts live in `api/`. Consumers depend on this contract, never on a concrete implementation.
+- **Service implementation** - orchestration and the transaction boundary. Concrete Spring services live in `service/impl/*Impl`, take a command (or nothing, when the use case has no input), load entities, call their methods, coordinate with other modules' contracts, and return a result. Never take a request DTO or return a response record directly.
 - **Repository** - Spring Data interfaces and projections. Nothing else.
 - **Entity** - state plus the rules that protect it.
 
@@ -51,6 +52,8 @@ Match the need to the mechanism:
 
 **Needs the other module to change something** - call its service. Never write to its tables.
 
+Cross-module calls must use the owning module's `api/` contract. Never import another module's `service.impl` class. A public module API must not expose that module's entities, repositories, or internal persistence enums/types.
+
 **Needs a join for reporting** - a read-only query, declared as an exception. See below.
 
 **Circular calls** are a design signal, not a technical problem. Check the direction first: usually only one module needs to know about the other. If both genuinely do, publish a Spring application event from one and listen in the other. If two modules can never be untangled, they are probably one module.
@@ -73,6 +76,8 @@ These conventions reduce accidental rule bypass. They do not prevent deliberate 
 ## Services and transactions
 
 `@Transactional` goes on the service method. Not on the controller, not on the repository.
+
+Every `@Service` implements an explicit contract, and its concrete class is named `*Impl` under `service/impl`. Controllers and other consumers inject the contract.
 
 Keep transactions short. Do not call an external service, an AI provider, or object storage inside one - persist intent, commit, and let a worker continue.
 

@@ -70,9 +70,13 @@ public class Exam {
 **Service** - transaction, orchestration, mapping to a result:
 
 ```java
+public interface ExamService {
+    ExamResult publish(PublishExamCommand command);
+}
+
 @Service
 @RequiredArgsConstructor
-public class ExamService {
+public class ExamServiceImpl implements ExamService {
 
     private final ExamRepository exams;
     private final CurrentUser currentUser;
@@ -131,9 +135,13 @@ public record ExamResponse(UUID id, String title, String status, Instant publish
 No invariants, so no entity behavior. Do not invent rules to justify a richer shape.
 
 ```java
+public interface ExamCategoryService {
+    CategoryResult rename(RenameCategoryCommand command);
+}
+
 @Service
 @RequiredArgsConstructor
-public class ExamCategoryService {
+public class ExamCategoryServiceImpl implements ExamCategoryService {
 
     private final ExamCategoryRepository categories;
 
@@ -287,6 +295,8 @@ public void handle(UUID jobId) {
 ```
 
 A job must never end in a state nothing will pick up again. Time out stuck work and surface dead jobs.
+
+For AI jobs in this codebase, request-side modules depend on `ai.api.AiJobQueue` and call its capability-specific methods, such as `enqueueSpeechAssessment(...)` or `enqueueTutorReply(...)`. They must not construct or expose `AiJob`/`AiJobType`. Worker code uses the internal `ai.service.AiJobWorkerQueue`; handlers use `ai.api.AiJobHandler` and receive stable identifiers/payloads rather than persistence entities.
 
 ## Concurrency
 

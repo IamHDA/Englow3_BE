@@ -31,7 +31,9 @@ com.<app>/
 ├── Application.java
 ├── <module>/
 │   ├── controller/       HTTP entry points
-│   ├── service/          orchestration, @Transactional
+│   ├── api/              public synchronous contracts for other modules
+│   ├── service/          internal service contracts, @Transactional boundaries
+│   │   └── impl/         concrete Spring services, named *Impl
 │   ├── repository/       Spring Data interfaces, projections
 │   ├── entity/           JPA entities, enums, module exceptions
 │   ├── dto/              request/response records
@@ -44,6 +46,8 @@ com.<app>/
 Create `query/` and `worker/` only in modules that have them. Split `dto/` into `request/` and `response/` only once it grows past roughly ten files.
 
 Admin and end-user features belong to the same module. They differ by controller and by use case, not by module - never mirror a module into `admin/` and `user/` trees.
+
+Every `@Service` implements an explicit contract. Controllers and other consumers inject the contract, never a `*Impl` class. Keep internal module contracts in `service/`; expose cross-module synchronous capabilities from `api/`. Public module contracts must not expose JPA entities, repositories, or internal persistence enums/types.
 
 ## Classify the work first
 
@@ -70,6 +74,9 @@ Details and examples: [implementation-patterns.md](references/implementation-pat
 - Cross-module references are `UUID` fields. No `@ManyToOne` across module boundaries.
 - Entities never leave their module and never appear in an HTTP response. Map to a record.
 - `@Transactional` sits on the service method, never on a controller.
+- Every `@Service` has its contract in `service/` or `api/` and its concrete class in `service/impl/*Impl`.
+- Cross-module calls target the owning module's `api/` contract; never import another module's `service.impl` class.
+- Public APIs expose stable commands, results, DTOs, or value types, not entities, repositories, or internal enums.
 - Flyway owns the schema. `ddl-auto` is `validate`. Never edit a migration that has already run - add a new one.
 - `open-in-view` is false. Anything the response needs must be loaded inside the transaction.
 - Concurrency is handled explicitly: `@Version` for lost-update protection, a database constraint for anything that must never be violated.
