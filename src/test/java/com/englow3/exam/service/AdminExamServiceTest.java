@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,8 +37,13 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.DifficultyLevel;
+import com.englow3.exam.entity.QuestionType;
+import com.englow3.exam.entity.SectionType;
+import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.query.AdminExamPaperQuery;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
 import com.englow3.exam.repository.QuestionOptionRepository;
@@ -46,6 +52,7 @@ import com.englow3.exam.repository.QuestionSetRepository;
 import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 
 class AdminExamServiceTest {
@@ -68,10 +75,11 @@ class AdminExamServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
+    private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final AdminExamService service = new com.englow3.exam.service.impl.AdminExamServiceImpl(examRepo,
             examSectionRepo, sectionPartRepo, questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery,
-            userDirectory, objectStorage, EXAM_BUCKET);
+            userDirectory, objectStorage, presignedUrls, EXAM_BUCKET, Duration.ofHours(1));
 
     private final UUID adminId = UUID.randomUUID();
 
@@ -111,10 +119,44 @@ class AdminExamServiceTest {
         @Test
         void handsBackThePaperTheQueryLoaded() {
             Exam exam = draft();
-            ExamDetailResult loaded = ExamDetailResult.of(exam, List.of());
+            var loaded = new AdminExamPaperProjection(exam, List.of());
             when(examPaperQuery.loadForAdmin(exam.getId())).thenReturn(Optional.of(loaded));
 
-            assertThat(service.detail(new ExamDetailCommand(exam.getId()))).isSameAs(loaded);
+            assertThat(service.detail(new ExamDetailCommand(exam.getId())).id()).isEqualTo(exam.getId());
+        }
+
+        @Test
+        void resolvesPaperMediaIntoApplicationResults() {
+            Exam exam = draft();
+            var option = new AdminExamPaperProjection.Option(UUID.randomUUID(), "option", 1, true, "because");
+            var question = new AdminExamPaperProjection.Question(UUID.randomUUID(), QuestionType.SINGLE_CHOICE,
+                    "question", DifficultyLevel.MEDIUM, SkillType.READING, null, 1, BigDecimal.ONE, "explanation", null,
+                    List.of(option));
+            var questionSet = new AdminExamPaperProjection.QuestionSet(UUID.randomUUID(), "set", null, 1, null,
+                    "sets/audio.mp3", "sets/image.png", null, List.of(question));
+            var part = new AdminExamPaperProjection.Part(UUID.randomUUID(), 1, "part", null, null, "parts/audio.mp3",
+                    "parts/image.png", List.of(questionSet));
+            var section = new AdminExamPaperProjection.Section(UUID.randomUUID(), SectionType.LISTENING, 1,
+                    BigDecimal.ONE, false, null, List.of(part));
+            when(examPaperQuery.loadForAdmin(exam.getId()))
+                    .thenReturn(Optional.of(new AdminExamPaperProjection(exam, List.of(section))));
+            when(presignedUrls.resolve(EXAM_BUCKET, "parts/audio.mp3", Duration.ofHours(1)))
+                    .thenReturn("https://storage.example/parts-audio");
+            when(presignedUrls.resolve(EXAM_BUCKET, "parts/image.png", Duration.ofHours(1)))
+                    .thenReturn("https://storage.example/parts-image");
+            when(presignedUrls.resolve(EXAM_BUCKET, "sets/audio.mp3", Duration.ofHours(1)))
+                    .thenReturn("https://storage.example/sets-audio");
+            when(presignedUrls.resolve(EXAM_BUCKET, "sets/image.png", Duration.ofHours(1)))
+                    .thenReturn("https://storage.example/sets-image");
+
+            var result = service.detail(new ExamDetailCommand(exam.getId()));
+            var resultPart = result.sections().get(0).parts().get(0);
+            var resultSet = resultPart.questionSets().get(0);
+
+            assertThat(resultPart.audioUrl()).isEqualTo("https://storage.example/parts-audio");
+            assertThat(resultPart.imageUrl()).isEqualTo("https://storage.example/parts-image");
+            assertThat(resultSet.audioUrl()).isEqualTo("https://storage.example/sets-audio");
+            assertThat(resultSet.imageUrl()).isEqualTo("https://storage.example/sets-image");
         }
 
         @Test
@@ -168,7 +210,7 @@ class AdminExamServiceTest {
         void replacesContentDeletesBottomUpBeforeReloadingTheTree() {
             Exam exam = draft();
             when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
-            ExamDetailResult reloaded = ExamDetailResult.of(exam, List.of());
+            var reloaded = new AdminExamPaperProjection(exam, List.of());
             when(examPaperQuery.loadForAdmin(exam.getId())).thenReturn(Optional.of(reloaded));
             UpdateExamContentCommand command = new UpdateExamContentCommand(exam.getId(), List.of());
 
@@ -182,7 +224,7 @@ class AdminExamServiceTest {
             deletionOrder.verify(questionSetRepo).deleteAllForExam(exam.getId());
             deletionOrder.verify(sectionPartRepo).deleteAllForExam(exam.getId());
             deletionOrder.verify(examSectionRepo).deleteAllForExam(exam.getId());
-            assertThat(result).isSameAs(reloaded);
+            assertThat(result.id()).isEqualTo(exam.getId());
         }
 
     }

@@ -1,10 +1,8 @@
 package com.englow3.learning.controller;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -19,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.learning.dto.command.RateFlashcardCommand;
 import com.englow3.learning.dto.request.RateFlashcardRequest;
-import com.englow3.learning.dto.response.FlashcardMediaUrls;
 import com.englow3.learning.dto.response.FlashcardResponse;
 import com.englow3.learning.dto.response.FlashcardReviewResponse;
 import com.englow3.learning.dto.response.FlashcardSetResponse;
@@ -27,7 +24,6 @@ import com.englow3.learning.dto.response.FlashcardStatsResponse;
 import com.englow3.learning.service.FlashcardService;
 import com.englow3.learning.service.FlashcardStatsService;
 import com.englow3.shared.page.PageResponse;
-import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
@@ -49,14 +45,10 @@ public class FlashcardController {
 
     private final FlashcardService flashcardService;
     private final FlashcardStatsService flashcardStatsService;
-    private final FlashcardMediaUrls mediaUrls;
 
-    public FlashcardController(FlashcardService flashcardService, FlashcardStatsService flashcardStatsService,
-            ObjectStorageClient objectStorage, @Value("${app.storage.learning-bucket}") String learningBucket,
-            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+    public FlashcardController(FlashcardService flashcardService, FlashcardStatsService flashcardStatsService) {
         this.flashcardService = flashcardService;
         this.flashcardStatsService = flashcardStatsService;
-        this.mediaUrls = new FlashcardMediaUrls(objectStorage, learningBucket, mediaUrlTtl);
     }
 
     @GetMapping("/sets")
@@ -71,7 +63,7 @@ public class FlashcardController {
     public ResponseEntity<FlashcardSetDetailResponse> setDetail(@PathVariable UUID id) {
         var detail = flashcardService.setDetail(id);
         return ResponseEntity.ok(new FlashcardSetDetailResponse(FlashcardSetResponse.from(detail.set()),
-                detail.cards().stream().map(card -> FlashcardResponse.from(card, mediaUrls)).toList()));
+                detail.cards().stream().map(FlashcardResponse::from).toList()));
     }
 
     /** What to study now: due cards first, then unseen ones to fill the session. */
@@ -79,7 +71,7 @@ public class FlashcardController {
     public ResponseEntity<List<FlashcardResponse>> studyQueue(@PathVariable UUID id,
             @RequestParam(defaultValue = "" + DEFAULT_STUDY_LIMIT) int limit) {
         return ResponseEntity.ok(flashcardService.studyQueue(id, Math.min(Math.max(limit, 1), MAX_STUDY_LIMIT)).stream()
-                .map(card -> FlashcardResponse.from(card, mediaUrls)).toList());
+                .map(FlashcardResponse::from).toList());
     }
 
     @GetMapping("/stats")

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,7 @@ import com.englow3.learning.repository.FlashcardReviewLogRepository;
 import com.englow3.learning.repository.FlashcardReviewRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 
 /**
@@ -36,9 +38,11 @@ class FlashcardServiceTest {
     private final FlashcardReviewRepository reviewRepo = mock(FlashcardReviewRepository.class);
     private final FlashcardReviewLogRepository reviewLogRepo = mock(FlashcardReviewLogRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final FlashcardService service = new com.englow3.learning.service.impl.FlashcardServiceImpl(setRepo,
-            cardRepo, reviewRepo, reviewLogRepo, userDirectory);
+            cardRepo, reviewRepo, reviewLogRepo, userDirectory, presignedUrls, "learning",
+            java.time.Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();
     private Flashcard card;
@@ -46,8 +50,9 @@ class FlashcardServiceTest {
     @BeforeEach
     void setUp() {
         UUID setId = UUID.randomUUID();
-        card = Flashcard.of(setId, 1, "agenda", "noun", "agenda (meeting)", "/əˈdʒendə/", null, null, null,
-                "A list of items to discuss.", "Chương trình nghị sự.", "Send the agenda.", null, null, "B1");
+        card = Flashcard.of(setId, 1, "agenda", "noun", "agenda (meeting)", "/əˈdʒendə/", null, "audio/us.mp3",
+                "audio/uk.mp3", "A list of items to discuss.", "Chương trình nghị sự.", "Send the agenda.", null, null,
+                "B1");
 
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(cardRepo.findById(card.getId())).thenReturn(Optional.of(card));
@@ -71,6 +76,22 @@ class FlashcardServiceTest {
 
         assertThat(result.flashcardId()).isEqualTo(card.getId());
         verify(reviewLogRepo).save(any());
+    }
+
+    @Test
+    void resolvesAudioUrlsBeforeBuildingTheStudyResult() {
+        setIsPublished(true);
+        when(cardRepo.findByFlashcardSetIdOrderByOrderNo(card.getFlashcardSetId())).thenReturn(List.of(card));
+        when(reviewRepo.findByUserIdAndFlashcardIdIn(userId, List.of(card.getId()))).thenReturn(List.of());
+        when(presignedUrls.resolve("learning", "audio/us.mp3", java.time.Duration.ofHours(3)))
+                .thenReturn("https://storage.example/us");
+        when(presignedUrls.resolve("learning", "audio/uk.mp3", java.time.Duration.ofHours(3)))
+                .thenReturn("https://storage.example/uk");
+
+        var result = service.studyQueue(card.getFlashcardSetId(), 1).get(0);
+
+        assertThat(result.audioUsUrl()).isEqualTo("https://storage.example/us");
+        assertThat(result.audioUkUrl()).isEqualTo("https://storage.example/uk");
     }
 
     /**

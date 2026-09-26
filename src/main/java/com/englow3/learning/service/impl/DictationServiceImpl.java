@@ -1,6 +1,7 @@
 package com.englow3.learning.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,23 +28,37 @@ import com.englow3.learning.repository.DictationAttemptRepository;
 import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 import com.englow3.learning.service.*;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * Practising dictation. The rule this class exists to enforce is that the transcript never leaves the server before the
  * learner has typed theirs - a screen that could read the answer is a screen that could show it.
  */
 @Service
-@RequiredArgsConstructor
 public class DictationServiceImpl implements DictationService {
 
     private final DictationLessonRepository lessonRepo;
     private final DictationSentenceRepository sentenceRepo;
     private final DictationAttemptRepository attemptRepo;
     private final UserDirectory userDirectory;
+    private final PresignedUrlResolver presignedUrls;
+    private final String learningBucket;
+    private final Duration mediaUrlTtl;
+
+    public DictationServiceImpl(DictationLessonRepository lessonRepo, DictationSentenceRepository sentenceRepo,
+            DictationAttemptRepository attemptRepo, UserDirectory userDirectory, PresignedUrlResolver presignedUrls,
+            @Value("${app.storage.learning-bucket}") String learningBucket,
+            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+        this.lessonRepo = lessonRepo;
+        this.sentenceRepo = sentenceRepo;
+        this.attemptRepo = attemptRepo;
+        this.userDirectory = userDirectory;
+        this.presignedUrls = presignedUrls;
+        this.learningBucket = learningBucket;
+        this.mediaUrlTtl = mediaUrlTtl;
+    }
 
     @Transactional(readOnly = true)
     public Page<DictationLessonSummaryResult> searchPublished(String topic, String title, Pageable pageable) {
@@ -83,13 +99,11 @@ public class DictationServiceImpl implements DictationService {
         return new DictationLessonDetailResult(
                 DictationLessonSummaryResult.of(lesson, sentences.size(), completedCount(userId, sentences),
                         totalDuration(sentences), lastPractisedFor(userId, List.of(lessonId)).get(lessonId)),
-                sentences.stream()
-                        .map(sentence -> new DictationSentenceResult(sentence.getId(), sentence.getOrderNo(),
-                                sentence.getAudioObjectKey(), sentence.getAudioDurationSeconds(),
-                                sentence.getHintWordCount(), sentence.getHintFirstLetters(),
-                                sentence.getHintRevealWord(), sentence.getHintPartialTranscript(),
-                                sentence.getAudioStartMs(), sentence.getAudioEndMs(), best.get(sentence.getId())))
-                        .toList());
+                sentences.stream().map(sentence -> new DictationSentenceResult(sentence.getId(), sentence.getOrderNo(),
+                        presignedUrls.resolve(learningBucket, sentence.getAudioObjectKey(), mediaUrlTtl),
+                        sentence.getAudioDurationSeconds(), sentence.getHintWordCount(), sentence.getHintFirstLetters(),
+                        sentence.getHintRevealWord(), sentence.getHintPartialTranscript(), sentence.getAudioStartMs(),
+                        sentence.getAudioEndMs(), best.get(sentence.getId()))).toList());
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.englow3.exam.service.impl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +33,7 @@ import com.englow3.exam.dto.result.ExamListItemResult;
 import com.englow3.exam.dto.result.ExamMediaResult;
 import com.englow3.exam.dto.result.ExamResult;
 import com.englow3.exam.dto.result.QuestionBankItemResult;
+import com.englow3.exam.dto.result.QuestionOptionResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
@@ -39,6 +41,9 @@ import com.englow3.exam.entity.QuestionOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.query.AdminExamPaperQuery;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection.Part;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection.Section;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
 import com.englow3.exam.repository.QuestionOptionRepository;
@@ -48,6 +53,7 @@ import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.exam.service.*;
 import com.englow3.user.api.UserDirectory;
 
@@ -67,13 +73,16 @@ public class AdminExamServiceImpl implements AdminExamService {
     private final AdminExamPaperQuery examPaperQuery;
     private final UserDirectory userDirectory;
     private final ObjectStorageClient objectStorage;
+    private final PresignedUrlResolver presignedUrls;
     private final String examBucket;
+    private final Duration mediaUrlTtl;
 
     public AdminExamServiceImpl(ExamRepository examRepo, ExamSectionRepository examSectionRepo,
             SectionPartRepository sectionPartRepo, QuestionSetRepository questionSetRepo,
             QuestionRepository questionRepo, QuestionOptionRepository questionOptionRepo,
             AdminExamPaperQuery examPaperQuery, UserDirectory userDirectory, ObjectStorageClient objectStorage,
-            @Value("${app.storage.exam-bucket}") String examBucket) {
+            PresignedUrlResolver presignedUrls, @Value("${app.storage.exam-bucket}") String examBucket,
+            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
         this.examRepo = examRepo;
         this.examSectionRepo = examSectionRepo;
         this.sectionPartRepo = sectionPartRepo;
@@ -83,7 +92,9 @@ public class AdminExamServiceImpl implements AdminExamService {
         this.examPaperQuery = examPaperQuery;
         this.userDirectory = userDirectory;
         this.objectStorage = objectStorage;
+        this.presignedUrls = presignedUrls;
         this.examBucket = examBucket;
+        this.mediaUrlTtl = mediaUrlTtl;
     }
 
     @Transactional
@@ -104,7 +115,8 @@ public class AdminExamServiceImpl implements AdminExamService {
     /** The whole paper with answer keys - what the detail screen renders and what its printed form uses. */
     @Transactional(readOnly = true)
     public ExamDetailResult detail(ExamDetailCommand command) {
-        return examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId()));
+        return toResult(
+                examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId())));
     }
 
     /** No {@code save()}: the entity is managed, so the change flushes at commit. */
@@ -209,7 +221,40 @@ public class AdminExamServiceImpl implements AdminExamService {
         deleteContent(exam.getId());
         createContent(exam.getId(), command.sections());
 
-        return examPaperQuery.loadForAdmin(exam.getId()).orElseThrow(() -> examNotFound(exam.getId()));
+        return toResult(examPaperQuery.loadForAdmin(exam.getId()).orElseThrow(() -> examNotFound(exam.getId())));
+    }
+
+    private ExamDetailResult toResult(AdminExamPaperProjection paper) {
+        return ExamDetailResult.of(paper.exam(), paper.sections().stream().map(this::toSection).toList());
+    }
+
+    private ExamDetailResult.AdminSection toSection(Section section) {
+        return new ExamDetailResult.AdminSection(section.id(), section.sectionType(), section.orderNo(),
+                section.maxRawScore(), section.scoredByCriteria(), section.timeLimitSeconds(),
+                section.parts().stream().map(this::toPart).toList());
+    }
+
+    private ExamDetailResult.AdminPart toPart(Part part) {
+        return new ExamDetailResult.AdminPart(part.id(), part.orderNo(), part.title(), part.instruction(),
+                part.content(), presignedUrls.resolve(examBucket, part.audioObjectKey(), mediaUrlTtl),
+                presignedUrls.resolve(examBucket, part.imageObjectKey(), mediaUrlTtl),
+                part.questionSets().stream().map(this::toQuestionSet).toList());
+    }
+
+    private ExamDetailResult.QuestionSetResult toQuestionSet(AdminExamPaperProjection.QuestionSet questionSet) {
+        return new ExamDetailResult.QuestionSetResult(questionSet.id(), questionSet.title(), questionSet.instruction(),
+                questionSet.orderNo(), questionSet.content(),
+                presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
+                presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
+                questionSet.sourceQuestionSetId(), questionSet.questions().stream().map(this::toQuestion).toList());
+    }
+
+    private ExamDetailResult.QuestionResult toQuestion(AdminExamPaperProjection.Question question) {
+        return new ExamDetailResult.QuestionResult(question.id(), question.questionType(), question.content(),
+                question.difficultyLevel(), question.skillType(), question.questionCategory(), question.orderNo(),
+                question.maxRawScore(), question.explanation(), question.sourceQuestionId(),
+                question.options().stream().map(option -> new QuestionOptionResult(option.id(), option.content(),
+                        option.orderNo(), option.correct(), option.explanation())).toList());
     }
 
     /**

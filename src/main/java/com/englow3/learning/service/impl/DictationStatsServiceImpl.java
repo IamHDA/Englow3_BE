@@ -1,5 +1,6 @@
 package com.englow3.learning.service.impl;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -7,21 +8,21 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.learning.dto.result.DictationStatsResult;
 import com.englow3.learning.dto.result.MistakeQueueResult;
+import com.englow3.learning.dto.result.MistakeSentenceResult;
 import com.englow3.learning.query.DictationStatsQuery;
 import com.englow3.shared.persistence.ParallelReads;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 import com.englow3.learning.service.*;
 
-import lombok.RequiredArgsConstructor;
-
 /** The dictation statistics screen. Read-only, built from dictation_attempts. */
 @Service
-@RequiredArgsConstructor
 public class DictationStatsServiceImpl implements DictationStatsService {
 
     private static final int DIFFICULT_SENTENCE_LIMIT = 10;
@@ -42,6 +43,20 @@ public class DictationStatsServiceImpl implements DictationStatsService {
     private final DictationStatsQuery statsQuery;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final PresignedUrlResolver presignedUrls;
+    private final String learningBucket;
+    private final Duration mediaUrlTtl;
+
+    public DictationStatsServiceImpl(DictationStatsQuery statsQuery, UserDirectory userDirectory, ParallelReads reads,
+            PresignedUrlResolver presignedUrls, @Value("${app.storage.learning-bucket}") String learningBucket,
+            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+        this.statsQuery = statsQuery;
+        this.userDirectory = userDirectory;
+        this.reads = reads;
+        this.presignedUrls = presignedUrls;
+        this.learningBucket = learningBucket;
+        this.mediaUrlTtl = mediaUrlTtl;
+    }
 
     /** Not transactional: the nine reads are independent and run side by side, see {@link ParallelReads}. */
     public DictationStatsResult statsFor(int periodDays) {
@@ -77,7 +92,15 @@ public class DictationStatsServiceImpl implements DictationStatsService {
     public MistakeQueueResult mistakeQueue() {
         UUID userId = userDirectory.requireCurrentUserId();
 
-        return new MistakeQueueResult(
-                statsQuery.mistakeQueue(userId, DictationScorer.COMPLETION_THRESHOLD, MISTAKE_QUEUE_LIMIT));
+        List<MistakeSentenceResult> sentences = statsQuery
+                .mistakeQueue(userId, DictationScorer.COMPLETION_THRESHOLD, MISTAKE_QUEUE_LIMIT).stream()
+                .map(sentence -> new MistakeSentenceResult(sentence.sentenceId(),
+                        presignedUrls.resolve(learningBucket, sentence.audioObjectKey(), mediaUrlTtl),
+                        sentence.audioDurationSeconds(), sentence.audioStartMs(), sentence.audioEndMs(),
+                        sentence.lessonId(), sentence.lessonTitle(), sentence.bestAccuracyPercent(),
+                        sentence.attemptCount(), sentence.lastResponse()))
+                .toList();
+
+        return new MistakeQueueResult(sentences);
     }
 }

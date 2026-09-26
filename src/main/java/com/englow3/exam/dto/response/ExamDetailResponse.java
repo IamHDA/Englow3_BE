@@ -27,41 +27,41 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
         int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, ExamStatus status, int versionNumber,
         UUID createdByUserId, Instant publishedAt, Instant createdAt, List<ExamSectionResponse> sections) {
 
-    public static ExamDetailResponse from(ExamDetailResult result, ExamMediaUrls media) {
+    public static ExamDetailResponse from(ExamDetailResult result) {
         return new ExamDetailResponse(result.id(), result.title(), result.description(), result.examType(),
                 result.certificateType(), result.certificateVariant(), result.targetLevel(), result.durationSeconds(),
                 result.maxRawScore(), result.passScore(), result.status(), result.versionNumber(),
                 result.createdByUserId(), result.publishedAt(), result.createdAt(),
-                result.sections().stream().map(section -> ExamSectionResponse.from(section, media)).toList());
+                result.sections().stream().map(ExamSectionResponse::from).toList());
     }
 
     public record ExamSectionResponse(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
             boolean scoredByCriteria, Integer timeLimitSeconds, List<SectionPartResponse> parts) {
 
-        static ExamSectionResponse from(ExamDetailResult.ExamSectionResult result, ExamMediaUrls media) {
+        static ExamSectionResponse from(ExamDetailResult.AdminSection result) {
             return new ExamSectionResponse(result.id(), result.sectionType(), result.orderNo(), result.maxRawScore(),
                     result.scoredByCriteria(), result.timeLimitSeconds(),
-                    result.parts().stream().map(part -> SectionPartResponse.from(part, media)).toList());
+                    result.parts().stream().map(SectionPartResponse::from).toList());
         }
     }
 
     public record SectionPartResponse(UUID id, int orderNo, String title, String instruction, String content,
             String audioUrl, String imageUrl, List<QuestionSetResponse> questionSets) {
 
-        static SectionPartResponse from(ExamDetailResult.SectionPartResult result, ExamMediaUrls media) {
+        static SectionPartResponse from(ExamDetailResult.AdminPart result) {
             return new SectionPartResponse(result.id(), result.orderNo(), result.title(), result.instruction(),
-                    result.content(), media.urlFor(result.audioObjectKey()), media.urlFor(result.imageObjectKey()),
-                    result.questionSets().stream().map(set -> QuestionSetResponse.from(set, media)).toList());
+                    result.content(), result.audioUrl(), result.imageUrl(),
+                    result.questionSets().stream().map(QuestionSetResponse::from).toList());
         }
     }
 
     public record QuestionSetResponse(UUID id, String title, String instruction, int orderNo, String content,
             String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResponse> questions) {
 
-        static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result, ExamMediaUrls media) {
+        static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
-                    result.content(), media.urlFor(result.audioObjectKey()), media.urlFor(result.imageObjectKey()),
-                    result.sourceQuestionSetId(), result.questions().stream().map(QuestionResponse::from).toList());
+                    result.content(), result.audioUrl(), result.imageUrl(), result.sourceQuestionSetId(),
+                    result.questions().stream().map(QuestionResponse::from).toList());
         }
     }
 

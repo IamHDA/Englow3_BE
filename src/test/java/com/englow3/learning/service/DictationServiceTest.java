@@ -31,6 +31,7 @@ import com.englow3.learning.repository.DictationAttemptRepository;
 import com.englow3.learning.repository.DictationLessonRepository;
 import com.englow3.learning.repository.DictationSentenceRepository;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 
 /**
@@ -46,9 +47,10 @@ class DictationServiceTest {
     private final DictationSentenceRepository sentenceRepo = mock(DictationSentenceRepository.class);
     private final DictationAttemptRepository attemptRepo = mock(DictationAttemptRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final DictationService service = new com.englow3.learning.service.impl.DictationServiceImpl(lessonRepo,
-            sentenceRepo, attemptRepo, userDirectory);
+            sentenceRepo, attemptRepo, userDirectory, presignedUrls, "learning", java.time.Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();
     private DictationLesson lesson;
@@ -65,6 +67,8 @@ class DictationServiceTest {
         when(sentenceRepo.findByDictationLessonIdOrderByOrderNo(lesson.getId())).thenReturn(List.of(sentence));
         when(attemptRepo.findBestAccuracyBySentence(any(), anyList())).thenReturn(List.of());
         when(attemptRepo.findLastPractisedAtByLesson(any(), anyCollection())).thenReturn(List.of());
+        when(presignedUrls.resolve("learning", "dictation/airport/1.mp3", java.time.Duration.ofHours(3)))
+                .thenReturn("https://storage.example/dictation/airport/1.mp3");
     }
 
     private void lessonIsPublished() {
@@ -105,7 +109,7 @@ class DictationServiceTest {
             assertThat(result.hintWordCount()).isEqualTo(6);
             assertThat(result.hintFirstLetters()).isEqualTo("T c s o t m");
             assertThat(result.hintPartialTranscript()).isEqualTo("The ___ sat ___ the ___");
-            assertThat(result.audioObjectKey()).isEqualTo("dictation/airport/1.mp3");
+            assertThat(result.audioUrl()).isEqualTo("https://storage.example/dictation/airport/1.mp3");
         }
 
         /** Submission is the first moment the learner is entitled to it, because they have already committed. */

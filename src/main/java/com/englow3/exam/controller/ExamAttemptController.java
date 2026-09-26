@@ -1,9 +1,7 @@
 package com.englow3.exam.controller;
 
-import java.time.Duration;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -16,11 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.exam.dto.request.SubmitExamAttemptRequest;
 import com.englow3.exam.dto.response.ExamAttemptResponse;
-import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.LearnerExamPaperResponse;
 import com.englow3.exam.service.LearnerExamService;
 import com.englow3.shared.page.PageResponse;
-import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
@@ -29,13 +25,9 @@ import jakarta.validation.Valid;
 public class ExamAttemptController {
 
     private final LearnerExamService learnerExamService;
-    private final ExamMediaUrls mediaUrls;
 
-    public ExamAttemptController(LearnerExamService learnerExamService, ObjectStorageClient objectStorage,
-            @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+    public ExamAttemptController(LearnerExamService learnerExamService) {
         this.learnerExamService = learnerExamService;
-        this.mediaUrls = new ExamMediaUrls(objectStorage, examBucket, mediaUrlTtl);
     }
 
     /** The learner's own history, newest first. No review data - that is the result endpoint's job. */
@@ -47,7 +39,7 @@ public class ExamAttemptController {
 
     @GetMapping("/{id}/paper")
     public ResponseEntity<LearnerExamPaperResponse> getPaper(@PathVariable UUID id) {
-        return ResponseEntity.ok(LearnerExamPaperResponse.from(learnerExamService.paperForAttempt(id), mediaUrls));
+        return ResponseEntity.ok(LearnerExamPaperResponse.from(learnerExamService.paperForAttempt(id)));
     }
 
     @PostMapping("/{id}/submit")

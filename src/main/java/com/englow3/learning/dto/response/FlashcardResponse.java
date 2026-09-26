@@ -15,11 +15,10 @@ public record FlashcardResponse(UUID id, int orderNo, String lemma, String partO
         String exampleSentence, String exampleTranslationVi, String mnemonicTipVi, String cefrLevel,
         FlashcardReviewStatus status, Instant dueAt, int lapseCount) {
 
-    public static FlashcardResponse from(FlashcardResult result, FlashcardMediaUrls media) {
+    public static FlashcardResponse from(FlashcardResult result) {
         return new FlashcardResponse(result.id(), result.orderNo(), result.lemma(), result.partOfSpeech(),
-                result.senseLabel(), result.ipaUs(), result.ipaUk(), media.urlFor(result.audioUsObjectKey()),
-                media.urlFor(result.audioUkObjectKey()), result.definitionEn(), result.definitionVi(),
-                result.exampleSentence(), result.exampleTranslationVi(), result.mnemonicTipVi(), result.cefrLevel(),
-                result.status(), result.dueAt(), result.lapseCount());
+                result.senseLabel(), result.ipaUs(), result.ipaUk(), result.audioUsUrl(), result.audioUkUrl(),
+                result.definitionEn(), result.definitionVi(), result.exampleSentence(), result.exampleTranslationVi(),
+                result.mnemonicTipVi(), result.cefrLevel(), result.status(), result.dueAt(), result.lapseCount());
     }
 }

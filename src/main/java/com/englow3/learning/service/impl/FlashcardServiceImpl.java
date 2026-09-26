@@ -1,5 +1,6 @@
 package com.englow3.learning.service.impl;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,17 +30,15 @@ import com.englow3.learning.repository.FlashcardReviewLogRepository;
 import com.englow3.learning.repository.FlashcardReviewRepository;
 import com.englow3.learning.repository.FlashcardSetRepository;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 import com.englow3.learning.service.*;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * Reading the catalogue and answering cards. Scheduling itself is {@link FlashcardSrs}; this class decides which cards
  * to show, writes the outcome, and appends the log row the statistics are later built from.
  */
 @Service
-@RequiredArgsConstructor
 public class FlashcardServiceImpl implements FlashcardService {
 
     private final FlashcardSetRepository setRepo;
@@ -46,6 +46,24 @@ public class FlashcardServiceImpl implements FlashcardService {
     private final FlashcardReviewRepository reviewRepo;
     private final FlashcardReviewLogRepository reviewLogRepo;
     private final UserDirectory userDirectory;
+    private final PresignedUrlResolver presignedUrls;
+    private final String learningBucket;
+    private final Duration mediaUrlTtl;
+
+    public FlashcardServiceImpl(FlashcardSetRepository setRepo, FlashcardRepository cardRepo,
+            FlashcardReviewRepository reviewRepo, FlashcardReviewLogRepository reviewLogRepo,
+            UserDirectory userDirectory, PresignedUrlResolver presignedUrls,
+            @Value("${app.storage.learning-bucket}") String learningBucket,
+            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+        this.setRepo = setRepo;
+        this.cardRepo = cardRepo;
+        this.reviewRepo = reviewRepo;
+        this.reviewLogRepo = reviewLogRepo;
+        this.userDirectory = userDirectory;
+        this.presignedUrls = presignedUrls;
+        this.learningBucket = learningBucket;
+        this.mediaUrlTtl = mediaUrlTtl;
+    }
 
     @Transactional(readOnly = true)
     public Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, Pageable pageable) {
@@ -76,7 +94,7 @@ public class FlashcardServiceImpl implements FlashcardService {
         Map<UUID, FlashcardReview> reviews = reviewsFor(userId, cards);
 
         return new FlashcardSetDetailResult(summaryOf(set, userId, cards.size()),
-                cards.stream().map(card -> FlashcardResult.of(card, reviews.get(card.getId()))).toList());
+                cards.stream().map(card -> resultOf(card, reviews.get(card.getId()))).toList());
     }
 
     /**
@@ -96,10 +114,10 @@ public class FlashcardServiceImpl implements FlashcardService {
         List<FlashcardResult> due = cards.stream().filter(card -> {
             FlashcardReview review = reviews.get(card.getId());
             return review != null && !review.getDueAt().isAfter(now);
-        }).map(card -> FlashcardResult.of(card, reviews.get(card.getId()))).toList();
+        }).map(card -> resultOf(card, reviews.get(card.getId()))).toList();
 
         List<FlashcardResult> unseen = cards.stream().filter(card -> !reviews.containsKey(card.getId()))
-                .map(card -> FlashcardResult.of(card, null)).toList();
+                .map(card -> resultOf(card, null)).toList();
 
         return java.util.stream.Stream.concat(due.stream(), unseen.stream()).limit(limit).toList();
     }
@@ -164,5 +182,11 @@ public class FlashcardServiceImpl implements FlashcardService {
         return setRepo.findById(setId).filter(set -> set.getStatus() == FlashcardSetStatus.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("FLASHCARD_SET_NOT_FOUND",
                         "No published flashcard set with id %s".formatted(setId)));
+    }
+
+    private FlashcardResult resultOf(Flashcard card, FlashcardReview review) {
+        return FlashcardResult.of(card, review,
+                presignedUrls.resolve(learningBucket, card.getAudioUsObjectKey(), mediaUrlTtl),
+                presignedUrls.resolve(learningBucket, card.getAudioUkObjectKey(), mediaUrlTtl));
     }
 }

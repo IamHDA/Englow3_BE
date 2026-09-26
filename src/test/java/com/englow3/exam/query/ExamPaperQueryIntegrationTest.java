@@ -11,10 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import com.englow3.exam.dto.result.LearnerExamPaperResult;
 import com.englow3.support.ExamFixture;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
 
 /**
  * The three exam read models, against a real database.
@@ -73,16 +73,16 @@ class ExamPaperQueryIntegrationTest extends PostgresIntegrationTest {
         void carriesNoMarkerForWhichOptionIsRight() {
             var paper = learnerPaper.load(examId).orElseThrow();
 
-            List<LearnerExamPaperResult.QuestionOptionResult> options = paper.sections().stream()
+            List<LearnerExamPaperProjection.Option> options = paper.sections().stream()
                     .flatMap(section -> section.parts().stream()).flatMap(part -> part.questionSets().stream())
                     .flatMap(set -> set.questions().stream()).flatMap(question -> question.options().stream()).toList();
 
             assertThat(options).isNotEmpty();
-            for (var component : LearnerExamPaperResult.QuestionOptionResult.class.getRecordComponents()) {
+            for (var component : LearnerExamPaperProjection.Option.class.getRecordComponents()) {
                 assertThat(component.getType()).as("component %s", component.getName()).isNotEqualTo(boolean.class);
             }
-            assertThat(options).extracting(LearnerExamPaperResult.QuestionOptionResult::content)
-                    .containsExactly("The right one", "A wrong one");
+            assertThat(options).extracting(LearnerExamPaperProjection.Option::content).containsExactly("The right one",
+                    "A wrong one");
         }
 
         /** The tree has to come back in the order it was authored, or question 2 is asked before question 1. */
@@ -94,7 +94,7 @@ class ExamPaperQueryIntegrationTest extends PostgresIntegrationTest {
             assertThat(paper.sections().get(0).parts()).singleElement()
                     .satisfies(part -> assertThat(part.title()).isEqualTo("Part 1"));
             assertThat(paper.sections().get(0).parts().get(0).questionSets().get(0).questions())
-                    .extracting(LearnerExamPaperResult.QuestionResult::orderNo).containsExactly(1, 2);
+                    .extracting(LearnerExamPaperProjection.Question::orderNo).containsExactly(1, 2);
         }
 
         /** A section with nothing under it still appears - an empty part of a paper is a fact about the paper. */

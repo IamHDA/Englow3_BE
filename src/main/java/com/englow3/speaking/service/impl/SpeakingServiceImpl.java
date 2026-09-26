@@ -19,6 +19,7 @@ import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.speaking.dto.result.SpeakingAttemptResult;
 import com.englow3.speaking.dto.result.SpeakingPromptResult;
 import com.englow3.speaking.dto.result.SpeakingUploadTicket;
@@ -57,6 +58,7 @@ public class SpeakingServiceImpl implements SpeakingService {
     private final AiJobQueue aiJobQueue;
     private final UserDirectory userDirectory;
     private final ObjectStorageClient objectStorage;
+    private final PresignedUrlResolver presignedUrls;
     private final ObjectMapper objectMapper;
 
     @Value("${app.storage.speaking-bucket}")
@@ -169,8 +171,7 @@ public class SpeakingServiceImpl implements SpeakingService {
     private SpeakingAttemptResult result(SpeakingAttempt attempt, SpeakingPrompt prompt,
             List<SpeakingAttemptWord> words) {
         // Signed fresh on every read rather than stored: a URL kept in the row would be a URL that stops working.
-        String audioUrl = objectStorage.presignGet(speakingBucket, attempt.getAudioObjectKey(), playbackUrlTtl)
-                .toString();
+        String audioUrl = presignedUrls.resolve(speakingBucket, attempt.getAudioObjectKey(), playbackUrlTtl);
 
         return SpeakingAttemptResult.of(attempt, prompt, audioUrl, words);
     }

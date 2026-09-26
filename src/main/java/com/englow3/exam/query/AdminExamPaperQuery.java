@@ -12,40 +12,28 @@ import java.util.function.Function;
 
 import org.springframework.stereotype.Repository;
 
-import com.englow3.exam.dto.result.ExamDetailResult;
-import com.englow3.exam.dto.result.ExamDetailResult.ExamSectionResult;
-import com.englow3.exam.dto.result.ExamDetailResult.QuestionResult;
-import com.englow3.exam.dto.result.ExamDetailResult.QuestionSetResult;
-import com.englow3.exam.dto.result.ExamDetailResult.SectionPartResult;
-import com.englow3.exam.dto.result.QuestionOptionResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
 import com.englow3.exam.entity.QuestionOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection.Option;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection.Part;
+import com.englow3.exam.dto.projection.AdminExamPaperProjection.Section;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 
-/**
- * Loads a whole paper. Read-only, and every table it touches is exam-owned, so it needs no cross-module read exception.
- * Five flat queries assembled in memory rather than one query with five {@code join fetch}es: fetching more than one
- * collection level either raises MultipleBagFetchException or multiplies rows into a cartesian product, and the row
- * count of a full TOEIC paper makes that expensive rather than merely wrong.
- */
+/** Loads the admin paper as a query-scoped projection that still contains raw media object keys. */
 @Repository
 @RequiredArgsConstructor
 public class AdminExamPaperQuery {
 
     private final EntityManager em;
 
-    /**
-     * The admin projection: answer keys and explanations included. It is what the detail screen and its printed form
-     * both read. The sitting owes a second descent over the same tables with those left out - deliberately not this
-     * method with a flag, because a flag is one edit away from leaking an answer key into a paper being sat.
-     */
-    public Optional<ExamDetailResult> loadForAdmin(UUID examId) {
+    public Optional<AdminExamPaperProjection> loadForAdmin(UUID examId) {
         Exam exam = em.find(Exam.class, examId);
         if (exam == null) {
             return Optional.empty();
@@ -70,33 +58,39 @@ public class AdminExamPaperQuery {
         return Optional.of(assemble(exam, sections, parts, questionSets, questions, options));
     }
 
-    /**
-     * Bottom up, so each level is built once and looked up by its parent id. groupingBy keeps the encounter order of
-     * the stream, and every query above is ordered by {@code order_no}, so the children of a parent stay in the order
-     * the paper puts them.
-     */
-    private ExamDetailResult assemble(Exam exam, List<ExamSection> sections, List<SectionPart> parts,
+    private AdminExamPaperProjection assemble(Exam exam, List<ExamSection> sections, List<SectionPart> parts,
             List<QuestionSet> questionSets, List<Question> questions, List<QuestionOption> options) {
-        Map<UUID, List<QuestionOptionResult>> optionsByQuestion = options.stream()
-                .collect(groupingBy(QuestionOption::getQuestionId, mapping(QuestionOptionResult::of, toList())));
+        Map<UUID, List<Option>> optionsByQuestion = options.stream()
+                .collect(groupingBy(QuestionOption::getQuestionId,
+                        mapping(option -> new Option(option.getId(), option.getContent(), option.getOrderNo(),
+                                option.isCorrect(), option.getExplanation()), toList())));
 
-        Map<UUID, List<QuestionResult>> questionsBySet = questions.stream().collect(groupingBy(
-                Question::getQuestionSetId,
-                mapping(q -> QuestionResult.of(q, optionsByQuestion.getOrDefault(q.getId(), List.of())), toList())));
+        Map<UUID, List<AdminExamPaperProjection.Question>> questionsBySet = questions.stream()
+                .collect(groupingBy(Question::getQuestionSetId,
+                        mapping(q -> new AdminExamPaperProjection.Question(q.getId(), q.getQuestionType(),
+                                q.getContent(), q.getDifficultyLevel(), q.getSkillType(), q.getQuestionCategory(),
+                                q.getOrderNo(), q.getMaxRawScore(), q.getExplanation(), q.getSourceQuestionId(),
+                                optionsByQuestion.getOrDefault(q.getId(), List.of())), toList())));
 
-        Map<UUID, List<QuestionSetResult>> setsByPart = questionSets.stream().collect(groupingBy(
+        Map<UUID, List<AdminExamPaperProjection.QuestionSet>> setsByPart = questionSets.stream().collect(groupingBy(
                 QuestionSet::getSectionPartId,
-                mapping(qs -> QuestionSetResult.of(qs, questionsBySet.getOrDefault(qs.getId(), List.of())), toList())));
+                mapping(qs -> new AdminExamPaperProjection.QuestionSet(qs.getId(), qs.getTitle(), qs.getInstruction(),
+                        qs.getOrderNo(), qs.getContent(), qs.getAudioObjectKey(), qs.getImageObjectKey(),
+                        qs.getSourceQuestionSetId(), questionsBySet.getOrDefault(qs.getId(), List.of())), toList())));
 
-        Map<UUID, List<SectionPartResult>> partsBySection = parts.stream().collect(groupingBy(
-                SectionPart::getExamSectionId,
-                mapping(p -> SectionPartResult.of(p, setsByPart.getOrDefault(p.getId(), List.of())), toList())));
+        Map<UUID, List<Part>> partsBySection = parts.stream().collect(groupingBy(SectionPart::getExamSectionId,
+                mapping(part -> new Part(part.getId(), part.getOrderNo(), part.getTitle(), part.getInstruction(),
+                        part.getContent(), part.getAudioObjectKey(), part.getImageObjectKey(),
+                        setsByPart.getOrDefault(part.getId(), List.of())), toList())));
 
-        return ExamDetailResult.of(exam, sections.stream()
-                .map(s -> ExamSectionResult.of(s, partsBySection.getOrDefault(s.getId(), List.of()))).toList());
+        return new AdminExamPaperProjection(exam,
+                sections.stream()
+                        .map(section -> new Section(section.getId(), section.getSectionType(), section.getOrderNo(),
+                                section.getMaxRawScore(), section.isScoredByCriteria(), section.getTimeLimitSeconds(),
+                                partsBySection.getOrDefault(section.getId(), List.of())))
+                        .toList());
     }
 
-    /** An empty parent set must not reach the query: {@code in ()} is not valid SQL. */
     private <T> List<T> childrenOf(List<UUID> parentIds, String jpql, Class<T> type) {
         return parentIds.isEmpty() ? List.of()
                 : em.createQuery(jpql, type).setParameter("parentIds", parentIds).getResultList();
@@ -105,4 +99,5 @@ public class AdminExamPaperQuery {
     private static <T> List<UUID> idsOf(List<T> rows, Function<T, UUID> id) {
         return rows.stream().map(id).toList();
     }
+
 }

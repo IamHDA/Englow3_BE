@@ -2,7 +2,7 @@ package com.englow3.learning.dto.response;
 
 import java.util.UUID;
 
-import com.englow3.learning.query.DictationStatsQuery.MistakeSentence;
+import com.englow3.learning.dto.result.MistakeSentenceResult;
 
 /**
  * One line to practise again. No transcript, like the practice type. It used to carry one, on the reasoning that a
@@ -20,10 +20,9 @@ public record MistakeSentenceResponse(UUID sentenceId, String audioUrl, int audi
         Integer audioEndMs, UUID lessonId, String lessonTitle, int bestAccuracyPercent, long attemptCount,
         String lastResponse) {
 
-    public static MistakeSentenceResponse from(MistakeSentence sentence, FlashcardMediaUrls media) {
-        return new MistakeSentenceResponse(sentence.sentenceId(), media.urlFor(sentence.audioObjectKey()),
-                sentence.audioDurationSeconds(), sentence.audioStartMs(), sentence.audioEndMs(), sentence.lessonId(),
-                sentence.lessonTitle(), sentence.bestAccuracyPercent(), sentence.attemptCount(),
-                sentence.lastResponse());
+    public static MistakeSentenceResponse from(MistakeSentenceResult sentence) {
+        return new MistakeSentenceResponse(sentence.sentenceId(), sentence.audioUrl(), sentence.audioDurationSeconds(),
+                sentence.audioStartMs(), sentence.audioEndMs(), sentence.lessonId(), sentence.lessonTitle(),
+                sentence.bestAccuracyPercent(), sentence.attemptCount(), sentence.lastResponse());
     }
 }

@@ -26,6 +26,7 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.speaking.entity.SpeakingAttempt;
 import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
@@ -45,9 +46,10 @@ class SpeakingServiceTest {
     private final AiJobQueue aiJobQueue = mock(AiJobQueue.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
+    private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final SpeakingService service = new com.englow3.speaking.service.impl.SpeakingServiceImpl(promptRepo,
-            attemptRepo, wordRepo, aiJobQueue, userDirectory, objectStorage, new ObjectMapper());
+            attemptRepo, wordRepo, aiJobQueue, userDirectory, objectStorage, presignedUrls, new ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
     private SpeakingPrompt prompt;
@@ -71,8 +73,7 @@ class SpeakingServiceTest {
         when(aiJobQueue.dailyRequestLimit()).thenReturn(DAILY_LIMIT);
         when(objectStorage.presignPut(anyString(), anyString(), anyString(), anyLong(), any()))
                 .thenReturn(URI.create("https://storage.example/put").toURL());
-        when(objectStorage.presignGet(anyString(), anyString(), any()))
-                .thenReturn(URI.create("https://storage.example/get").toURL());
+        when(presignedUrls.resolve(anyString(), anyString(), any())).thenReturn("https://storage.example/get");
     }
 
     private SpeakingAttempt uploadedAttempt() {

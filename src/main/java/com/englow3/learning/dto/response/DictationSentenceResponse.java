@@ -10,8 +10,8 @@ public record DictationSentenceResponse(UUID id, int orderNo, String audioUrl, i
         int hintWordCount, String hintFirstLetters, String hintRevealWord, String hintPartialTranscript,
         Integer audioStartMs, Integer audioEndMs, BigDecimal bestAccuracyPercent) {
 
-    public static DictationSentenceResponse from(DictationSentenceResult result, FlashcardMediaUrls media) {
-        return new DictationSentenceResponse(result.id(), result.orderNo(), media.urlFor(result.audioObjectKey()),
+    public static DictationSentenceResponse from(DictationSentenceResult result) {
+        return new DictationSentenceResponse(result.id(), result.orderNo(), result.audioUrl(),
                 result.audioDurationSeconds(), result.hintWordCount(), result.hintFirstLetters(),
                 result.hintRevealWord(), result.hintPartialTranscript(), result.audioStartMs(), result.audioEndMs(),
                 result.bestAccuracyPercent());

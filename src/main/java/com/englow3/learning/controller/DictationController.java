@@ -1,10 +1,8 @@
 package com.englow3.learning.controller;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -24,11 +22,9 @@ import com.englow3.learning.dto.response.MistakeSentenceResponse;
 import com.englow3.learning.dto.response.DictationSentenceResponse;
 import com.englow3.learning.dto.response.DictationStatsResponse;
 import com.englow3.learning.dto.response.DictationSubmissionResponse;
-import com.englow3.learning.dto.response.FlashcardMediaUrls;
 import com.englow3.learning.service.DictationService;
 import com.englow3.learning.service.DictationStatsService;
 import com.englow3.shared.page.PageResponse;
-import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
@@ -43,14 +39,10 @@ class DictationController {
 
     private final DictationService dictationService;
     private final DictationStatsService dictationStatsService;
-    private final FlashcardMediaUrls mediaUrls;
 
-    DictationController(DictationService dictationService, DictationStatsService dictationStatsService,
-            ObjectStorageClient objectStorage, @Value("${app.storage.learning-bucket}") String learningBucket,
-            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+    DictationController(DictationService dictationService, DictationStatsService dictationStatsService) {
         this.dictationService = dictationService;
         this.dictationStatsService = dictationStatsService;
-        this.mediaUrls = new FlashcardMediaUrls(objectStorage, learningBucket, mediaUrlTtl);
     }
 
     @GetMapping("/lessons")
@@ -64,8 +56,8 @@ class DictationController {
     @GetMapping("/lessons/{id}")
     ResponseEntity<DictationLessonDetailResponse> lessonDetail(@PathVariable UUID id) {
         var detail = dictationService.lessonDetail(id);
-        return ResponseEntity.ok(new DictationLessonDetailResponse(DictationLessonResponse.from(detail.lesson()), detail
-                .sentences().stream().map(sentence -> DictationSentenceResponse.from(sentence, mediaUrls)).toList()));
+        return ResponseEntity.ok(new DictationLessonDetailResponse(DictationLessonResponse.from(detail.lesson()),
+                detail.sentences().stream().map(DictationSentenceResponse::from).toList()));
     }
 
     @GetMapping("/stats")
@@ -92,7 +84,7 @@ class DictationController {
      */
     @GetMapping("/mistakes")
     public ResponseEntity<List<MistakeSentenceResponse>> mistakes() {
-        return ResponseEntity.ok(dictationStatsService.mistakeQueue().sentences().stream()
-                .map(sentence -> MistakeSentenceResponse.from(sentence, mediaUrls)).toList());
+        return ResponseEntity.ok(
+                dictationStatsService.mistakeQueue().sentences().stream().map(MistakeSentenceResponse::from).toList());
     }
 }

@@ -1,6 +1,7 @@
 package com.englow3.exam.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,11 @@ import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.query.ExamGradingQuery;
 import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.LearnerExamPaperQuery;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Part;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Question;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection.QuestionSet;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Section;
 import com.englow3.exam.repository.AttemptAnswerOptionRepository;
 import com.englow3.exam.repository.AttemptAnswerRepository;
 import com.englow3.exam.repository.ExamAttemptRepository;
@@ -46,14 +53,12 @@ import com.englow3.exam.repository.ExamRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.exam.service.*;
 import com.englow3.user.api.PlacementRecorder;
 import com.englow3.user.api.UserDirectory;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 public class LearnerExamServiceImpl implements LearnerExamService {
 
     private final ExamRepository examRepo;
@@ -64,6 +69,28 @@ public class LearnerExamServiceImpl implements LearnerExamService {
     private final ExamGradingQuery gradingQuery;
     private final UserDirectory userDirectory;
     private final PlacementRecorder placementRecorder;
+    private final PresignedUrlResolver presignedUrls;
+    private final String examBucket;
+    private final Duration mediaUrlTtl;
+
+    public LearnerExamServiceImpl(ExamRepository examRepo, ExamAttemptRepository attemptRepo,
+            AttemptAnswerRepository answerRepo, AttemptAnswerOptionRepository answerOptionRepo,
+            LearnerExamPaperQuery paperQuery, ExamGradingQuery gradingQuery, UserDirectory userDirectory,
+            PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls,
+            @Value("${app.storage.exam-bucket}") String examBucket,
+            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+        this.examRepo = examRepo;
+        this.attemptRepo = attemptRepo;
+        this.answerRepo = answerRepo;
+        this.answerOptionRepo = answerOptionRepo;
+        this.paperQuery = paperQuery;
+        this.gradingQuery = gradingQuery;
+        this.userDirectory = userDirectory;
+        this.placementRecorder = placementRecorder;
+        this.presignedUrls = presignedUrls;
+        this.examBucket = examBucket;
+        this.mediaUrlTtl = mediaUrlTtl;
+    }
 
     @Transactional(readOnly = true)
     public Page<LearnerExamListItemResult> search(ExamType examType, CertificateType certificateType,
@@ -145,7 +172,40 @@ public class LearnerExamServiceImpl implements LearnerExamService {
         if (!Instant.now().isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "This exam attempt has expired");
         }
-        return paperQuery.load(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
+        return toResult(paperQuery.load(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId())));
+    }
+
+    private LearnerExamPaperResult toResult(LearnerExamPaperProjection paper) {
+        return LearnerExamPaperResult.of(paper.exam(), paper.sections().stream().map(this::toSection).toList());
+    }
+
+    private LearnerExamPaperResult.LearnerSection toSection(Section section) {
+        return new LearnerExamPaperResult.LearnerSection(section.id(), section.sectionType(), section.orderNo(),
+                section.maxRawScore(), section.scoredByCriteria(), section.timeLimitSeconds(),
+                section.parts().stream().map(this::toPart).toList());
+    }
+
+    private LearnerExamPaperResult.LearnerPart toPart(Part part) {
+        return new LearnerExamPaperResult.LearnerPart(part.id(), part.orderNo(), part.title(), part.instruction(),
+                part.content(), presignedUrls.resolve(examBucket, part.audioObjectKey(), mediaUrlTtl),
+                presignedUrls.resolve(examBucket, part.imageObjectKey(), mediaUrlTtl),
+                part.questionSets().stream().map(this::toQuestionSet).toList());
+    }
+
+    private LearnerExamPaperResult.QuestionSetResult toQuestionSet(QuestionSet questionSet) {
+        return new LearnerExamPaperResult.QuestionSetResult(questionSet.id(), questionSet.title(),
+                questionSet.instruction(), questionSet.orderNo(), questionSet.content(),
+                presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
+                presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
+                questionSet.questions().stream().map(this::toQuestion).toList());
+    }
+
+    private LearnerExamPaperResult.QuestionResult toQuestion(Question question) {
+        return new LearnerExamPaperResult.QuestionResult(question.id(), question.questionType(), question.content(),
+                question.difficultyLevel(), question.skillType(), question.questionCategory(), question.orderNo(),
+                question.maxRawScore(),
+                question.options().stream().map(option -> new LearnerExamPaperResult.QuestionOptionResult(option.id(),
+                        option.content(), option.orderNo())).toList());
     }
 
     @Transactional

@@ -1,9 +1,7 @@
 package com.englow3.exam.controller;
 
-import java.time.Duration;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -39,12 +37,10 @@ import com.englow3.exam.dto.request.UpdateExamRequest;
 import com.englow3.exam.dto.response.ExamDetailResponse;
 import com.englow3.exam.dto.response.ExamListItemResponse;
 import com.englow3.exam.dto.response.ExamMediaResponse;
-import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.ExamResponse;
 import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.service.AdminExamService;
 import com.englow3.shared.page.PageResponse;
-import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
@@ -62,13 +58,9 @@ import jakarta.validation.Valid;
 class AdminExamController {
 
     private final AdminExamService adminExamService;
-    private final ExamMediaUrls mediaUrls;
 
-    AdminExamController(AdminExamService adminExamService, ObjectStorageClient objectStorage,
-            @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+    AdminExamController(AdminExamService adminExamService) {
         this.adminExamService = adminExamService;
-        this.mediaUrls = new ExamMediaUrls(objectStorage, examBucket, mediaUrlTtl);
     }
 
     @PostMapping
@@ -94,7 +86,7 @@ class AdminExamController {
     ResponseEntity<ExamDetailResponse> detail(@PathVariable UUID id) {
         ExamDetailResult result = adminExamService.detail(new ExamDetailCommand(id));
 
-        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
+        return ResponseEntity.ok(ExamDetailResponse.from(result));
     }
 
     @PutMapping("/{id}")
@@ -143,7 +135,7 @@ class AdminExamController {
             @Valid @RequestBody UpdateExamContentRequest request) {
         ExamDetailResult result = adminExamService.replaceContent(UpdateExamContentCommand.of(id, request));
 
-        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
+        return ResponseEntity.ok(ExamDetailResponse.from(result));
     }
 
     /** Publishing a draft outright, skipping review. An administrator holds the approval power either way. */

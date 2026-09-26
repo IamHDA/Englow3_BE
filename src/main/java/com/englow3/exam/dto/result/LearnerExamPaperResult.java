@@ -20,39 +20,41 @@ import com.englow3.exam.entity.TargetLevel;
 public record LearnerExamPaperResult(UUID id, String title, String description, ExamType examType,
         CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
         int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, int versionNumber,
-        List<ExamSectionResult> sections) {
+        List<LearnerSection> sections) {
 
-    public static LearnerExamPaperResult of(Exam exam, List<ExamSectionResult> sections) {
+    public static LearnerExamPaperResult of(Exam exam, List<LearnerSection> sections) {
         return new LearnerExamPaperResult(exam.getId(), exam.getTitle(), exam.getDescription(), exam.getExamType(),
                 exam.getCertificateType(), exam.getCertificateVariant(), exam.getTargetLevel(),
                 exam.getDurationSeconds(), exam.getMaxRawScore(), exam.getPassScore(), exam.getVersionNumber(),
                 sections);
     }
 
-    public record ExamSectionResult(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
-            boolean scoredByCriteria, Integer timeLimitSeconds, List<SectionPartResult> parts) {
+    public record LearnerSection(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
+            boolean scoredByCriteria, Integer timeLimitSeconds, List<LearnerPart> parts) {
 
-        public static ExamSectionResult of(ExamSection section, List<SectionPartResult> parts) {
-            return new ExamSectionResult(section.getId(), section.getSectionType(), section.getOrderNo(),
+        public static LearnerSection of(ExamSection section, List<LearnerPart> parts) {
+            return new LearnerSection(section.getId(), section.getSectionType(), section.getOrderNo(),
                     section.getMaxRawScore(), section.isScoredByCriteria(), section.getTimeLimitSeconds(), parts);
         }
     }
 
-    public record SectionPartResult(UUID id, int orderNo, String title, String instruction, String content,
-            String audioObjectKey, String imageObjectKey, List<QuestionSetResult> questionSets) {
+    public record LearnerPart(UUID id, int orderNo, String title, String instruction, String content, String audioUrl,
+            String imageUrl, List<QuestionSetResult> questionSets) {
 
-        public static SectionPartResult of(SectionPart part, List<QuestionSetResult> questionSets) {
-            return new SectionPartResult(part.getId(), part.getOrderNo(), part.getTitle(), part.getInstruction(),
-                    part.getContent(), part.getAudioObjectKey(), part.getImageObjectKey(), questionSets);
+        public static LearnerPart of(SectionPart part, String audioUrl, String imageUrl,
+                List<QuestionSetResult> questionSets) {
+            return new LearnerPart(part.getId(), part.getOrderNo(), part.getTitle(), part.getInstruction(),
+                    part.getContent(), audioUrl, imageUrl, questionSets);
         }
     }
 
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
-            String audioObjectKey, String imageObjectKey, List<QuestionResult> questions) {
+            String audioUrl, String imageUrl, List<QuestionResult> questions) {
 
-        public static QuestionSetResult of(com.englow3.exam.entity.QuestionSet set, List<QuestionResult> questions) {
+        public static QuestionSetResult of(com.englow3.exam.entity.QuestionSet set, String audioUrl, String imageUrl,
+                List<QuestionResult> questions) {
             return new QuestionSetResult(set.getId(), set.getTitle(), set.getInstruction(), set.getOrderNo(),
-                    set.getContent(), set.getAudioObjectKey(), set.getImageObjectKey(), questions);
+                    set.getContent(), audioUrl, imageUrl, questions);
         }
     }
 
