@@ -15,8 +15,8 @@ import org.mockito.ArgumentCaptor;
 
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobHandler;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobHandler;
+import com.englow3.ai.service.AiJobWorkerQueue;
 
 /**
  * What the worker does when a handler misbehaves. Each branch decides whether work is tried again, which is the whole
@@ -24,7 +24,7 @@ import com.englow3.ai.service.AiJobQueue;
  */
 class AiJobWorkerTest {
 
-    private final AiJobQueue queue = mock(AiJobQueue.class);
+    private final AiJobWorkerQueue queue = mock(AiJobWorkerQueue.class);
 
     private static AiJob job() {
         return AiJob.pending(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", UUID.randomUUID(), "azure", "model", "v1",
@@ -35,16 +35,16 @@ class AiJobWorkerTest {
         return new AiJobWorker(queue, List.of(handlers), 5, Duration.ofMinutes(5));
     }
 
-    private static AiJobHandler handlerThat(java.util.function.Function<AiJob, AiJobHandler.Outcome> behaviour) {
+    private static AiJobHandler handlerThat(java.util.function.Function<UUID, AiJobHandler.Outcome> behaviour) {
         return new AiJobHandler() {
             @Override
-            public AiJobType handles() {
-                return AiJobType.SPEECH_ASSESSMENT;
+            public String handles() {
+                return "SPEECH_ASSESSMENT";
             }
 
             @Override
-            public Outcome run(AiJob job) {
-                return behaviour.apply(job);
+            public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
+                return behaviour.apply(jobId);
             }
         };
     }
@@ -94,8 +94,8 @@ class AiJobWorkerTest {
         AiJob second = job();
         when(queue.claimBatch(5)).thenReturn(List.of(first, second));
 
-        workerWith(handlerThat(job -> {
-            if (job.getId().equals(first.getId())) {
+        workerWith(handlerThat(jobId -> {
+            if (jobId.equals(first.getId())) {
                 throw new IllegalStateException("boom");
             }
             return AiJobHandler.Outcome.succeeded("{}");
@@ -145,24 +145,24 @@ class AiJobWorkerTest {
     private static final class Recording implements AiJobHandler {
 
         final java.util.List<String> gaveUp = new java.util.ArrayList<>();
-        private final java.util.function.Function<AiJob, Outcome> behaviour;
+        private final java.util.function.Function<UUID, Outcome> behaviour;
 
-        Recording(java.util.function.Function<AiJob, Outcome> behaviour) {
+        Recording(java.util.function.Function<UUID, Outcome> behaviour) {
             this.behaviour = behaviour;
         }
 
         @Override
-        public AiJobType handles() {
-            return AiJobType.SPEECH_ASSESSMENT;
+        public String handles() {
+            return "SPEECH_ASSESSMENT";
         }
 
         @Override
-        public Outcome run(AiJob job) {
-            return behaviour.apply(job);
+        public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
+            return behaviour.apply(jobId);
         }
 
         @Override
-        public void onGaveUp(AiJob job, String errorCode) {
+        public void onGaveUp(UUID targetId, String errorCode) {
             gaveUp.add(errorCode);
         }
     }
@@ -247,17 +247,17 @@ class AiJobWorkerTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(true);
         AiJobHandler throwingOnGiveUp = new AiJobHandler() {
             @Override
-            public AiJobType handles() {
-                return AiJobType.SPEECH_ASSESSMENT;
+            public String handles() {
+                return "SPEECH_ASSESSMENT";
             }
 
             @Override
-            public Outcome run(AiJob job) {
+            public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
                 return Outcome.permanentFailure("BAD", "x");
             }
 
             @Override
-            public void onGaveUp(AiJob job, String errorCode) {
+            public void onGaveUp(UUID targetId, String errorCode) {
                 throw new IllegalStateException("could not write");
             }
         };

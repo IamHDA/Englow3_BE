@@ -1,9 +1,7 @@
 package com.englow3.exam.controller;
 
-import java.time.Duration;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -39,12 +37,12 @@ import com.englow3.exam.dto.request.UpdateExamRequest;
 import com.englow3.exam.dto.response.ExamDetailResponse;
 import com.englow3.exam.dto.response.ExamListItemResponse;
 import com.englow3.exam.dto.response.ExamMediaResponse;
-import com.englow3.exam.dto.response.ExamMediaUrls;
 import com.englow3.exam.dto.response.ExamResponse;
 import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.service.AdminExamService;
+import com.englow3.exam.service.ExamContentService;
+import com.englow3.exam.service.ExamReviewService;
 import com.englow3.shared.page.PageResponse;
-import com.englow3.shared.storage.ObjectStorageClient;
 
 import jakarta.validation.Valid;
 
@@ -62,13 +60,14 @@ import jakarta.validation.Valid;
 class AdminExamController {
 
     private final AdminExamService adminExamService;
-    private final ExamMediaUrls mediaUrls;
+    private final ExamReviewService examReviewService;
+    private final ExamContentService examContentService;
 
-    AdminExamController(AdminExamService adminExamService, ObjectStorageClient objectStorage,
-            @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+    AdminExamController(AdminExamService adminExamService, ExamReviewService examReviewService,
+            ExamContentService examContentService) {
         this.adminExamService = adminExamService;
-        this.mediaUrls = new ExamMediaUrls(objectStorage, examBucket, mediaUrlTtl);
+        this.examReviewService = examReviewService;
+        this.examContentService = examContentService;
     }
 
     @PostMapping
@@ -94,7 +93,7 @@ class AdminExamController {
     ResponseEntity<ExamDetailResponse> detail(@PathVariable UUID id) {
         ExamDetailResult result = adminExamService.detail(new ExamDetailCommand(id));
 
-        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
+        return ResponseEntity.ok(ExamDetailResponse.from(result));
     }
 
     @PutMapping("/{id}")
@@ -110,20 +109,21 @@ class AdminExamController {
     @PostMapping("/{id}/submit-for-review")
     ResponseEntity<ExamResponse> submitForReview(@PathVariable UUID id) {
         return ResponseEntity
-                .ok(ExamResponse.from(adminExamService.submitForReview(new SubmitExamForReviewCommand(id))));
+                .ok(ExamResponse.from(examReviewService.submitForReview(new SubmitExamForReviewCommand(id))));
     }
 
     /** Approving publishes in the same step - they are one decision, so there is no approved-but-unpublished state. */
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> approve(@PathVariable UUID id) {
-        return ResponseEntity.ok(ExamResponse.from(adminExamService.approve(new ApproveExamCommand(id))));
+        return ResponseEntity.ok(ExamResponse.from(examReviewService.approve(new ApproveExamCommand(id))));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> reject(@PathVariable UUID id, @Valid @RequestBody RejectExamRequest request) {
-        return ResponseEntity.ok(ExamResponse.from(adminExamService.reject(new RejectExamCommand(id, request.note()))));
+        return ResponseEntity
+                .ok(ExamResponse.from(examReviewService.reject(new RejectExamCommand(id, request.note()))));
     }
 
     /**
@@ -132,7 +132,7 @@ class AdminExamController {
      */
     @PostMapping(path = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<ExamMediaResponse> uploadMedia(@PathVariable UUID id, @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok(ExamMediaResponse.from(adminExamService.uploadMedia(id, file)));
+        return ResponseEntity.ok(ExamMediaResponse.from(examContentService.uploadMedia(id, file)));
     }
 
     /**
@@ -141,21 +141,21 @@ class AdminExamController {
     @PutMapping("/{id}/content")
     ResponseEntity<ExamDetailResponse> replaceContent(@PathVariable UUID id,
             @Valid @RequestBody UpdateExamContentRequest request) {
-        ExamDetailResult result = adminExamService.replaceContent(UpdateExamContentCommand.of(id, request));
+        ExamDetailResult result = examContentService.replaceContent(UpdateExamContentCommand.of(id, request));
 
-        return ResponseEntity.ok(ExamDetailResponse.from(result, mediaUrls));
+        return ResponseEntity.ok(ExamDetailResponse.from(result));
     }
 
     /** Publishing a draft outright, skipping review. An administrator holds the approval power either way. */
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> publish(@PathVariable UUID id) {
-        return ResponseEntity.ok(ExamResponse.from(adminExamService.publish(new PublishExamCommand(id))));
+        return ResponseEntity.ok(ExamResponse.from(examReviewService.publish(new PublishExamCommand(id))));
     }
 
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> archive(@PathVariable UUID id) {
-        return ResponseEntity.ok(ExamResponse.from(adminExamService.archive(new ArchiveExamCommand(id))));
+        return ResponseEntity.ok(ExamResponse.from(examReviewService.archive(new ArchiveExamCommand(id))));
     }
 }

@@ -249,6 +249,10 @@ ra dựa trên câu trả lời của provider — nhưng **chưa từng gọi p
 
 ## 7. Chạy toàn bộ kiểm thử
 
+Các route trong walkthrough không đổi sau khi tách module. Code backend tương ứng
+nay thuộc `flashcard`, `quiz`, `dictation`, và module read-only `progress`; không còn
+package `com.englow3.learning`.
+
 ```bash
 cd Englow3_BE && mvn clean test          # 240 test
 cd Englow3_FE && pnpm test               # 75 (bff) + 47 (web)

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.user.api.UserDirectory;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
 
@@ -24,7 +25,8 @@ class UserDirectoryTest {
 
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final UserDirectory userDirectory = new UserDirectory(userRepo, currentUser);
+    private final UserDirectory userDirectory = new com.englow3.user.service.impl.UserDirectoryImpl(userRepo,
+            currentUser);
 
     private final UUID authProviderId = UUID.randomUUID();
 

@@ -1,5 +1,6 @@
 package com.englow3.shared.time;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -19,9 +20,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class StudyCalendar {
 
+    private final Clock clock;
     private final ZoneId zone;
 
-    public StudyCalendar(@Value("${app.calendar.zone:Asia/Ho_Chi_Minh}") String zone) {
+    /** Reads the application's {@link Clock}, so a test that fixes the time fixes the day as well. */
+    public StudyCalendar(Clock clock, @Value("${app.calendar.zone:Asia/Ho_Chi_Minh}") String zone) {
+        this.clock = clock;
         this.zone = ZoneId.of(zone);
     }
 
@@ -35,7 +39,7 @@ public class StudyCalendar {
     }
 
     public LocalDate today() {
-        return LocalDate.now(zone);
+        return LocalDate.now(clock.withZone(zone));
     }
 
     public Instant startOfToday() {

@@ -1,0 +1,19 @@
+package com.englow3.dictation.dto.response;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+import com.englow3.dictation.dto.result.DictationSentenceResult;
+
+/** No transcript on this type - see DictationService for why that is the whole point. */
+public record DictationSentenceResponse(UUID id, int orderNo, String audioUrl, int audioDurationSeconds,
+        int hintWordCount, String hintFirstLetters, String hintRevealWord, String hintPartialTranscript,
+        Integer audioStartMs, Integer audioEndMs, BigDecimal bestAccuracyPercent) {
+
+    public static DictationSentenceResponse from(DictationSentenceResult result) {
+        return new DictationSentenceResponse(result.id(), result.orderNo(), result.audioUrl(),
+                result.audioDurationSeconds(), result.hintWordCount(), result.hintFirstLetters(),
+                result.hintRevealWord(), result.hintPartialTranscript(), result.audioStartMs(), result.audioEndMs(),
+                result.bestAccuracyPercent());
+    }
+}

@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.englow3.ai.client.LlmClient;
 import com.englow3.ai.client.LlmException;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.service.AiJobWorkerQueue;
 import com.englow3.ai.worker.AiJobWorker;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
@@ -50,7 +50,7 @@ class TutorPipelineIntegrationTest extends PostgresIntegrationTest {
     private TutorReplyWriter writer;
 
     @Autowired
-    private AiJobQueue queue;
+    private AiJobWorkerQueue queue;
 
     @Autowired
     private JdbcClient jdbc;

@@ -13,11 +13,11 @@ import jakarta.validation.Validator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
+import com.englow3.dictation.dto.request.AddDictationSentencesRequest;
 import com.englow3.exam.dto.request.SubmitExamAttemptRequest;
-import com.englow3.learning.dto.request.AddDictationSentencesRequest;
-import com.englow3.learning.dto.request.AddFlashcardsRequest;
-import com.englow3.learning.dto.request.AddQuizQuestionsRequest;
-import com.englow3.learning.dto.request.SubmitQuizAttemptRequest;
+import com.englow3.flashcard.dto.request.AddFlashcardsRequest;
+import com.englow3.quiz.dto.request.AddQuizQuestionsRequest;
+import com.englow3.quiz.dto.request.SubmitQuizAttemptRequest;
 import com.englow3.user.dto.request.SelectLearningPurposesRequest;
 import com.englow3.user.dto.request.SelectTargetSkillsRequest;
 

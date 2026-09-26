@@ -23,6 +23,7 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.service.LearnerExamService;
+import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.page.PageResponse;
 
 @RestController
@@ -30,9 +31,11 @@ import com.englow3.shared.page.PageResponse;
 public class ExamController {
 
     private final LearnerExamService learnerExamService;
+    private final ExamAttemptService examAttemptService;
 
-    public ExamController(LearnerExamService learnerExamService) {
+    public ExamController(LearnerExamService learnerExamService, ExamAttemptService examAttemptService) {
         this.learnerExamService = learnerExamService;
+        this.examAttemptService = examAttemptService;
     }
 
     @GetMapping
@@ -64,12 +67,12 @@ public class ExamController {
     public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id) {
         ExamAttemptResult result;
         try {
-            result = learnerExamService.start(id);
+            result = examAttemptService.start(id);
         } catch (DataIntegrityViolationException raced) {
             // Two starts at once - a double click, a second tab - both found nothing open and both inserted; the
             // partial unique index let one through. The loser asks again, in a fresh transaction, and is handed the
             // attempt the winner opened rather than a conflict.
-            result = learnerExamService.start(id);
+            result = examAttemptService.start(id);
         }
         return ResponseEntity.status(result.resumed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(ExamAttemptResponse.from(result));

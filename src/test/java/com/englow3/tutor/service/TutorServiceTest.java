@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.tutor.dto.command.ReportTutorMessageCommand;
@@ -32,7 +34,7 @@ import com.englow3.tutor.entity.TutorMessage;
 import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
-import com.englow3.user.service.UserDirectory;
+import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -41,6 +43,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class TutorServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private static final int DAILY_LIMIT = 5;
 
     private final TutorConversationRepository conversationRepo = mock(TutorConversationRepository.class);
@@ -48,8 +52,8 @@ class TutorServiceTest {
     private final AiJobQueue aiJobQueue = mock(AiJobQueue.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final TutorService service = new TutorService(conversationRepo, messageRepo, aiJobQueue, userDirectory,
-            new ObjectMapper());
+    private final TutorService service = new com.englow3.tutor.service.impl.TutorServiceImpl(conversationRepo,
+            messageRepo, aiJobQueue, userDirectory, new ObjectMapper(), CLOCK);
 
     private final UUID userId = UUID.randomUUID();
     private TutorConversation conversation;
@@ -108,8 +112,8 @@ class TutorServiceTest {
             service.send(new SendTutorMessageCommand(null, "What is a gerund?", null));
 
             UUID pendingId = savedMessages().get(1).getId();
-            verify(aiJobQueue).enqueue(eq(AiJobType.TUTOR_REPLY), eq("TUTOR_MESSAGE"), eq(pendingId), anyString(),
-                    anyString(), eq(TutorPrompt.VERSION), eq(userId));
+            verify(aiJobQueue).enqueueTutorReply(eq(pendingId), anyString(), anyString(), eq(TutorPrompt.VERSION),
+                    eq(userId));
         }
 
         /** Continuing a thread numbers the new turns after the ones already in it, not from one. */
@@ -147,8 +151,7 @@ class TutorServiceTest {
                     () -> service.send(new SendTutorMessageCommand(conversation.getId(), "Still there?", null)))
                             .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                             .isEqualTo("TUTOR_CONVERSATION_ARCHIVED");
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
-                    any());
+            verify(aiJobQueue, never()).enqueueTutorReply(any(), anyString(), anyString(), anyString(), any());
         }
 
         /** The earlier turns travel with the question, or the tutor answers a follow-up it cannot see the start of. */
@@ -162,7 +165,7 @@ class TutorServiceTest {
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
             ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
-            verify(aiJobQueue).enqueue(any(), anyString(), any(), payload.capture(), anyString(), anyString(), any());
+            verify(aiJobQueue).enqueueTutorReply(any(), payload.capture(), anyString(), anyString(), any());
             assertThat(payload.getValue()).contains("What is a gerund?").contains("A verb used as a noun.")
                     .contains("Give me an example.");
         }
@@ -205,8 +208,7 @@ class TutorServiceTest {
 
             verify(conversationRepo, never()).save(any());
             verify(messageRepo, never()).save(any());
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
-                    any());
+            verify(aiJobQueue, never()).enqueueTutorReply(any(), anyString(), anyString(), anyString(), any());
         }
     }
 
@@ -234,8 +236,7 @@ class TutorServiceTest {
             assertThatThrownBy(() -> service.send(new SendTutorMessageCommand(other, "hello", null)))
                     .isInstanceOf(NotFoundException.class);
 
-            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
-                    any());
+            verify(aiJobQueue, never()).enqueueTutorReply(any(), anyString(), anyString(), anyString(), any());
         }
 
         @Test

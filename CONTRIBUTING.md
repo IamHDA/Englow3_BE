@@ -34,9 +34,11 @@ by layer inside the module:
 com.englow3
 |-- <module>/
 |   |-- controller/    HTTP entry points
+|   |-- api/           cross-module contracts, only when needed
 |   |-- service/       use-case orchestration and transactions
 |   |-- repository/    Spring Data repositories and projections
 |   |-- entity/        JPA entities, enums, and protected business rules
+|   |-- helper/        pure, stateless business logic owned by this module
 |   |-- dto/
 |   |   |-- request/   HTTP input records
 |   |   |-- response/  HTTP output records
@@ -56,6 +58,22 @@ use different controllers.
 Never introduce generic `utils`, `helpers`, `misc`, `manager`, `common`, or
 `CommonService` packages. Keep `shared` limited to technical concerns such as base
 errors, security context, paging, logging, and storage clients.
+
+Use a singular module-local `helper/` package for pure calculators, scorers,
+parsers, and import logic. These are not application services: do not create an
+interface/`Impl` pair for them. Feature-specific helpers stay with their owner;
+only genuinely technical behavior shared by multiple modules belongs in `shared`.
+
+## Service contracts
+
+Every Spring application service must implement an explicit contract. Controllers
+and other consumers depend on the contract, never on the `*Impl` class.
+
+Concrete Spring services live under `service/impl` and are named `*Impl`.
+
+Cross-module synchronous calls must target the owning module's `api/` contract.
+Public module APIs must not expose persistence entities or move internal enums/types
+outward solely to satisfy callers.
 
 ## Layer responsibilities
 

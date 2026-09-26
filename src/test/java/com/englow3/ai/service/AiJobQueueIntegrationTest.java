@@ -12,8 +12,9 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.englow3.ai.api.AiJobHandler;
+import com.englow3.ai.api.AiJobQueue;
 import com.englow3.ai.entity.AiJob;
-import com.englow3.ai.entity.AiJobType;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 
@@ -33,6 +34,9 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private AiJobWorkerQueue workerQueue;
 
     private AiJobQueue target;
     private int originalLimit;
@@ -56,12 +60,12 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
 
     private void speak(UUID userId) {
         UUID target = UUID.randomUUID();
-        queue.enqueue(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", target, "{}", "speech:" + target, "v1", userId);
+        queue.enqueueSpeechAssessment(target, "{}", "speech:" + target, "v1", userId);
     }
 
     private void ask(UUID userId) {
         UUID target = UUID.randomUUID();
-        queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1", userId);
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", userId);
     }
 
     /** The bug itself. Two assessments and one question are three requests, whichever screens they came from. */
@@ -94,8 +98,7 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     void doesNotChargeTwiceForTheSameWork() {
         UUID attempt = UUID.randomUUID();
         for (int i = 0; i < LIMIT + 2; i++) {
-            queue.enqueue(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", attempt, "{}", "speech:" + attempt, "v1",
-                    learner);
+            queue.enqueueSpeechAssessment(attempt, "{}", "speech:" + attempt, "v1", learner);
         }
 
         assertThat(queue.hasDailyAllowance(learner)).isTrue();
@@ -132,13 +135,13 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     @Test
     void dropsALateOutcomeFromAClaimThatWasReclaimed() {
         UUID target = UUID.randomUUID();
-        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1",
-                learner);
-        AiJob claimed = queue.claimBatch(1000).stream().filter(candidate -> candidate.getId().equals(job.getId()))
-                .findFirst().orElseThrow();
-        queue.reclaimStalled(java.time.Duration.ZERO);
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        AiJob claimed = workerQueue.claimBatch(1000).stream()
+                .filter(candidate -> candidate.getTargetId().equals(target)).findFirst().orElseThrow();
+        AiJob job = claimed;
+        workerQueue.reclaimStalled(java.time.Duration.ZERO);
 
-        boolean gaveUp = queue.record(job.getId(), claimed.getStartedAt(),
+        boolean gaveUp = workerQueue.record(job.getId(), claimed.getStartedAt(),
                 AiJobHandler.Outcome.transientFailure("PROVIDER_TIMEOUT", "late"));
 
         assertThat(gaveUp).isFalse();
@@ -148,13 +151,13 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     @Test
     void dropsALateFailureForAJobAlreadyFinished() {
         UUID target = UUID.randomUUID();
-        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1",
-                learner);
-        AiJob claimed = queue.claimBatch(1000).stream().filter(candidate -> candidate.getId().equals(job.getId()))
-                .findFirst().orElseThrow();
-        queue.record(job.getId(), claimed.getStartedAt(), AiJobHandler.Outcome.succeeded("{\"content\":\"ok\"}"));
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        AiJob claimed = workerQueue.claimBatch(1000).stream()
+                .filter(candidate -> candidate.getTargetId().equals(target)).findFirst().orElseThrow();
+        AiJob job = claimed;
+        workerQueue.record(job.getId(), claimed.getStartedAt(), AiJobHandler.Outcome.succeeded("{\"content\":\"ok\"}"));
 
-        queue.record(job.getId(), claimed.getStartedAt(),
+        workerQueue.record(job.getId(), claimed.getStartedAt(),
                 AiJobHandler.Outcome.transientFailure("PROVIDER_TIMEOUT", "late"));
 
         assertThat(statusOf(job.getId())).isEqualTo("SUCCEEDED");

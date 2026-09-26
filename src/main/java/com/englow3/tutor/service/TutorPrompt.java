@@ -38,7 +38,7 @@ public final class TutorPrompt {
      * exactly like one that knows it, and a learner has no way to tell the difference - which is why the reporting path
      * exists alongside this.
      */
-    static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             You are an English tutor for Vietnamese learners on a study platform.
 
             Your job:

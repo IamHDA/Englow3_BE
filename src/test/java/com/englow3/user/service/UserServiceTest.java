@@ -41,7 +41,8 @@ class UserServiceTest {
 
     private final ObjectStorageClient objectStorageClient = mock(ObjectStorageClient.class);
 
-    private final UserService service = new UserService(userRepo, currentUser, objectStorageClient, BUCKET);
+    private final UserService service = new com.englow3.user.service.impl.UserServiceImpl(userRepo, currentUser,
+            objectStorageClient, BUCKET);
 
     private final UUID userId = UUID.randomUUID();
 

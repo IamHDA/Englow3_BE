@@ -17,50 +17,51 @@ import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
 
 /**
- * The five levels below are nested for the same reason as on {@link ExamDetailResult}: each is only ever the field type
- * of the level above it. What this layer adds over the result is real work, not a copy - the part and question set
- * levels swap a stored object key for a presigned URL, the way {@code UserInformationResponse} does for an avatar.
+ * Four of the five levels below are nested for the same reason as on {@link ExamDetailResult}: each is only ever the
+ * field type of the level above it. What this layer adds over the result is real work, not a copy - the part and
+ * question set levels swap a stored object key for a presigned URL, the way {@code UserInformationResponse} does for an
+ * avatar. {@link QuestionOptionResponse} is the exception, in its own file for the same reason as on the result side.
  */
 public record ExamDetailResponse(UUID id, String title, String description, ExamType examType,
         CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
         int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, ExamStatus status, int versionNumber,
         UUID createdByUserId, Instant publishedAt, Instant createdAt, List<ExamSectionResponse> sections) {
 
-    public static ExamDetailResponse from(ExamDetailResult result, ExamMediaUrls media) {
+    public static ExamDetailResponse from(ExamDetailResult result) {
         return new ExamDetailResponse(result.id(), result.title(), result.description(), result.examType(),
                 result.certificateType(), result.certificateVariant(), result.targetLevel(), result.durationSeconds(),
                 result.maxRawScore(), result.passScore(), result.status(), result.versionNumber(),
                 result.createdByUserId(), result.publishedAt(), result.createdAt(),
-                result.sections().stream().map(section -> ExamSectionResponse.from(section, media)).toList());
+                result.sections().stream().map(ExamSectionResponse::from).toList());
     }
 
     public record ExamSectionResponse(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
             boolean scoredByCriteria, Integer timeLimitSeconds, List<SectionPartResponse> parts) {
 
-        static ExamSectionResponse from(ExamDetailResult.ExamSectionResult result, ExamMediaUrls media) {
+        static ExamSectionResponse from(ExamDetailResult.AdminSection result) {
             return new ExamSectionResponse(result.id(), result.sectionType(), result.orderNo(), result.maxRawScore(),
                     result.scoredByCriteria(), result.timeLimitSeconds(),
-                    result.parts().stream().map(part -> SectionPartResponse.from(part, media)).toList());
+                    result.parts().stream().map(SectionPartResponse::from).toList());
         }
     }
 
     public record SectionPartResponse(UUID id, int orderNo, String title, String instruction, String content,
             String audioUrl, String imageUrl, List<QuestionSetResponse> questionSets) {
 
-        static SectionPartResponse from(ExamDetailResult.SectionPartResult result, ExamMediaUrls media) {
+        static SectionPartResponse from(ExamDetailResult.AdminPart result) {
             return new SectionPartResponse(result.id(), result.orderNo(), result.title(), result.instruction(),
-                    result.content(), media.urlFor(result.audioObjectKey()), media.urlFor(result.imageObjectKey()),
-                    result.questionSets().stream().map(set -> QuestionSetResponse.from(set, media)).toList());
+                    result.content(), result.audioUrl(), result.imageUrl(),
+                    result.questionSets().stream().map(QuestionSetResponse::from).toList());
         }
     }
 
     public record QuestionSetResponse(UUID id, String title, String instruction, int orderNo, String content,
             String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResponse> questions) {
 
-        static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result, ExamMediaUrls media) {
+        static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
-                    result.content(), media.urlFor(result.audioObjectKey()), media.urlFor(result.imageObjectKey()),
-                    result.sourceQuestionSetId(), result.questions().stream().map(QuestionResponse::from).toList());
+                    result.content(), result.audioUrl(), result.imageUrl(), result.sourceQuestionSetId(),
+                    result.questions().stream().map(QuestionResponse::from).toList());
         }
     }
 
@@ -73,14 +74,6 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
                     result.skillType(), result.questionCategory(), result.orderNo(), result.maxRawScore(),
                     result.explanation(), result.sourceQuestionId(),
                     result.options().stream().map(QuestionOptionResponse::from).toList());
-        }
-    }
-
-    public record QuestionOptionResponse(UUID id, String content, int orderNo, boolean correct, String explanation) {
-
-        static QuestionOptionResponse from(ExamDetailResult.QuestionOptionResult result) {
-            return new QuestionOptionResponse(result.id(), result.content(), result.orderNo(), result.correct(),
-                    result.explanation());
         }
     }
 }

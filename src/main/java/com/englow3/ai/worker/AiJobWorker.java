@@ -1,7 +1,7 @@
 package com.englow3.ai.worker;
 
 import java.time.Duration;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
 
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobHandler;
-import com.englow3.ai.service.AiJobQueue;
+import com.englow3.ai.api.AiJobHandler;
+import com.englow3.ai.service.AiJobWorkerQueue;
 
 /**
  * Drains the queue.
@@ -33,12 +33,12 @@ public class AiJobWorker {
 
     private static final Logger log = LoggerFactory.getLogger(AiJobWorker.class);
 
-    private final AiJobQueue queue;
-    private final Map<AiJobType, AiJobHandler> handlers = new EnumMap<>(AiJobType.class);
+    private final AiJobWorkerQueue queue;
+    private final Map<String, AiJobHandler> handlers = new HashMap<>();
     private final int batchSize;
     private final Duration lockTimeout;
 
-    public AiJobWorker(AiJobQueue queue, List<AiJobHandler> handlers,
+    public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers,
             @Value("${app.ai.worker.batch-size:5}") int batchSize,
             @Value("${app.ai.worker.lock-timeout:5m}") Duration lockTimeout) {
         this.queue = queue;
@@ -77,12 +77,12 @@ public class AiJobWorker {
      * failed: a handler that throws here must not undo that, or take the rest of the batch down with it.
      */
     private void gaveUp(AiJob job, String errorCode) {
-        AiJobHandler handler = handlers.get(job.getJobType());
+        AiJobHandler handler = handlers.get(job.getJobType().name());
         if (handler == null) {
             return;
         }
         try {
-            handler.onGaveUp(job, errorCode);
+            handler.onGaveUp(job.getTargetId(), errorCode);
         } catch (RuntimeException failure) {
             log.error("AI job {} gave up, and its handler could not record that", job.getId(), failure);
         }
@@ -97,7 +97,7 @@ public class AiJobWorker {
      * conjure one up.
      */
     private AiJobHandler.Outcome attempt(AiJob job) {
-        AiJobHandler handler = handlers.get(job.getJobType());
+        AiJobHandler handler = handlers.get(job.getJobType().name());
         if (handler == null) {
             log.error("No handler registered for AI job type {} (job {})", job.getJobType(), job.getId());
             return AiJobHandler.Outcome.permanentFailure("AI_JOB_NO_HANDLER",
@@ -105,7 +105,7 @@ public class AiJobWorker {
         }
 
         try {
-            return handler.run(job);
+            return handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
         } catch (RuntimeException failure) {
             log.error("AI job {} threw while running", job.getId(), failure);
             return AiJobHandler.Outcome.transientFailure("AI_JOB_HANDLER_ERROR", failure.getMessage());

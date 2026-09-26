@@ -19,7 +19,7 @@ import com.englow3.ai.client.LlmClient;
 import com.englow3.ai.client.LlmException;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.service.AiJobHandler.Outcome;
+import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -46,12 +46,16 @@ class TutorReplyHandlerTest {
                 """.formatted(messageId));
     }
 
+    private Outcome run(AiJob job) {
+        return handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
+    }
+
     @Test
     void storesTheAnswerAndReportsSuccess() {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt())).thenReturn(
                 "{\"content\":\"A verb used as a noun.\",\"model\":\"gpt-4o-mini\",\"input_tokens\":120,\"output_tokens\":40}");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.success()).isTrue();
         verify(writer).storeReply(messageId, "A verb used as a noun.", "gpt-4o-mini", 120, 40);
@@ -67,7 +71,7 @@ class TutorReplyHandlerTest {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt()))
                 .thenThrow(new LlmException("TUTOR_SERVICE_UNREACHABLE", "timeout", true));
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isTrue();
         verify(writer, never()).markFailed(any(), anyString());
@@ -82,7 +86,7 @@ class TutorReplyHandlerTest {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt()))
                 .thenThrow(new LlmException("TUTOR_GENERATION_REJECTED", "400", false));
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
         verify(writer, never()).markFailed(any(), anyString());
@@ -93,7 +97,7 @@ class TutorReplyHandlerTest {
     void givesUpOnAnAnswerThatCannotBeRead() {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt())).thenReturn("<html>502</html>");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_REPLY_UNREADABLE");
@@ -105,7 +109,7 @@ class TutorReplyHandlerTest {
     void failsWhenTheProviderReturnedNothingToShow() {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt())).thenReturn("{\"content\":\"   \"}");
 
-        Outcome outcome = handler.run(validJob());
+        Outcome outcome = run(validJob());
 
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_REPLY_EMPTY");
         verify(writer, never()).markFailed(any(), anyString());
@@ -120,7 +124,7 @@ class TutorReplyHandlerTest {
         when(llmClient.generate(anyString(), anyString(), anyDouble(), anyInt()))
                 .thenReturn("{\"content\":\"A verb used as a noun.\",\"model\":\"gpt-4o-mini\"}");
 
-        handler.run(validJob());
+        run(validJob());
 
         verify(writer).storeReply(eq(messageId), anyString(), eq("gpt-4o-mini"), eq(null), eq(null));
     }
@@ -131,7 +135,7 @@ class TutorReplyHandlerTest {
      */
     @Test
     void failsPermanentlyOnAPayloadItDoesNotRecognise() {
-        Outcome outcome = handler.run(jobFor("{\"somethingElse\":true}"));
+        Outcome outcome = run(jobFor("{\"somethingElse\":true}"));
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_JOB_PAYLOAD_UNREADABLE");
@@ -140,7 +144,7 @@ class TutorReplyHandlerTest {
 
     @Test
     void failsPermanentlyOnAPayloadThatIsNotJson() {
-        Outcome outcome = handler.run(jobFor("not json at all"));
+        Outcome outcome = run(jobFor("not json at all"));
 
         assertThat(outcome.retryable()).isFalse();
         assertThat(outcome.errorCode()).isEqualTo("TUTOR_JOB_PAYLOAD_UNREADABLE");
@@ -149,7 +153,7 @@ class TutorReplyHandlerTest {
     /** The queue dispatches on this; a handler answering for the wrong type would silently take work it cannot do. */
     @Test
     void handlesOnlyTutorReplies() {
-        assertThat(handler.handles()).isEqualTo(AiJobType.TUTOR_REPLY);
+        assertThat(handler.handles()).isEqualTo("TUTOR_REPLY");
     }
 
     /**
@@ -158,7 +162,7 @@ class TutorReplyHandlerTest {
      */
     @Test
     void tellsTheLearnerOnceTheJobHasGivenUp() {
-        handler.onGaveUp(validJob(), "PROVIDER_DOWN");
+        handler.onGaveUp(validJob().getTargetId(), "PROVIDER_DOWN");
 
         verify(writer).markFailed(messageId, "PROVIDER_DOWN");
     }
@@ -169,7 +173,7 @@ class TutorReplyHandlerTest {
      */
     @Test
     void reachesTheLearnerEvenWhenThePayloadWasUnreadable() {
-        handler.onGaveUp(jobFor("not json at all"), "PAYLOAD_UNREADABLE");
+        handler.onGaveUp(jobFor("not json at all").getTargetId(), "PAYLOAD_UNREADABLE");
 
         verify(writer).markFailed(messageId, "PAYLOAD_UNREADABLE");
     }
