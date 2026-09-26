@@ -34,9 +34,11 @@ by layer inside the module:
 com.englow3
 |-- <module>/
 |   |-- controller/    HTTP entry points
+|   |-- api/           cross-module contracts, only when needed
 |   |-- service/       use-case orchestration and transactions
 |   |-- repository/    Spring Data repositories and projections
 |   |-- entity/        JPA entities, enums, and protected business rules
+|   |-- helper/        pure, stateless business logic owned by this module
 |   |-- dto/
 |   |   |-- request/   HTTP input records
 |   |   |-- response/  HTTP output records
@@ -56,6 +58,11 @@ use different controllers.
 Never introduce generic `utils`, `helpers`, `misc`, `manager`, `common`, or
 `CommonService` packages. Keep `shared` limited to technical concerns such as base
 errors, security context, paging, logging, and storage clients.
+
+Use a singular module-local `helper/` package for pure calculators, scorers,
+parsers, and import logic. These are not application services: do not create an
+interface/`Impl` pair for them. Feature-specific helpers stay with their owner;
+only genuinely technical behavior shared by multiple modules belongs in `shared`.
 
 ## Service contracts
 

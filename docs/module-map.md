@@ -39,43 +39,60 @@ answers, and section results.
 - **Files:** question media and private attempt media are exam-owned even when the
   shared storage client performs the I/O.
 
-## `learning`
+## `flashcard`
 
-Owns everyday practice: vocabulary sets and their spaced-repetition schedule,
-quizzes and quiz attempts, dictation lessons and transcription attempts, and the
-daily path that assembles all three into a plan.
+Owns flashcard authoring, vocabulary sets and cards, spaced repetition, review
+history, learner statistics, and flashcard batch import.
 
-- **Tables:** `flashcard_sets`, `flashcards`, `flashcard_reviews`,
-  `flashcard_review_logs`, `quizzes`, `quiz_questions`, `quiz_question_options`,
-  `quiz_question_tokens`, `quiz_question_pairs`, `quiz_attempts`,
-  `quiz_attempt_answers`, `dictation_lessons`, `dictation_sentences`, and
-  `dictation_attempts`.
-- **Entry points:** administrator authoring APIs, learner catalogues, the study,
-  sitting and submission lifecycles, the per-feature statistics screens, and
-  `GET /api/daily-path`.
-- **Import:** this module owns the two use cases that bring generated content in -
-  flashcard batches and shadowing batches. Both check before they write, both land
-  in a draft, and both hold to the generator's schema through a contract test. See
-  the data pipeline boundary below for why they exist.
-- **Read model:** ordinary reads belong in the module's repositories; the grouped
-  aggregates behind the statistics screens and the daily path live in its read-only
-  `query/` package.
+- **Tables:** `flashcard_sets`, `flashcards`, `flashcard_reviews`, and
+  `flashcard_review_logs`. Only this module writes them.
+- **Entry points:** administrator authoring/review/import APIs, learner catalogue,
+  study/rating lifecycle, and flashcard statistics.
+- **Import:** `flashcard.helper.FlashcardImport` validates generated batches and
+  `AdminFlashcardService` writes accepted cards into a draft set.
+
+## `quiz`
+
+Owns quiz authoring, all five question shapes, attempts, deterministic matching
+shuffle, and grading.
+
+- **Tables:** `quizzes`, `quiz_questions`, `quiz_question_options`,
+  `quiz_question_tokens`, `quiz_question_pairs`, `quiz_attempts`, and
+  `quiz_attempt_answers`. Only this module writes them.
+- **Entry points:** administrator authoring/review APIs plus learner catalogue,
+  start/resume, submission, and result APIs.
 - **Answer keys:** a paper delivered mid-attempt carries no correct answer. Each
   audience gets its own projection rather than a shared record with fields blanked
   out.
-- **Cross-module read:** `DailyPathQuery` reads `exam_attempts` to count study days
-  and experience points. Read-only, declared here, and deliberate: a streak that
-  ignored exams would tell a learner who spent two hours on a mock paper that they
-  had not studied. No `learning` code writes an exam table.
-- **Cross-module read:** `AdminOverviewQuery`, behind `GET /api/admin/overview`,
-  counts `speaking_prompts`, `exams`, `exam_attempts` and `users` alongside this
-  module's own tables - drafts, items waiting on review and published items per
-  kind of content, and learner activity over the last week. It lives here
-  because content review does; it writes nothing, and each count is one it
-  could not get through another module's service without twenty calls.
-- **Derived, not stored:** the experience counter and level are computed from the
-  activity tables on every read. There is no points ledger to drift out of step
-  with the work it counts.
+
+## `dictation`
+
+Owns dictation authoring, sentence/audio metadata, attempts, scoring, the mistake
+queue, learner statistics, and shadowing batch import.
+
+- **Tables:** `dictation_lessons`, `dictation_sentences`, and
+  `dictation_attempts`. Only this module writes them.
+- **Entry points:** administrator authoring/review/import APIs plus learner
+  catalogue, practice/submission, mistake queue, and statistics APIs.
+- **Public API:** `dictation.api.DictationCompletionPolicy` exposes the completion
+  rule needed by `progress` without exporting the scorer or its internal types.
+- **Import:** `dictation.helper.DictationImport` validates generated batches and
+  `AdminDictationService` writes accepted lessons as drafts.
+
+## `progress`
+
+Owns the read-only composition behind Daily Path, XP/level, streaks, daily quests,
+and the administrator overview. It owns no business write table and maps no other
+module's table as a JPA entity.
+
+- **Entry points:** `GET /api/daily-path` and `GET /api/admin/overview`.
+- **Cross-module read:** `DailyPathQuery` reads activity from flashcard, quiz,
+  dictation, and exam tables. `AdminOverviewQuery` reads user, speaking, exam,
+  flashcard, quiz, and dictation tables. Both are documented read-only joins; no
+  `progress` code writes those tables.
+- **Derived, not stored:** plans, experience, levels, streaks, and quests are
+  computed on every read. There is no points ledger or persisted daily path to
+  drift out of step with activity.
 
 ## `ai`
 
@@ -112,9 +129,9 @@ it, and what the assessment made of it.
 - **Tables:** `speaking_prompts`, `speaking_attempts`, `speaking_attempt_words`.
 - **Entry points:** the learner catalogue and attempt lifecycle, plus the admin
   authoring API.
-- **Review workflow:** the same one `learning`'s three content types run, through
-  its own status enum. Persistence types do not cross module boundaries, so the
-  review columns are repeated here rather than borrowed.
+- **Review workflow:** the same shape used by flashcard, quiz, and dictation,
+  through its own status enum. Persistence types do not cross module boundaries,
+  so the review columns are repeated here rather than borrowed.
 - **Files:** recordings go from the browser straight to object storage through a
   presigned PUT bound to the declared size; nothing streams through the API.
 - **AI:** enqueues through `ai`. It never calls a provider itself.
@@ -170,12 +187,14 @@ Frontend and mobile clients must call the Spring API, never FastAPI directly.
 `data_pipeline/` is an offline authoring and validation toolchain, not a runtime
 Spring module. It owns generators, schemas, validators, local output, and QA reports.
 Runtime ingestion must go through an explicitly owned backend use case; the pipeline
-does not become a second writer to application tables. Two such use cases exist, both
-owned by `learning`: `POST /api/admin/flashcards/import` and
-`POST /api/admin/dictation/import`. Each offers a dry run first, because the check has
-to be visible before anything is saved, and each writes only into a draft - generated
-content is not reviewed content, and an import that could reach a published set would
-be a way around the review workflow.
+does not become a second writer to application tables. The flashcard module owns
+`POST /api/admin/flashcards/import`; dictation owns
+`POST /api/admin/dictation/import`. Each offers a dry run first, because the check
+has to be visible before anything is saved, and each writes only into a draft -
+generated content is not reviewed content, and an import that could reach a
+published set would be a way around the review workflow. The cross-feature command
+line adapter lives in `tooling.pipeline` and calls those service contracts; it owns
+no business table.
 
 The importers read the generator's schema files directly in their tests. The two sides
 live in one repository and otherwise never meet until someone uploads a file; the

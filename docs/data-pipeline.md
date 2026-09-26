@@ -55,6 +55,15 @@ make test                          # pytest
 
 Xem [TODO.md](TODO.md) — checklist từng phase và danh sách blocker đang chờ quyết.
 
+## Biên runtime backend
+
+Pipeline không ghi thẳng vào database. Flashcard batch đi qua
+`flashcard.helper.FlashcardImport` và `flashcard.service.AdminFlashcardService`;
+shadowing batch đi qua `dictation.helper.DictationImport` và
+`dictation.service.AdminDictationService`. CLI import nhiều loại nội dung nằm ở
+`tooling.pipeline.PipelineImportRunner`, chỉ điều phối các service contract và luôn
+tạo draft để review.
+
 ## Ràng buộc bất di bất dịch
 
 - Model dữ liệu định nghĩa **một lần** trong Pydantic. JSON Schema sinh ra từ đó.
