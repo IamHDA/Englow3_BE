@@ -175,6 +175,9 @@ public class AdminExamService {
      * recording is the paper, and a stable public link to it is a leaked paper.
      */
     public ExamMediaResult uploadMedia(UUID examId, MultipartFile file) {
+        // The paper first: media can only ever be attached to an editable one, so a file for a missing or published
+        // paper would be an orphan in the bucket that nothing points at and nothing cleans up.
+        requireExam(examId).requireEditable();
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("MEDIA_REQUIRED", "No media file was uploaded");
         }

@@ -2,8 +2,6 @@ package com.englow3.ai.service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobStatus;
 import com.englow3.ai.entity.AiJobType;
+import com.englow3.shared.time.StudyCalendar;
 import com.englow3.ai.repository.AiJobRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class AiJobQueue {
 
     private final AiJobRepository jobRepo;
+    private final StudyCalendar calendar;
 
     @Value("${app.ai.provider:ai-service}")
     private String providerName;
@@ -55,13 +55,12 @@ public class AiJobQueue {
      * Whether this learner may cause another provider call today.
      * <p>
      * A question rather than a refusal, so each feature keeps deciding when to ask and how to say no - speaking asks at
-     * submission, after the recording exists, and the tutor before the question is stored. The day is UTC, like every
-     * other daily figure in this schema.
+     * submission, after the recording exists, and the tutor before the question is stored. The day is the learners'
+     * day, like every other daily figure - see {@link StudyCalendar}.
      */
     @Transactional(readOnly = true)
     public boolean hasDailyAllowance(UUID userId) {
-        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return jobRepo.countRequestedSince(userId, startOfDay) < dailyRequestLimit;
+        return jobRepo.countRequestedSince(userId, calendar.startOfToday()) < dailyRequestLimit;
     }
 
     /** The ceiling, so a refusal can say what it was. */

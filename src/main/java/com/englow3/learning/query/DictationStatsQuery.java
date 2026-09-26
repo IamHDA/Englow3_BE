@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.englow3.shared.persistence.SqlTime;
+import com.englow3.shared.time.StudyCalendar;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class DictationStatsQuery {
 
     private final JdbcClient jdbcClient;
+    private final StudyCalendar calendar;
 
     /**
      * Lessons where every sentence has been cleared. The threshold is applied here as well as in the service that shows
@@ -74,14 +76,14 @@ public class DictationStatsQuery {
 
     public List<DailyAccuracy> accuracyByDay(UUID userId, Instant from) {
         return jdbcClient.sql("""
-                select cast(attempted_at at time zone 'UTC' as date) as day,
+                select cast(attempted_at at time zone :zone as date) as day,
                        cast(round(avg(accuracy_percent)) as integer) as accuracy,
                        count(*) as attempts
                   from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
                  group by day
                  order by day
-                """).param("userId", userId).param("from", SqlTime.at(from))
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new DailyAccuracy(rs.getObject("day", LocalDate.class), rs.getInt("accuracy"),
                         rs.getLong("attempts")))
                 .list();
@@ -109,7 +111,7 @@ public class DictationStatsQuery {
 
     public List<SessionSummary> history(UUID userId, int limit) {
         return jdbcClient.sql("""
-                select cast(a.attempted_at at time zone 'UTC' as date) as day,
+                select cast(a.attempted_at at time zone :zone as date) as day,
                        l.id as lesson_id,
                        l.title as lesson_title,
                        count(*) as sentences,
@@ -122,7 +124,7 @@ public class DictationStatsQuery {
                  group by day, l.id, l.title
                  order by day desc
                  limit :limit
-                """).param("userId", userId).param("limit", limit)
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("limit", limit)
                 .query((rs, rowNum) -> new SessionSummary(rs.getObject("day", LocalDate.class),
                         rs.getObject("lesson_id", UUID.class), rs.getString("lesson_title"), rs.getLong("sentences"),
                         rs.getInt("accuracy"), rs.getLong("listening_seconds")))
@@ -151,11 +153,12 @@ public class DictationStatsQuery {
 
     public List<LocalDate> practiceDays(UUID userId, Instant from) {
         return jdbcClient.sql("""
-                select distinct cast(attempted_at at time zone 'UTC' as date) as day
+                select distinct cast(attempted_at at time zone :zone as date) as day
                   from dictation_attempts
                  where user_id = :userId and attempted_at >= :from
                  order by day desc
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
+                .query(LocalDate.class).list();
     }
 
     /**

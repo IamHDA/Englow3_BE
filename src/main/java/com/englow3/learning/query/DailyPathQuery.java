@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.englow3.shared.persistence.SqlTime;
+import com.englow3.shared.time.StudyCalendar;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 public class DailyPathQuery {
 
     private final JdbcClient jdbcClient;
+    private final StudyCalendar calendar;
 
     /**
      * Every day the learner did anything at all, newest first, across all four kinds of practice. Counted here rather
@@ -33,24 +35,25 @@ public class DailyPathQuery {
     public List<LocalDate> studyDays(UUID userId, Instant from) {
         return jdbcClient.sql("""
                 select distinct day from (
-                  select cast(reviewed_at at time zone 'UTC' as date) as day
+                  select cast(reviewed_at at time zone :zone as date) as day
                     from flashcard_review_logs
                    where user_id = :userId and reviewed_at >= :from
                   union all
-                  select cast(attempted_at at time zone 'UTC' as date)
+                  select cast(attempted_at at time zone :zone as date)
                     from dictation_attempts
                    where user_id = :userId and attempted_at >= :from
                   union all
-                  select cast(submitted_at at time zone 'UTC' as date)
+                  select cast(submitted_at at time zone :zone as date)
                     from quiz_attempts
                    where user_id = :userId and submitted_at >= :from and status = 'SCORED'
                   union all
-                  select cast(submitted_at at time zone 'UTC' as date)
+                  select cast(submitted_at at time zone :zone as date)
                     from exam_attempts
                    where user_id = :userId and submitted_at >= :from and status = 'SCORED'
                 ) activity
                  order by day desc
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
+                .query(LocalDate.class).list();
     }
 
     /**

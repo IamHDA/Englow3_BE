@@ -2,7 +2,6 @@ package com.englow3.learning.service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +13,7 @@ import com.englow3.learning.dto.result.DictationStatsResult;
 import com.englow3.learning.dto.result.MistakeQueueResult;
 import com.englow3.learning.query.DictationStatsQuery;
 import com.englow3.shared.persistence.ParallelReads;
+import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -41,6 +41,7 @@ public class DictationStatsService {
     private final DictationStatsQuery statsQuery;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final StudyCalendar calendar;
 
     /** Not transactional: the nine reads are independent and run side by side, see {@link ParallelReads}. */
     public DictationStatsResult statsFor(int periodDays) {
@@ -64,7 +65,7 @@ public class DictationStatsService {
 
         return new DictationStatsResult(periodDays, lessonsCompleted.get(), averageAccuracy.get(),
                 listeningSeconds.get(), sentencesPractised.get(),
-                StudyStreak.count(practiceDays.get(), LocalDate.now(ZoneOffset.UTC)), accuracyByDay.get(),
+                StudyStreak.count(practiceDays.get(), calendar.today()), accuracyByDay.get(),
                 MissedWordCounter.count(attemptPairs, MISSED_WORD_LIMIT), difficultSentences.get(), history.get());
     }
 

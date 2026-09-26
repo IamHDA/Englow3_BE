@@ -2,7 +2,6 @@ package com.englow3.learning.service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +16,7 @@ import com.englow3.learning.dto.result.DailyPathResult;
 import com.englow3.learning.entity.DailyTaskKind;
 import com.englow3.learning.query.DailyPathQuery;
 import com.englow3.shared.persistence.ParallelReads;
+import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -42,6 +42,7 @@ public class DailyPathService {
     private final DailyPathQuery pathQuery;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final StudyCalendar calendar;
 
     /**
      * Not transactional: the nine reads below are independent and run side by side through {@link ParallelReads}, each
@@ -50,8 +51,8 @@ public class DailyPathService {
     public DailyPathResult dailyPath() {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = Instant.now();
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        Instant startOfToday = today.atStartOfDay(ZoneOffset.UTC).toInstant();
+        LocalDate today = calendar.today();
+        Instant startOfToday = calendar.startOfToday();
 
         var studyDaysRead = reads
                 .fork(() -> pathQuery.studyDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));

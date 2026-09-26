@@ -191,6 +191,18 @@ class QuizServiceTest {
             assertThat(result.reviews()).singleElement().satisfies(review -> assertThat(review.correct()).isFalse());
         }
 
+        /** A null response is a skipped question - it used to be a NullPointerException and a 500. */
+        @Test
+        void marksANullResponseAsUnansweredRatherThanFailing() {
+            QuizAttempt attempt = liveAttempt();
+
+            QuizAttemptResult result = service.submit(
+                    new SubmitQuizAttemptCommand(attempt.getId(), List.of(new SubmittedAnswer(choice.getId(), null))));
+
+            assertThat(result.correctAnswerCount()).isZero();
+            assertThat(result.reviews()).singleElement().satisfies(review -> assertThat(review.correct()).isFalse());
+        }
+
         /** The review shows the option the learner picked, not the uuid they sent. */
         @Test
         void reportsTheChosenOptionInWordsOnTheReview() {
@@ -203,6 +215,23 @@ class QuizServiceTest {
                 assertThat(review.userAnswerText()).isEqualTo("B. have been");
                 assertThat(review.correctAnswerText()).isEqualTo("A. has been");
             });
+        }
+    }
+
+    @Nested
+    class ReadingAResult {
+
+        /** Archiving retires a quiz from the catalogue; it must not take away the results of those who sat it. */
+        @Test
+        void stillShowsAResultAfterTheQuizIsArchived() {
+            QuizAttempt attempt = liveAttempt();
+            service.submit(new SubmitQuizAttemptCommand(attempt.getId(),
+                    List.of(new SubmittedAnswer(choice.getId(), right.getId().toString()))));
+            quiz.archive();
+
+            QuizAttemptResult result = service.result(attempt.getId());
+
+            assertThat(result.score()).isEqualByComparingTo("2");
         }
     }
 }

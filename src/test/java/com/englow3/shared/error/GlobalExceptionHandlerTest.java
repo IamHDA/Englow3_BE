@@ -14,6 +14,8 @@ import org.springframework.data.util.TypeInformation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import software.amazon.awssdk.core.exception.SdkClientException;
+
 class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
@@ -73,6 +75,15 @@ class GlobalExceptionHandlerTest {
             var ex = new InvalidDataAccessApiUsageException("wrapped", new IllegalStateException("bug"));
 
             assertThat(handler.onInvalidDataAccess(ex).getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        @Test
+        void mapsAStorageFailureTo503() {
+            ResponseEntity<ApiErrorResponse> response = handler
+                    .onStorageFailure(SdkClientException.create("Unable to execute HTTP request"));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+            assertThat(response.getBody().code()).isEqualTo("STORAGE_UNAVAILABLE");
         }
 
         @Test

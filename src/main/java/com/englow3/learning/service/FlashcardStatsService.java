@@ -2,7 +2,6 @@ package com.englow3.learning.service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.englow3.learning.dto.result.FlashcardStatsResult;
 import com.englow3.learning.query.FlashcardStatsQuery;
 import com.englow3.shared.persistence.ParallelReads;
+import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.service.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -38,6 +38,7 @@ public class FlashcardStatsService {
     private final FlashcardStatsQuery statsQuery;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final StudyCalendar calendar;
 
     /** Not transactional: the five reads are independent and run side by side, see {@link ParallelReads}. */
     public FlashcardStatsResult statsFor(int periodDays) {
@@ -53,7 +54,7 @@ public class FlashcardStatsService {
 
         FlashcardStatsQuery.PeriodSummary summary = summaryRead.get();
         return new FlashcardStatsResult(periodDays, summary.cardsStudied(), summary.retentionPercent(),
-                summary.studySeconds(), StudyStreak.count(studyDays.get(), LocalDate.now(ZoneOffset.UTC)),
-                activityByDay.get(), difficultCards.get(), history.get());
+                summary.studySeconds(), StudyStreak.count(studyDays.get(), calendar.today()), activityByDay.get(),
+                difficultCards.get(), history.get());
     }
 }

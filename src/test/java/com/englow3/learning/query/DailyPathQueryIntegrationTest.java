@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -16,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.englow3.shared.persistence.SqlTime;
+import com.englow3.shared.time.StudyCalendar;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 
@@ -36,6 +36,9 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private StudyCalendar calendar;
 
     private LearnerFixture fixture;
     private UUID learner;
@@ -91,8 +94,20 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
         void countsADayWhoseOnlyWorkWasAnExam() {
             examAttempt(learner, "SCORED", daysAgo(1));
 
-            assertThat(query.studyDays(learner, EPOCH))
-                    .containsExactly(LocalDate.ofInstant(daysAgo(1), ZoneOffset.UTC));
+            assertThat(query.studyDays(learner, EPOCH)).containsExactly(calendar.dayOf(daysAgo(1)));
+        }
+
+        /**
+         * Half past six in the morning in Hanoi is still the previous evening in UTC. Counted in UTC, an early session
+         * landed on yesterday and could break a streak over a night's sleep; it belongs to the learner's day.
+         */
+        @Test
+        void countsAnEarlyMorningSessionOnTheLearnersDay() {
+            Instant earlyMorningInHanoi = Instant.parse("2026-03-13T23:30:00Z");
+            UUID set = fixture.publishedFlashcardSet("Morning", learner);
+            fixture.reviewLog(learner, fixture.flashcard(set, 1, "dawn"), set, "GOOD", earlyMorningInHanoi);
+
+            assertThat(query.studyDays(learner, EPOCH)).containsExactly(LocalDate.of(2026, 3, 14));
         }
 
         /**

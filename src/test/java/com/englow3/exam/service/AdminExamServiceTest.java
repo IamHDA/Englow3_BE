@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import com.englow3.shared.error.ConflictException;
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
 import com.englow3.exam.dto.command.ExamDetailCommand;
@@ -154,7 +156,9 @@ class AdminExamServiceTest {
 
         @Test
         void uploadsMediaThroughTheObjectStorageClient() {
-            UUID examId = UUID.randomUUID();
+            Exam exam = draft();
+            when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+            UUID examId = exam.getId();
             MockMultipartFile file = new MockMultipartFile("file", "clip.mp3", "audio/mpeg", "audio-bytes".getBytes());
 
             ExamMediaResult result = service.uploadMedia(examId, file);
@@ -162,6 +166,21 @@ class AdminExamServiceTest {
             assertThat(result.objectKey()).startsWith(examId + "/audios/").endsWith(".mp3");
             verify(objectStorage).upload(eq(EXAM_BUCKET), eq(result.objectKey()), any(), eq(file.getSize()),
                     eq("audio/mpeg"));
+        }
+
+        /** A file for a paper that is not there, or can no longer change, would be an orphan in the bucket. */
+        @Test
+        void uploadsNothingForAMissingOrPublishedPaper() {
+            UUID missing = UUID.randomUUID();
+            when(examRepo.findById(missing)).thenReturn(Optional.empty());
+            Exam archived = draft();
+            archived.archive();
+            when(examRepo.findById(archived.getId())).thenReturn(Optional.of(archived));
+            MockMultipartFile file = new MockMultipartFile("file", "clip.mp3", "audio/mpeg", "audio-bytes".getBytes());
+
+            assertThatThrownBy(() -> service.uploadMedia(missing, file)).isInstanceOf(NotFoundException.class);
+            assertThatThrownBy(() -> service.uploadMedia(archived.getId(), file)).isInstanceOf(ConflictException.class);
+            verifyNoInteractions(objectStorage);
         }
 
         @Test

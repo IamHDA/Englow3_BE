@@ -54,6 +54,10 @@ spring:
           audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
 
 app:
+  # The day every daily figure is counted in - streaks, today's tasks and quests, per-day charts, the AI allowance.
+  # The learners' zone, not UTC: see StudyCalendar.
+  calendar:
+    zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.104.183.3:4000}
 

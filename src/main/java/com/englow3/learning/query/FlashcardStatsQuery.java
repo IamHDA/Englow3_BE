@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.englow3.shared.persistence.SqlTime;
+import com.englow3.shared.time.StudyCalendar;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class FlashcardStatsQuery {
 
     private final JdbcClient jdbcClient;
+    private final StudyCalendar calendar;
 
     /** How many distinct cards the learner has answered at least once. */
     /**
@@ -49,12 +51,12 @@ public class FlashcardStatsQuery {
     /** One row per day the learner answered anything, newest last so a chart can plot it straight. */
     public List<DailyActivity> activityByDay(UUID userId, Instant from) {
         return jdbcClient.sql("""
-                select cast(reviewed_at at time zone 'UTC' as date) as day, count(*) as cards
+                select cast(reviewed_at at time zone :zone as date) as day, count(*) as cards
                   from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
                  group by day
                  order by day
-                """).param("userId", userId).param("from", SqlTime.at(from))
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new DailyActivity(rs.getObject("day", LocalDate.class), rs.getLong("cards")))
                 .list();
     }
@@ -82,7 +84,7 @@ public class FlashcardStatsQuery {
     /** One row per day and set - the history table reads as "on this day, in this set, you did this". */
     public List<SessionSummary> history(UUID userId, int limit) {
         return jdbcClient.sql("""
-                select cast(l.reviewed_at at time zone 'UTC' as date) as day,
+                select cast(l.reviewed_at at time zone :zone as date) as day,
                        s.id as set_id,
                        s.name as set_name,
                        count(*) as cards,
@@ -96,7 +98,7 @@ public class FlashcardStatsQuery {
                  group by day, s.id, s.name
                  order by day desc
                  limit :limit
-                """).param("userId", userId).param("limit", limit)
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("limit", limit)
                 .query((rs, rowNum) -> new SessionSummary(rs.getObject("day", LocalDate.class),
                         rs.getObject("set_id", UUID.class), rs.getString("set_name"), rs.getLong("cards"),
                         rs.getInt("recall_percent"), rs.getLong("study_seconds")))
@@ -109,11 +111,12 @@ public class FlashcardStatsQuery {
      */
     public List<LocalDate> studyDays(UUID userId, Instant from) {
         return jdbcClient.sql("""
-                select distinct cast(reviewed_at at time zone 'UTC' as date) as day
+                select distinct cast(reviewed_at at time zone :zone as date) as day
                   from flashcard_review_logs
                  where user_id = :userId and reviewed_at >= :from
                  order by day desc
-                """).param("userId", userId).param("from", SqlTime.at(from)).query(LocalDate.class).list();
+                """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
+                .query(LocalDate.class).list();
     }
 
     public record PeriodSummary(long cardsStudied, int retentionPercent, long studySeconds) {

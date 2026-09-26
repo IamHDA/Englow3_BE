@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import software.amazon.awssdk.core.exception.SdkException;
+
 import com.englow3.shared.logging.TraceIdFilter;
 
 @RestControllerAdvice
@@ -70,6 +72,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiErrorResponse> onUnknownSortProperty(PropertyReferenceException ex) {
         return ResponseEntity.badRequest()
                 .body(error("INVALID_SORT_PROPERTY", "Cannot sort by '%s'".formatted(ex.getPropertyName())));
+    }
+
+    /**
+     * The object store failed - an upload or a delete that never reached the bucket. Not the caller's fault and not a
+     * bug here either, and a 503 tells the client that trying again later is the right move.
+     */
+    @ExceptionHandler(SdkException.class)
+    public ResponseEntity<ApiErrorResponse> onStorageFailure(SdkException ex) {
+        log.error("Object storage failure", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(error("STORAGE_UNAVAILABLE", "File storage is unavailable, please try again later"));
     }
 
     /**

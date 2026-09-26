@@ -100,7 +100,7 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
         assertThat(queue.hasDailyAllowance(learner)).isTrue();
     }
 
-    /** The budget is per day, in UTC like every other daily figure here. Yesterday's spending is spent. */
+    /** The budget is per day, the learners' day like every other daily figure here. Yesterday's spending is spent. */
     @Test
     void startsAgainEachDay() {
         speak(learner);

@@ -138,8 +138,10 @@ public class QuizService {
         Quiz quiz = requirePublished(attempt.getQuizId());
         List<QuizQuestion> questions = questionRepo.findByQuizIdOrderByOrderNo(quiz.getId());
         QuestionContent content = loadContent(questions);
-        Map<UUID, String> responses = command.answers().stream().collect(
-                Collectors.toMap(SubmittedAnswer::questionId, answer -> answer.response(), (left, right) -> left));
+        // A null response is an unanswered question, marked wrong like one left out. Collectors.toMap refuses null
+        // values outright, so passing it through turned a skipped question into a 500.
+        Map<UUID, String> responses = command.answers().stream().collect(Collectors.toMap(SubmittedAnswer::questionId,
+                answer -> answer.response() == null ? "" : answer.response(), (left, right) -> left));
 
         BigDecimal score = BigDecimal.ZERO;
         int correctCount = 0;
@@ -177,7 +179,10 @@ public class QuizService {
             throw new ConflictException("QUIZ_ATTEMPT_NOT_SCORED", "This quiz attempt has not been scored");
         }
 
-        Quiz quiz = requirePublished(attempt.getQuizId());
+        // Not requirePublished: a result is the learner's record of something they already did. Archiving the quiz
+        // afterwards retires it from the catalogue; it must not take away their marked answers.
+        Quiz quiz = quizRepo.findById(attempt.getQuizId()).orElseThrow(
+                () -> new NotFoundException("QUIZ_NOT_FOUND", "No quiz with id %s".formatted(attempt.getQuizId())));
         List<QuizQuestion> questions = questionRepo.findByQuizIdOrderByOrderNo(quiz.getId());
         QuestionContent content = loadContent(questions);
         Map<UUID, QuizAttemptAnswer> answers = attemptAnswerRepo.findByQuizAttemptId(attemptId).stream()
