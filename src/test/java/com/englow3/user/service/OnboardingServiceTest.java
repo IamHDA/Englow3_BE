@@ -1,5 +1,6 @@
 package com.englow3.user.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
@@ -205,6 +206,42 @@ class OnboardingServiceTest {
                     new BigDecimal("7.0"), LocalDate.now().plusMonths(6)))).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
+        }
+
+        /** Without a purpose the flow cannot know whether a certificate step belonged in between. */
+        @Test
+        void refusesTheLevelStepBeforeAPurposeIsChosen() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of());
+
+            assertThatThrownBy(() -> service.setCurrentLevel(new SetCurrentLevelCommand(CertificateLevel.B1)))
+                    .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                    .isEqualTo("ONBOARDING_PURPOSE_REQUIRED");
+        }
+
+        /** An IELTS 45 is a TOEIC habit or a typo, not a goal - and a goal no one can reach misleads every screen. */
+        @Test
+        void refusesAScoreTheCertificateCannotAward() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.declareCurrentLevel(CertificateLevel.B1);
+
+            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(CertificateType.IELTS, null,
+                    new BigDecimal("45"), LocalDate.now().plusMonths(6)))).isInstanceOf(BadRequestException.class)
+                            .extracting(e -> ((BadRequestException) e).getCode())
+                            .isEqualTo("TARGET_SCORE_OUT_OF_RANGE");
+            assertThatThrownBy(() -> service.setLearningGoal(
+                    new SetLearningGoalCommand(CertificateType.TOEIC, new BigDecimal("7"), null, null)))
+                            .isInstanceOf(BadRequestException.class)
+                            .extracting(e -> ((BadRequestException) e).getCode())
+                            .isEqualTo("CURRENT_SCORE_OUT_OF_RANGE");
+        }
+
+        @Test
+        void acceptsHalfBandsForIeltsAndStepsOfFiveForToeic() {
+            assertThat(CertificateType.IELTS.isValidScore(new BigDecimal("6.5"))).isTrue();
+            assertThat(CertificateType.IELTS.isValidScore(new BigDecimal("6.3"))).isFalse();
+            assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("785"))).isTrue();
+            assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("787"))).isFalse();
+            assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("995"))).isFalse();
         }
 
     }

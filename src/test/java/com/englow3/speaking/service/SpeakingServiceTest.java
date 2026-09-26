@@ -21,6 +21,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import software.amazon.awssdk.services.s3.model.S3Exception;
+
 import com.englow3.ai.service.AiJobQueue;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
@@ -134,15 +136,41 @@ class SpeakingServiceTest {
         verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
     }
 
+    /** A second submit of one already queued is "already submitted", even for a learner who has spent the day. */
+    @Test
+    void saysAlreadySubmittedBeforeSayingTheLimitIsReached() {
+        SpeakingAttempt attempt = uploadedAttempt();
+        attempt.markQueued();
+        when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
+                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_ATTEMPT_NOT_AWAITING_UPLOAD");
+    }
+
     /** A client that failed its upload and submitted anyway is told what actually went wrong. */
     @Test
     void refusesWhenTheRecordingNeverArrived() {
         SpeakingAttempt attempt = uploadedAttempt();
-        when(objectStorage.metadata(anyString(), anyString())).thenThrow(new RuntimeException("no such key"));
+        when(objectStorage.metadata(anyString(), anyString()))
+                .thenThrow(S3Exception.builder().statusCode(404).message("no such key").build());
 
         assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_RECORDING_MISSING");
 
+        verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
+    }
+
+    /**
+     * A store that is down is not a missing recording. Saying it was sent the learner off to record again, when the
+     * recording was fine and only needed the store to come back.
+     */
+    @Test
+    void doesNotBlameTheLearnerWhenTheStoreIsDown() {
+        SpeakingAttempt attempt = uploadedAttempt();
+        when(objectStorage.metadata(anyString(), anyString()))
+                .thenThrow(S3Exception.builder().statusCode(503).message("slow down").build());
+
+        assertThatThrownBy(() -> service.submitAttempt(attempt.getId())).isInstanceOf(S3Exception.class);
         verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(), any());
     }
 

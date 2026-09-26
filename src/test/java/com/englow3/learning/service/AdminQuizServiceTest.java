@@ -98,6 +98,44 @@ class AdminQuizServiceTest {
         }
 
         @Test
+        void refusesAMultipleChoiceWithOneOption() {
+            assertThatThrownBy(() -> add(question(QuizQuestionType.MULTIPLE_CHOICE,
+                    List.of(new NewOption("A", "The only one", true)), null, null, null, null)))
+                            .isInstanceOf(BadRequestException.class)
+                            .hasFieldOrPropertyWithValue("code", "QUIZ_QUESTION_TOO_FEW_OPTIONS");
+        }
+
+        /** Tiles that are not the answer's words make the right order impossible to build. */
+        @Test
+        void refusesScrambledWordsThatAreNotTheAnswersWords() {
+            NewQuestion reorder = new NewQuestion(QuizQuestionType.REORDER, "Title", "Prompt", (short) 1, "", null,
+                    null, null, null, null, null, null, null, List.of("She", "left"), List.of("She", "has", "left"),
+                    null);
+
+            assertThatThrownBy(() -> add(reorder)).isInstanceOf(BadRequestException.class)
+                    .hasFieldOrPropertyWithValue("code", "QUIZ_QUESTION_SCRAMBLE_MISMATCH");
+        }
+
+        @Test
+        void refusesAWordBankMissingAWordOfTheAnswer() {
+            NewQuestion rewrite = new NewQuestion(QuizQuestionType.REWRITE, "Title", "Prompt", (short) 1, "", null,
+                    null, null, null, null, null, List.of("She", "left"), List.of("She", "has", "left"), null, null,
+                    null);
+
+            assertThatThrownBy(() -> add(rewrite)).isInstanceOf(BadRequestException.class)
+                    .hasFieldOrPropertyWithValue("code", "QUIZ_QUESTION_WORD_BANK_INCOMPLETE");
+        }
+
+        /** The answer's halves arrive joined by '|'; a half containing it could never be marked right. */
+        @Test
+        void refusesAMatchingPairContainingTheSeparator() {
+            assertThatThrownBy(() -> add(question(QuizQuestionType.MATCHING, null, null, null, null,
+                    List.of(new NewPair("either|or", "b"), new NewPair("c", "d")))))
+                            .isInstanceOf(BadRequestException.class)
+                            .hasFieldOrPropertyWithValue("code", "QUIZ_QUESTION_PAIR_HAS_SEPARATOR");
+        }
+
+        @Test
         void refusesAMatchingWithNoPairs() {
             assertThatThrownBy(() -> add(question(QuizQuestionType.MATCHING, null, null, null, null, null)))
                     .isInstanceOf(BadRequestException.class)
@@ -135,9 +173,8 @@ class AdminQuizServiceTest {
         void refusesToAddQuestionsToAPublishedQuiz() {
             quiz.publish(1, 1, Instant.now());
 
-            assertThatThrownBy(() -> add(
-                    question(QuizQuestionType.MATCHING, null, null, null, null, List.of(new NewPair("a", "b")))))
-                            .isInstanceOf(ConflictException.class)
+            assertThatThrownBy(() -> add(question(QuizQuestionType.MATCHING, null, null, null, null,
+                    List.of(new NewPair("a", "b"), new NewPair("c", "d"))))).isInstanceOf(ConflictException.class)
                             .hasFieldOrPropertyWithValue("code", "QUIZ_NOT_EDITABLE");
         }
 
@@ -150,7 +187,8 @@ class AdminQuizServiceTest {
             quiz.submitForReview(1, 1, Instant.now());
             quiz.reject(UUID.randomUUID(), "Add a question about the passive.", Instant.now());
 
-            add(question(QuizQuestionType.MATCHING, null, null, null, null, List.of(new NewPair("a", "b"))));
+            add(question(QuizQuestionType.MATCHING, null, null, null, null,
+                    List.of(new NewPair("a", "b"), new NewPair("c", "d"))));
 
             verify(questionRepo).saveAll(any());
         }

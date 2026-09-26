@@ -85,6 +85,16 @@ class QuizGraderTest {
         void collapsesRepeatedSpacesBetweenWords() {
             assertThat(QuizGrader.isCorrect(question, "she  has never   been there")).isTrue();
         }
+
+        /** A tile of more than one word used to make the question impossible: the answer was split on spaces. */
+        @Test
+        void acceptsATileThatIsMoreThanOneWord() {
+            GradableQuestion chunked = of(QuizQuestionType.REWRITE, List.of(), List.of(),
+                    List.of("We went out", "in spite of", "the rain"), List.of());
+
+            assertThat(QuizGrader.isCorrect(chunked, "We went out in spite of the rain")).isTrue();
+            assertThat(QuizGrader.isCorrect(chunked, "We went out the rain in spite of")).isFalse();
+        }
     }
 
     @Nested

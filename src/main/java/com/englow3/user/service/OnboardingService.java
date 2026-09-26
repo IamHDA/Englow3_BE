@@ -1,5 +1,6 @@
 package com.englow3.user.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import com.englow3.user.dto.command.SetCurrentLevelCommand;
 import com.englow3.user.dto.command.SetLearningGoalCommand;
 import com.englow3.user.dto.result.LearningPurposeResult;
 import com.englow3.user.dto.result.OnboardingStateResult;
+import com.englow3.user.entity.CertificateType;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.LearningPurpose;
 import com.englow3.user.entity.OnboardingStep;
@@ -82,6 +84,12 @@ public class OnboardingService {
         if (command.level() == null) {
             throw levelAssessmentUnavailable(isCertificateLearner(user));
         }
+        // In order, like the goal step below: without a purpose the flow cannot know whether a certificate step
+        // belonged in between, and the learner would be moved past it.
+        if (user.getLearningPurposeIds().isEmpty()) {
+            throw new ConflictException("ONBOARDING_PURPOSE_REQUIRED",
+                    "The level step opens only once a learning purpose is chosen");
+        }
 
         LearnerProfile profile = profileOf(user);
         profile.declareCurrentLevel(command.level());
@@ -102,6 +110,9 @@ public class OnboardingService {
             throw new BadRequestException("TARGET_SCORE_NOT_APPLICABLE",
                     "Only a certificate learner has a score to aim at");
         }
+
+        requireScoreOnScale(command.certificateType(), command.currentScore(), "CURRENT_SCORE_OUT_OF_RANGE");
+        requireScoreOnScale(command.certificateType(), command.targetScore(), "TARGET_SCORE_OUT_OF_RANGE");
 
         profile.setGoal(command.certificateType(), command.targetScore(), command.currentScore(), command.targetDate());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
@@ -125,6 +136,13 @@ public class OnboardingService {
                 profile.getTargetCertificateType());
 
         return state(user, profile);
+    }
+
+    private static void requireScoreOnScale(CertificateType certificate, BigDecimal score, String code) {
+        if (score != null && !certificate.isValidScore(score)) {
+            throw new BadRequestException(code, "%s is not a %s score; %s scores run %s"
+                    .formatted(score.toPlainString(), certificate, certificate, certificate.scoreRange()));
+        }
     }
 
     private User requireCurrentUser() {

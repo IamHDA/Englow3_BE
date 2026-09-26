@@ -33,6 +33,7 @@ import com.englow3.learning.entity.QuizQuestionOption;
 import com.englow3.learning.entity.QuizQuestionPair;
 import com.englow3.learning.entity.QuizQuestionToken;
 import com.englow3.learning.entity.QuizStatus;
+import com.englow3.learning.entity.QuizQuestionType;
 import com.englow3.learning.entity.QuizTokenRole;
 import com.englow3.learning.repository.QuizAttemptAnswerRepository;
 import com.englow3.learning.repository.QuizAttemptRepository;
@@ -212,24 +213,38 @@ public class QuizService {
 
         List<QuizQuestionPair> pairs = content.pairsOf(question);
 
+        // The paper only ever shows tiles, so a REWRITE with no word bank or a REORDER with no scrambled words was a
+        // question with nothing to answer it with. Where the author gave none, the answer's own words are dealt out.
+        List<String> wordBank = content.tokensOf(question, QuizTokenRole.WORD_BANK);
+        if (wordBank.isEmpty() && question.getQuestionType() == QuizQuestionType.REWRITE) {
+            wordBank = shuffled(content.tokensOf(question, QuizTokenRole.CORRECT_WORD), attemptId, question);
+        }
+        List<String> scrambled = content.tokensOf(question, QuizTokenRole.SCRAMBLED);
+        if (scrambled.isEmpty() && question.getQuestionType() == QuizQuestionType.REORDER) {
+            scrambled = shuffled(content.tokensOf(question, QuizTokenRole.CORRECT_ORDER), attemptId, question);
+        }
+
         return new QuizQuestionResult(question.getId(), question.getOrderNo(), question.getQuestionType(),
                 question.getTitle(), question.getPrompt(), question.getPoints(), question.getBeforeText(),
                 question.getAfterText(), question.getOriginalSentence(), question.getRewriteKeyword(), options,
-                content.tokensOf(question, QuizTokenRole.WORD_BANK),
-                content.tokensOf(question, QuizTokenRole.SCRAMBLED),
-                pairs.stream().map(QuizQuestionPair::getLeftText).toList(), shuffledRights(pairs, attemptId, question));
+                wordBank, scrambled, pairs.stream().map(QuizQuestionPair::getLeftText).toList(),
+                shuffled(pairs.stream().map(QuizQuestionPair::getRightText).toList(), attemptId, question));
     }
 
     /**
-     * Matching pairs are stored in their answered order, so handing the right column over as stored would hand over the
-     * pairing. Shuffled with a seed derived from the attempt and the question, so the learner sees the same arrangement
-     * every time they reload rather than a new puzzle on each refresh.
+     * Anything stored in its answered order - matching right halves, and tiles dealt from an answer - handed over as
+     * stored would hand over the answer. Shuffled with a seed derived from the attempt and the question, so the learner
+     * sees the same arrangement every time they reload rather than a new puzzle on each refresh. A shuffle that happens
+     * to land on the answer is turned by one, or a two-word reorder would be solved half the time.
      */
-    private List<String> shuffledRights(List<QuizQuestionPair> pairs, UUID attemptId, QuizQuestion question) {
-        List<String> rights = new ArrayList<>(pairs.stream().map(QuizQuestionPair::getRightText).toList());
-        java.util.Collections.shuffle(rights,
+    private static List<String> shuffled(List<String> answerOrder, UUID attemptId, QuizQuestion question) {
+        List<String> dealt = new ArrayList<>(answerOrder);
+        java.util.Collections.shuffle(dealt,
                 new Random(attemptId.getMostSignificantBits() ^ question.getId().getMostSignificantBits()));
-        return rights;
+        if (dealt.size() > 1 && dealt.equals(answerOrder)) {
+            java.util.Collections.rotate(dealt, 1);
+        }
+        return dealt;
     }
 
     private QuestionContent loadContent(List<QuizQuestion> questions) {

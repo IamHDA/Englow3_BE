@@ -1,8 +1,6 @@
 package com.englow3.tutor.service;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +20,7 @@ import com.englow3.tutor.dto.result.TutorMessageResult;
 import com.englow3.tutor.entity.TutorConversation;
 import com.englow3.tutor.entity.TutorMessage;
 import com.englow3.tutor.entity.TutorMessageRole;
+import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
 import com.englow3.user.service.UserDirectory;
@@ -59,13 +58,29 @@ public class TutorService {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = Instant.now();
 
-        requireQuotaRemaining(userId);
-
-        TutorConversation conversation = command.conversationId() == null
-                ? conversationRepo.save(TutorConversation.start(userId, command.message(), command.topic(), now))
+        TutorConversation conversation = command.conversationId() == null ? null
                 : requireOwnConversation(command.conversationId(), userId);
+        if (conversation != null && conversation.getArchivedAt() != null) {
+            // Archived is gone from the learner's list; writing into it spent their allowance on a thread they
+            // could no longer see.
+            throw new ConflictException("TUTOR_CONVERSATION_ARCHIVED", "This conversation has been archived");
+        }
+        List<TutorMessage> existing = conversation == null ? List.of()
+                : messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId());
+        // One question at a time. A second one sent before the first is answered was generated without that answer
+        // in its history, and paid for a second reply to a conversation that had not moved on.
+        if (existing.stream().anyMatch(message -> message.getStatus() == TutorMessageStatus.PENDING)) {
+            throw new ConflictException("TUTOR_REPLY_PENDING",
+                    "Wait for the tutor to answer before asking the next question");
+        }
+        // After the conversation's own checks, so an archived or busy thread says so rather than "limit reached";
+        // and before anything is written, so a refusal leaves no empty thread behind.
+        requireQuotaRemaining(userId);
+        if (conversation == null) {
+            conversation = conversationRepo
+                    .save(TutorConversation.start(userId, command.message(), command.topic(), now));
+        }
 
-        List<TutorMessage> existing = messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId());
         int nextOrderNo = existing.size() + 1;
 
         TutorMessage question = messageRepo

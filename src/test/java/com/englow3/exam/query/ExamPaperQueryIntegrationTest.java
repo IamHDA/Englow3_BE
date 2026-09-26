@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.englow3.exam.dto.result.LearnerExamPaperResult;
+import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.support.ExamFixture;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
@@ -37,6 +38,9 @@ class ExamPaperQueryIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private QuestionRepository questions;
+
     private ExamFixture exams;
     private UUID examId;
     private UUID rightOption;
@@ -59,7 +63,10 @@ class ExamPaperQueryIntegrationTest extends PostgresIntegrationTest {
 
         rightOption = exams.option(first, 1, "The right one", true);
         exams.option(first, 2, "A wrong one", false);
+        this.set = set;
     }
+
+    private UUID set;
 
     @Nested
     class TheLearnersCopy {
@@ -161,6 +168,19 @@ class ExamPaperQueryIntegrationTest extends PostgresIntegrationTest {
             UUID empty = exams.publishedExam("Empty paper", new LearnerFixture(jdbc).learner());
 
             assertThat(grading.load(empty)).isEmpty();
+        }
+    }
+
+    @Nested
+    class WhatPublishingRefuses {
+
+        /** One option, and it the right one, is a question that answers itself - as unfinished as one with none. */
+        @Test
+        void flagsAQuestionWithASingleOptionAsIncomplete() {
+            UUID lonely = exams.question(set, 3, "Only one way to answer");
+            exams.option(lonely, 1, "The only one", true);
+
+            assertThat(questions.findIncompleteQuestionOrderNos(examId)).containsExactly(2, 3);
         }
     }
 }

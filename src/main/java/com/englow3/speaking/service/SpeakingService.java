@@ -3,8 +3,6 @@ package com.englow3.speaking.service;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,6 +12,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.service.AiJobQueue;
@@ -132,9 +132,11 @@ public class SpeakingService {
         SpeakingPrompt prompt = promptRepo.findById(attempt.getSpeakingPromptId())
                 .orElseThrow(() -> promptNotFound(attempt.getSpeakingPromptId()));
 
+        // The attempt's own state first: a second submit of one already queued is "already submitted", not "you are
+        // out of requests", and the upload check would only cost a round trip to the bucket to say so.
+        attempt.markQueued();
         requireUploadedAudio(attempt);
         requireQuotaRemaining(userId);
-        attempt.markQueued();
 
         aiJobQueue.enqueue(AiJobType.SPEECH_ASSESSMENT, ATTEMPT_TARGET_TYPE, attempt.getId(),
                 assessmentRequest(attempt, prompt),
@@ -196,7 +198,12 @@ public class SpeakingService {
     private void requireUploadedAudio(SpeakingAttempt attempt) {
         try {
             objectStorage.metadata(speakingBucket, attempt.getAudioObjectKey());
-        } catch (RuntimeException missing) {
+        } catch (S3Exception notThere) {
+            // Only "no such object" means the learner has not uploaded. Anything else is the store failing, and
+            // reporting that as a missing recording sent learners back to record again for nothing.
+            if (notThere.statusCode() != 404) {
+                throw notThere;
+            }
             throw new ConflictException("SPEAKING_RECORDING_MISSING",
                     "The recording for this attempt has not been uploaded");
         }

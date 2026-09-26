@@ -26,7 +26,9 @@ import com.englow3.learning.entity.QuizAttempt;
 import com.englow3.learning.entity.QuizQuestion;
 import com.englow3.learning.entity.QuizQuestionOption;
 import com.englow3.learning.entity.QuizQuestionPair;
+import com.englow3.learning.entity.QuizQuestionToken;
 import com.englow3.learning.entity.QuizQuestionType;
+import com.englow3.learning.entity.QuizTokenRole;
 import com.englow3.learning.repository.QuizAttemptAnswerRepository;
 import com.englow3.learning.repository.QuizAttemptRepository;
 import com.englow3.learning.repository.QuizQuestionOptionRepository;
@@ -160,6 +162,28 @@ class QuizServiceTest {
             List<String> lefts = service.paperForAttempt(liveAttempt().getId()).questions().get(0).leftTexts();
 
             assertThat(lefts).containsExactly("We stayed in", "The film ended", "He was tired");
+        }
+    }
+
+    @Nested
+    class DealingTiles {
+
+        /** The paper only shows tiles; a reorder authored without scrambled words had nothing to arrange. */
+        @Test
+        void dealsTheAnswersWordsWhenNoScrambledWordsWereGiven() {
+            QuizQuestion reorder = QuizQuestion.of(quiz.getId(), 1, QuizQuestionType.REORDER, "Order them",
+                    "Make a sentence", (short) 1, "", null, null, null, null);
+            when(questionRepo.findByQuizIdOrderByOrderNo(quiz.getId())).thenReturn(List.of(reorder));
+            when(optionRepo.findByQuizQuestionIdInOrderByOrderNo(anyCollection())).thenReturn(List.of());
+            when(tokenRepo.findByQuizQuestionIdInOrderByOrderNo(anyCollection()))
+                    .thenReturn(List.of(QuizQuestionToken.of(reorder.getId(), QuizTokenRole.CORRECT_ORDER, 1, "She"),
+                            QuizQuestionToken.of(reorder.getId(), QuizTokenRole.CORRECT_ORDER, 2, "has"),
+                            QuizQuestionToken.of(reorder.getId(), QuizTokenRole.CORRECT_ORDER, 3, "left")));
+
+            List<String> tiles = service.paperForAttempt(liveAttempt().getId()).questions().get(0).scrambledWords();
+
+            assertThat(tiles).containsExactlyInAnyOrder("She", "has", "left");
+            assertThat(tiles).isNotEqualTo(List.of("She", "has", "left"));
         }
     }
 

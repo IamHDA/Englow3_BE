@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,9 @@ public class UserService {
 
     private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of("image/png", "png", "image/jpeg", "jpg",
             "image/webp", "webp");
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
 
     private final UserRepository userRepo;
     private final CurrentUser currentUser;
@@ -66,18 +71,43 @@ public class UserService {
         User user = requireCurrentUser();
         String objectKey = upload(image, user.getId(), kind);
 
+        String replaced;
         if ("avatar".equals(kind)) {
+            replaced = user.getAvatarObjectKey();
             user.changeAvatar(objectKey);
         } else {
+            replaced = user.getBannerObjectKey();
             user.changeBanner(objectKey);
         }
 
-        return UserInformationResult.of(userRepo.save(user));
+        UserInformationResult result = UserInformationResult.of(userRepo.save(user));
+        deleteQuietly(replaced);
+        return result;
+    }
+
+    /**
+     * The picture that was just replaced. Every change used to leave the old file in the bucket for good. Only once the
+     * new key is saved, and best effort: a delete that fails leaves one stray file, which is no reason to fail a change
+     * that has already happened.
+     */
+    private void deleteQuietly(String objectKey) {
+        if (objectKey == null) {
+            return;
+        }
+        try {
+            objectStorageClient.delete(avatarBucket, objectKey);
+        } catch (RuntimeException failure) {
+            log.warn("Could not delete replaced profile image {}", objectKey, failure);
+        }
     }
 
     private String upload(MultipartFile image, UUID userId, String kind) {
         if (image == null || image.isEmpty()) {
             throw new BadRequestException("IMAGE_REQUIRED", "No image was uploaded");
+        }
+        // The request limit is sized for exam audio; a profile picture has no business being twelve megabytes.
+        if (image.getSize() > MAX_IMAGE_BYTES) {
+            throw new BadRequestException("IMAGE_TOO_LARGE", "Profile images can be at most 5 MB");
         }
         String extension = ALLOWED_IMAGE_TYPES.get(image.getContentType());
         if (extension == null) {

@@ -105,6 +105,28 @@ class UserServiceTest {
             verify(user).changeAvatar(key.getValue());
         }
 
+        /** Every change used to leave the old picture in the bucket for good. */
+        @Test
+        void deletesThePictureItReplaces() {
+            when(user.getAvatarObjectKey()).thenReturn("users/old/avatar/previous.png");
+
+            service.changeAvatar(mockImage("image/png"));
+
+            verify(objectStorageClient).delete(BUCKET, "users/old/avatar/previous.png");
+        }
+
+        /** The change has happened by then; a stray file is no reason to report it as failed. */
+        @Test
+        void keepsTheChangeWhenTheOldPictureCannotBeDeleted() {
+            when(user.getAvatarObjectKey()).thenReturn("users/old/avatar/previous.png");
+            org.mockito.Mockito.doThrow(new RuntimeException("store down")).when(objectStorageClient)
+                    .delete(anyString(), anyString());
+
+            service.changeAvatar(mockImage("image/png"));
+
+            verify(user).changeAvatar(anyString());
+        }
+
         @Test
         void storesABannerUnderTheBannerPrefix() {
             service.changeBanner(mockImage("image/jpeg"));
@@ -133,6 +155,16 @@ class UserServiceTest {
             assertThatThrownBy(() -> service.changeAvatar(mockImage("image/svg+xml")))
                     .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                     .isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+        }
+
+        @Test
+        void refusesAnImageOverFiveMegabytes() {
+            MultipartFile huge = mockImage("image/png");
+            when(huge.getSize()).thenReturn(6L * 1024 * 1024);
+
+            assertThatThrownBy(() -> service.changeAvatar(huge)).isInstanceOf(BadRequestException.class)
+                    .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_TOO_LARGE");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
         }
 

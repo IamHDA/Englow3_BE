@@ -115,13 +115,40 @@ class TutorServiceTest {
         /** Continuing a thread numbers the new turns after the ones already in it, not from one. */
         @Test
         void numbersNewTurnsAfterTheExistingOnes() {
+            TutorMessage answered = TutorMessage.awaitingReply(conversation.getId(), 2);
+            answered.answer("A verb used as a noun.", "m", "v1", 1, 1, Instant.now());
             when(messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId()))
-                    .thenReturn(List.of(TutorMessage.fromLearner(conversation.getId(), 1, "earlier"),
-                            TutorMessage.awaitingReply(conversation.getId(), 2)));
+                    .thenReturn(List.of(TutorMessage.fromLearner(conversation.getId(), 1, "earlier"), answered));
 
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
             assertThat(savedMessages()).extracting(TutorMessage::getOrderNo).containsExactly(3, 4);
+        }
+
+        /** A second question before the first is answered would be generated without that answer, and paid twice. */
+        @Test
+        void refusesANewQuestionWhileTheLastIsUnanswered() {
+            when(messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId()))
+                    .thenReturn(List.of(TutorMessage.fromLearner(conversation.getId(), 1, "earlier"),
+                            TutorMessage.awaitingReply(conversation.getId(), 2)));
+
+            assertThatThrownBy(
+                    () -> service.send(new SendTutorMessageCommand(conversation.getId(), "And another?", null)))
+                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("TUTOR_REPLY_PENDING");
+            verify(messageRepo, never()).save(any());
+        }
+
+        @Test
+        void refusesAnArchivedConversation() {
+            conversation.archive(Instant.now());
+
+            assertThatThrownBy(
+                    () -> service.send(new SendTutorMessageCommand(conversation.getId(), "Still there?", null)))
+                            .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                            .isEqualTo("TUTOR_CONVERSATION_ARCHIVED");
+            verify(aiJobQueue, never()).enqueue(any(), anyString(), any(), anyString(), anyString(), anyString(),
+                    any());
         }
 
         /** The earlier turns travel with the question, or the tutor answers a follow-up it cannot see the start of. */

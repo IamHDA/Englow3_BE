@@ -119,6 +119,12 @@ public class User {
      * The step is a resume pointer, not a state machine - the flow branches, so the service decides what comes next.
      */
     public void moveTo(OnboardingStep step) {
+        // A finished onboarding stays finished. The steps can be answered again - to change a goal, say - but that is
+        // an edit, not a trip back through the flow: moving a completed learner back to LEARNING_GOAL reopened the
+        // onboarding popup on every page.
+        if (onboardingStep == OnboardingStep.COMPLETED) {
+            return;
+        }
         this.onboardingStep = step;
     }
 

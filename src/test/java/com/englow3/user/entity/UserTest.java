@@ -24,6 +24,18 @@ class UserTest {
             assertThat(user.getOnboardingStep()).isEqualTo(OnboardingStep.COMPLETED);
         }
 
+        /** Editing a goal after onboarding is an edit, not a trip back through the flow and its popup. */
+        @Test
+        void staysCompletedWhenAStepIsAnsweredAgain() {
+            User user = new User();
+            user.selectLearningPurposes(Set.of(1));
+            user.completeOnboarding(CertificateLevel.B2, false, null);
+
+            user.moveTo(OnboardingStep.LEARNING_GOAL);
+
+            assertThat(user.getOnboardingStep()).isEqualTo(OnboardingStep.COMPLETED);
+        }
+
         @Test
         void replacesTheWholeLearningPurposeSelectionOnEachCall() {
             User user = new User();

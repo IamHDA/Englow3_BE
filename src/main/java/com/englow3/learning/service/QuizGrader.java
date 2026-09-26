@@ -39,7 +39,9 @@ public final class QuizGrader {
         return switch (question.type()) {
             case MULTIPLE_CHOICE -> question.correctOptionIds().contains(answer);
             case FILL_BLANK -> question.acceptedAnswers().stream().anyMatch(accepted -> equalText(accepted, answer));
-            case REWRITE, REORDER -> equalWordSequence(question.correctWords(), splitWords(answer));
+            // The sentence as a whole, not word by word against the tiles: a tile may be more than one word ("in
+            // spite of"), and splitting the answer on spaces made such a question impossible to get right.
+            case REWRITE, REORDER -> equalText(String.join(WORD_SEPARATOR, question.correctWords()), answer);
             case MATCHING -> equalWordSequence(question.correctRightTexts(), splitMatching(answer));
         };
     }
@@ -52,10 +54,6 @@ public final class QuizGrader {
             case REWRITE, REORDER -> String.join(WORD_SEPARATOR, question.correctWords());
             case MATCHING -> String.join(MATCHING_SEPARATOR, question.correctRightTexts());
         };
-    }
-
-    private static List<String> splitWords(String answer) {
-        return List.of(answer.trim().split("\\s+"));
     }
 
     /**

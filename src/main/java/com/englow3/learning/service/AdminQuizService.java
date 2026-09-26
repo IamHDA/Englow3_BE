@@ -162,6 +162,10 @@ public class AdminQuizService {
         switch (source.questionType()) {
             case MULTIPLE_CHOICE -> {
                 List<NewOption> given = orEmpty(source.options());
+                if (given.size() < 2) {
+                    throw new BadRequestException("QUIZ_QUESTION_TOO_FEW_OPTIONS",
+                            "A multiple choice question needs at least two options to choose between");
+                }
                 if (given.stream().noneMatch(NewOption::correct)) {
                     throw new BadRequestException("QUIZ_QUESTION_NO_CORRECT_OPTION",
                             "A multiple choice question needs at least one correct option");
@@ -173,22 +177,49 @@ public class AdminQuizService {
                 }
             }
             case FILL_BLANK -> addTokens(tokens, question.getId(), QuizTokenRole.ACCEPTED_ANSWER,
-                    require(source.acceptedAnswers(), "QUIZ_QUESTION_NO_ACCEPTED_ANSWER",
-                            "A fill in the blank question needs at least one accepted answer"));
+                    requireNoBlank(require(source.acceptedAnswers(), "QUIZ_QUESTION_NO_ACCEPTED_ANSWER",
+                            "A fill in the blank question needs at least one accepted answer")));
             case REWRITE -> {
-                addTokens(tokens, question.getId(), QuizTokenRole.WORD_BANK, orEmpty(source.wordBank()));
-                addTokens(tokens, question.getId(), QuizTokenRole.CORRECT_WORD,
+                List<String> correctWords = requireNoBlank(
                         require(source.correctWords(), "QUIZ_QUESTION_NO_CORRECT_WORDS",
                                 "A rewrite question needs the words of its answer, in order"));
+                List<String> wordBank = requireNoBlank(orEmpty(source.wordBank()));
+                // The learner builds the answer from the bank, so every word of the answer has to be in it -
+                // otherwise the question cannot be got right. An empty bank is dealt from the answer instead.
+                if (!wordBank.isEmpty() && !containsAll(wordBank, correctWords)) {
+                    throw new BadRequestException("QUIZ_QUESTION_WORD_BANK_INCOMPLETE",
+                            "The word bank must contain every word of the answer");
+                }
+                addTokens(tokens, question.getId(), QuizTokenRole.WORD_BANK, wordBank);
+                addTokens(tokens, question.getId(), QuizTokenRole.CORRECT_WORD, correctWords);
             }
             case REORDER -> {
-                addTokens(tokens, question.getId(), QuizTokenRole.SCRAMBLED, orEmpty(source.scrambledWords()));
-                addTokens(tokens, question.getId(), QuizTokenRole.CORRECT_ORDER, require(source.correctOrder(),
+                List<String> correctOrder = requireNoBlank(require(source.correctOrder(),
                         "QUIZ_QUESTION_NO_CORRECT_ORDER", "A reorder question needs its words in the right order"));
+                List<String> scrambled = requireNoBlank(orEmpty(source.scrambledWords()));
+                // Reordering rearranges; it cannot add or drop a word. Tiles that are not the answer's words would
+                // make the right order impossible to build. Left empty, they are dealt from the answer.
+                if (!scrambled.isEmpty() && !sameWords(scrambled, correctOrder)) {
+                    throw new BadRequestException("QUIZ_QUESTION_SCRAMBLE_MISMATCH",
+                            "The scrambled words must be exactly the words of the correct order");
+                }
+                addTokens(tokens, question.getId(), QuizTokenRole.SCRAMBLED, scrambled);
+                addTokens(tokens, question.getId(), QuizTokenRole.CORRECT_ORDER, correctOrder);
             }
             case MATCHING -> {
                 List<NewPair> given = require(source.pairs(), "QUIZ_QUESTION_NO_PAIRS",
                         "A matching question needs at least one pair");
+                if (given.size() < 2) {
+                    throw new BadRequestException("QUIZ_QUESTION_TOO_FEW_PAIRS",
+                            "A matching question needs at least two pairs, or there is nothing to match");
+                }
+                // The learner's answer arrives with its halves joined by this character; a half containing it
+                // would be split in two and could never be marked right.
+                if (given.stream().anyMatch(pair -> pair.leftText().contains(QuizGrader.MATCHING_SEPARATOR)
+                        || pair.rightText().contains(QuizGrader.MATCHING_SEPARATOR))) {
+                    throw new BadRequestException("QUIZ_QUESTION_PAIR_HAS_SEPARATOR",
+                            "A matching pair cannot contain '%s'".formatted(QuizGrader.MATCHING_SEPARATOR));
+                }
                 int orderNo = 1;
                 for (NewPair pair : given) {
                     pairs.add(QuizQuestionPair.of(question.getId(), orderNo++, pair.leftText(), pair.rightText()));
@@ -215,6 +246,32 @@ public class AdminQuizService {
 
     private static <T> List<T> orEmpty(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private static List<String> requireNoBlank(List<String> values) {
+        if (values.stream().anyMatch(value -> value == null || value.isBlank())) {
+            throw new BadRequestException("QUIZ_QUESTION_BLANK_ANSWER", "An answer or a tile cannot be blank");
+        }
+        return values;
+    }
+
+    /** Whether {@code bank} holds every word of {@code words}, a repeated word as often as it repeats. */
+    private static boolean containsAll(List<String> bank, List<String> words) {
+        Map<String, Long> available = counts(bank);
+        return counts(words).entrySet().stream()
+                .allMatch(entry -> available.getOrDefault(entry.getKey(), 0L) >= entry.getValue());
+    }
+
+    private static boolean sameWords(List<String> left, List<String> right) {
+        return counts(left).equals(counts(right));
+    }
+
+    /** Compared the way the grader compares: case and surrounding space do not matter. */
+    private static Map<String, Long> counts(List<String> words) {
+        return words.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        word -> word.trim().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT),
+                        java.util.stream.Collectors.counting()));
     }
 
     private QuizSummaryResult summaryOf(Quiz quiz) {
