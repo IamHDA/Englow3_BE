@@ -1,6 +1,6 @@
 package com.englow3.flashcard.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +42,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     private final FlashcardRepository cardRepo;
     private final UserDirectory userDirectory;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public FlashcardSetSummaryResult createSet(CreateFlashcardSetCommand command) {
@@ -132,14 +133,14 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     @Transactional
     public ContentReviewResult publish(UUID setId) {
         FlashcardSet set = requireSet(setId);
-        set.publish(cardRepo.countByFlashcardSetId(setId), Instant.now());
+        set.publish(cardRepo.countByFlashcardSetId(setId), clock.instant());
         return reviewStateOf(set);
     }
 
     @Transactional
     public ContentReviewResult submitForReview(UUID setId) {
         FlashcardSet set = requireSet(setId);
-        set.submitForReview(cardRepo.countByFlashcardSetId(setId), Instant.now());
+        set.submitForReview(cardRepo.countByFlashcardSetId(setId), clock.instant());
 
         return reviewStateOf(set);
     }
@@ -151,7 +152,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     @Transactional
     public ContentReviewResult approve(UUID setId) {
         FlashcardSet set = requireSet(setId);
-        set.approve(userDirectory.requireCurrentUserId(), cardRepo.countByFlashcardSetId(setId), Instant.now());
+        set.approve(userDirectory.requireCurrentUserId(), cardRepo.countByFlashcardSetId(setId), clock.instant());
 
         return reviewStateOf(set);
     }
@@ -159,7 +160,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     @Transactional
     public ContentReviewResult reject(UUID setId, String note) {
         FlashcardSet set = requireSet(setId);
-        set.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+        set.reject(userDirectory.requireCurrentUserId(), note, clock.instant());
 
         return reviewStateOf(set);
     }

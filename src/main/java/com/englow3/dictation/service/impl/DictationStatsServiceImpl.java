@@ -1,9 +1,9 @@
 package com.englow3.dictation.service.impl;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -47,16 +47,18 @@ public class DictationStatsServiceImpl implements DictationStatsService {
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
     private final PresignedUrlResolver presignedUrls;
+    private final Clock clock;
     private final String learningBucket;
     private final Duration mediaUrlTtl;
 
     public DictationStatsServiceImpl(DictationStatsQuery statsQuery, UserDirectory userDirectory, ParallelReads reads,
             PresignedUrlResolver presignedUrls, @Value("${app.storage.learning-bucket}") String learningBucket,
-            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl, Clock clock) {
         this.statsQuery = statsQuery;
         this.userDirectory = userDirectory;
         this.reads = reads;
         this.presignedUrls = presignedUrls;
+        this.clock = clock;
         this.learningBucket = learningBucket;
         this.mediaUrlTtl = mediaUrlTtl;
     }
@@ -64,11 +66,13 @@ public class DictationStatsServiceImpl implements DictationStatsService {
     /** Not transactional: the nine reads are independent and run side by side, see {@link ParallelReads}. */
     public DictationStatsResult statsFor(int periodDays) {
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant from = Instant.now().minus(periodDays, ChronoUnit.DAYS);
+        Instant now = clock.instant();
+        LocalDate today = LocalDate.now(clock);
+        Instant from = now.minus(periodDays, ChronoUnit.DAYS);
 
         var attempts = reads.fork(() -> statsQuery.recentAttemptTexts(userId, from, MISSED_WORD_SAMPLE));
-        var practiceDays = reads.fork(
-                () -> statsQuery.practiceDays(userId, Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
+        var practiceDays = reads
+                .fork(() -> statsQuery.practiceDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
         var lessonsCompleted = reads
                 .fork(() -> statsQuery.lessonsCompleted(userId, DictationScorer.COMPLETION_THRESHOLD));
         var averageAccuracy = reads.fork(() -> statsQuery.averageAccuracy(userId, from));
@@ -82,9 +86,9 @@ public class DictationStatsServiceImpl implements DictationStatsService {
                 .map(attempt -> new String[] { attempt.expected(), attempt.actual() }).toList();
 
         return new DictationStatsResult(periodDays, lessonsCompleted.get(), averageAccuracy.get(),
-                listeningSeconds.get(), sentencesPractised.get(),
-                StudyStreak.count(practiceDays.get(), LocalDate.now(ZoneOffset.UTC)), accuracyByDay.get(),
-                MissedWordCounter.count(attemptPairs, MISSED_WORD_LIMIT), difficultSentences.get(), history.get());
+                listeningSeconds.get(), sentencesPractised.get(), StudyStreak.count(practiceDays.get(), today),
+                accuracyByDay.get(), MissedWordCounter.count(attemptPairs, MISSED_WORD_LIMIT), difficultSentences.get(),
+                history.get());
     }
 
     /**

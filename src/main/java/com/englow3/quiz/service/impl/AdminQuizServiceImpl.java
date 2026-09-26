@@ -1,6 +1,6 @@
 package com.englow3.quiz.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,6 +31,7 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     private final QuizRepository quizRepo;
     private final QuizQuestionRepository questionRepo;
     private final UserDirectory userDirectory;
+    private final Clock clock;
 
     @Transactional
     public QuizSummaryResult create(CreateQuizCommand command) {
@@ -54,14 +55,14 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     @Transactional
     public ContentReviewResult publish(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
-        quiz.publish(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), Instant.now());
+        quiz.publish(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), clock.instant());
         return reviewStateOf(quiz);
     }
 
     @Transactional
     public ContentReviewResult submitForReview(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
-        quiz.submitForReview(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), Instant.now());
+        quiz.submitForReview(questionRepo.countByQuizId(quizId), questionRepo.sumPoints(quizId), clock.instant());
         return reviewStateOf(quiz);
     }
 
@@ -69,14 +70,14 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     public ContentReviewResult approve(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
         quiz.approve(userDirectory.requireCurrentUserId(), questionRepo.countByQuizId(quizId),
-                questionRepo.sumPoints(quizId), Instant.now());
+                questionRepo.sumPoints(quizId), clock.instant());
         return reviewStateOf(quiz);
     }
 
     @Transactional
     public ContentReviewResult reject(UUID quizId, String note) {
         Quiz quiz = requireQuiz(quizId);
-        quiz.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+        quiz.reject(userDirectory.requireCurrentUserId(), note, clock.instant());
         return reviewStateOf(quiz);
     }
 

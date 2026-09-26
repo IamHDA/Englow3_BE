@@ -1,5 +1,6 @@
 package com.englow3.ai.service.impl;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
 
     private final AiJobRepository jobRepo;
+    private final Clock clock;
 
     @Value("${app.ai.provider:ai-service}")
     private String providerName;
@@ -63,7 +65,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
      */
     @Transactional(readOnly = true)
     public boolean hasDailyAllowance(UUID userId) {
-        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant startOfDay = LocalDate.now(clock).atStartOfDay(ZoneOffset.UTC).toInstant();
         return jobRepo.countRequestedSince(userId, startOfDay) < dailyRequestLimit;
     }
 
@@ -119,7 +121,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
      */
     @Transactional
     public List<AiJob> claimBatch(int limit) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<AiJob> claimed = jobRepo.lockNextPending(now, limit);
         claimed.forEach(job -> job.claim(now));
 
@@ -134,11 +136,12 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
      */
     @Transactional
     public boolean record(UUID jobId, AiJobHandler.Outcome outcome) {
+        Instant now = clock.instant();
         return jobRepo.findById(jobId).map(job -> {
             if (outcome.success()) {
-                job.succeed(outcome.outputPayload(), Instant.now());
+                job.succeed(outcome.outputPayload(), now);
             } else {
-                job.fail(outcome.errorCode(), outcome.errorMessage(), outcome.retryable(), Instant.now());
+                job.fail(outcome.errorCode(), outcome.errorMessage(), outcome.retryable(), now);
             }
             return job.getStatus() == AiJobStatus.FAILED;
         }).orElse(false);
@@ -147,7 +150,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     /** Puts jobs whose worker vanished back in the queue. Each costs a retry - see {@code AiJob.reclaim}. */
     @Transactional
     public List<AiJob> reclaimStalled(Duration lockTimeout) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<AiJob> stalled = jobRepo.findStalled(now.minus(lockTimeout));
         stalled.forEach(job -> job.reclaim(now));
 

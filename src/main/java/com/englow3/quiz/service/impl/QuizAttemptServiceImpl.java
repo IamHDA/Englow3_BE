@@ -1,6 +1,7 @@
 package com.englow3.quiz.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,12 +61,13 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
     private final QuizAttemptRepository attemptRepo;
     private final QuizAttemptAnswerRepository attemptAnswerRepo;
     private final UserDirectory userDirectory;
+    private final Clock clock;
 
     @Transactional
     public QuizAttemptResult start(UUID quizId) {
         Quiz quiz = requirePublished(quizId);
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         var active = attemptRepo.findFirstByUserIdAndQuizIdAndStatusOrderByStartedAtDesc(userId, quizId,
                 QuizAttemptStatus.IN_PROGRESS);
@@ -91,7 +93,7 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
         if (attempt.getStatus() != QuizAttemptStatus.IN_PROGRESS) {
             throw new ConflictException("QUIZ_ATTEMPT_NOT_IN_PROGRESS", "This quiz attempt is no longer in progress");
         }
-        if (!Instant.now().isBefore(attempt.getExpiresAt())) {
+        if (!clock.instant().isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("QUIZ_ATTEMPT_EXPIRED", "This quiz attempt has expired");
         }
 
@@ -110,7 +112,7 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
         QuizAttempt attempt = attemptRepo.findByIdForUpdate(command.attemptId())
                 .filter(candidate -> candidate.getUserId().equals(userDirectory.requireCurrentUserId()))
                 .orElseThrow(() -> attemptNotFound(command.attemptId()));
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         if (attempt.getStatus() != QuizAttemptStatus.IN_PROGRESS) {
             throw new ConflictException("QUIZ_ATTEMPT_ALREADY_FINALIZED",

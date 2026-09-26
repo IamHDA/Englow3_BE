@@ -1,6 +1,6 @@
 package com.englow3.speaking.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -35,12 +35,13 @@ public class SpeakingAssessmentWriterImpl implements SpeakingAssessmentWriter {
     private final SpeakingAttemptRepository attemptRepo;
     private final SpeakingAttemptWordRepository wordRepo;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public void storeAssessment(UUID attemptId, Assessment assessment) {
         attemptRepo.findById(attemptId).ifPresent(attempt -> {
             attempt.recordAssessment(assessment.recognizedText(), assessment.accuracy(), assessment.fluency(),
-                    assessment.completeness(), assessment.prosody(), assessment.pronunciation(), Instant.now());
+                    assessment.completeness(), assessment.prosody(), assessment.pronunciation(), clock.instant());
             replaceWords(attempt, assessment);
         });
     }
@@ -52,7 +53,7 @@ public class SpeakingAssessmentWriterImpl implements SpeakingAssessmentWriter {
     @Transactional
     public void markFailed(UUID attemptId, String errorCode) {
         attemptRepo.findById(attemptId).filter(attempt -> attempt.getStatus() == SpeakingAttemptStatus.QUEUED)
-                .ifPresent(attempt -> attempt.recordFailure(errorCode, Instant.now()));
+                .ifPresent(attempt -> attempt.recordFailure(errorCode, clock.instant()));
     }
 
     /**

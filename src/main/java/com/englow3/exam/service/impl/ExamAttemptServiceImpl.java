@@ -1,6 +1,7 @@
 package com.englow3.exam.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -67,13 +68,14 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final UserDirectory userDirectory;
     private final PlacementRecorder placementRecorder;
     private final PresignedUrlResolver presignedUrls;
+    private final Clock clock;
     private final String examBucket;
     private final Duration mediaUrlTtl;
 
     public ExamAttemptServiceImpl(ExamRepository examRepo, ExamAttemptRepository attemptRepo,
             AttemptAnswerRepository answerRepo, AttemptAnswerOptionRepository answerOptionRepo,
             LearnerExamPaperQuery paperQuery, ExamGradingQuery gradingQuery, UserDirectory userDirectory,
-            PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls,
+            PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
         this.examRepo = examRepo;
@@ -85,6 +87,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.userDirectory = userDirectory;
         this.placementRecorder = placementRecorder;
         this.presignedUrls = presignedUrls;
+        this.clock = clock;
         this.examBucket = examBucket;
         this.mediaUrlTtl = mediaUrlTtl;
     }
@@ -103,7 +106,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     public ExamAttemptResult start(UUID examId) {
         Exam exam = requirePublishedExam(examId);
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         var active = attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, examId,
                 ExamAttemptStatus.IN_PROGRESS);
@@ -126,7 +129,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
             throw new ConflictException("ATTEMPT_NOT_IN_PROGRESS", "This exam attempt is no longer in progress");
         }
-        if (!Instant.now().isBefore(attempt.getExpiresAt())) {
+        if (!clock.instant().isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "This exam attempt has expired");
         }
         return toResult(paperQuery.load(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId())));
@@ -136,7 +139,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     public ExamAttemptResult submit(SubmitExamAttemptCommand command) {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(command.attemptId()),
                 command.attemptId());
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
             throw new ConflictException("ATTEMPT_ALREADY_FINALIZED", "This exam attempt has already been finalized");
         }

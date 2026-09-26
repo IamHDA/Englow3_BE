@@ -8,10 +8,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -39,6 +41,8 @@ import com.englow3.user.api.UserDirectory;
 
 class QuizAttemptServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final QuizRepository quizRepo = mock(QuizRepository.class);
     private final QuizQuestionRepository questionRepo = mock(QuizQuestionRepository.class);
     private final QuizQuestionOptionRepository optionRepo = mock(QuizQuestionOptionRepository.class);
@@ -49,7 +53,7 @@ class QuizAttemptServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
     private final QuizAttemptService service = new com.englow3.quiz.service.impl.QuizAttemptServiceImpl(quizRepo,
-            questionRepo, optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory);
+            questionRepo, optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory, CLOCK);
 
     private final UUID userId = UUID.randomUUID();
     private Quiz quiz;

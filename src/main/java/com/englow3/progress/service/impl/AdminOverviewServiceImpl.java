@@ -1,6 +1,6 @@
 package com.englow3.progress.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -23,6 +23,7 @@ public class AdminOverviewServiceImpl implements AdminOverviewService {
     static final int PERIOD_DAYS = 7;
 
     private final AdminOverviewQuery overviewQuery;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public AdminOverviewResult overview() {
@@ -32,7 +33,7 @@ public class AdminOverviewServiceImpl implements AdminOverviewService {
         long pending = content.stream().mapToLong(ContentKindCounts::pendingReview).sum();
 
         AdminOverviewQuery.Activity activity = overviewQuery
-                .activitySince(Instant.now().minus(PERIOD_DAYS, ChronoUnit.DAYS));
+                .activitySince(clock.instant().minus(PERIOD_DAYS, ChronoUnit.DAYS));
 
         return new AdminOverviewResult(content, pending, activity.learners(), activity.newLearners(),
                 activity.activeLearners(), activity.cardReviews(), activity.dictationSentences(),

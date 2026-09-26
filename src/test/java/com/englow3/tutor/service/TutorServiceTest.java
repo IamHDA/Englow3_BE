@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class TutorServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private static final int DAILY_LIMIT = 5;
 
     private final TutorConversationRepository conversationRepo = mock(TutorConversationRepository.class);
@@ -49,7 +53,7 @@ class TutorServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
     private final TutorService service = new com.englow3.tutor.service.impl.TutorServiceImpl(conversationRepo,
-            messageRepo, aiJobQueue, userDirectory, new ObjectMapper());
+            messageRepo, aiJobQueue, userDirectory, new ObjectMapper(), CLOCK);
 
     private final UUID userId = UUID.randomUUID();
     private TutorConversation conversation;

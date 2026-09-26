@@ -9,7 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,8 @@ import com.englow3.user.api.UserDirectory;
 
 class ExamAttemptServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final ExamAttemptRepository attemptRepo = mock(ExamAttemptRepository.class);
     private final AttemptAnswerRepository answerRepo = mock(AttemptAnswerRepository.class);
@@ -59,7 +63,7 @@ class ExamAttemptServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
     private final ExamAttemptService service = new com.englow3.exam.service.impl.ExamAttemptServiceImpl(examRepo,
             attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder,
-            presignedUrls, "exams", java.time.Duration.ofHours(1));
+            presignedUrls, CLOCK, "exams", java.time.Duration.ofHours(1));
 
     private final UUID userId = UUID.randomUUID();
 

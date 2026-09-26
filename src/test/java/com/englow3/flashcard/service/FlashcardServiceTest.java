@@ -10,6 +10,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +36,8 @@ import com.englow3.user.api.UserDirectory;
  */
 class FlashcardServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final FlashcardSetRepository setRepo = mock(FlashcardSetRepository.class);
     private final FlashcardRepository cardRepo = mock(FlashcardRepository.class);
     private final FlashcardReviewRepository reviewRepo = mock(FlashcardReviewRepository.class);
@@ -41,7 +46,7 @@ class FlashcardServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final FlashcardService service = new com.englow3.flashcard.service.impl.FlashcardServiceImpl(setRepo,
-            cardRepo, reviewRepo, reviewLogRepo, userDirectory, presignedUrls, "learning",
+            cardRepo, reviewRepo, reviewLogRepo, userDirectory, presignedUrls, CLOCK, "learning",
             java.time.Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();

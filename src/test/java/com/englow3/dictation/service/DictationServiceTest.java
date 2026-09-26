@@ -12,10 +12,12 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -41,6 +43,8 @@ import com.englow3.user.api.UserDirectory;
  */
 class DictationServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private static final String TRANSCRIPT = "The cat sat on the mat.";
 
     private final DictationLessonRepository lessonRepo = mock(DictationLessonRepository.class);
@@ -50,7 +54,7 @@ class DictationServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final DictationService service = new com.englow3.dictation.service.impl.DictationServiceImpl(lessonRepo,
-            sentenceRepo, attemptRepo, userDirectory, presignedUrls, "learning", java.time.Duration.ofHours(3));
+            sentenceRepo, attemptRepo, userDirectory, presignedUrls, CLOCK, "learning", java.time.Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();
     private DictationLesson lesson;

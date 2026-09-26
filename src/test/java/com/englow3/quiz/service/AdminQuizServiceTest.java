@@ -6,6 +6,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,10 +20,12 @@ import com.englow3.user.api.UserDirectory;
 
 class AdminQuizServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final QuizRepository quizRepo = mock(QuizRepository.class);
     private final QuizQuestionRepository questionRepo = mock(QuizQuestionRepository.class);
     private final AdminQuizService service = new com.englow3.quiz.service.impl.AdminQuizServiceImpl(quizRepo,
-            questionRepo, mock(UserDirectory.class));
+            questionRepo, mock(UserDirectory.class), CLOCK);
 
     @Test
     void refusesToPublishAQuizWhoseQuestionsAreAllWorthNothing() {

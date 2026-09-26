@@ -1,8 +1,7 @@
 package com.englow3.tutor.service.impl;
 
+import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,6 +46,7 @@ public class TutorServiceImpl implements TutorService {
     private final AiJobQueue aiJobQueue;
     private final UserDirectory userDirectory;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     /**
      * Stores the question, queues the answer, and hands back both turns.
@@ -57,7 +57,7 @@ public class TutorServiceImpl implements TutorService {
     @Transactional
     public TutorConversationResult send(SendTutorMessageCommand command) {
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         requireQuotaRemaining(userId);
 
@@ -108,7 +108,7 @@ public class TutorServiceImpl implements TutorService {
     public TutorConversationSummaryResult archive(UUID conversationId) {
         UUID userId = userDirectory.requireCurrentUserId();
         TutorConversation conversation = requireOwnConversation(conversationId, userId);
-        conversation.archive(Instant.now());
+        conversation.archive(clock.instant());
 
         return TutorConversationSummaryResult.of(conversation);
     }
@@ -128,7 +128,7 @@ public class TutorServiceImpl implements TutorService {
         TutorMessage message = messageRepo.findByIdAndTutorConversationId(messageId, conversationId)
                 .orElseThrow(() -> new NotFoundException("TUTOR_MESSAGE_NOT_FOUND",
                         "No message with id %s in this conversation".formatted(messageId)));
-        message.report(command == null ? null : command.note(), Instant.now());
+        message.report(command == null ? null : command.note(), clock.instant());
 
         return TutorMessageResult.of(message);
     }

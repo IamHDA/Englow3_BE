@@ -1,6 +1,6 @@
 package com.englow3.speaking.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -30,6 +30,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     private final SpeakingPromptRepository promptRepo;
     private final UserDirectory userDirectory;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public SpeakingPromptReviewResult create(CreateSpeakingPromptCommand command) {
@@ -59,7 +60,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     @Transactional
     public SpeakingPromptReviewResult submitForReview(UUID promptId) {
         SpeakingPrompt prompt = requirePrompt(promptId);
-        prompt.submitForReview(Instant.now());
+        prompt.submitForReview(clock.instant());
 
         return SpeakingPromptReviewResult.of(prompt);
     }
@@ -68,7 +69,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     @Transactional
     public SpeakingPromptReviewResult approve(UUID promptId) {
         SpeakingPrompt prompt = requirePrompt(promptId);
-        prompt.approve(userDirectory.requireCurrentUserId(), Instant.now());
+        prompt.approve(userDirectory.requireCurrentUserId(), clock.instant());
 
         return SpeakingPromptReviewResult.of(prompt);
     }
@@ -76,7 +77,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     @Transactional
     public SpeakingPromptReviewResult reject(UUID promptId, String note) {
         SpeakingPrompt prompt = requirePrompt(promptId);
-        prompt.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+        prompt.reject(userDirectory.requireCurrentUserId(), note, clock.instant());
 
         return SpeakingPromptReviewResult.of(prompt);
     }
@@ -84,7 +85,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     @Transactional
     public SpeakingPromptReviewResult publish(UUID promptId) {
         SpeakingPrompt prompt = requirePrompt(promptId);
-        prompt.publish(Instant.now());
+        prompt.publish(clock.instant());
 
         return SpeakingPromptReviewResult.of(prompt);
     }

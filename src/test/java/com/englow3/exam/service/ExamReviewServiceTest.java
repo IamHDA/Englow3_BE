@@ -7,6 +7,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,10 +29,12 @@ import com.englow3.user.api.UserDirectory;
 
 class ExamReviewServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final QuestionRepository questionRepo = mock(QuestionRepository.class);
     private final ExamReviewService service = new com.englow3.exam.service.impl.ExamReviewServiceImpl(examRepo,
-            questionRepo, mock(UserDirectory.class));
+            questionRepo, mock(UserDirectory.class), CLOCK);
 
     @BeforeEach
     void completeQuestions() {

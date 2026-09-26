@@ -1,6 +1,6 @@
 package com.englow3.exam.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -29,13 +29,14 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     private final ExamRepository examRepo;
     private final QuestionRepository questionRepo;
     private final UserDirectory userDirectory;
+    private final Clock clock;
 
     @Transactional
     public ExamResult publish(PublishExamCommand command) {
         Exam exam = requireExam(command.examId());
         exam.publish(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), questionRepo.findIncompleteQuestionOrderNos(exam.getId()),
-                Instant.now());
+                clock.instant());
         return ExamResult.of(exam);
     }
 
@@ -44,7 +45,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
         Exam exam = requireExam(command.examId());
         exam.submitForReview(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), questionRepo.findIncompleteQuestionOrderNos(exam.getId()),
-                Instant.now());
+                clock.instant());
         return ExamResult.of(exam);
     }
 
@@ -53,14 +54,14 @@ public class ExamReviewServiceImpl implements ExamReviewService {
         Exam exam = requireExam(command.examId());
         exam.approve(userDirectory.requireCurrentUserId(), examRepo.countSections(exam.getId()),
                 examRepo.countQuestions(exam.getId()), examRepo.sumSectionScores(exam.getId()),
-                questionRepo.findIncompleteQuestionOrderNos(exam.getId()), Instant.now());
+                questionRepo.findIncompleteQuestionOrderNos(exam.getId()), clock.instant());
         return ExamResult.of(exam);
     }
 
     @Transactional
     public ExamResult reject(RejectExamCommand command) {
         Exam exam = requireExam(command.examId());
-        exam.reject(userDirectory.requireCurrentUserId(), command.note(), Instant.now());
+        exam.reject(userDirectory.requireCurrentUserId(), command.note(), clock.instant());
         return ExamResult.of(exam);
     }
 

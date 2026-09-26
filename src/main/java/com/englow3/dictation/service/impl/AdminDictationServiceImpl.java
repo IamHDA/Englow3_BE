@@ -1,6 +1,6 @@
 package com.englow3.dictation.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +41,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     private final DictationSentenceRepository sentenceRepo;
     private final UserDirectory userDirectory;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public DictationLessonSummaryResult create(CreateDictationLessonCommand command) {
@@ -141,14 +142,14 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     @Transactional
     public ContentReviewResult publish(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
-        lesson.publish(sentenceRepo.countByDictationLessonId(lessonId), Instant.now());
+        lesson.publish(sentenceRepo.countByDictationLessonId(lessonId), clock.instant());
         return reviewStateOf(lesson);
     }
 
     @Transactional
     public ContentReviewResult submitForReview(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
-        lesson.submitForReview(sentenceRepo.countByDictationLessonId(lessonId), Instant.now());
+        lesson.submitForReview(sentenceRepo.countByDictationLessonId(lessonId), clock.instant());
 
         return reviewStateOf(lesson);
     }
@@ -158,7 +159,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     public ContentReviewResult approve(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
         lesson.approve(userDirectory.requireCurrentUserId(), sentenceRepo.countByDictationLessonId(lessonId),
-                Instant.now());
+                clock.instant());
 
         return reviewStateOf(lesson);
     }
@@ -166,7 +167,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     @Transactional
     public ContentReviewResult reject(UUID lessonId, String note) {
         DictationLesson lesson = requireLesson(lessonId);
-        lesson.reject(userDirectory.requireCurrentUserId(), note, Instant.now());
+        lesson.reject(userDirectory.requireCurrentUserId(), note, clock.instant());
 
         return reviewStateOf(lesson);
     }

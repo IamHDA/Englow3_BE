@@ -10,6 +10,9 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -34,12 +37,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class AdminFlashcardServiceTest {
 
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-26T10:00:00Z"), ZoneOffset.UTC);
+
     private final FlashcardSetRepository setRepo = mock(FlashcardSetRepository.class);
     private final FlashcardRepository cardRepo = mock(FlashcardRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
     private final AdminFlashcardService service = new com.englow3.flashcard.service.impl.AdminFlashcardServiceImpl(
-            setRepo, cardRepo, userDirectory, new ObjectMapper());
+            setRepo, cardRepo, userDirectory, new ObjectMapper(), CLOCK);
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;

@@ -1,8 +1,8 @@
 package com.englow3.flashcard.service.impl;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -40,14 +40,17 @@ public class FlashcardStatsServiceImpl implements FlashcardStatsService {
     private final FlashcardStatsQuery statsQuery;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final Clock clock;
 
     /** Not transactional: the five reads are independent and run side by side, see {@link ParallelReads}. */
     public FlashcardStatsResult statsFor(int periodDays) {
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant from = Instant.now().minus(periodDays, ChronoUnit.DAYS);
+        Instant now = clock.instant();
+        LocalDate today = LocalDate.now(clock);
+        Instant from = now.minus(periodDays, ChronoUnit.DAYS);
 
         var studyDays = reads
-                .fork(() -> statsQuery.studyDays(userId, Instant.now().minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
+                .fork(() -> statsQuery.studyDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));
         var summaryRead = reads.fork(() -> statsQuery.periodSummary(userId, from));
         var activityByDay = reads.fork(() -> statsQuery.activityByDay(userId, from));
         var difficultCards = reads.fork(() -> statsQuery.difficultCards(userId, DIFFICULT_CARD_LIMIT));
@@ -55,7 +58,7 @@ public class FlashcardStatsServiceImpl implements FlashcardStatsService {
 
         FlashcardStatsQuery.PeriodSummary summary = summaryRead.get();
         return new FlashcardStatsResult(periodDays, summary.cardsStudied(), summary.retentionPercent(),
-                summary.studySeconds(), StudyStreak.count(studyDays.get(), LocalDate.now(ZoneOffset.UTC)),
-                activityByDay.get(), difficultCards.get(), history.get());
+                summary.studySeconds(), StudyStreak.count(studyDays.get(), today), activityByDay.get(),
+                difficultCards.get(), history.get());
     }
 }

@@ -1,6 +1,7 @@
 package com.englow3.dictation.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -45,18 +46,20 @@ public class DictationServiceImpl implements DictationService {
     private final DictationAttemptRepository attemptRepo;
     private final UserDirectory userDirectory;
     private final PresignedUrlResolver presignedUrls;
+    private final Clock clock;
     private final String learningBucket;
     private final Duration mediaUrlTtl;
 
     public DictationServiceImpl(DictationLessonRepository lessonRepo, DictationSentenceRepository sentenceRepo,
             DictationAttemptRepository attemptRepo, UserDirectory userDirectory, PresignedUrlResolver presignedUrls,
-            @Value("${app.storage.learning-bucket}") String learningBucket,
+            Clock clock, @Value("${app.storage.learning-bucket}") String learningBucket,
             @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
         this.lessonRepo = lessonRepo;
         this.sentenceRepo = sentenceRepo;
         this.attemptRepo = attemptRepo;
         this.userDirectory = userDirectory;
         this.presignedUrls = presignedUrls;
+        this.clock = clock;
         this.learningBucket = learningBucket;
         this.mediaUrlTtl = mediaUrlTtl;
     }
@@ -123,7 +126,7 @@ public class DictationServiceImpl implements DictationService {
         DictationScorer.Score score = DictationScorer.score(sentence.getText(), response);
 
         attemptRepo.save(DictationAttempt.of(userId, sentence.getDictationLessonId(), sentence.getId(), response,
-                score.accuracyPercent(), score.correctWordCount(), score.totalWordCount(), Instant.now()));
+                score.accuracyPercent(), score.correctWordCount(), score.totalWordCount(), clock.instant()));
 
         return new DictationSubmissionResult(sentence.getId(), sentence.getText(), sentence.getTranslationVi(),
                 response, score.accuracyPercent(), score.correctWordCount(), score.totalWordCount(),

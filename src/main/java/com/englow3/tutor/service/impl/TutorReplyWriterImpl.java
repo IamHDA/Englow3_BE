@@ -1,6 +1,6 @@
 package com.englow3.tutor.service.impl;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +24,7 @@ import com.englow3.tutor.service.*;
 public class TutorReplyWriterImpl implements TutorReplyWriter {
 
     private final TutorMessageRepository messageRepo;
+    private final Clock clock;
 
     /**
      * Fills the pending turn.
@@ -36,12 +37,12 @@ public class TutorReplyWriterImpl implements TutorReplyWriter {
     public void storeReply(UUID messageId, String content, String model, Integer inputTokens, Integer outputTokens) {
         messageRepo.findById(messageId).filter(message -> message.getStatus() == TutorMessageStatus.PENDING)
                 .ifPresent(message -> message.answer(content, model, TutorPrompt.VERSION, inputTokens, outputTokens,
-                        Instant.now()));
+                        clock.instant()));
     }
 
     @Transactional
     public void markFailed(UUID messageId, String errorCode) {
         messageRepo.findById(messageId).filter(message -> message.getStatus() == TutorMessageStatus.PENDING)
-                .ifPresent(message -> message.fail(errorCode, Instant.now()));
+                .ifPresent(message -> message.fail(errorCode, clock.instant()));
     }
 }

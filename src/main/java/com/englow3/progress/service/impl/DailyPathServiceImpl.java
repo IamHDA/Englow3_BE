@@ -1,8 +1,8 @@
 package com.englow3.progress.service.impl;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +49,7 @@ public class DailyPathServiceImpl implements DailyPathService {
     private final DictationCompletionPolicy dictationCompletionPolicy;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
+    private final Clock clock;
 
     /**
      * Not transactional: the nine reads below are independent and run side by side through {@link ParallelReads}, each
@@ -56,9 +57,9 @@ public class DailyPathServiceImpl implements DailyPathService {
      */
     public DailyPathResult dailyPath() {
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant now = Instant.now();
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        Instant startOfToday = today.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant now = clock.instant();
+        LocalDate today = LocalDate.now(clock);
+        Instant startOfToday = today.atStartOfDay(clock.getZone()).toInstant();
 
         var studyDaysRead = reads
                 .fork(() -> pathQuery.studyDays(userId, now.minus(STREAK_LOOKBACK_DAYS, ChronoUnit.DAYS)));

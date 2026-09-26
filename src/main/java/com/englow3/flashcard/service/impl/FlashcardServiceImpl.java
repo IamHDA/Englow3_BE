@@ -1,5 +1,6 @@
 package com.englow3.flashcard.service.impl;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -48,12 +49,13 @@ public class FlashcardServiceImpl implements FlashcardService {
     private final FlashcardReviewLogRepository reviewLogRepo;
     private final UserDirectory userDirectory;
     private final PresignedUrlResolver presignedUrls;
+    private final Clock clock;
     private final String learningBucket;
     private final Duration mediaUrlTtl;
 
     public FlashcardServiceImpl(FlashcardSetRepository setRepo, FlashcardRepository cardRepo,
             FlashcardReviewRepository reviewRepo, FlashcardReviewLogRepository reviewLogRepo,
-            UserDirectory userDirectory, PresignedUrlResolver presignedUrls,
+            UserDirectory userDirectory, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.learning-bucket}") String learningBucket,
             @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
         this.setRepo = setRepo;
@@ -62,6 +64,7 @@ public class FlashcardServiceImpl implements FlashcardService {
         this.reviewLogRepo = reviewLogRepo;
         this.userDirectory = userDirectory;
         this.presignedUrls = presignedUrls;
+        this.clock = clock;
         this.learningBucket = learningBucket;
         this.mediaUrlTtl = mediaUrlTtl;
     }
@@ -69,7 +72,7 @@ public class FlashcardServiceImpl implements FlashcardService {
     @Transactional(readOnly = true)
     public Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         Page<FlashcardSet> page = setRepo.searchByStatus(FlashcardSetStatus.PUBLISHED, topic, title, pageable);
         List<UUID> setIds = page.getContent().stream().map(FlashcardSet::getId).toList();
@@ -89,12 +92,13 @@ public class FlashcardServiceImpl implements FlashcardService {
     @Transactional(readOnly = true)
     public FlashcardSetDetailResult setDetail(UUID setId) {
         UUID userId = userDirectory.requireCurrentUserId();
+        Instant now = clock.instant();
         FlashcardSet set = requirePublishedSet(setId);
 
         List<Flashcard> cards = cardRepo.findByFlashcardSetIdOrderByOrderNo(setId);
         Map<UUID, FlashcardReview> reviews = reviewsFor(userId, cards);
 
-        return new FlashcardSetDetailResult(summaryOf(set, userId, cards.size()),
+        return new FlashcardSetDetailResult(summaryOf(set, userId, cards.size(), now),
                 cards.stream().map(card -> resultOf(card, reviews.get(card.getId()))).toList());
     }
 
@@ -107,10 +111,10 @@ public class FlashcardServiceImpl implements FlashcardService {
     public List<FlashcardResult> studyQueue(UUID setId, int limit) {
         UUID userId = userDirectory.requireCurrentUserId();
         requirePublishedSet(setId);
+        Instant now = clock.instant();
 
         List<Flashcard> cards = cardRepo.findByFlashcardSetIdOrderByOrderNo(setId);
         Map<UUID, FlashcardReview> reviews = reviewsFor(userId, cards);
-        Instant now = Instant.now();
 
         List<FlashcardResult> due = cards.stream().filter(card -> {
             FlashcardReview review = reviews.get(card.getId());
@@ -138,7 +142,7 @@ public class FlashcardServiceImpl implements FlashcardService {
         // else's draft into this learner's review schedule, and the same refusal for "not yours" and "not there" is
         // what stops an id being a way to find out which drafts exist.
         requirePublishedSet(card.getFlashcardSetId());
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         FlashcardReview review = reviewRepo.findByUserIdAndFlashcardId(userId, card.getId())
                 .orElseGet(() -> reviewRepo.save(FlashcardReview.unseen(userId, card.getId(), now)));
@@ -151,9 +155,8 @@ public class FlashcardServiceImpl implements FlashcardService {
         return FlashcardReviewResult.of(review);
     }
 
-    private FlashcardSetSummaryResult summaryOf(FlashcardSet set, UUID userId, long cardCount) {
-        return FlashcardSetSummaryResult.of(set, cardCount,
-                reviewRepo.countDueInSet(userId, set.getId(), Instant.now()),
+    private FlashcardSetSummaryResult summaryOf(FlashcardSet set, UUID userId, long cardCount, Instant now) {
+        return FlashcardSetSummaryResult.of(set, cardCount, reviewRepo.countDueInSet(userId, set.getId(), now),
                 reviewRepo.countMasteredInSet(userId, set.getId()),
                 lastStudiedFor(userId, List.of(set.getId())).get(set.getId()));
     }
