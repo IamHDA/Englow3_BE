@@ -29,6 +29,7 @@ import com.englow3.quiz.dto.response.ContentReviewResponse;
 import com.englow3.quiz.dto.response.QuizSummaryResponse;
 import com.englow3.shared.page.PageResponse;
 import com.englow3.quiz.service.AdminQuizService;
+import com.englow3.quiz.service.QuizQuestionAuthoringService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ import lombok.RequiredArgsConstructor;
 class AdminQuizController {
 
     private final AdminQuizService adminQuizService;
+    private final QuizQuestionAuthoringService quizQuestionAuthoringService;
 
     /**
      * The authoring list. Separate from the learner catalogue because that one shows published quizzes only - an
@@ -79,8 +81,8 @@ class AdminQuizController {
                                 .toList()))
                 .toList();
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                QuizSummaryResponse.from(adminQuizService.addQuestions(new AddQuizQuestionsCommand(id, questions))));
+        return ResponseEntity.status(HttpStatus.CREATED).body(QuizSummaryResponse
+                .from(quizQuestionAuthoringService.addQuestions(new AddQuizQuestionsCommand(id, questions))));
     }
 
     /** Staff hand a quiz over for review. Available from a draft or from one that came back. */

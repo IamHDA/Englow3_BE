@@ -37,11 +37,7 @@ import com.englow3.quiz.repository.QuizRepository;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
 
-/**
- * What this class can get wrong that the grader cannot: handing the answer key to a learner who is still sitting, and
- * reshuffling a matching question under them. Both are asserted here; the marking itself is QuizGraderTest.
- */
-class QuizServiceTest {
+class QuizAttemptServiceTest {
 
     private final QuizRepository quizRepo = mock(QuizRepository.class);
     private final QuizQuestionRepository questionRepo = mock(QuizQuestionRepository.class);
@@ -52,8 +48,8 @@ class QuizServiceTest {
     private final QuizAttemptAnswerRepository attemptAnswerRepo = mock(QuizAttemptAnswerRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final QuizService service = new com.englow3.quiz.service.impl.QuizServiceImpl(quizRepo, questionRepo,
-            optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory);
+    private final QuizAttemptService service = new com.englow3.quiz.service.impl.QuizAttemptServiceImpl(quizRepo,
+            questionRepo, optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory);
 
     private final UUID userId = UUID.randomUUID();
     private Quiz quiz;
@@ -91,17 +87,12 @@ class QuizServiceTest {
     @Nested
     class DeliveringThePaper {
 
-        /**
-         * The whole reason the paper is a separate projection. If an option ever carried its correct flag, the answers
-         * would be one network tab away.
-         */
         @Test
         void carriesNoCorrectnessFlagOnAnOption() {
             QuizPaperResult paper = service.paperForAttempt(liveAttempt().getId());
 
             assertThat(paper.questions()).singleElement().satisfies(question -> {
                 assertThat(question.options()).extracting("label").containsExactly("A", "B");
-                // OptionResult has no `correct` component at all - this asserts the shape, not a false value.
                 assertThat(question.options().get(0).getClass().getRecordComponents())
                         .extracting(java.lang.reflect.RecordComponent::getName)
                         .containsExactly("id", "orderNo", "label", "content");
@@ -136,7 +127,6 @@ class QuizServiceTest {
                             QuizQuestionPair.of(matching.getId(), 3, "He was tired", "but he kept going")));
         }
 
-        /** Reloading mid-quiz must not deal a new puzzle - the seed is the attempt and the question, not the clock. */
         @Test
         void showsTheSameArrangementOnEveryLoadOfOneAttempt() {
             UUID attemptId = liveAttempt().getId();
@@ -154,7 +144,6 @@ class QuizServiceTest {
             assertThat(rights).containsExactlyInAnyOrder("because it rained", "so we left", "but he kept going");
         }
 
-        /** Left halves stay in their stored order - they are the question, not the answer. */
         @Test
         void leavesTheLeftColumnInOrder() {
             List<String> lefts = service.paperForAttempt(liveAttempt().getId()).questions().get(0).leftTexts();
@@ -178,7 +167,6 @@ class QuizServiceTest {
             assertThat(result.passed()).isTrue();
         }
 
-        /** An unanswered question is marked wrong rather than skipped, or the percentage would flatter the learner. */
         @Test
         void marksAQuestionThatWasNeverAnsweredAsWrong() {
             QuizAttempt attempt = liveAttempt();
@@ -191,7 +179,6 @@ class QuizServiceTest {
             assertThat(result.reviews()).singleElement().satisfies(review -> assertThat(review.correct()).isFalse());
         }
 
-        /** The review shows the option the learner picked, not the uuid they sent. */
         @Test
         void reportsTheChosenOptionInWordsOnTheReview() {
             QuizAttempt attempt = liveAttempt();

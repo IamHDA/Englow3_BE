@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand.SubmittedAnswer;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
 import com.englow3.exam.dto.result.ExamAttemptResult;
 import com.englow3.exam.entity.CertificateType;
 import com.englow3.exam.entity.CertificateVariant;
@@ -35,7 +36,6 @@ import com.englow3.exam.query.ExamGradingQuery;
 import com.englow3.exam.query.ExamGradingQuery.GradingOption;
 import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.LearnerExamPaperQuery;
-import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
 import com.englow3.exam.repository.AttemptAnswerOptionRepository;
 import com.englow3.exam.repository.AttemptAnswerRepository;
 import com.englow3.exam.repository.ExamAttemptRepository;
@@ -46,7 +46,7 @@ import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.PlacementRecorder;
 import com.englow3.user.api.UserDirectory;
 
-class LearnerExamServiceTest {
+class ExamAttemptServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final ExamAttemptRepository attemptRepo = mock(ExamAttemptRepository.class);
@@ -57,7 +57,7 @@ class LearnerExamServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
-    private final LearnerExamService service = new com.englow3.exam.service.impl.LearnerExamServiceImpl(examRepo,
+    private final ExamAttemptService service = new com.englow3.exam.service.impl.ExamAttemptServiceImpl(examRepo,
             attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder,
             presignedUrls, "exams", java.time.Duration.ofHours(1));
 

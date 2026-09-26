@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.englow3.quiz.dto.request.SubmitQuizAttemptRequest;
 import com.englow3.quiz.dto.response.QuizAttemptResponse;
 import com.englow3.quiz.dto.response.QuizPaperResponse;
-import com.englow3.quiz.service.QuizService;
+import com.englow3.quiz.service.QuizAttemptService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,21 +27,21 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 class QuizAttemptController {
 
-    private final QuizService quizService;
+    private final QuizAttemptService quizAttemptService;
 
     @GetMapping("/{id}/paper")
     ResponseEntity<QuizPaperResponse> paper(@PathVariable UUID id) {
-        return ResponseEntity.ok(QuizPaperResponse.from(quizService.paperForAttempt(id)));
+        return ResponseEntity.ok(QuizPaperResponse.from(quizAttemptService.paperForAttempt(id)));
     }
 
     @PostMapping("/{id}/submit")
     ResponseEntity<QuizAttemptResponse> submit(@PathVariable UUID id,
             @Valid @RequestBody SubmitQuizAttemptRequest request) {
-        return ResponseEntity.ok(QuizAttemptResponse.from(quizService.submit(request.toCommand(id))));
+        return ResponseEntity.ok(QuizAttemptResponse.from(quizAttemptService.submit(request.toCommand(id))));
     }
 
     @GetMapping("/{id}/result")
     ResponseEntity<QuizAttemptResponse> result(@PathVariable UUID id) {
-        return ResponseEntity.ok(QuizAttemptResponse.from(quizService.result(id)));
+        return ResponseEntity.ok(QuizAttemptResponse.from(quizAttemptService.result(id)));
     }
 }

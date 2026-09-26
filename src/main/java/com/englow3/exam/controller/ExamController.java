@@ -22,6 +22,7 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.service.LearnerExamService;
+import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.page.PageResponse;
 
 @RestController
@@ -29,9 +30,11 @@ import com.englow3.shared.page.PageResponse;
 public class ExamController {
 
     private final LearnerExamService learnerExamService;
+    private final ExamAttemptService examAttemptService;
 
-    public ExamController(LearnerExamService learnerExamService) {
+    public ExamController(LearnerExamService learnerExamService, ExamAttemptService examAttemptService) {
         this.learnerExamService = learnerExamService;
+        this.examAttemptService = examAttemptService;
     }
 
     @GetMapping
@@ -61,7 +64,7 @@ public class ExamController {
 
     @PostMapping("/{id}/attempts")
     public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id) {
-        ExamAttemptResult result = learnerExamService.start(id);
+        ExamAttemptResult result = examAttemptService.start(id);
         return ResponseEntity.status(result.resumed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(ExamAttemptResponse.from(result));
     }

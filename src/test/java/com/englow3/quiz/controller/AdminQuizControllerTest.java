@@ -27,6 +27,7 @@ import com.englow3.config.SecurityConfig;
 import com.englow3.quiz.dto.result.ContentReviewResult;
 import com.englow3.quiz.entity.QuizStatus;
 import com.englow3.quiz.service.AdminQuizService;
+import com.englow3.quiz.service.QuizQuestionAuthoringService;
 
 /**
  * The quiz authoring list, at the HTTP layer.
@@ -50,6 +51,9 @@ class AdminQuizControllerTest {
 
     @MockitoBean
     private AdminQuizService adminQuizService;
+
+    @MockitoBean
+    private QuizQuestionAuthoringService quizQuestionAuthoringService;
 
     @Test
     void listsQuizzesForAuthoring() throws Exception {

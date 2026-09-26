@@ -12,8 +12,6 @@ import com.englow3.quiz.entity.QuizStatus;
 public interface AdminQuizService {
     QuizSummaryResult create(CreateQuizCommand command);
 
-    QuizSummaryResult addQuestions(AddQuizQuestionsCommand command);
-
     Page<ContentReviewResult> searchForAuthoring(QuizStatus status, String title, Pageable pageable);
 
     ContentReviewResult publish(UUID quizId);

@@ -22,6 +22,7 @@ import com.englow3.speaking.dto.response.SpeakingAttemptResponse;
 import com.englow3.speaking.dto.response.SpeakingPromptResponse;
 import com.englow3.speaking.dto.response.SpeakingUploadTicketResponse;
 import com.englow3.speaking.service.SpeakingService;
+import com.englow3.speaking.service.SpeakingAttemptService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class SpeakingController {
 
     private final SpeakingService speakingService;
+    private final SpeakingAttemptService speakingAttemptService;
 
     @GetMapping("/prompts")
     public ResponseEntity<PageResponse<SpeakingPromptResponse>> prompts(@RequestParam(required = false) String category,
@@ -58,13 +60,13 @@ public class SpeakingController {
     public ResponseEntity<SpeakingUploadTicketResponse> startAttempt(@PathVariable UUID id,
             @Valid @RequestBody StartSpeakingAttemptRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(SpeakingUploadTicketResponse
-                .from(speakingService.startAttempt(id, request.contentType(), request.contentLength())));
+                .from(speakingAttemptService.startAttempt(id, request.contentType(), request.contentLength())));
     }
 
     /** The upload is done; queue the assessment. Refused if the recording is not actually in storage. */
     @PostMapping("/attempts/{id}/submit")
     public ResponseEntity<SpeakingAttemptResponse> submitAttempt(@PathVariable UUID id) {
-        return ResponseEntity.ok(SpeakingAttemptResponse.from(speakingService.submitAttempt(id)));
+        return ResponseEntity.ok(SpeakingAttemptResponse.from(speakingAttemptService.submitAttempt(id)));
     }
 
     /**
@@ -73,12 +75,12 @@ public class SpeakingController {
      */
     @GetMapping("/attempts/{id}")
     public ResponseEntity<SpeakingAttemptResponse> attempt(@PathVariable UUID id) {
-        return ResponseEntity.ok(SpeakingAttemptResponse.from(speakingService.attemptResult(id)));
+        return ResponseEntity.ok(SpeakingAttemptResponse.from(speakingAttemptService.attemptResult(id)));
     }
 
     @GetMapping("/prompts/{id}/attempts")
     public ResponseEntity<List<SpeakingAttemptResponse>> attemptHistory(@PathVariable UUID id) {
         return ResponseEntity
-                .ok(speakingService.attemptHistory(id).stream().map(SpeakingAttemptResponse::from).toList());
+                .ok(speakingAttemptService.attemptHistory(id).stream().map(SpeakingAttemptResponse::from).toList());
     }
 }
