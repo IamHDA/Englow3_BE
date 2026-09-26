@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
@@ -121,5 +122,45 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
                 .param("userId", learner).query(Long.class).single();
 
         assertThat(attributed).isEqualTo(1);
+    }
+
+    /**
+     * A worker slow enough to have its job reclaimed still reports in. Its late answer must not land: a late transient
+     * failure used to put a job back in the queue after another worker had already finished it, to be run - and paid
+     * for - again.
+     */
+    @Test
+    void dropsALateOutcomeFromAClaimThatWasReclaimed() {
+        UUID target = UUID.randomUUID();
+        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1",
+                learner);
+        AiJob claimed = queue.claimBatch(1000).stream().filter(candidate -> candidate.getId().equals(job.getId()))
+                .findFirst().orElseThrow();
+        queue.reclaimStalled(java.time.Duration.ZERO);
+
+        boolean gaveUp = queue.record(job.getId(), claimed.getStartedAt(),
+                AiJobHandler.Outcome.transientFailure("PROVIDER_TIMEOUT", "late"));
+
+        assertThat(gaveUp).isFalse();
+        assertThat(statusOf(job.getId())).isEqualTo("PENDING");
+    }
+
+    @Test
+    void dropsALateFailureForAJobAlreadyFinished() {
+        UUID target = UUID.randomUUID();
+        AiJob job = queue.enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", target, "{}", "tutor:" + target, "v1",
+                learner);
+        AiJob claimed = queue.claimBatch(1000).stream().filter(candidate -> candidate.getId().equals(job.getId()))
+                .findFirst().orElseThrow();
+        queue.record(job.getId(), claimed.getStartedAt(), AiJobHandler.Outcome.succeeded("{\"content\":\"ok\"}"));
+
+        queue.record(job.getId(), claimed.getStartedAt(),
+                AiJobHandler.Outcome.transientFailure("PROVIDER_TIMEOUT", "late"));
+
+        assertThat(statusOf(job.getId())).isEqualTo("SUCCEEDED");
+    }
+
+    private String statusOf(UUID jobId) {
+        return jdbc.sql("select status from ai_jobs where id = :id").param("id", jobId).query(String.class).single();
     }
 }

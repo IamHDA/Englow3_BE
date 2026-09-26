@@ -46,6 +46,13 @@ public final class FlashcardSrs {
      */
     private static final int MASTERED_REPETITIONS = 4;
 
+    /**
+     * A hundred years, as Anki caps it. Compounding by ease has no ceiling of its own: some twenty successes in a row
+     * would push the due date past the largest timestamp Postgres stores, and every later answer on that card would
+     * fail.
+     */
+    static final int MAX_INTERVAL_DAYS = 36_500;
+
     private FlashcardSrs() {
     }
 
@@ -75,8 +82,9 @@ public final class FlashcardSrs {
         }
         // From here the interval compounds by ease. Rounded up so it always moves: rounding down would let a low-ease
         // card repeat the same interval forever.
-        return BigDecimal.valueOf(currentIntervalDays).multiply(easeFactor).setScale(0, RoundingMode.CEILING)
-                .intValueExact();
+        BigDecimal next = BigDecimal.valueOf(currentIntervalDays).multiply(easeFactor).setScale(0,
+                RoundingMode.CEILING);
+        return next.min(BigDecimal.valueOf(MAX_INTERVAL_DAYS)).intValueExact();
     }
 
     /**

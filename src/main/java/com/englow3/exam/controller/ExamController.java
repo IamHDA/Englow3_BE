@@ -2,6 +2,7 @@ package com.englow3.exam.controller;
 
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -61,7 +62,15 @@ public class ExamController {
 
     @PostMapping("/{id}/attempts")
     public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id) {
-        ExamAttemptResult result = learnerExamService.start(id);
+        ExamAttemptResult result;
+        try {
+            result = learnerExamService.start(id);
+        } catch (DataIntegrityViolationException raced) {
+            // Two starts at once - a double click, a second tab - both found nothing open and both inserted; the
+            // partial unique index let one through. The loser asks again, in a fresh transaction, and is handed the
+            // attempt the winner opened rather than a conflict.
+            result = learnerExamService.start(id);
+        }
         return ResponseEntity.status(result.resumed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(ExamAttemptResponse.from(result));
     }

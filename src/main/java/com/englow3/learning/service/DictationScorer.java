@@ -68,17 +68,30 @@ public final class DictationScorer {
         List<String> expectedWords = words(expected);
         List<String> actualWords = words(actual);
 
-        int correct = 0;
-        for (int i = 0; i < expectedWords.size() && i < actualWords.size(); i++) {
-            if (expectedWords.get(i).equals(actualWords.get(i))) {
-                correct++;
-            }
-        }
+        // Words matched in order, allowing for words missed or added along the way - the longest common subsequence.
+        // Compared position by position, one word left out at the start shifted every word after it and a nearly
+        // perfect answer scored zero, while the practice screen, which aligns the same way as this, showed a single
+        // missing word.
+        int correct = longestCommonSubsequence(expectedWords, actualWords);
 
+        // Out of the longer of the two, so typing the sentence and then a string of guesses is not a hundred percent.
+        int outOf = Math.max(expectedWords.size(), actualWords.size());
         BigDecimal accuracy = expectedWords.isEmpty() ? BigDecimal.ZERO
-                : BigDecimal.valueOf(correct).multiply(BigDecimal.valueOf(100))
-                        .divide(BigDecimal.valueOf(expectedWords.size()), 2, RoundingMode.HALF_UP);
-
+                : BigDecimal.valueOf(correct).multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(outOf), 2,
+                        RoundingMode.HALF_UP);
         return new Score(accuracy, correct, expectedWords.size());
+    }
+
+    private static int longestCommonSubsequence(List<String> left, List<String> right) {
+        int[] previous = new int[right.size() + 1];
+        for (String word : left) {
+            int[] current = new int[right.size() + 1];
+            for (int j = 1; j <= right.size(); j++) {
+                current[j] = word.equals(right.get(j - 1)) ? previous[j - 1] + 1
+                        : Math.max(previous[j], current[j - 1]);
+            }
+            previous = current;
+        }
+        return previous[right.size()];
     }
 }

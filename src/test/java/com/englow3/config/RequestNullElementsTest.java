@@ -69,4 +69,13 @@ class RequestNullElementsTest {
         assertThat(VALIDATOR.validate(new SelectTargetSkillsRequest(null))).isNotEmpty();
         assertThat(VALIDATOR.validate(new SelectTargetSkillsRequest(Set.of()))).isEmpty();
     }
+
+    /** Every other kind of content already insisted on a CEFR band; a speaking prompt took any two characters. */
+    @Test
+    void refusesASpeakingPromptLevelThatIsNotACefrBand() {
+        assertThat(VALIDATOR.validate(new com.englow3.speaking.dto.request.CreateSpeakingPromptRequest("slug", "Title",
+                "Sounds", "ZZ", "Hello there.", null, null, null, null))).isNotEmpty();
+        assertThat(VALIDATOR.validate(new com.englow3.speaking.dto.request.CreateSpeakingPromptRequest("slug", "Title",
+                "Sounds", "B1", "Hello there.", null, null, null, null))).isEmpty();
+    }
 }

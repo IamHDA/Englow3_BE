@@ -51,7 +51,7 @@ class AiJobWorkerTest {
 
     private AiJobHandler.Outcome drainAndCapture(AiJob job) {
         ArgumentCaptor<AiJobHandler.Outcome> outcome = ArgumentCaptor.forClass(AiJobHandler.Outcome.class);
-        verify(queue).record(eq(job.getId()), outcome.capture());
+        verify(queue).record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), outcome.capture());
 
         return outcome.getValue();
     }
@@ -101,8 +101,9 @@ class AiJobWorkerTest {
             return AiJobHandler.Outcome.succeeded("{}");
         })).drain();
 
-        verify(queue).record(eq(first.getId()), org.mockito.ArgumentMatchers.any());
-        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any());
+        verify(queue).record(eq(first.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 
     /**
@@ -128,7 +129,7 @@ class AiJobWorkerTest {
         workerWith(handlerThat(ignored -> AiJobHandler.Outcome.succeeded("{}"))).drain();
 
         verify(queue, org.mockito.Mockito.never()).record(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -174,7 +175,8 @@ class AiJobWorkerTest {
     void tellsTheHandlerWhenAJobHasGivenUp() {
         AiJob job = job();
         when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
         Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
 
         workerWith(handler).drain();
@@ -187,7 +189,8 @@ class AiJobWorkerTest {
     void saysNothingWhileARetryIsStillComing() {
         AiJob job = job();
         when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(false);
         Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
 
         workerWith(handler).drain();
@@ -200,7 +203,8 @@ class AiJobWorkerTest {
     void tellsTheHandlerEvenWhenItsLastAttemptThrew() {
         AiJob job = job();
         when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
         Recording handler = new Recording(ignored -> {
             throw new IllegalStateException("boom");
         });
@@ -239,7 +243,8 @@ class AiJobWorkerTest {
         AiJob first = job();
         AiJob second = job();
         when(queue.claimBatch(5)).thenReturn(List.of(first, second));
-        when(queue.record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(queue.record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(true);
         AiJobHandler throwingOnGiveUp = new AiJobHandler() {
             @Override
             public AiJobType handles() {
@@ -259,6 +264,7 @@ class AiJobWorkerTest {
 
         workerWith(throwingOnGiveUp).drain();
 
-        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any());
+        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 }

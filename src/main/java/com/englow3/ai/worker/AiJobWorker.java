@@ -53,7 +53,7 @@ public class AiJobWorker {
 
         for (AiJob job : claimed) {
             AiJobHandler.Outcome outcome = attempt(job);
-            if (queue.record(job.getId(), outcome)) {
+            if (queue.record(job.getId(), job.getStartedAt(), outcome)) {
                 gaveUp(job, outcome.errorCode());
             }
         }

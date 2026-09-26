@@ -163,6 +163,17 @@ class FlashcardSrsTest {
             assertThat(review.getLapseCount()).isEqualTo(1);
         }
 
+        /** A mastered card that slips is the lapse that matters most - it used to go uncounted. */
+        @Test
+        void failingAMasteredCardCountsAsALapse() {
+            FlashcardReview review = after(ReviewRating.GOOD, ReviewRating.GOOD, ReviewRating.GOOD, ReviewRating.GOOD);
+            assertThat(review.getStatus()).isEqualTo(FlashcardReviewStatus.MASTERED);
+
+            review.applySchedule(ReviewRating.AGAIN, FlashcardSrs.schedule(review, ReviewRating.AGAIN, NOW), NOW);
+
+            assertThat(review.getLapseCount()).isEqualTo(1);
+        }
+
         @Test
         void failingACardStillBeingLearnedDoesNot() {
             FlashcardReview review = after(ReviewRating.GOOD);
@@ -171,6 +182,21 @@ class FlashcardSrsTest {
             review.applySchedule(ReviewRating.AGAIN, FlashcardSrs.schedule(review, ReviewRating.AGAIN, NOW), NOW);
 
             assertThat(review.getLapseCount()).isZero();
+        }
+    }
+
+    @Nested
+    class Ceiling {
+
+        /** Forty easy answers in a row would once have scheduled a card past the end of Postgres' calendar. */
+        @Test
+        void neverSchedulesFurtherThanAHundredYears() {
+            FlashcardReview review = unseen();
+            for (int i = 0; i < 40; i++) {
+                review.applySchedule(ReviewRating.EASY, FlashcardSrs.schedule(review, ReviewRating.EASY, NOW), NOW);
+            }
+
+            assertThat(review.getIntervalDays()).isEqualTo(FlashcardSrs.MAX_INTERVAL_DAYS);
         }
     }
 }

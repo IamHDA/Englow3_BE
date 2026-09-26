@@ -68,14 +68,38 @@ class DictationScorerTest {
             assertThat(score.accuracyPercent()).isLessThan(java.math.BigDecimal.valueOf(100));
         }
 
-        /** Words the learner invented are not correct, and the ones they missed simply never match. */
+        /**
+         * Words the learner invented are not correct, and they count against the answer: the sentence followed by a
+         * string of guesses used to score a hundred percent. Out of the longer of the two, as the practice screen
+         * computes it.
+         */
         @Test
         void doesNotCreditExtraWords() {
             Score score = DictationScorer.score("The cat sat", "The cat sat on the mat");
 
             assertThat(score.correctWordCount()).isEqualTo(3);
             assertThat(score.totalWordCount()).isEqualTo(3);
-            assertThat(score.accuracyPercent()).isEqualByComparingTo("100.00");
+            assertThat(score.accuracyPercent()).isEqualByComparingTo("50.00");
+        }
+
+        /**
+         * One word left out at the start used to shift every word after it, so a nearly perfect answer scored zero
+         * while the screen showed a single missing word.
+         */
+        @Test
+        void aWordMissedEarlyCostsOnlyThatWord() {
+            Score score = DictationScorer.score("the cat sat on the mat", "cat sat on the mat");
+
+            assertThat(score.correctWordCount()).isEqualTo(5);
+            assertThat(score.accuracyPercent()).isEqualByComparingTo("83.33");
+        }
+
+        @Test
+        void aWordAddedEarlyCostsOnlyThatWord() {
+            Score score = DictationScorer.score("the cat sat on the mat", "the big cat sat on the mat");
+
+            assertThat(score.correctWordCount()).isEqualTo(6);
+            assertThat(score.accuracyPercent()).isEqualByComparingTo("85.71");
         }
 
         @Test

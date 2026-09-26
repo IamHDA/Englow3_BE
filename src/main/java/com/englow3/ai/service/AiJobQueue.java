@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -13,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobStatus;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.shared.time.StudyCalendar;
 import com.englow3.ai.repository.AiJobRepository;
+import com.englow3.shared.time.StudyCalendar;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +30,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AiJobQueue {
+
+    private static final Logger log = LoggerFactory.getLogger(AiJobQueue.class);
 
     private final AiJobRepository jobRepo;
     private final StudyCalendar calendar;
@@ -115,7 +119,26 @@ public class AiJobQueue {
      */
     @Transactional
     public boolean record(UUID jobId, AiJobHandler.Outcome outcome) {
+        return record(jobId, null, outcome);
+    }
+
+    /**
+     * As above, for the attempt that claimed the job at {@code claimedAt}.
+     * <p>
+     * A worker slow enough to have its job reclaimed still finishes, and its answer arrives after the job has moved on
+     * - retried by another worker, finished, or given up. Applied anyway, a late transient failure put a job that
+     * another worker had already completed back in the queue to run, and be paid for, again. So an outcome only lands
+     * while the job is still running under the claim that produced it; otherwise it is dropped.
+     */
+    @Transactional
+    public boolean record(UUID jobId, Instant claimedAt, AiJobHandler.Outcome outcome) {
         return jobRepo.findById(jobId).map(job -> {
+            if (job.getStatus() != AiJobStatus.RUNNING
+                    || (claimedAt != null && !sameInstant(job.getStartedAt(), claimedAt))) {
+                log.warn("Dropped a late outcome for AI job {}: it is {} and no longer under that claim", jobId,
+                        job.getStatus());
+                return false;
+            }
             if (outcome.success()) {
                 job.succeed(outcome.outputPayload(), Instant.now());
             } else {
@@ -142,4 +165,15 @@ public class AiJobQueue {
     public List<AiJob> jobsFor(String targetType, UUID targetId) {
         return jobRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(targetType, targetId);
     }
+
+    /**
+     * The same claim, to within the microsecond the column keeps. Within, not truncated: Postgres rounds to the
+     * microsecond, so a claim made at .1234567 is stored as .123457 and truncating the in-memory value to .123456 would
+     * call it a different claim.
+     */
+    private static boolean sameInstant(Instant stored, Instant claimed) {
+        return stored != null && Duration.between(stored, claimed).abs().compareTo(ONE_MICROSECOND) <= 0;
+    }
+
+    private static final Duration ONE_MICROSECOND = Duration.ofNanos(1_000);
 }

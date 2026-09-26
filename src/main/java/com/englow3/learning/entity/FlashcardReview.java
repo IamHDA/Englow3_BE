@@ -87,7 +87,10 @@ public class FlashcardReview {
      * being learned is ordinary progress, not a relapse, and counting it would make the difficulty statistics lie.
      */
     public void applySchedule(ReviewRating rating, FlashcardSchedule schedule, Instant now) {
-        if (rating.isFailure() && status == FlashcardReviewStatus.REVIEW) {
+        // A card that had been learned - under review or already mastered - and is now forgotten is a lapse.
+        // Counting REVIEW only left out the mastered card that slipped, the very one the "difficult" list is for.
+        if (rating.isFailure()
+                && (status == FlashcardReviewStatus.REVIEW || status == FlashcardReviewStatus.MASTERED)) {
             lapseCount++;
         }
         this.repetitions = schedule.repetitions();
