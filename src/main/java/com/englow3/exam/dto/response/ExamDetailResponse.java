@@ -15,6 +15,7 @@ import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Four of the five levels below are nested for the same reason as on {@link ExamDetailResult}: each is only ever the
@@ -23,9 +24,11 @@ import com.englow3.exam.entity.TargetLevel;
  * avatar. {@link QuestionOptionResponse} is the exception, in its own file for the same reason as on the result side.
  */
 public record ExamDetailResponse(UUID id, String title, String description, ExamType examType,
-        CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
-        int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, ExamStatus status, int versionNumber,
-        UUID createdByUserId, Instant publishedAt, Instant createdAt, List<ExamSectionResponse> sections) {
+        @Schema(nullable = true) CertificateType certificateType,
+        @Schema(nullable = true) CertificateVariant certificateVariant,
+        @Schema(nullable = true) TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
+        @Schema(nullable = true) BigDecimal passScore, ExamStatus status, int versionNumber, UUID createdByUserId,
+        @Schema(nullable = true) Instant publishedAt, Instant createdAt, List<ExamSectionResponse> sections) {
 
     public static ExamDetailResponse from(ExamDetailResult result) {
         return new ExamDetailResponse(result.id(), result.title(), result.description(), result.examType(),
@@ -36,7 +39,8 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
     }
 
     public record ExamSectionResponse(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
-            boolean scoredByCriteria, Integer timeLimitSeconds, List<SectionPartResponse> parts) {
+            boolean scoredByCriteria, @Schema(nullable = true) Integer timeLimitSeconds,
+            List<SectionPartResponse> parts) {
 
         static ExamSectionResponse from(ExamDetailResult.AdminSection result) {
             return new ExamSectionResponse(result.id(), result.sectionType(), result.orderNo(), result.maxRawScore(),
@@ -45,8 +49,9 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
         }
     }
 
-    public record SectionPartResponse(UUID id, int orderNo, String title, String instruction, String content,
-            String audioUrl, String imageUrl, List<QuestionSetResponse> questionSets) {
+    public record SectionPartResponse(UUID id, int orderNo, String title, @Schema(nullable = true) String instruction,
+            @Schema(nullable = true) String content, @Schema(nullable = true) String audioUrl,
+            @Schema(nullable = true) String imageUrl, List<QuestionSetResponse> questionSets) {
 
         static SectionPartResponse from(ExamDetailResult.AdminPart result) {
             return new SectionPartResponse(result.id(), result.orderNo(), result.title(), result.instruction(),
@@ -55,8 +60,10 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
         }
     }
 
-    public record QuestionSetResponse(UUID id, String title, String instruction, int orderNo, String content,
-            String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResponse> questions) {
+    public record QuestionSetResponse(UUID id, @Schema(nullable = true) String title,
+            @Schema(nullable = true) String instruction, int orderNo, @Schema(nullable = true) String content,
+            @Schema(nullable = true) String audioUrl, @Schema(nullable = true) String imageUrl,
+            @Schema(nullable = true) UUID sourceQuestionSetId, List<QuestionResponse> questions) {
 
         static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
@@ -66,8 +73,9 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
     }
 
     public record QuestionResponse(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
-            SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<QuestionOptionResponse> options) {
+            SkillType skillType, @Schema(nullable = true) String questionCategory, int orderNo, BigDecimal maxRawScore,
+            @Schema(nullable = true) String explanation, @Schema(nullable = true) UUID sourceQuestionId,
+            List<QuestionOptionResponse> options) {
 
         static QuestionResponse from(ExamDetailResult.QuestionResult result) {
             return new QuestionResponse(result.id(), result.questionType(), result.content(), result.difficultyLevel(),

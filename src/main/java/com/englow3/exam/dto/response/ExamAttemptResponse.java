@@ -7,10 +7,13 @@ import java.util.UUID;
 
 import com.englow3.exam.dto.result.ExamAttemptResult;
 import com.englow3.exam.entity.ExamAttemptStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status, Instant startedAt, Instant expiresAt,
-        Instant submittedAt, Instant scoredAt, BigDecimal rawScore, BigDecimal maxRawScore, BigDecimal scorePercentage,
-        Integer correctAnswerCount, int questionCount, boolean resumed, String examTitle,
+        @Schema(nullable = true) Instant submittedAt, @Schema(nullable = true) Instant scoredAt,
+        @Schema(nullable = true) BigDecimal rawScore, BigDecimal maxRawScore,
+        @Schema(nullable = true) BigDecimal scorePercentage, @Schema(nullable = true) Integer correctAnswerCount,
+        int questionCount, boolean resumed, @Schema(nullable = true) String examTitle,
         List<QuestionReviewResponse> questions) {
 
     public static ExamAttemptResponse from(ExamAttemptResult result) {
@@ -21,7 +24,8 @@ public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status
     }
 
     public record QuestionReviewResponse(UUID questionId, List<UUID> selectedOptionIds, List<UUID> correctOptionIds,
-            boolean correct, BigDecimal awardedRawScore, String explanation, List<OptionReviewResponse> options) {
+            boolean correct, BigDecimal awardedRawScore, @Schema(nullable = true) String explanation,
+            List<OptionReviewResponse> options) {
 
         static QuestionReviewResponse from(ExamAttemptResult.QuestionReviewResult result) {
             return new QuestionReviewResponse(result.questionId(), result.selectedOptionIds(),
@@ -30,7 +34,7 @@ public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status
         }
     }
 
-    public record OptionReviewResponse(UUID optionId, boolean correct, String explanation) {
+    public record OptionReviewResponse(UUID optionId, boolean correct, @Schema(nullable = true) String explanation) {
         static OptionReviewResponse from(ExamAttemptResult.OptionReviewResult result) {
             return new OptionReviewResponse(result.optionId(), result.correct(), result.explanation());
         }

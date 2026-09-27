@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.englow3.flashcard.dto.result.FlashcardStatsResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record FlashcardStatsResponse(int periodDays, long cardsStudied, int retentionPercent, long studySeconds,
         int streakDays, List<DailyActivityResponse> activity, List<DifficultCardResponse> difficultCards,
@@ -28,7 +29,7 @@ public record FlashcardStatsResponse(int periodDays, long cardsStudied, int rete
     }
 
     public record DifficultCardResponse(UUID flashcardId, String lemma, String setName, int lapseCount,
-            Instant lastReviewed) {
+            @Schema(nullable = true) Instant lastReviewed) {
     }
 
     public record SessionSummaryResponse(LocalDate day, UUID setId, String setName, long cardCount, int recallPercent,

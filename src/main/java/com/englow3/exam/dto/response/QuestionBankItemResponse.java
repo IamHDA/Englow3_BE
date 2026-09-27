@@ -8,11 +8,12 @@ import com.englow3.exam.dto.result.QuestionBankItemResult;
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SkillType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Reuses {@link QuestionOptionResponse} - same shape, same reason as on the result side. */
 public record QuestionBankItemResponse(UUID id, UUID questionSetId, QuestionType questionType, String content,
-        DifficultyLevel difficultyLevel, SkillType skillType, String questionCategory, BigDecimal maxRawScore,
-        String explanation, List<QuestionOptionResponse> options) {
+        DifficultyLevel difficultyLevel, SkillType skillType, @Schema(nullable = true) String questionCategory,
+        BigDecimal maxRawScore, @Schema(nullable = true) String explanation, List<QuestionOptionResponse> options) {
 
     public static QuestionBankItemResponse from(QuestionBankItemResult result) {
         return new QuestionBankItemResponse(result.id(), result.questionSetId(), result.questionType(),

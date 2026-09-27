@@ -25,6 +25,7 @@ import com.englow3.speaking.service.SpeakingService;
 import com.englow3.speaking.service.SpeakingAttemptService;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -57,6 +58,7 @@ public class SpeakingController {
 
     /** Opens an attempt and hands back somewhere to put the recording. */
     @PostMapping("/prompts/{id}/attempts")
+    @ApiResponse(responseCode = "201", description = "Speaking attempt created")
     public ResponseEntity<SpeakingUploadTicketResponse> startAttempt(@PathVariable UUID id,
             @Valid @RequestBody StartSpeakingAttemptRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(SpeakingUploadTicketResponse

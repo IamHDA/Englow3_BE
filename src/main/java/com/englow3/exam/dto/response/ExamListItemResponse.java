@@ -9,10 +9,14 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-public record ExamListItemResponse(UUID id, String title, ExamType examType, CertificateType certificateType,
-        CertificateVariant certificateVariant, TargetLevel targetLevel, ExamStatus status, int versionNumber,
-        UUID createdByUserId, Instant publishedAt, Instant createdAt, Instant submittedForReviewAt, String reviewNote) {
+public record ExamListItemResponse(UUID id, String title, ExamType examType,
+        @Schema(nullable = true) CertificateType certificateType,
+        @Schema(nullable = true) CertificateVariant certificateVariant,
+        @Schema(nullable = true) TargetLevel targetLevel, ExamStatus status, int versionNumber, UUID createdByUserId,
+        @Schema(nullable = true) Instant publishedAt, Instant createdAt,
+        @Schema(nullable = true) Instant submittedForReviewAt, @Schema(nullable = true) String reviewNote) {
 
     public static ExamListItemResponse from(ExamListItemResult result) {
         return new ExamListItemResponse(result.id(), result.title(), result.examType(), result.certificateType(),

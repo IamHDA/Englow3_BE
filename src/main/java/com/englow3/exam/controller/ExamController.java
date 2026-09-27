@@ -25,6 +25,7 @@ import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.service.LearnerExamService;
 import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.page.PageResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -64,6 +65,8 @@ public class ExamController {
     }
 
     @PostMapping("/{id}/attempts")
+    @ApiResponse(responseCode = "200", description = "Existing attempt resumed")
+    @ApiResponse(responseCode = "201", description = "New attempt created")
     public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id) {
         ExamAttemptResult result;
         try {

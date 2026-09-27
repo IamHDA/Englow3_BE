@@ -8,11 +8,13 @@ import java.util.UUID;
 import com.englow3.quiz.dto.result.QuizAttemptResult;
 import com.englow3.quiz.entity.QuizAttemptStatus;
 import com.englow3.quiz.entity.QuizQuestionType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record QuizAttemptResponse(UUID id, UUID quizId, String quizTitle, QuizAttemptStatus status, Instant startedAt,
-        Instant expiresAt, Instant submittedAt, BigDecimal score, BigDecimal maxScore, BigDecimal scorePercentage,
-        Integer correctAnswerCount, int questionCount, Boolean passed, boolean resumed,
-        List<QuestionReviewResponse> reviews) {
+        Instant expiresAt, @Schema(nullable = true) Instant submittedAt, @Schema(nullable = true) BigDecimal score,
+        BigDecimal maxScore, @Schema(nullable = true) BigDecimal scorePercentage,
+        @Schema(nullable = true) Integer correctAnswerCount, int questionCount, @Schema(nullable = true) Boolean passed,
+        boolean resumed, List<QuestionReviewResponse> reviews) {
 
     public static QuizAttemptResponse from(QuizAttemptResult result) {
         return new QuizAttemptResponse(result.id(), result.quizId(), result.quizTitle(), result.status(),

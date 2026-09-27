@@ -35,6 +35,7 @@ import com.englow3.shared.error.BadRequestException;
 import com.englow3.dictation.service.AdminDictationService;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -82,6 +83,7 @@ class AdminDictationController {
     }
 
     @PostMapping("/lessons")
+    @ApiResponse(responseCode = "201", description = "Dictation lesson created")
     ResponseEntity<DictationLessonResponse> create(@Valid @RequestBody CreateDictationLessonRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(DictationLessonResponse
@@ -90,6 +92,7 @@ class AdminDictationController {
     }
 
     @PostMapping("/lessons/{id}/sentences")
+    @ApiResponse(responseCode = "201", description = "Dictation sentences added")
     ResponseEntity<DictationLessonResponse> addSentences(@PathVariable UUID id,
             @Valid @RequestBody AddDictationSentencesRequest request) {
         var sentences = request.sentences().stream()

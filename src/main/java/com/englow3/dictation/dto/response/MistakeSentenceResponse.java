@@ -3,6 +3,7 @@ package com.englow3.dictation.dto.response;
 import java.util.UUID;
 
 import com.englow3.dictation.dto.result.MistakeSentenceResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * One line to practise again. No transcript, like the practice type. It used to carry one, on the reasoning that a
@@ -16,9 +17,9 @@ import com.englow3.dictation.dto.result.MistakeSentenceResult;
  * @param lastResponse
  *            the last thing they typed, so the screen can show what changed rather than just a new score
  */
-public record MistakeSentenceResponse(UUID sentenceId, String audioUrl, int audioDurationSeconds, Integer audioStartMs,
-        Integer audioEndMs, UUID lessonId, String lessonTitle, int bestAccuracyPercent, long attemptCount,
-        String lastResponse) {
+public record MistakeSentenceResponse(UUID sentenceId, String audioUrl, int audioDurationSeconds,
+        @Schema(nullable = true) Integer audioStartMs, @Schema(nullable = true) Integer audioEndMs, UUID lessonId,
+        String lessonTitle, int bestAccuracyPercent, long attemptCount, @Schema(nullable = true) String lastResponse) {
 
     public static MistakeSentenceResponse from(MistakeSentenceResult sentence) {
         return new MistakeSentenceResponse(sentence.sentenceId(), sentence.audioUrl(), sentence.audioDurationSeconds(),

@@ -4,9 +4,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.dictation.dto.result.DictationLessonSummaryResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-public record DictationLessonResponse(UUID id, String slug, String title, String topic, String targetLevel,
-        long sentenceCount, long completedSentenceCount, int totalDurationSeconds, Instant lastPractisedAt) {
+public record DictationLessonResponse(UUID id, String slug, String title, String topic,
+        @Schema(nullable = true) String targetLevel, long sentenceCount, long completedSentenceCount,
+        int totalDurationSeconds, @Schema(nullable = true) Instant lastPractisedAt) {
 
     public static DictationLessonResponse from(DictationLessonSummaryResult result) {
         return new DictationLessonResponse(result.id(), result.slug(), result.title(), result.topic(),

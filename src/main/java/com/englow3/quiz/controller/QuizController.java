@@ -23,6 +23,7 @@ import com.englow3.quiz.service.QuizAttemptService;
 import com.englow3.shared.page.PageResponse;
 
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -42,6 +43,8 @@ class QuizController {
 
     /** 201 for a new attempt, 200 for one that was already open - same convention as an exam. */
     @PostMapping("/{id}/attempts")
+    @ApiResponse(responseCode = "200", description = "Existing attempt resumed")
+    @ApiResponse(responseCode = "201", description = "New attempt created")
     ResponseEntity<QuizAttemptResponse> startAttempt(@PathVariable UUID id) {
         QuizAttemptResult result;
         try {

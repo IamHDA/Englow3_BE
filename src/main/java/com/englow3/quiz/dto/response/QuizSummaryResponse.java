@@ -4,10 +4,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.englow3.quiz.dto.result.QuizSummaryResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record QuizSummaryResponse(UUID id, String slug, String title, String description, String category,
-        String targetLevel, int timeLimitSeconds, short passingScorePercent, long questionCount,
-        BigDecimal bestScorePercent, int attemptCount) {
+        @Schema(nullable = true) String targetLevel, int timeLimitSeconds, short passingScorePercent,
+        long questionCount, @Schema(nullable = true) BigDecimal bestScorePercent, int attemptCount) {
 
     public static QuizSummaryResponse from(QuizSummaryResult result) {
         return new QuizSummaryResponse(result.id(), result.slug(), result.title(), result.description(),

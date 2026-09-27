@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.englow3.quiz.dto.result.QuizPaperResult;
 import com.englow3.quiz.dto.result.QuizQuestionResult;
 import com.englow3.quiz.entity.QuizQuestionType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record QuizPaperResponse(UUID attemptId, UUID quizId, String title, String description, int timeLimitSeconds,
         Instant expiresAt, List<QuestionResponse> questions) {
@@ -18,7 +19,8 @@ public record QuizPaperResponse(UUID attemptId, UUID quizId, String title, Strin
     }
 
     public record QuestionResponse(UUID id, int orderNo, QuizQuestionType questionType, String title, String prompt,
-            int points, String beforeText, String afterText, String originalSentence, String rewriteKeyword,
+            int points, @Schema(nullable = true) String beforeText, @Schema(nullable = true) String afterText,
+            @Schema(nullable = true) String originalSentence, @Schema(nullable = true) String rewriteKeyword,
             List<OptionResponse> options, List<String> wordBank, List<String> scrambledWords, List<String> leftTexts,
             List<String> rightTexts) {
 

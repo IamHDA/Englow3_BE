@@ -32,6 +32,7 @@ import com.englow3.quiz.service.AdminQuizService;
 import com.englow3.quiz.service.QuizQuestionAuthoringService;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -57,6 +58,7 @@ class AdminQuizController {
     }
 
     @PostMapping
+    @ApiResponse(responseCode = "201", description = "Quiz created")
     ResponseEntity<QuizSummaryResponse> create(@Valid @RequestBody CreateQuizRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(QuizSummaryResponse.from(adminQuizService.create(new CreateQuizCommand(request.slug(),
@@ -65,6 +67,7 @@ class AdminQuizController {
     }
 
     @PostMapping("/{id}/questions")
+    @ApiResponse(responseCode = "201", description = "Quiz questions added")
     ResponseEntity<QuizSummaryResponse> addQuestions(@PathVariable UUID id,
             @Valid @RequestBody AddQuizQuestionsRequest request) {
         var questions = request.questions().stream().map(question -> new NewQuestion(question.questionType(),

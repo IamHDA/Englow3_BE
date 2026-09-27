@@ -7,6 +7,7 @@ import com.englow3.progress.dto.result.DailyPathResult;
 import com.englow3.progress.entity.DailyQuestKind;
 import com.englow3.progress.entity.DailyTaskKind;
 import com.englow3.progress.entity.DailyTaskStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record DailyPathResponse(int streakDays, long totalXp, int level, long xpIntoLevel, long levelCostXp,
         List<DailyTaskResponse> tasks, List<DailyQuestResponse> quests) {
@@ -38,7 +39,8 @@ public record DailyPathResponse(int streakDays, long totalXp, int level, long xp
      *            what finishing it pays out, computed from the same weights the counter uses
      */
     public record DailyTaskResponse(DailyTaskKind kind, DailyTaskStatus status, UUID targetId, String title, int order,
-            long unitsRemaining, long unitsDoneToday, Integer completionPercent, long xpReward) {
+            long unitsRemaining, long unitsDoneToday, @Schema(nullable = true) Integer completionPercent,
+            long xpReward) {
     }
 
     /**

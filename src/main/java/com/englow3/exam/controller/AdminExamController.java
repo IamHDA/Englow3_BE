@@ -45,6 +45,7 @@ import com.englow3.exam.service.ExamReviewService;
 import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 /**
  * Authoring and review.
@@ -71,6 +72,7 @@ class AdminExamController {
     }
 
     @PostMapping
+    @ApiResponse(responseCode = "201", description = "Exam created")
     ResponseEntity<ExamResponse> create(@Valid @RequestBody CreateExamRequest request) {
         CreateExamCommand command = new CreateExamCommand(request.title(), request.description(), request.examType(),
                 request.certificateType(), request.certificateVariant(), request.targetLevel(),

@@ -53,6 +53,11 @@ spring:
           jws-algorithms: ES256
           audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
 
+springdoc:
+  use-fqn: true
+  default-produces-media-type: application/json
+  default-flat-param-object: true
+
 app:
   # The day every daily figure is counted in - streaks, today's tasks and quests, per-day charts, the AI allowance.
   # The learners' zone, not UTC: see StudyCalendar.

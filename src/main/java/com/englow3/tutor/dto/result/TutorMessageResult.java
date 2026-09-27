@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.tutor.entity.TutorMessage;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * One turn as a screen sees it.
@@ -14,8 +15,10 @@ import com.englow3.tutor.entity.TutorMessage;
  * @param errorCode
  *            why no answer came, when none did. Shown as an explanation rather than a bubble that never fills.
  */
-public record TutorMessageResult(UUID id, int orderNo, String role, String status, String content, String errorCode,
-        String model, boolean reported, Instant createdAt, Instant answeredAt) {
+public record TutorMessageResult(UUID id, int orderNo, String role, String status,
+        @Schema(nullable = true) String content, @Schema(nullable = true) String errorCode,
+        @Schema(nullable = true) String model, boolean reported, Instant createdAt,
+        @Schema(nullable = true) Instant answeredAt) {
 
     public static TutorMessageResult of(TutorMessage message) {
         return new TutorMessageResult(message.getId(), message.getOrderNo(), message.getRole().name(),

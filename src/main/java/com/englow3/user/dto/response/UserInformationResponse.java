@@ -7,9 +7,12 @@ import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.Gender;
 import com.englow3.user.entity.OnboardingStep;
 import com.englow3.user.entity.Role;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-public record UserInformationResponse(UUID id, String email, String fullName, String displayName, Gender gender,
-        LocalDate birthDate, String avatarUrl, String bannerUrl, OnboardingStep onboardingStep, Role role) {
+public record UserInformationResponse(UUID id, String email, String fullName, String displayName,
+        @Schema(nullable = true) Gender gender, @Schema(nullable = true) LocalDate birthDate,
+        @Schema(nullable = true) String avatarUrl, @Schema(nullable = true) String bannerUrl,
+        OnboardingStep onboardingStep, Role role) {
 
     public static UserInformationResponse from(UserInformationResult result, String publicBaseUrl) {
         return new UserInformationResponse(result.id(), result.email(), result.fullName(), result.displayName(),

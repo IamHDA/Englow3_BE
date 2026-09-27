@@ -38,6 +38,7 @@ import com.englow3.flashcard.dto.result.FlashcardImportResult;
 import com.englow3.shared.error.BadRequestException;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -66,6 +67,7 @@ class AdminFlashcardController {
     }
 
     @PostMapping("/sets")
+    @ApiResponse(responseCode = "201", description = "Flashcard set created")
     ResponseEntity<FlashcardSetResponse> createSet(@Valid @RequestBody CreateFlashcardSetRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 FlashcardSetResponse.from(adminFlashcardService.createSet(new CreateFlashcardSetCommand(request.slug(),
@@ -105,6 +107,7 @@ class AdminFlashcardController {
     }
 
     @PostMapping("/sets/{id}/cards")
+    @ApiResponse(responseCode = "201", description = "Flashcards added")
     ResponseEntity<FlashcardSetResponse> addCards(@PathVariable UUID id,
             @Valid @RequestBody AddFlashcardsRequest request) {
         List<AddFlashcardsCommand.NewCard> cards = request.cards().stream()

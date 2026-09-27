@@ -10,11 +10,15 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record LearnerExamResponse(UUID id, String title, String description, ExamType examType,
-        CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
-        int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, long questionCount, ExamStatus status,
-        Instant publishedAt, BigDecimal bestScorePercentage, String attemptStatus) {
+        @Schema(nullable = true) CertificateType certificateType,
+        @Schema(nullable = true) CertificateVariant certificateVariant,
+        @Schema(nullable = true) TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
+        @Schema(nullable = true) BigDecimal passScore, long questionCount, ExamStatus status,
+        @Schema(nullable = true) Instant publishedAt, @Schema(nullable = true) BigDecimal bestScorePercentage,
+        String attemptStatus) {
 
     public static LearnerExamResponse from(LearnerExamListItemResult result) {
         return new LearnerExamResponse(result.id(), result.title(), result.description(), result.examType(),

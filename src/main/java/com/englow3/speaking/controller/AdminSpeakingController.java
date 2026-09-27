@@ -25,6 +25,7 @@ import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.service.AdminSpeakingService;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -39,6 +40,7 @@ class AdminSpeakingController {
     private final AdminSpeakingService adminSpeakingService;
 
     @PostMapping("/prompts")
+    @ApiResponse(responseCode = "201", description = "Speaking prompt created")
     ResponseEntity<SpeakingPromptReviewResponse> create(@Valid @RequestBody CreateSpeakingPromptRequest request) {
         CreateSpeakingPromptCommand command = new CreateSpeakingPromptCommand(request.slug(), request.title(),
                 request.category(), request.targetLevel(), request.referenceText(), request.ipaTranscript(),

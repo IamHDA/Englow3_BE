@@ -13,11 +13,13 @@ import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record LearnerExamPaperResponse(UUID id, String title, String description, ExamType examType,
-        CertificateType certificateType, CertificateVariant certificateVariant, TargetLevel targetLevel,
-        int durationSeconds, BigDecimal maxRawScore, BigDecimal passScore, int versionNumber,
-        List<ExamSectionResponse> sections) {
+        @Schema(nullable = true) CertificateType certificateType,
+        @Schema(nullable = true) CertificateVariant certificateVariant,
+        @Schema(nullable = true) TargetLevel targetLevel, int durationSeconds, BigDecimal maxRawScore,
+        @Schema(nullable = true) BigDecimal passScore, int versionNumber, List<ExamSectionResponse> sections) {
 
     public static LearnerExamPaperResponse from(LearnerExamPaperResult result) {
         return new LearnerExamPaperResponse(result.id(), result.title(), result.description(), result.examType(),
@@ -27,7 +29,8 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
     }
 
     public record ExamSectionResponse(UUID id, SectionType sectionType, int orderNo, BigDecimal maxRawScore,
-            boolean scoredByCriteria, Integer timeLimitSeconds, List<SectionPartResponse> parts) {
+            boolean scoredByCriteria, @Schema(nullable = true) Integer timeLimitSeconds,
+            List<SectionPartResponse> parts) {
         static ExamSectionResponse from(LearnerExamPaperResult.LearnerSection result) {
             return new ExamSectionResponse(result.id(), result.sectionType(), result.orderNo(), result.maxRawScore(),
                     result.scoredByCriteria(), result.timeLimitSeconds(),
@@ -35,8 +38,9 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
         }
     }
 
-    public record SectionPartResponse(UUID id, int orderNo, String title, String instruction, String content,
-            String audioUrl, String imageUrl, List<QuestionSetResponse> questionSets) {
+    public record SectionPartResponse(UUID id, int orderNo, String title, @Schema(nullable = true) String instruction,
+            @Schema(nullable = true) String content, @Schema(nullable = true) String audioUrl,
+            @Schema(nullable = true) String imageUrl, List<QuestionSetResponse> questionSets) {
         static SectionPartResponse from(LearnerExamPaperResult.LearnerPart result) {
             return new SectionPartResponse(result.id(), result.orderNo(), result.title(), result.instruction(),
                     result.content(), result.audioUrl(), result.imageUrl(),
@@ -44,8 +48,10 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
         }
     }
 
-    public record QuestionSetResponse(UUID id, String title, String instruction, int orderNo, String content,
-            String audioUrl, String imageUrl, List<QuestionResponse> questions) {
+    public record QuestionSetResponse(UUID id, @Schema(nullable = true) String title,
+            @Schema(nullable = true) String instruction, int orderNo, @Schema(nullable = true) String content,
+            @Schema(nullable = true) String audioUrl, @Schema(nullable = true) String imageUrl,
+            List<QuestionResponse> questions) {
         static QuestionSetResponse from(LearnerExamPaperResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
                     result.content(), result.audioUrl(), result.imageUrl(),
@@ -54,7 +60,7 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
     }
 
     public record QuestionResponse(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
-            SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore,
+            SkillType skillType, @Schema(nullable = true) String questionCategory, int orderNo, BigDecimal maxRawScore,
             List<QuestionOptionResponse> options) {
         static QuestionResponse from(LearnerExamPaperResult.QuestionResult result) {
             return new QuestionResponse(result.id(), result.questionType(), result.content(), result.difficultyLevel(),
