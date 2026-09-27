@@ -114,7 +114,7 @@ class AdminExamController {
 
 A command with a single field that already comes from a `@PathVariable` (nothing to destructure from a request body) is still worth it once the service needs to stay decoupled from `@PathVariable`/`@RequestBody` - skip it only for use cases with no input at all.
 
-**Result and response records** - mapping as static factories, no mapper class. The result carries raw entity data; the response is what the client actually sees:
+**Result and response records** - mapping as static factories, no mapper class. A result is service output; it may already contain a resolved URL when the service owns storage policy, while a response record is the HTTP shape:
 
 ```java
 public record ExamResult(UUID id, String title, ExamStatus status, Instant publishedAt) {
@@ -157,51 +157,35 @@ public class ExamCategoryServiceImpl implements ExamCategoryService {
 
 ## Queries and projections
 
-Prefer a record projection over loading entities for read-only endpoints:
+Use the smallest read path that matches the shape:
+
+- A flat page with no lazy collection may return entities from a Spring Data repository and map them to a `dto/result` record in the service. Do not create a constructor projection just to avoid a short mapping method.
+- A complex paper or aggregate read belongs in `query/`. Query classes are read-only and use the dependencies already present in this codebase: `JdbcClient` for aggregate/cross-module SQL and JPA `EntityManager` for hierarchical paper assembly.
+- A query-side tree or row model that crosses into the service belongs in `dto/projection`, not in the query class. The service maps it to `dto/result`, resolves presigned URLs there, and returns no raw object keys to HTTP.
+- For `Instant` parameters in `JdbcClient`, use `shared.persistence.SqlTime.at(...)` as the existing queries do.
 
 ```java
-public interface ExamRepository extends JpaRepository<Exam, UUID> {
-
-    @Query("""
-        select new com.app.exam.dto.ExamListItem(e.id, e.title, e.status, e.publishedAt)
-        from Exam e
-        where (:status is null or e.status = :status)
-        """)
-    Page<ExamListItem> search(@Param("status") ExamStatus status, Pageable pageable);
-}
-```
-
-This handles one or two optional filters. Past that, the `null` checks multiply and the query plan degrades - move to `query/`.
-
-## Complex read-only queries
-
-Use `query/` for optional filter combinations, aggregation, or joins across modules. Read-only, always.
-
-```java
-@Repository
+@Component
 @RequiredArgsConstructor
 public class ExamStatsQuery {
 
-    private final DSLContext dsl;
+    private final JdbcClient jdbcClient;
 
-    public List<LevelStat> countByLevel(LocalDate from, LocalDate to, Set<String> levels) {
-        Condition where = EXAM_ATTEMPTS.SUBMITTED_AT.between(from.atStartOfDay(), to.atStartOfDay());
-        if (!levels.isEmpty()) {
-            where = where.and(EXAM_ATTEMPTS.LEVEL.in(levels));   // filters compose
-        }
-
-        return dsl.select(EXAM_ATTEMPTS.LEVEL, count())
-                  .from(EXAM_ATTEMPTS)
-                  .where(where)
-                  .groupBy(EXAM_ATTEMPTS.LEVEL)
-                  .fetch(r -> new LevelStat(r.value1(), r.value2()));
+    public List<LevelStat> countByLevel(Instant from) {
+        return jdbcClient.sql("""
+                select level, count(*) as total
+                  from exam_attempts
+                 where submitted_at >= :from
+                 group by level
+                """)
+                .param("from", SqlTime.at(from))
+                .query((rs, rowNum) -> new LevelStat(rs.getString("level"), rs.getLong("total")))
+                .list();
     }
 }
 ```
 
-Composing conditions like this is the actual reason to use a query DSL. If every filter is mandatory, plain SQL is simpler.
-
-Regenerate the query metadata after any migration. A stale reference fails at runtime, which defeats the purpose.
+Keep SQL/JPQL in the query or repository that owns the read. There is no jOOQ/querydsl code or generated query metadata in this repository.
 
 ## Calling another module
 

@@ -21,14 +21,17 @@
 - **Controller** - HTTP only. Maps the request DTO to a command, calls one service method, maps the returned result to a response record. No business logic, no transaction, no repository access.
 - **Service contract** - the callable use-case surface. Internal contracts live in `service/`; cross-module contracts live in `api/`. Consumers depend on this contract, never on a concrete implementation.
 - **Service implementation** - orchestration and the transaction boundary. Concrete Spring services live in `service/impl/*Impl`, take a command (or nothing, when the use case has no input), load entities, call their methods, coordinate with other modules' contracts, and return a result. Never take a request DTO or return a response record directly.
-- **Repository** - Spring Data interfaces and projections. Nothing else.
+- **Repository** - Spring Data interfaces for ordinary lookup, paging, and simple projections. Complex read models belong in `query/`.
 - **Entity** - state plus the rules that protect it.
 
-`command` and `result` are plain records owned by the module (`dto/command`, `dto/result`), distinct from the web-facing `dto/request` / `dto/response`:
+`command` and `result` are plain records owned by the module (`dto/command`, `dto/result`), distinct from the web-facing `dto/request` / `dto/response`. Query-side aggregate projections belong in `dto/projection`:
 
-- A **command** carries no validation annotations - those belong on the request record, and are already enforced by `@Valid` before the controller builds the command.
-- A **result** carries raw data, not display-ready values - building a URL from an object key, for instance, is the response's job, not the result's.
+- A **command** normally carries no validation annotations - those belong on the request record, and are already enforced by `@Valid` before the controller builds the command. The tutor's direct HTTP commands are an existing exception.
+- A **result** carries service output, not web request/response types. It may contain resolved URLs when the service owns storage policy (for example presigned exam media); otherwise raw object keys remain internal and a response mapper may build a public URL.
+- A **projection** is query-owned read data, not an HTTP response. A complex query returns it to the service; the service resolves storage URLs and maps it to a result.
 - Skip the command when a use case takes no input (`complete()`, `me()`); skip introducing a new command/result pair for a one-off method that already takes two or three plain values - destructuring in the controller is enough until the list grows unwieldy.
+
+The tutor controller and import-validation endpoints are existing direct HTTP exceptions: they use command/result records at the web boundary when no separate request/response mapping is needed. Do not normalize them as part of an unrelated change.
 
 This is not a move to full hexagonal architecture: there is still no separate domain model, no repository ports/interfaces beyond Spring Data, and the entity is still the JPA-mapped model directly. The only boundary this draws is between "what HTTP sends and receives" and "what the service takes and returns", so a service is callable and testable without constructing a validated web request, and the JSON contract can change without touching a service signature.
 
@@ -102,7 +105,7 @@ That code lives in `query/`, separate from `repository/`, and is **read-only**. 
 
 A query joining tables owned by different modules is an exception to the ownership rule. It is acceptable when it is declared: record in the module map which module hosts it, which schemas it reads, and what should happen when those schemas change. An exception that is written down and bounded is a design decision; the same one left unstated is a leak.
 
-Generated query metadata is build output. It stays out of version control, and it must be regenerated whenever a migration changes - otherwise a stale reference fails at runtime rather than at compile time, which is the opposite of the point.
+Current complex queries use Spring's `JdbcClient` for aggregate or cross-module SQL and JPA `EntityManager` for hierarchical paper assembly. There is no jOOQ/querydsl code or generated query metadata to regenerate. Verify changed SQL/JPQL with the relevant query integration test.
 
 ## Concurrency
 
@@ -134,7 +137,7 @@ Not in `shared`: entities used by several modules, business enums, DTOs passed b
 
 Duplicate until the third occurrence before extracting. Two similar things are often coincidence. If `shared` grows past roughly ten files, something in it belongs to a module.
 
-Reject `utils`, `helpers`, `manager`, `misc`, and cross-domain `CommonService` outright.
+Reject generic `utils`, `helpers`, `manager`, `misc`, and cross-domain `CommonService` packages. A singular module-local `helper/` package is valid for pure business calculators, scorers, parsers, and import logic.
 
 ## Determining the owning module
 

@@ -8,6 +8,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 - Layers are respected: controller has no business logic and no repository access; repository holds no logic.
 - Admin and end-user features sit in the same module, differing only by controller.
 - `query/` and `worker/` exist only where actually used.
+- Query-side aggregate projections live in `dto/projection`, service outputs in `dto/result`, and HTTP records in `dto/request` or `dto/response`.
 - Nothing landed in `shared` that carries business meaning.
 
 ## Rules and entities
@@ -33,6 +34,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 - `@Transactional` is on the service, and no external call sits inside it.
 - Everything the response needs is loaded inside the transaction - nothing relies on lazy access afterwards.
 - Entities do not appear in any HTTP response.
+- Nullable HTTP response components are marked with `@Schema(nullable = true)`; OpenAPI customizers do not contain hardcoded schema refs.
 - Schema changes are a new migration; no already-applied migration was edited.
 - Seed or demo data stays out of versioned migrations.
 - New lookup columns are indexed; uniqueness rules have a unique index.
@@ -55,7 +57,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 ## Build and tests
 
 - The project compiles and the tests pass. Do not report done without running them.
-- Query metadata was regenerated if a migration changed.
+- Changed SQL/JPQL queries have the relevant integration test or verification run.
 - Entity rules are covered by tests that need no database.
 - Failure paths are tested, not only the happy path.
 

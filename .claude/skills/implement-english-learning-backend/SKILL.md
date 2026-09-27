@@ -15,7 +15,7 @@ Implement one vertical slice at a time: one endpoint, its service, its persisten
 
 Read the repository rather than assuming its shape:
 
-1. Repository instructions - `CLAUDE.md`, `AGENTS.md`, or `README.md`, whichever exists.
+1. Read `AGENTS.md` first; follow it to `CONTRIBUTING.md`, then read `docs/module-map.md`. Read `CLAUDE.md` or `README.md` too when present.
 2. `docs/module-map.md` if present. It records which module owns what and where rules live. Follow it.
 3. The module you are about to touch, and at least one existing slice in it. Match its conventions over the examples here when they differ.
 4. Existing migrations, so you know the real schema.
@@ -36,14 +36,21 @@ com.<app>/
 │   │   └── impl/         concrete Spring services, named *Impl
 │   ├── repository/       Spring Data interfaces, projections
 │   ├── entity/           JPA entities, enums, module exceptions
-│   ├── dto/              request/response records
+│   ├── helper/           pure, stateless module-local business logic
+│   ├── dto/
+│   │   ├── request/      HTTP input records
+│   │   ├── response/     HTTP output records
+│   │   ├── command/      service inputs
+│   │   ├── result/       service outputs
+│   │   └── projection/   query-side read models passed to a service
 │   ├── query/            read-only complex queries - only where needed
 │   └── worker/           async job handling - only where needed
-├── shared/               technical types only: error, page, security
+├── tooling/pipeline/     offline import runner, not a business module
+├── shared/               technical infrastructure only
 └── config/               Spring configuration
 ```
 
-Create `query/` and `worker/` only in modules that have them. Split `dto/` into `request/` and `response/` only once it grows past roughly ten files.
+Create `query/` and `worker/` only in modules that have them. Keep query-side projections in the module's `dto/projection`, service outputs in `dto/result`, and HTTP records in `dto/request` or `dto/response`; do not put service/result objects in a query class. Nested result records are fine for a single response tree such as `ExamDetailResult.AdminSection` and `AdminPart`.
 
 Admin and end-user features belong to the same module. They differ by controller and by use case, not by module - never mirror a module into `admin/` and `user/` trees.
 
@@ -54,7 +61,7 @@ Every `@Service` implements an explicit contract. Controllers and other consumer
 Pick the shape before writing classes:
 
 - **Command** - changes state. Controller -> service -> entity (if it has rules) -> repository. Transaction at the service.
-- **Query** - reads only. Controller -> service -> repository projection, or `query/` when the repository is not enough. No entity behavior involved.
+- **Query** - reads only. Controller -> service -> repository, or `query/` when the repository is not enough. Repository queries may return entities for simple pages; complex read models use `dto/projection`, are mapped by the service to `dto/result`, and never perform writes or storage URL resolution.
 - **Simple CRUD** - no invariants. Plain service logic, plain entity. Do not manufacture rules that do not exist.
 - **Async work** - anything slow or external. Persist a record, commit, then let a worker pick it up. Never do it inline in the request thread.
 
@@ -80,7 +87,16 @@ Details and examples: [implementation-patterns.md](references/implementation-pat
 - Flyway owns the schema. `ddl-auto` is `validate`. Never edit a migration that has already run - add a new one.
 - `open-in-view` is false. Anything the response needs must be loaded inside the transaction.
 - Concurrency is handled explicitly: `@Version` for lost-update protection, a database constraint for anything that must never be violated.
-- No `utils`, `helpers`, `common`, or `CommonService` packages.
+- No generic `utils`, `helpers`, `common`, or `CommonService` packages. Pure module-local code belongs in the singular `helper/` package.
+
+## Current HTTP and platform conventions
+
+- Requests use `dto/request` with `@Valid`; `@NotNull` describes input requiredness and is not a response nullability marker.
+- HTTP responses normally use `dto/response` mapped from `dto/result`. Tutor endpoints and import validation endpoints are existing exceptions that return a result record directly when no HTTP-specific mapping is needed; preserve that shape unless the task is to normalize them.
+- Actual nullable response components use `@Schema(nullable = true)`. `config/OpenApiConfig` globally marks Jackson record response properties as required, adds common error responses, and resolves the error schema name dynamically. Do not hardcode a schema `$ref`.
+- `application.yml` enables `springdoc.use-fqn`, JSON response media types, and flat query parameters. An endpoint that can return both 200 and 201 documents both with `@ApiResponse`.
+- `shared/logging/TraceIdFilter` accepts a valid `X-Request-ID` into MDC as `traceId`; otherwise it generates a short id. Controllers do not create trace ids.
+- Current technical `shared` packages are `error`, `logging`, `page`, `persistence`, `security`, `storage`, and `time`; do not move module business DTOs or enums there.
 
 Full reasoning and edge cases: [architecture-rules.md](references/architecture-rules.md).
 

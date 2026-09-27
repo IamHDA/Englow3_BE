@@ -104,6 +104,7 @@ Reads deserve their own decision rather than inheriting the write path.
 
 - Simple reads and projections use the repository.
 - Complex reads - optional filter combinations, aggregation, window functions - use dedicated query code in a package separate from the repository, and strictly read-only.
+- When a complex query's read model crosses into the service, keep its records in the owning module's `dto/projection`; map them to `dto/result` before the HTTP layer. Do not place service/result objects in the query class.
 
 **A query joining tables owned by different modules belongs to no module.** Do not resolve this by inventing a module for it. Present the shapes and ask:
 
