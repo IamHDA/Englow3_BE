@@ -35,16 +35,17 @@ import io.swagger.v3.oas.models.Operation;
 @SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
 class OpenApiConfig {
 
-    private static final String ERROR_SCHEMA_REF = "#/components/schemas/ApiErrorResponse";
-
     /** 401 and 500 are the two answers every endpoint can give, so they are documented once here, not per method. */
     @Bean
     OpenApiCustomizer commonErrorResponses() {
         return openApi -> {
             ResolvedSchema resolved = ModelConverters.getInstance().readAllAsResolvedSchema(ApiErrorResponse.class);
             resolved.referencedSchemas.forEach(openApi::schema);
+            String errorSchemaRef = "#/components/schemas/" + resolved.referencedSchemas.keySet().stream()
+                    .filter(name -> name.endsWith(ApiErrorResponse.class.getSimpleName())).findFirst()
+                    .orElseThrow(() -> new IllegalStateException("ApiErrorResponse schema not registered"));
             openApi.getPaths().values().stream().flatMap(pathItem -> pathItem.readOperations().stream())
-                    .forEach(operation -> addCommonErrorResponses(operation));
+                    .forEach(operation -> addCommonErrorResponses(operation, errorSchemaRef));
         };
     }
 
@@ -75,13 +76,15 @@ class OpenApiConfig {
         };
     }
 
-    private static void addCommonErrorResponses(Operation operation) {
-        operation.getResponses().addApiResponse("400", errorResponse("Invalid request"))
-                .addApiResponse("401", errorResponse("Missing or invalid access token"))
-                .addApiResponse("403", errorResponse("Authenticated user is not allowed to perform this action"))
-                .addApiResponse("404", errorResponse("Requested resource was not found"))
-                .addApiResponse("409", errorResponse("Operation conflicts with the current resource state"))
-                .addApiResponse("500", errorResponse("Unexpected server error"));
+    private static void addCommonErrorResponses(Operation operation, String errorSchemaRef) {
+        operation.getResponses().addApiResponse("400", errorResponse("Invalid request", errorSchemaRef))
+                .addApiResponse("401", errorResponse("Missing or invalid access token", errorSchemaRef))
+                .addApiResponse("403",
+                        errorResponse("Authenticated user is not allowed to perform this action", errorSchemaRef))
+                .addApiResponse("404", errorResponse("Requested resource was not found", errorSchemaRef))
+                .addApiResponse("409",
+                        errorResponse("Operation conflicts with the current resource state", errorSchemaRef))
+                .addApiResponse("500", errorResponse("Unexpected server error", errorSchemaRef));
     }
 
     @SuppressWarnings("rawtypes")
@@ -112,8 +115,8 @@ class OpenApiConfig {
         }
     }
 
-    private static ApiResponse errorResponse(String description) {
+    private static ApiResponse errorResponse(String description, String errorSchemaRef) {
         return new ApiResponse().description(description).content(new Content().addMediaType("application/json",
-                new MediaType().schema(new Schema<>().$ref(ERROR_SCHEMA_REF))));
+                new MediaType().schema(new Schema<>().$ref(errorSchemaRef))));
     }
 }
