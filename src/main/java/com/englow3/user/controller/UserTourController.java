@@ -20,12 +20,12 @@ class UserTourController {
     }
 
     @GetMapping
-    ResponseEntity<UserTourStatusResponse> status() {
+    ResponseEntity<UserTourStatusResponse> getTourStatus() {
         return ResponseEntity.ok(new UserTourStatusResponse(tourService.completed()));
     }
 
     @PutMapping
-    ResponseEntity<UserTourStatusResponse> complete() {
+    ResponseEntity<UserTourStatusResponse> completeUserTour() {
         tourService.complete();
         return ResponseEntity.ok(new UserTourStatusResponse(true));
     }
