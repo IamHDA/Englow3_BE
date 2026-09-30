@@ -9,8 +9,8 @@ Owns authentication-linked identity, learner profile, learning purposes, target
 skills, and onboarding.
 
 - **Tables:** `users`, `learner_profiles`, `learning_purposes`,
-  `user_learning_purposes`, `user_target_skills`.
-- **Entry points:** profile and onboarding APIs.
+  `user_learning_purposes`, `user_target_skills`, `user_tour_completions`.
+- **Entry points:** profile, onboarding, and role-specific website tour APIs.
 - **Authentication:** Supabase issues JWTs. The backend maps the token subject to
   `users.auth_provider_id`; application code does not manage passwords or sessions.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam
