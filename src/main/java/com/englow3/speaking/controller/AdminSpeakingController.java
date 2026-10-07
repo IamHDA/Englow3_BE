@@ -83,9 +83,44 @@ class AdminSpeakingController {
         return ResponseEntity.ok(SpeakingPromptReviewResponse.from(adminSpeakingService.publish(id)));
     }
 
+    @PostMapping("/prompts/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<SpeakingPromptReviewResponse> restore(@PathVariable UUID id) {
+        return ResponseEntity.ok(SpeakingPromptReviewResponse.from(adminSpeakingService.restore(id)));
+    }
+
     @PostMapping("/prompts/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<SpeakingPromptReviewResponse> archive(@PathVariable UUID id) {
         return ResponseEntity.ok(SpeakingPromptReviewResponse.from(adminSpeakingService.archive(id)));
+    }
+
+    @GetMapping("/prompts/{id}/authoring")
+    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity
+                .ok(com.englow3.speaking.dto.response.AuthoringResponse.from(adminSpeakingService.authoringDetail(id)));
+    }
+
+    @PostMapping("/prompts/authoring")
+    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> createAuthoring(
+            @Valid @RequestBody com.englow3.speaking.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.speaking.dto.response.AuthoringResponse
+                .from(adminSpeakingService.saveAuthoring(authoringCommand(null, request))));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/prompts/{id}/authoring")
+    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody com.englow3.speaking.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.ok(com.englow3.speaking.dto.response.AuthoringResponse
+                .from(adminSpeakingService.saveAuthoring(authoringCommand(id, request))));
+    }
+
+    private com.englow3.speaking.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
+            com.englow3.speaking.dto.request.SaveAuthoringRequest r) {
+        var m = r.metadata();
+        return new com.englow3.speaking.dto.command.SaveAuthoringCommand(id, r.version(),
+                new com.englow3.speaking.dto.command.CreateSpeakingPromptCommand(m.slug(), m.title(), m.category(),
+                        m.targetLevel(), m.referenceText(), m.ipaTranscript(), m.translationVi(), m.phonemeTarget(),
+                        m.tips()));
     }
 }

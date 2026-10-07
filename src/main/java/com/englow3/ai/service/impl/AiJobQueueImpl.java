@@ -41,6 +41,29 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     private final StudyCalendar calendar;
     private final Clock clock;
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasFailedProductiveAssessment(UUID attemptId, int revision) {
+        return jobRepo.findByIdempotencyKey("productive:" + attemptId + ":" + revision)
+                .map(job -> job.getStatus() == AiJobStatus.FAILED).orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public void enqueueProductiveAssessment(UUID attemptId, String inputPayload, String idempotencyKey,
+            String promptVersion, UUID requestedByUserId) {
+        jobRepo.lockProductiveBudget(requestedByUserId.toString());
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isPresent()) {
+            return;
+        }
+        if (!hasDailyAllowance(requestedByUserId)) {
+            throw new com.englow3.shared.error.ConflictException("ASSESSMENT_DAILY_LIMIT",
+                    "Today's AI allowance has been reached");
+        }
+        enqueue(AiJobType.PRODUCTIVE_ASSESSMENT, "ASSESSMENT_ATTEMPT", attemptId, inputPayload, idempotencyKey,
+                promptVersion, requestedByUserId);
+    }
+
     @Value("${app.ai.provider:ai-service}")
     private String providerName;
 

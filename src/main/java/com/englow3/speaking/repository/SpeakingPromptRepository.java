@@ -12,6 +12,7 @@ import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 
 public interface SpeakingPromptRepository extends JpaRepository<SpeakingPrompt, UUID> {
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 
     /** The slug is the prompt's public handle, so it is unique across every status, not just published ones. */
     boolean existsBySlug(String slug);

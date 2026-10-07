@@ -91,6 +91,14 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     }
 
     @Transactional
+    public SpeakingPromptReviewResult restore(UUID promptId) {
+        SpeakingPrompt prompt = requirePrompt(promptId);
+        prompt.restore();
+
+        return SpeakingPromptReviewResult.of(prompt);
+    }
+
+    @Transactional
     public SpeakingPromptReviewResult archive(UUID promptId) {
         SpeakingPrompt prompt = requirePrompt(promptId);
         prompt.archive();
@@ -104,6 +112,49 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
             return objectMapper.writeValueAsString(command.tips() == null ? java.util.List.of() : command.tips());
         } catch (JsonProcessingException impossible) {
             throw new IllegalStateException("Could not serialise the prompt tips", impossible);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.speaking.dto.result.AuthoringResult authoringDetail(UUID id) {
+        var item = requirePrompt(id);
+        return new com.englow3.speaking.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
+                item.getReviewNote(),
+                new CreateSpeakingPromptCommand(item.getSlug(), item.getTitle(), item.getCategory(),
+                        item.getTargetLevel(), item.getReferenceText(), item.getIpaTranscript(),
+                        item.getTranslationVi(), item.getPhonemeTarget(), parseTips(item.getTips())));
+    }
+
+    @Transactional
+    public com.englow3.speaking.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.speaking.dto.command.SaveAuthoringCommand command) {
+        UUID id = command.id();
+        if (id == null) {
+            id = create(command.metadata()).id();
+        } else {
+            if (command.version() == null) {
+                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
+                        "A version is required when editing");
+            }
+            var item = requirePrompt(id);
+            if (promptRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
+                throw new ConflictException("CONTENT_SLUG_TAKEN", "Another item uses this slug");
+            }
+            item.updateDraft(command.metadata(), command.version(), clock.instant(), tipsJson(command.metadata()));
+            promptRepo.flush();
+        }
+
+        promptRepo.flush();
+        return authoringDetail(id);
+    }
+
+    private java.util.List<String> parseTips(String json) {
+        try {
+            return objectMapper.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                    });
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Invalid stored coaching notes", e);
         }
     }
 

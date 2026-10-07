@@ -75,24 +75,26 @@ public class DailyPathServiceImpl implements DailyPathService {
         var unfinishedLessons = reads.fork(() -> pathQuery.unfinishedLessons(userId,
                 dictationCompletionPolicy.completionThreshold(), TASKS_PER_KIND));
         var unpassedQuizzes = reads.fork(() -> pathQuery.unpassedQuizzes(userId, TASKS_PER_KIND));
+        var productiveTasks = reads.fork(() -> pathQuery.productiveTasks(userId, startOfToday, TASKS_PER_KIND * 2));
         var questCounts = reads.fork(() -> pathQuery.questCounts(userId, startOfToday, now));
 
         List<LocalDate> studyDays = studyDaysRead.get();
         DailyPathQuery.ActivityTotals totals = totalsRead.get();
-        long totalXp = ExperiencePoints.totalXp(new ExperiencePoints.Activity(totals.flashcardReviews(),
-                totals.dictationSentences(), totals.quizAttempts(), totals.examAttempts()));
+        long totalXp = ExperiencePoints
+                .totalXp(new ExperiencePoints.Activity(totals.flashcardReviews(), totals.dictationSentences(),
+                        totals.quizAttempts(), totals.examAttempts(), totals.productiveAttempts()));
         ExperiencePoints.Level level = ExperiencePoints.levelFor(totalXp);
 
         return new DailyPathResult(StudyStreak.count(studyDays, today), level.totalXp(), level.level(),
                 level.xpIntoLevel(), level.levelCostXp(), nodes(setsToday.get(), lessonsToday.get(), quizzesToday.get(),
-                        dueSets.get(), unfinishedLessons.get(), unpassedQuizzes.get()),
+                        dueSets.get(), unfinishedLessons.get(), unpassedQuizzes.get(), productiveTasks.get()),
                 quests(questCounts.get(), studyDays, today));
     }
 
     private static List<DailyPlan.Node> nodes(List<DailyPathQuery.StudiedSet> setsToday,
             List<DailyPathQuery.PractisedLesson> lessonsToday, List<DailyPathQuery.AttemptedQuiz> quizzesToday,
             List<DailyPathQuery.DueSet> dueSets, List<DailyPathQuery.PendingLesson> unfinishedLessons,
-            List<DailyPathQuery.PendingQuiz> unpassedQuizzes) {
+            List<DailyPathQuery.PendingQuiz> unpassedQuizzes, List<DailyPathQuery.ProductiveTask> productiveTasks) {
         Map<UUID, Long> cardsPerSetToday = setsToday.stream().collect(
                 Collectors.toMap(DailyPathQuery.StudiedSet::setId, DailyPathQuery.StudiedSet::cardCount, Long::sum));
         Map<UUID, Long> sentencesPerLessonToday = lessonsToday.stream().collect(Collectors.toMap(
@@ -120,6 +122,13 @@ public class DailyPathServiceImpl implements DailyPathService {
         unpassedQuizzes.forEach(quiz -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.QUIZ, quiz.quizId(),
                 quiz.title(), quiz.questionCount(), 0, quiz.bestScorePercent())));
 
+        productiveTasks.forEach(task -> {
+            var kind = task.skill().equals("WRITING") ? DailyTaskKind.WRITING : DailyTaskKind.SPEAKING;
+            if (task.submittedToday())
+                finished.add(new DailyPlan.Finished(kind, task.id(), task.title(), 1, null));
+            else if (task.unsubmitted())
+                candidates.add(new DailyPlan.Candidate(kind, task.id(), task.title(), 1, 0, null));
+        });
         return DailyPlan.build(finished, candidates);
     }
 

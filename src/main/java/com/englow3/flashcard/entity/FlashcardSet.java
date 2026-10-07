@@ -20,6 +20,12 @@ import lombok.Getter;
 @Getter
 public class FlashcardSet {
 
+    @jakarta.persistence.Version
+    private long version;
+
+    @Column(name = "authoring_updated_at", nullable = false)
+    private Instant authoringUpdatedAt = Instant.now();
+
     @Id
     private UUID id;
 
@@ -158,6 +164,39 @@ public class FlashcardSet {
             case PENDING_REVIEW, ARCHIVED -> throw new ConflictException("FLASHCARD_SET_NOT_EDITABLE",
                     "Nothing can be added to a set that is %s".formatted(status));
         }
+    }
+
+    public void updateDraft(com.englow3.flashcard.dto.command.CreateFlashcardSetCommand source, long expectedVersion,
+            Instant now) {
+        if ((status != FlashcardSetStatus.DRAFT && status != FlashcardSetStatus.REJECTED) || publishedAt != null) {
+            throw new ConflictException("CONTENT_NOT_EDITABLE",
+                    "Only an unpublished draft or rejected item can be edited");
+        }
+        if (version != expectedVersion) {
+            throw new ConflictException("CONTENT_CHANGED", "This item changed. Reload before saving again");
+        }
+        this.slug = source.slug();
+        this.name = source.name();
+        this.description = source.description();
+        this.topic = source.topic();
+        this.targetLevel = source.targetLevel();
+        authoringUpdatedAt = now;
+    }
+
+    public void touchContent() {
+        authoringUpdatedAt = Instant.now();
+    }
+
+    /**
+     * Undoes an archive. Back to where it was: a set that had been published returns to the library as it was -
+     * published content is never edited, so it needs no second review - and one that never was goes back to draft.
+     * Archiving used to be one-way; a mistaken click could only be undone in the database.
+     */
+    public void restore() {
+        if (status != FlashcardSetStatus.ARCHIVED) {
+            throw new ConflictException("FLASHCARD_SET_NOT_ARCHIVED", "Only an archived set can be restored");
+        }
+        this.status = publishedAt != null ? FlashcardSetStatus.PUBLISHED : FlashcardSetStatus.DRAFT;
     }
 
     public void archive() {

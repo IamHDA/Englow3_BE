@@ -31,7 +31,11 @@ answers, and section results.
   `question_matching_answers`, `question_accepted_answers`, `grading_criteria`,
   `score_conversions`, `exam_attempts`, `attempt_section_results`,
   `attempt_answers`, `attempt_answer_options`, and
-  `attempt_answer_criterion_scores`.
+  `attempt_answer_criterion_scores`, and `exam_attempt_drafts`.
+- **Deadline:** draft replacements lock the owning attempt and check the server
+  deadline plus draft revision. A scheduled, idempotent finalizer grades only
+  the last accepted snapshot when a browser is absent. Result reads also finalize
+  expired live attempts; late client answers never enter the graded snapshot.
 - **Entry points:** administrator authoring APIs, learner catalogue and safe paper
   delivery, plus the start, submit, grade, and result lifecycle for exam attempts.
 - **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
@@ -87,9 +91,10 @@ module's table as a JPA entity.
 
 - **Entry points:** `GET /api/daily-path` and `GET /api/admin/overview`.
 - **Cross-module read:** `DailyPathQuery` reads activity from flashcard, quiz,
-  dictation, and exam tables. `AdminOverviewQuery` reads user, speaking, exam,
-  flashcard, quiz, and dictation tables. Both are documented read-only joins; no
+  dictation, exam and assessment tables. `AdminOverviewQuery` reads user, speaking, exam,
+  flashcard, quiz, dictation and assessment tables. Both are documented read-only joins; no
   `progress` code writes those tables.
+- **Productive practice:** a valid first submission on each attempt counts once for study activity and the existing practice-attempt XP rate. Regrading, retrying a grader and reading a report do not add another submission. Drafts count for neither XP nor streak.
 - **Derived, not stored:** plans, experience, levels, streaks, and quests are
   computed on every read. There is no points ledger or persisted daily path to
   drift out of step with activity.
@@ -136,6 +141,36 @@ it, and what the assessment made of it.
   presigned PUT bound to the declared size; nothing streams through the API.
 - **AI:** enqueues through `ai`. It never calls a provider itself.
 
+## `assessment`
+
+Owns rubric-based productive practice for free Writing and Speaking responses.
+Pronunciation read-aloud tasks remain in `speaking`; they measure a different
+exercise and retain their existing percentage scores.
+
+- **Tables:** `assessment_tasks`, `assessment_attempts`, `assessment_reviews`.
+- **Roles:** staff author and grade their own tasks; administrators approve,
+  reject or archive tasks and may correct a completed grade. Learners only read
+  published tasks and their own drafts, submissions and reports.
+- **Reporting:** `AssessmentQueueQuery` performs a declared read-only join to
+  `users.display_name` for the authorized back-office search. Batched display-name
+  lookup otherwise uses `user.api.UserDirectory`; no assessment code writes user rows.
+- **Snapshots:** an attempt stores its task and rubric reference at creation;
+  sample answers are hidden until completion. Published tasks cannot be edited.
+- **Drafts:** Writing uses optimistic version checks, server persistence and a
+  browser recovery copy. Submitted evidence cannot be edited.
+- **Audio:** private recordings use size-bound upload tickets and are copied to
+  an immutable submission key before grading; an old PUT ticket cannot replace
+  the recording used for assessment.
+- **AI:** `PRODUCTIVE_ASSESSMENT` jobs use the existing `ai` queue and provider
+  boundary. Writing requests structured LLM feedback. Speaking adds transcript
+  and acoustic evidence from Azure. All four rubric scores are validated; the
+  server calculates the mean and labels the result an estimated practice score.
+- **Recovery:** grading revision fences discard old results. A failed callback
+  only changes an attempt when its current job actually failed. When automatic
+  grading is disabled, submitted work goes directly to the human review queue.
+- **Review:** human grading and administrator corrections save an audit row,
+  including the previous report and the reviewer note.
+
 ## `tutor`
 
 Owns the AI tutor conversation.
@@ -176,9 +211,10 @@ above now owns it. Speech assessment and tutor replies both ride that queue;
 neither module calls a provider directly, and no module outside `ai` writes the
 table.
 
-Neither pipeline has ever run against a real provider - there is no key for either
-Azure Speech or an LLM. Every decision they make about a provider answer is tested;
-the call itself is not.
+Provider parsing and failure handling have automated coverage. Real-provider
+acceptance requires separately configured credentials and is not implied by those
+tests. Productive practice supports a human review path when automatic grading is
+disabled; see `productive-assessment-walkthrough.md` for setup and role workflows.
 
 Frontend and mobile clients must call the Spring API, never FastAPI directly.
 

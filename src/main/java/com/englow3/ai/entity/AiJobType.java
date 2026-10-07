@@ -5,6 +5,7 @@ package com.englow3.ai.entity;
  * one value and never sees the others, which is what lets a second kind of work be added without touching the first.
  */
 public enum AiJobType {
+    PRODUCTIVE_ASSESSMENT,
 
     /** Score a recording against a reference sentence. Target is a speaking attempt. */
     SPEECH_ASSESSMENT,

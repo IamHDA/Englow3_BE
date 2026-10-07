@@ -129,9 +129,48 @@ class AdminDictationController {
         return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.publish(id)));
     }
 
+    @PostMapping("/lessons/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> restore(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.restore(id)));
+    }
+
     @PostMapping("/lessons/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ContentReviewResponse> archive(@PathVariable UUID id) {
         return ResponseEntity.ok(ContentReviewResponse.from(adminDictationService.archive(id)));
+    }
+
+    @GetMapping("/lessons/{id}/authoring")
+    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(
+                com.englow3.dictation.dto.response.AuthoringResponse.from(adminDictationService.authoringDetail(id)));
+    }
+
+    @PostMapping("/lessons/authoring")
+    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> createAuthoring(
+            @Valid @RequestBody com.englow3.dictation.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.dictation.dto.response.AuthoringResponse
+                .from(adminDictationService.saveAuthoring(authoringCommand(null, request))));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/lessons/{id}/authoring")
+    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody com.englow3.dictation.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.ok(com.englow3.dictation.dto.response.AuthoringResponse
+                .from(adminDictationService.saveAuthoring(authoringCommand(id, request))));
+    }
+
+    private com.englow3.dictation.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
+            com.englow3.dictation.dto.request.SaveAuthoringRequest r) {
+        var m = r.metadata();
+        return new com.englow3.dictation.dto.command.SaveAuthoringCommand(id, r.version(),
+                new com.englow3.dictation.dto.command.CreateDictationLessonCommand(m.slug(), m.title(), m.topic(),
+                        m.targetLevel()),
+                r.sentences().stream()
+                        .map(c -> new com.englow3.dictation.dto.command.SaveAuthoringCommand.Sentence(c.text(),
+                                c.translationVi(), c.audioObjectKey(), c.audioDurationSeconds(), c.hintFirstLetters(),
+                                c.hintRevealWord(), c.hintPartialTranscript(), c.audioStartMs(), c.audioEndMs()))
+                        .toList());
     }
 }

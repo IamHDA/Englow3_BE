@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 import com.englow3.ai.entity.AiJob;
 
 public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
+    @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:userId,0)) as text)", nativeQuery = true)
+    String lockProductiveBudget(@Param("userId") String userId);
 
     Optional<AiJob> findByIdempotencyKey(String idempotencyKey);
 

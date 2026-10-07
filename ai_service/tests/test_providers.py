@@ -1,6 +1,8 @@
 import asyncio
 import base64
+import io
 import json
+import wave
 
 import httpx
 import pytest
@@ -12,6 +14,16 @@ from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
 from app.schemas import EmbeddingRequest, LlmGenerateRequest
+
+
+def wav_audio() -> bytes:
+    output = io.BytesIO()
+    with wave.open(output, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(bytes(32000))
+    return output.getvalue()
 
 
 def configured(**overrides) -> Settings:
@@ -185,7 +197,7 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
             assert request.headers["Ocp-Apim-Subscription-Key"] == "speech-secret"
             assessment = json.loads(base64.b64decode(request.headers["Pronunciation-Assessment"]))
             assert assessment["ReferenceText"] == "Hello"
-            assert request.content == b"RIFF-audio"
+            assert request.content == wav_audio()
             return httpx.Response(
                 200,
                 headers={"X-RequestId": "speech-request"},
@@ -224,7 +236,7 @@ def test_speech_provider_builds_assessment_and_normalizes_scores():
 
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             return await AzureSpeechProvider(client, configured()).assess(
-                b"RIFF-audio", "audio/wav", "en-US", "Hello"
+                wav_audio(), "audio/wav", "en-US", "Hello"
             )
 
     result = asyncio.run(run())
@@ -243,7 +255,7 @@ def test_speech_recognition_failure_is_not_retryable():
         )
         async with httpx.AsyncClient(transport=transport) as client:
             await AzureSpeechProvider(client, configured()).assess(
-                b"RIFF-audio", "audio/wav", "en-US", None
+                wav_audio(), "audio/wav", "en-US", None
             )
 
     with pytest.raises(ProviderError) as captured:
@@ -278,7 +290,7 @@ def test_speech_malformed_responses_use_a_stable_error(payload):
         transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
         async with httpx.AsyncClient(transport=transport) as client:
             await AzureSpeechProvider(client, configured()).assess(
-                b"RIFF-audio", "audio/wav", "en-US", None
+                wav_audio(), "audio/wav", "en-US", None
             )
 
     with pytest.raises(ProviderError) as captured:

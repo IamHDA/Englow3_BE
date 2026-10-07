@@ -105,6 +105,8 @@ public class ExamContentServiceImpl implements ExamContentService {
         Exam exam = requireExam(command.examId());
         exam.requireEditable();
         validateContentTree(exam.getId(), command.sections());
+        exam.touchContent();
+        examRepo.flush();
 
         deleteContent(exam.getId());
         createContent(exam.getId(), command.sections());

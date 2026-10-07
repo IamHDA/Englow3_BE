@@ -66,6 +66,13 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     }
 
     @Transactional
+    public ExamResult restore(UUID examId) {
+        Exam exam = requireExam(examId);
+        exam.restore();
+        return ExamResult.of(exam);
+    }
+
+    @Transactional
     public ExamResult archive(ArchiveExamCommand command) {
         Exam exam = requireExam(command.examId());
         exam.archive();

@@ -12,6 +12,7 @@ import com.englow3.quiz.entity.Quiz;
 import com.englow3.quiz.entity.QuizStatus;
 
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 
     boolean existsBySlug(String slug);
 

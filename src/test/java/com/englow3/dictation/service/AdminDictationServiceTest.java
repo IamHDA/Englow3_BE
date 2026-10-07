@@ -51,7 +51,8 @@ class AdminDictationServiceTest {
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminDictationService service = new com.englow3.dictation.service.impl.AdminDictationServiceImpl(
-            lessonRepo, sentenceRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK);
+            lessonRepo, sentenceRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK,
+            mock(com.englow3.shared.storage.PresignedUrlResolver.class));
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;

@@ -33,7 +33,7 @@ public class SpeechAssessmentClient {
     public SpeechAssessmentClient(@Value("${app.ai.base-url}") String baseUrl,
             @Value("${app.ai.internal-api-key:}") String internalApiKey,
             @Value("${app.ai.connect-timeout:5s}") Duration connectTimeout,
-            @Value("${app.ai.read-timeout:45s}") Duration readTimeout) {
+            @Value("${app.ai.speech-read-timeout:240s}") Duration readTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         // Both timeouts set explicitly: the default is none at all, and a worker blocked forever on a provider that
         // stopped answering holds its job RUNNING until the stall reconciler notices - minutes of nothing.

@@ -53,6 +53,7 @@ public class QuizQuestionAuthoringServiceImpl implements QuizQuestionAuthoringSe
                             .formatted(quiz.getStatus()));
         }
 
+        quiz.touchContent();
         int nextOrderNo = Math.toIntExact(questionRepo.countByQuizId(quiz.getId())) + 1;
         List<QuizQuestion> questions = new ArrayList<>();
         List<QuizQuestionOption> options = new ArrayList<>();
@@ -72,6 +73,49 @@ public class QuizQuestionAuthoringServiceImpl implements QuizQuestionAuthoringSe
         tokenRepo.saveAll(tokens);
         pairRepo.saveAll(pairs);
         return QuizSummaryResult.of(quiz, questionRepo.countByQuizId(quiz.getId()), null, 0);
+    }
+
+    @Transactional
+    public QuizSummaryResult replaceQuestions(AddQuizQuestionsCommand command) {
+        var quiz = requireQuiz(command.quizId());
+        if ((quiz.getStatus() != QuizStatus.DRAFT && quiz.getStatus() != QuizStatus.REJECTED)
+                || quiz.getPublishedAt() != null) {
+            throw new ConflictException("CONTENT_NOT_EDITABLE", "Published questions cannot be replaced");
+        }
+        questionRepo.deleteAllInBatch(questionRepo.findByQuizIdOrderByOrderNo(command.quizId()));
+        return addQuestions(command);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NewQuestion> authoringQuestions(UUID id) {
+        requireQuiz(id);
+        var questions = questionRepo.findByQuizIdOrderByOrderNo(id);
+        var ids = questions.stream().map(QuizQuestion::getId).toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        var options = optionRepo.findByQuizQuestionIdInOrderByOrderNo(ids);
+        var tokens = tokenRepo.findByQuizQuestionIdInOrderByOrderNo(ids);
+        var pairs = pairRepo.findByQuizQuestionIdInOrderByOrderNo(ids);
+        return questions.stream()
+                .map(q -> new NewQuestion(q.getQuestionType(), q.getTitle(), q.getPrompt(), q.getPoints(),
+                        q.getExplanation(), q.getBeforeText(), q.getAfterText(), q.getOriginalSentence(),
+                        q.getRewriteKeyword(),
+                        options.stream().filter(o -> o.getQuizQuestionId().equals(q.getId()))
+                                .map(o -> new NewOption(o.getLabel(), o.getContent(), o.isCorrect())).toList(),
+                        values(tokens, q.getId(), QuizTokenRole.ACCEPTED_ANSWER),
+                        values(tokens, q.getId(), QuizTokenRole.WORD_BANK),
+                        values(tokens, q.getId(), QuizTokenRole.CORRECT_WORD),
+                        values(tokens, q.getId(), QuizTokenRole.SCRAMBLED),
+                        values(tokens, q.getId(), QuizTokenRole.CORRECT_ORDER),
+                        pairs.stream().filter(p -> p.getQuizQuestionId().equals(q.getId()))
+                                .map(p -> new NewPair(p.getLeftText(), p.getRightText())).toList()))
+                .toList();
+    }
+
+    private List<String> values(List<QuizQuestionToken> tokens, UUID id, QuizTokenRole role) {
+        return tokens.stream().filter(t -> t.getQuizQuestionId().equals(id) && t.getRole() == role)
+                .map(QuizQuestionToken::getValue).toList();
     }
 
     private void collectPayload(QuizQuestion question, NewQuestion source, List<QuizQuestionOption> options,

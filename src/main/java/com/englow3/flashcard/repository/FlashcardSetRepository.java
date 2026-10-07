@@ -13,6 +13,7 @@ import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 
 public interface FlashcardSetRepository extends JpaRepository<FlashcardSet, UUID> {
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 
     /** The slug is the set's public handle, so it has to be unique across every status, not just published ones. */
     boolean existsBySlug(String slug);

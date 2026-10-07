@@ -45,6 +45,9 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final com.englow3.shared.storage.PresignedUrlResolver presignedUrls;
+    @org.springframework.beans.factory.annotation.Value("${app.storage.learning-bucket}")
+    private String learningBucket;
 
     @Transactional
     public FlashcardSetSummaryResult createSet(CreateFlashcardSetCommand command) {
@@ -68,6 +71,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     public FlashcardSetSummaryResult addCards(AddFlashcardsCommand command) {
         FlashcardSet set = requireSet(command.flashcardSetId());
         set.requireAppendable(currentUser.hasRole("ADMIN"));
+        set.touchContent();
         int nextOrderNo = cardRepo.findMaxOrderNo(set.getId()).orElse(0) + 1;
 
         List<Flashcard> cards = new ArrayList<>();
@@ -170,6 +174,13 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     }
 
     @Transactional
+    public ContentReviewResult restore(UUID setId) {
+        FlashcardSet set = requireSet(setId);
+        set.restore();
+        return reviewStateOf(set);
+    }
+
+    @Transactional
     public ContentReviewResult archive(UUID setId) {
         FlashcardSet set = requireSet(setId);
         set.archive();
@@ -186,6 +197,54 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
 
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set) {
         return FlashcardSetSummaryResult.of(set, cardRepo.countByFlashcardSetId(set.getId()), 0L, 0L, null);
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.flashcard.dto.result.AuthoringResult authoringDetail(UUID id) {
+        var item = requireSet(id);
+        return new com.englow3.flashcard.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
+                item.getReview().getReviewNote(),
+                new CreateFlashcardSetCommand(item.getSlug(), item.getName(), item.getDescription(), item.getTopic(),
+                        item.getTargetLevel()),
+                cardRepo.findByFlashcardSetIdOrderByOrderNo(id).stream()
+                        .map(c -> new AddFlashcardsCommand.NewCard(c.getLemma(), c.getPartOfSpeech(), c.getSenseLabel(),
+                                c.getIpaUs(), c.getIpaUk(), c.getAudioUsObjectKey(), c.getAudioUkObjectKey(),
+                                c.getDefinitionEn(), c.getDefinitionVi(), c.getExampleSentence(),
+                                c.getExampleTranslationVi(), c.getMnemonicTipVi(), c.getCefrLevel()))
+                        .toList(),
+                mediaUrls(id));
+    }
+
+    private java.util.Map<String, String> mediaUrls(UUID id) {
+        return cardRepo.findByFlashcardSetIdOrderByOrderNo(id).stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.getAudioUsObjectKey(), c.getAudioUkObjectKey()))
+                .filter(java.util.Objects::nonNull).filter(k -> !k.isBlank()).distinct()
+                .collect(java.util.stream.Collectors.toMap(java.util.function.Function.identity(),
+                        key -> presignedUrls.resolve(learningBucket, key, java.time.Duration.ofHours(1))));
+    }
+
+    @Transactional
+    public com.englow3.flashcard.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.flashcard.dto.command.SaveAuthoringCommand command) {
+        UUID id = command.id();
+        if (id == null) {
+            id = createSet(command.metadata()).id();
+        } else {
+            if (command.version() == null) {
+                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
+                        "A version is required when editing");
+            }
+            var item = requireSet(id);
+            if (setRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
+                throw new ConflictException("CONTENT_SLUG_TAKEN", "Another item uses this slug");
+            }
+            item.updateDraft(command.metadata(), command.version(), clock.instant());
+            setRepo.flush();
+        }
+        cardRepo.deleteAllInBatch(cardRepo.findByFlashcardSetIdOrderByOrderNo(id));
+        addCards(new AddFlashcardsCommand(id, command.cards()));
+        setRepo.flush();
+        return authoringDetail(id);
     }
 
     private FlashcardSet requireSet(UUID setId) {

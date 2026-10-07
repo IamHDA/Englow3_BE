@@ -92,4 +92,34 @@ class FlashcardSetReviewLifecycleTest {
                 .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("REVIEW_NOTE_REQUIRED");
         assertThat(set.getStatus()).isEqualTo(FlashcardSetStatus.PENDING_REVIEW);
     }
+
+    /** Archiving was one-way. A published set comes back published; it was reviewed and is never edited. */
+    @Test
+    void restoresAnArchivedPublishedSetToPublished() {
+        FlashcardSet set = FlashcardSet.draft("kitchen", "Kitchen", "", "home", "A1", UUID.randomUUID());
+        set.publish(3, Instant.now());
+        set.archive();
+
+        set.restore();
+
+        assertThat(set.getStatus()).isEqualTo(FlashcardSetStatus.PUBLISHED);
+    }
+
+    @Test
+    void restoresAnArchivedDraftToDraft() {
+        FlashcardSet set = FlashcardSet.draft("kitchen", "Kitchen", "", "home", "A1", UUID.randomUUID());
+        set.archive();
+
+        set.restore();
+
+        assertThat(set.getStatus()).isEqualTo(FlashcardSetStatus.DRAFT);
+    }
+
+    @Test
+    void refusesToRestoreASetThatIsNotArchived() {
+        FlashcardSet set = FlashcardSet.draft("kitchen", "Kitchen", "", "home", "A1", UUID.randomUUID());
+
+        assertThatThrownBy(set::restore).isInstanceOf(ConflictException.class)
+                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("FLASHCARD_SET_NOT_ARCHIVED");
+    }
 }

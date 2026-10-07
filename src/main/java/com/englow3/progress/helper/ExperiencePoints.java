@@ -37,7 +37,11 @@ public final class ExperiencePoints {
     }
 
     /** Units of work done, as counted from the activity tables. */
-    public record Activity(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts) {
+    public record Activity(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts,
+            long productiveAttempts) {
+        public Activity(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts) {
+            this(flashcardReviews, dictationSentences, quizAttempts, examAttempts, 0);
+        }
 
         public static final Activity NONE = new Activity(0, 0, 0, 0);
     }
@@ -55,7 +59,8 @@ public final class ExperiencePoints {
 
     public static long totalXp(Activity activity) {
         return activity.flashcardReviews() * FLASHCARD_REVIEW_XP + activity.dictationSentences() * DICTATION_SENTENCE_XP
-                + activity.quizAttempts() * QUIZ_ATTEMPT_XP + activity.examAttempts() * EXAM_ATTEMPT_XP;
+                + activity.quizAttempts() * QUIZ_ATTEMPT_XP + activity.examAttempts() * EXAM_ATTEMPT_XP
+                + activity.productiveAttempts() * QUIZ_ATTEMPT_XP;
     }
 
     /** Walks the curve rather than inverting it: the arithmetic is obvious at a glance and levels are small numbers. */

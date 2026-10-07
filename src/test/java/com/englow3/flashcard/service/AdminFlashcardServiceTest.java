@@ -48,7 +48,8 @@ class AdminFlashcardServiceTest {
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminFlashcardService service = new com.englow3.flashcard.service.impl.AdminFlashcardServiceImpl(
-            setRepo, cardRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK);
+            setRepo, cardRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK,
+            mock(com.englow3.shared.storage.PresignedUrlResolver.class));
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;

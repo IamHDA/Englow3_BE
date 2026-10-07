@@ -1,5 +1,7 @@
 package com.englow3.exam.service;
 
+import java.util.UUID;
+
 import com.englow3.exam.dto.command.ApproveExamCommand;
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
@@ -17,4 +19,6 @@ public interface ExamReviewService {
     ExamResult reject(RejectExamCommand command);
 
     ExamResult archive(ArchiveExamCommand command);
+
+    ExamResult restore(UUID examId);
 }

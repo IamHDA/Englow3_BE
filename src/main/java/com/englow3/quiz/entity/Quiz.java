@@ -19,6 +19,12 @@ import lombok.Getter;
 @Getter
 public class Quiz {
 
+    @jakarta.persistence.Version
+    private long version;
+
+    @Column(name = "authoring_updated_at", nullable = false)
+    private Instant authoringUpdatedAt = Instant.now();
+
     @Id
     private UUID id;
 
@@ -150,6 +156,40 @@ public class Quiz {
             throw new ConflictException("QUIZ_ZERO_POINTS",
                     "A quiz whose questions are all worth zero cannot be scored");
         }
+    }
+
+    public void updateDraft(com.englow3.quiz.dto.command.CreateQuizCommand source, long expectedVersion, Instant now) {
+        if ((status != QuizStatus.DRAFT && status != QuizStatus.REJECTED) || publishedAt != null) {
+            throw new ConflictException("CONTENT_NOT_EDITABLE",
+                    "Only an unpublished draft or rejected item can be edited");
+        }
+        if (version != expectedVersion) {
+            throw new ConflictException("CONTENT_CHANGED", "This item changed. Reload before saving again");
+        }
+        this.slug = source.slug();
+        this.title = source.title();
+        this.description = source.description();
+        this.category = source.category();
+        this.targetLevel = source.targetLevel();
+        this.timeLimitSeconds = source.timeLimitSeconds();
+        this.passingScorePercent = source.passingScorePercent();
+        authoringUpdatedAt = now;
+    }
+
+    public void touchContent() {
+        authoringUpdatedAt = Instant.now();
+    }
+
+    /**
+     * Undoes an archive. Back to where it was: a quiz that had been published returns to the library as it was -
+     * published content is never edited, so it needs no second review - and one that never was goes back to draft.
+     * Archiving used to be one-way; a mistaken click could only be undone in the database.
+     */
+    public void restore() {
+        if (status != QuizStatus.ARCHIVED) {
+            throw new ConflictException("QUIZ_NOT_ARCHIVED", "Only an archived quiz can be restored");
+        }
+        this.status = publishedAt != null ? QuizStatus.PUBLISHED : QuizStatus.DRAFT;
     }
 
     public void archive() {

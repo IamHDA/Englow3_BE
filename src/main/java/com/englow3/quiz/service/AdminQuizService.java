@@ -10,6 +10,11 @@ import com.englow3.quiz.dto.result.*;
 import com.englow3.quiz.entity.QuizStatus;
 
 public interface AdminQuizService {
+    com.englow3.quiz.dto.result.AuthoringResult authoringDetail(UUID id);
+
+    com.englow3.quiz.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.quiz.dto.command.SaveAuthoringCommand command);
+
     QuizSummaryResult create(CreateQuizCommand command);
 
     Page<ContentReviewResult> searchForAuthoring(QuizStatus status, String title, Pageable pageable);
@@ -23,4 +28,6 @@ public interface AdminQuizService {
     ContentReviewResult reject(UUID quizId, String note);
 
     ContentReviewResult archive(UUID quizId);
+
+    ContentReviewResult restore(UUID quizId);
 }

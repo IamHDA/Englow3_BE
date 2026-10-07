@@ -44,6 +44,9 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final com.englow3.shared.storage.PresignedUrlResolver presignedUrls;
+    @org.springframework.beans.factory.annotation.Value("${app.storage.learning-bucket}")
+    private String learningBucket;
 
     @Transactional
     public DictationLessonSummaryResult create(CreateDictationLessonCommand command) {
@@ -66,6 +69,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     public DictationLessonSummaryResult addSentences(AddDictationSentencesCommand command) {
         DictationLesson lesson = requireLesson(command.lessonId());
         lesson.requireAppendable(currentUser.hasRole("ADMIN"));
+        lesson.touchContent();
         int nextOrderNo = Math.toIntExact(sentenceRepo.countByDictationLessonId(lesson.getId())) + 1;
 
         List<DictationSentence> sentences = new ArrayList<>();
@@ -177,6 +181,13 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     }
 
     @Transactional
+    public ContentReviewResult restore(UUID lessonId) {
+        DictationLesson lesson = requireLesson(lessonId);
+        lesson.restore();
+        return reviewStateOf(lesson);
+    }
+
+    @Transactional
     public ContentReviewResult archive(UUID lessonId) {
         DictationLesson lesson = requireLesson(lessonId);
         lesson.archive();
@@ -195,6 +206,60 @@ public class AdminDictationServiceImpl implements AdminDictationService {
         List<DictationSentence> sentences = sentenceRepo.findByDictationLessonIdOrderByOrderNo(lesson.getId());
         return DictationLessonSummaryResult.of(lesson, sentences.size(), 0L,
                 sentences.stream().mapToInt(DictationSentence::getAudioDurationSeconds).sum(), null);
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.dictation.dto.result.AuthoringResult authoringDetail(UUID id) {
+        var item = requireLesson(id);
+        return new com.englow3.dictation.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
+                item.getReview().getReviewNote(),
+                new CreateDictationLessonCommand(item.getSlug(), item.getTitle(), item.getTopic(),
+                        item.getTargetLevel()),
+                sentenceRepo.findByDictationLessonIdOrderByOrderNo(id).stream()
+                        .map(c -> new com.englow3.dictation.dto.command.SaveAuthoringCommand.Sentence(c.getText(),
+                                c.getTranslationVi(), c.getAudioObjectKey(), c.getAudioDurationSeconds(),
+                                c.getHintFirstLetters(), c.getHintRevealWord(), c.getHintPartialTranscript(),
+                                c.getAudioStartMs(), c.getAudioEndMs()))
+                        .toList(),
+                mediaUrls(id));
+    }
+
+    private java.util.Map<String, String> mediaUrls(UUID id) {
+        return sentenceRepo.findByDictationLessonIdOrderByOrderNo(id).stream().map(c -> c.getAudioObjectKey())
+                .filter(java.util.Objects::nonNull).filter(k -> !k.isBlank()).distinct()
+                .collect(java.util.stream.Collectors.toMap(java.util.function.Function.identity(),
+                        key -> presignedUrls.resolve(learningBucket, key, java.time.Duration.ofHours(1))));
+    }
+
+    @Transactional
+    public com.englow3.dictation.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.dictation.dto.command.SaveAuthoringCommand command) {
+        UUID id = command.id();
+        if (id == null) {
+            id = create(command.metadata()).id();
+        } else {
+            if (command.version() == null) {
+                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
+                        "A version is required when editing");
+            }
+            var item = requireLesson(id);
+            if (lessonRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
+                throw new ConflictException("CONTENT_SLUG_TAKEN", "Another item uses this slug");
+            }
+            item.updateDraft(command.metadata(), command.version(), clock.instant());
+            lessonRepo.flush();
+        }
+        sentenceRepo.deleteAllInBatch(sentenceRepo.findByDictationLessonIdOrderByOrderNo(id));
+        int order = 1;
+        var rows = new java.util.ArrayList<DictationSentence>();
+        for (var c : command.sentences()) {
+            rows.add(DictationSentence.of(id, order++, c.text(), c.translationVi(), c.audioObjectKey(),
+                    c.audioDurationSeconds(), DictationScorer.words(c.text()).size(), c.hintFirstLetters(),
+                    c.hintRevealWord(), c.hintPartialTranscript(), c.audioStartMs(), c.audioEndMs()));
+        }
+        sentenceRepo.saveAll(rows);
+        lessonRepo.flush();
+        return authoringDetail(id);
     }
 
     private DictationLesson requireLesson(UUID lessonId) {

@@ -27,6 +27,12 @@ import lombok.Getter;
 @Getter
 public class SpeakingPrompt {
 
+    @jakarta.persistence.Version
+    private long version;
+
+    @Column(name = "authoring_updated_at", nullable = false)
+    private Instant authoringUpdatedAt = Instant.now();
+
     @Id
     private UUID id;
 
@@ -149,6 +155,40 @@ public class SpeakingPrompt {
         this.reviewedByUserId = reviewerId;
         this.reviewedAt = now;
         this.reviewNote = note.strip();
+    }
+
+    public void updateDraft(com.englow3.speaking.dto.command.CreateSpeakingPromptCommand source, long expectedVersion,
+            Instant now, String tipsJson) {
+        if ((status != SpeakingPromptStatus.DRAFT && status != SpeakingPromptStatus.REJECTED) || publishedAt != null) {
+            throw new ConflictException("CONTENT_NOT_EDITABLE",
+                    "Only an unpublished draft or rejected item can be edited");
+        }
+        if (version != expectedVersion) {
+            throw new ConflictException("CONTENT_CHANGED", "This item changed. Reload before saving again");
+        }
+        requireReferenceText(source.referenceText());
+        this.slug = source.slug();
+        this.title = source.title();
+        this.category = source.category();
+        this.targetLevel = source.targetLevel();
+        this.referenceText = source.referenceText();
+        this.ipaTranscript = source.ipaTranscript();
+        this.translationVi = source.translationVi();
+        this.phonemeTarget = source.phonemeTarget();
+        this.tips = tipsJson;
+        authoringUpdatedAt = now;
+    }
+
+    /**
+     * Undoes an archive. Back to where it was: a prompt that had been published returns to the library as it was -
+     * published content is never edited, so it needs no second review - and one that never was goes back to draft.
+     * Archiving used to be one-way; a mistaken click could only be undone in the database.
+     */
+    public void restore() {
+        if (status != SpeakingPromptStatus.ARCHIVED) {
+            throw new ConflictException("SPEAKING_PROMPT_NOT_ARCHIVED", "Only an archived prompt can be restored");
+        }
+        this.status = publishedAt != null ? SpeakingPromptStatus.PUBLISHED : SpeakingPromptStatus.DRAFT;
     }
 
     public void archive() {

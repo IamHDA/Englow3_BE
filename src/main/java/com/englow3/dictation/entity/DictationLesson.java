@@ -20,6 +20,12 @@ import lombok.Getter;
 @Getter
 public class DictationLesson {
 
+    @jakarta.persistence.Version
+    private long version;
+
+    @Column(name = "authoring_updated_at", nullable = false)
+    private Instant authoringUpdatedAt = Instant.now();
+
     @Id
     private UUID id;
 
@@ -148,6 +154,39 @@ public class DictationLesson {
             case PENDING_REVIEW, ARCHIVED -> throw new ConflictException("DICTATION_LESSON_NOT_EDITABLE",
                     "Nothing can be added to a lesson that is %s".formatted(status));
         }
+    }
+
+    public void updateDraft(com.englow3.dictation.dto.command.CreateDictationLessonCommand source, long expectedVersion,
+            Instant now) {
+        if ((status != DictationLessonStatus.DRAFT && status != DictationLessonStatus.REJECTED)
+                || publishedAt != null) {
+            throw new ConflictException("CONTENT_NOT_EDITABLE",
+                    "Only an unpublished draft or rejected item can be edited");
+        }
+        if (version != expectedVersion) {
+            throw new ConflictException("CONTENT_CHANGED", "This item changed. Reload before saving again");
+        }
+        this.slug = source.slug();
+        this.title = source.title();
+        this.topic = source.topic();
+        this.targetLevel = source.targetLevel();
+        authoringUpdatedAt = now;
+    }
+
+    public void touchContent() {
+        authoringUpdatedAt = Instant.now();
+    }
+
+    /**
+     * Undoes an archive. Back to where it was: a lesson that had been published returns to the library as it was -
+     * published content is never edited, so it needs no second review - and one that never was goes back to draft.
+     * Archiving used to be one-way; a mistaken click could only be undone in the database.
+     */
+    public void restore() {
+        if (status != DictationLessonStatus.ARCHIVED) {
+            throw new ConflictException("DICTATION_LESSON_NOT_ARCHIVED", "Only an archived lesson can be restored");
+        }
+        this.status = publishedAt != null ? DictationLessonStatus.PUBLISHED : DictationLessonStatus.DRAFT;
     }
 
     public void archive() {

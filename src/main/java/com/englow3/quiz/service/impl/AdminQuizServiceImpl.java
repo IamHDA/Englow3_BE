@@ -32,6 +32,7 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     private final QuizQuestionRepository questionRepo;
     private final UserDirectory userDirectory;
     private final Clock clock;
+    private final com.englow3.quiz.service.QuizQuestionAuthoringService questionAuthoring;
 
     @Transactional
     public QuizSummaryResult create(CreateQuizCommand command) {
@@ -82,6 +83,13 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     }
 
     @Transactional
+    public ContentReviewResult restore(UUID quizId) {
+        Quiz quiz = requireQuiz(quizId);
+        quiz.restore();
+        return reviewStateOf(quiz);
+    }
+
+    @Transactional
     public ContentReviewResult archive(UUID quizId) {
         Quiz quiz = requireQuiz(quizId);
         quiz.archive();
@@ -94,6 +102,40 @@ public class AdminQuizServiceImpl implements AdminQuizService {
 
     private QuizSummaryResult summaryOf(Quiz quiz) {
         return QuizSummaryResult.of(quiz, questionRepo.countByQuizId(quiz.getId()), null, 0);
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.quiz.dto.result.AuthoringResult authoringDetail(UUID id) {
+        var item = requireQuiz(id);
+        return new com.englow3.quiz.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
+                item.getReview().getReviewNote(),
+                new CreateQuizCommand(item.getSlug(), item.getTitle(), item.getDescription(), item.getCategory(),
+                        item.getTargetLevel(), item.getTimeLimitSeconds(), item.getPassingScorePercent()),
+                questionAuthoring.authoringQuestions(id));
+    }
+
+    @Transactional
+    public com.englow3.quiz.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.quiz.dto.command.SaveAuthoringCommand command) {
+        UUID id = command.id();
+        if (id == null) {
+            id = create(command.metadata()).id();
+        } else {
+            if (command.version() == null) {
+                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
+                        "A version is required when editing");
+            }
+            var item = requireQuiz(id);
+            if (quizRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
+                throw new ConflictException("CONTENT_SLUG_TAKEN", "Another item uses this slug");
+            }
+            item.updateDraft(command.metadata(), command.version(), clock.instant());
+            quizRepo.flush();
+        }
+        questionAuthoring
+                .replaceQuestions(new com.englow3.quiz.dto.command.AddQuizQuestionsCommand(id, command.questions()));
+        quizRepo.flush();
+        return authoringDetail(id);
     }
 
     private Quiz requireQuiz(UUID quizId) {

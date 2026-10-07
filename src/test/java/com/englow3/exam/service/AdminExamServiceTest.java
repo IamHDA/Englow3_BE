@@ -48,7 +48,8 @@ class AdminExamServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
     private final AdminExamService service = new com.englow3.exam.service.impl.AdminExamServiceImpl(examRepo,
-            examPaperQuery, userDirectory, presignedUrls, EXAM_BUCKET, Duration.ofHours(1));
+            examPaperQuery, userDirectory, presignedUrls, EXAM_BUCKET, mock(ExamContentService.class),
+            Duration.ofHours(1));
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach

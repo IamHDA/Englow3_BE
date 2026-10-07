@@ -50,6 +50,10 @@ public class DailyPathQuery {
                   select cast(submitted_at at time zone :zone as date)
                     from exam_attempts
                    where user_id = :userId and submitted_at >= :from and status = 'SCORED'
+                  union all
+                  select cast(submitted_at at time zone :zone as date)
+                    from assessment_attempts
+                   where user_id = :userId and submitted_at >= :from and status <> 'DRAFT'
                 ) activity
                  order by day desc
                 """).param("zone", calendar.zoneId()).param("userId", userId).param("from", SqlTime.at(from))
@@ -70,10 +74,13 @@ public class DailyPathQuery {
                   (select count(*) from quiz_attempts
                     where user_id = :userId and submitted_at >= :from and status = 'SCORED') as quiz_attempts,
                   (select count(*) from exam_attempts
-                    where user_id = :userId and submitted_at >= :from and status = 'SCORED') as exam_attempts
+                    where user_id = :userId and submitted_at >= :from and status = 'SCORED') as exam_attempts,
+                  (select count(*) from assessment_attempts
+                    where user_id = :userId and submitted_at >= :from and status <> 'DRAFT') as productive_attempts
                 """).param("userId", userId).param("from", SqlTime.at(from))
                 .query((rs, rowNum) -> new ActivityTotals(rs.getLong("flashcard_reviews"),
-                        rs.getLong("dictation_sentences"), rs.getLong("quiz_attempts"), rs.getLong("exam_attempts")))
+                        rs.getLong("dictation_sentences"), rs.getLong("quiz_attempts"), rs.getLong("exam_attempts"),
+                        rs.getLong("productive_attempts")))
                 .single();
     }
 
@@ -235,7 +242,31 @@ public class DailyPathQuery {
                 .list();
     }
 
-    public record ActivityTotals(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts) {
+    public List<ProductiveTask> productiveTasks(UUID userId, Instant from, int limit) {
+        return jdbcClient
+                .sql("""
+                        select t.id,t.title,t.skill,
+                          exists(select 1 from assessment_attempts a where a.task_id=t.id and a.user_id=:userId and a.submitted_at>=:from and a.status<>'DRAFT') as submitted_today,
+                          not exists(select 1 from assessment_attempts a where a.task_id=t.id and a.user_id=:userId and a.submitted_at is not null) as unsubmitted
+                        from assessment_tasks t
+                        where t.status='PUBLISHED' and (not exists(select 1 from assessment_attempts a where a.task_id=t.id and a.user_id=:userId and a.submitted_at is not null)
+                          or exists(select 1 from assessment_attempts a where a.task_id=t.id and a.user_id=:userId and a.submitted_at>=:from and a.status<>'DRAFT'))
+                        order by submitted_today desc,t.created_at desc,t.id limit :limit
+                        """)
+                .param("userId", userId).param("from", SqlTime.at(from)).param("limit", limit)
+                .query((rs, n) -> new ProductiveTask(rs.getObject("id", UUID.class), rs.getString("title"),
+                        rs.getString("skill"), rs.getBoolean("submitted_today"), rs.getBoolean("unsubmitted")))
+                .list();
+    }
+
+    public record ProductiveTask(UUID id, String title, String skill, boolean submittedToday, boolean unsubmitted) {
+    }
+
+    public record ActivityTotals(long flashcardReviews, long dictationSentences, long quizAttempts, long examAttempts,
+            long productiveAttempts) {
+        public ActivityTotals(long a, long b, long c, long d) {
+            this(a, b, c, d, 0);
+        }
     }
 
     public record QuestCounts(long cardsReviewedToday, long cardsDueNow, long quizzesPassedToday,

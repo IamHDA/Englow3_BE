@@ -12,6 +12,7 @@ import com.englow3.dictation.entity.DictationLesson;
 import com.englow3.dictation.entity.DictationLessonStatus;
 
 public interface DictationLessonRepository extends JpaRepository<DictationLesson, UUID> {
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 
     boolean existsBySlug(String slug);
 

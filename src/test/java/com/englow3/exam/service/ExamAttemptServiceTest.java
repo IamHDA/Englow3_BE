@@ -61,9 +61,12 @@ class ExamAttemptServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
+    private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo = mock(
+            com.englow3.exam.repository.ExamAttemptDraftRepository.class);
     private final ExamAttemptService service = new com.englow3.exam.service.impl.ExamAttemptServiceImpl(examRepo,
             attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder,
-            presignedUrls, CLOCK, "exams", java.time.Duration.ofHours(1));
+            presignedUrls, CLOCK, "exams", java.time.Duration.ofHours(1), draftRepo,
+            new com.fasterxml.jackson.databind.ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
 
@@ -190,10 +193,77 @@ class ExamAttemptServiceTest {
     void hidesAnAttemptOwnedByAnotherUser() {
         Exam exam = publishedExam();
         ExamAttempt someoneElsesAttempt = ExamAttempt.start(exam, UUID.randomUUID(), 1, Instant.now());
-        when(attemptRepo.findById(someoneElsesAttempt.getId())).thenReturn(Optional.of(someoneElsesAttempt));
+        when(attemptRepo.findByIdForUpdate(someoneElsesAttempt.getId())).thenReturn(Optional.of(someoneElsesAttempt));
 
         assertThatThrownBy(() -> service.result(someoneElsesAttempt.getId())).isInstanceOf(NotFoundException.class)
                 .extracting(error -> ((NotFoundException) error).getCode()).isEqualTo("EXAM_ATTEMPT_NOT_FOUND");
+    }
+
+    @Test
+    void ignoresLatePayloadAndFinalizesSavedAnswersExactlyOnce() throws Exception {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(7200));
+        UUID questionId = UUID.randomUUID(), correct = UUID.randomUUID(), wrong = UUID.randomUUID();
+        var question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
+                List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
+        var draft = com.englow3.exam.entity.ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant().minusSeconds(1));
+        draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                List.of(new SubmittedAnswer(questionId, List.of(correct)))), CLOCK.instant().minusSeconds(1));
+        when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(question));
+        var result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(wrong)))));
+        assertThat(result.rawScore()).isEqualByComparingTo("1");
+        assertThat(result.submittedAt()).isEqualTo(attempt.getExpiresAt());
+        service.finalizeExpired(attempt.getId());
+        service.result(attempt.getId());
+        service.submit(new SubmitExamAttemptCommand(attempt.getId(), List.of()));
+        verify(answerRepo, org.mockito.Mockito.times(1)).saveAll(any());
+        verify(answerOptionRepo, org.mockito.Mockito.times(1)).saveAll(any());
+    }
+
+    @Test
+    void resultReadFinalizesAnExpiredAttemptEvenWithoutBrowserSubmission() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(7200));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+        assertThat(service.result(attempt.getId()).status()).isEqualTo(ExamAttemptStatus.SCORED);
+        assertThat(attempt.getSubmittedAt()).isEqualTo(attempt.getExpiresAt());
+    }
+
+    @Test
+    void refusesAutosaveAtTheExactDeadline() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(7200));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        assertThatThrownBy(() -> service
+                .saveDraft(new com.englow3.exam.dto.command.SaveExamDraftCommand(attempt.getId(), 0, List.of())))
+                        .isInstanceOf(com.englow3.shared.error.ConflictException.class)
+                        .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
+                        .isEqualTo("ATTEMPT_EXPIRED");
+        verify(draftRepo, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void staleAutosaveCannotReplaceTheOtherTabsAcceptedAnswers() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
+        var draft = com.englow3.exam.entity.ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant());
+        draft.replace(0, "[]", CLOCK.instant());
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+        when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
+        assertThatThrownBy(() -> service
+                .saveDraft(new com.englow3.exam.dto.command.SaveExamDraftCommand(attempt.getId(), 0, List.of())))
+                        .isInstanceOf(com.englow3.shared.error.ConflictException.class)
+                        .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
+                        .isEqualTo("EXAM_DRAFT_CHANGED");
+        assertThat(draft.getRevision()).isEqualTo(1);
+        verify(draftRepo, never()).saveAndFlush(any());
     }
 
     private static Exam publishedExam() {

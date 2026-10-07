@@ -48,6 +48,14 @@ public class AdminOverviewQuery {
                 select 'EXAM', count(*) filter (where status = 'DRAFT'),
                        count(*) filter (where status = 'PENDING_REVIEW'), count(*) filter (where status = 'PUBLISHED')
                   from exams
+                union all
+                select 'WRITING_ASSESSMENT', count(*) filter (where status = 'DRAFT'),
+                       count(*) filter (where status = 'PENDING_REVIEW'), count(*) filter (where status = 'PUBLISHED')
+                  from assessment_tasks where skill = 'WRITING'
+                union all
+                select 'SPEAKING_ASSESSMENT', count(*) filter (where status = 'DRAFT'),
+                       count(*) filter (where status = 'PENDING_REVIEW'), count(*) filter (where status = 'PUBLISHED')
+                  from assessment_tasks where skill = 'SPEAKING'
                 """).query((rs, rowNum) -> new ContentCounts(rs.getString("kind"), rs.getLong("drafts"),
                 rs.getLong("pending"), rs.getLong("published"))).list();
     }
@@ -66,6 +74,7 @@ public class AdminOverviewQuery {
                       union select user_id from dictation_attempts where attempted_at >= :from
                       union select user_id from quiz_attempts where submitted_at >= :from
                       union select user_id from exam_attempts where submitted_at >= :from
+                      union select user_id from assessment_attempts where submitted_at >= :from
                    ) active) as active_learners,
                   (select count(*) from flashcard_review_logs where reviewed_at >= :from) as card_reviews,
                   (select count(*) from dictation_attempts where attempted_at >= :from) as dictation_sentences,

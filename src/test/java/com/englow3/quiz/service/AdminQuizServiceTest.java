@@ -25,7 +25,7 @@ class AdminQuizServiceTest {
     private final QuizRepository quizRepo = mock(QuizRepository.class);
     private final QuizQuestionRepository questionRepo = mock(QuizQuestionRepository.class);
     private final AdminQuizService service = new com.englow3.quiz.service.impl.AdminQuizServiceImpl(quizRepo,
-            questionRepo, mock(UserDirectory.class), CLOCK);
+            questionRepo, mock(UserDirectory.class), CLOCK, mock(QuizQuestionAuthoringService.class));
 
     @Test
     void refusesToPublishAQuizWhoseQuestionsAreAllWorthNothing() {

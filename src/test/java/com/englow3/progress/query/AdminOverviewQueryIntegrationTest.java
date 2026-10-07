@@ -36,8 +36,9 @@ class AdminOverviewQueryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void listsEveryKindOfContent() {
-        assertThat(query.contentCounts()).extracting(AdminOverviewQuery.ContentCounts::kind)
-                .containsExactly("FLASHCARD_SET", "QUIZ", "DICTATION_LESSON", "SPEAKING_PROMPT", "EXAM");
+        assertThat(query.contentCounts()).extracting(AdminOverviewQuery.ContentCounts::kind).containsExactly(
+                "FLASHCARD_SET", "QUIZ", "DICTATION_LESSON", "SPEAKING_PROMPT", "EXAM", "WRITING_ASSESSMENT",
+                "SPEAKING_ASSESSMENT");
     }
 
     @Test

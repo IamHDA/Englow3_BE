@@ -10,5 +10,7 @@ public enum DailyTaskKind {
     DICTATION,
 
     /** A published quiz the learner has not passed yet. */
-    QUIZ
+    QUIZ,
+
+    WRITING, SPEAKING
 }

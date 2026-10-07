@@ -155,9 +155,44 @@ class AdminExamController {
         return ResponseEntity.ok(ExamResponse.from(examReviewService.publish(new PublishExamCommand(id))));
     }
 
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ExamResponse> restore(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamResponse.from(examReviewService.restore(id)));
+    }
+
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ExamResponse> archive(@PathVariable UUID id) {
         return ResponseEntity.ok(ExamResponse.from(examReviewService.archive(new ArchiveExamCommand(id))));
+    }
+
+    @GetMapping("/{id}/authoring")
+    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity
+                .ok(com.englow3.exam.dto.response.AuthoringResponse.from(adminExamService.authoringDetail(id)));
+    }
+
+    @PostMapping("/authoring")
+    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> createAuthoring(
+            @Valid @RequestBody com.englow3.exam.dto.request.SaveAuthoringRequest r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.exam.dto.response.AuthoringResponse
+                .from(adminExamService.saveAuthoring(authoringCommand(null, r))));
+    }
+
+    @PutMapping("/{id}/authoring")
+    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody com.englow3.exam.dto.request.SaveAuthoringRequest r) {
+        return ResponseEntity.ok(com.englow3.exam.dto.response.AuthoringResponse
+                .from(adminExamService.saveAuthoring(authoringCommand(id, r))));
+    }
+
+    private com.englow3.exam.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
+            com.englow3.exam.dto.request.SaveAuthoringRequest r) {
+        var m = r.metadata();
+        return new com.englow3.exam.dto.command.SaveAuthoringCommand(id, r.version(),
+                new CreateExamCommand(m.title(), m.description(), m.examType(), m.certificateType(),
+                        m.certificateVariant(), m.targetLevel(), m.durationSeconds(), m.maxRawScore(), m.passScore()),
+                UpdateExamContentCommand.of(id, r.content()));
     }
 }

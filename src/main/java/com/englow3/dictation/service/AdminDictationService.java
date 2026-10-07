@@ -10,6 +10,11 @@ import com.englow3.dictation.dto.result.*;
 import com.englow3.dictation.entity.DictationLessonStatus;
 
 public interface AdminDictationService {
+    com.englow3.dictation.dto.result.AuthoringResult authoringDetail(UUID id);
+
+    com.englow3.dictation.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.dictation.dto.command.SaveAuthoringCommand command);
+
     DictationLessonSummaryResult create(CreateDictationLessonCommand command);
 
     DictationLessonSummaryResult addSentences(AddDictationSentencesCommand command);
@@ -29,4 +34,6 @@ public interface AdminDictationService {
     ContentReviewResult reject(UUID lessonId, String note);
 
     ContentReviewResult archive(UUID lessonId);
+
+    ContentReviewResult restore(UUID lessonId);
 }

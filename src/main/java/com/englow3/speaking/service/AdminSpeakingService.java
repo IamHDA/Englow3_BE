@@ -10,6 +10,11 @@ import com.englow3.speaking.dto.result.SpeakingPromptReviewResult;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 
 public interface AdminSpeakingService {
+    com.englow3.speaking.dto.result.AuthoringResult authoringDetail(UUID id);
+
+    com.englow3.speaking.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.speaking.dto.command.SaveAuthoringCommand command);
+
     SpeakingPromptReviewResult create(CreateSpeakingPromptCommand command);
 
     Page<SpeakingPromptReviewResult> searchForAuthoring(SpeakingPromptStatus status, String title, Pageable pageable);
@@ -23,4 +28,6 @@ public interface AdminSpeakingService {
     SpeakingPromptReviewResult publish(UUID promptId);
 
     SpeakingPromptReviewResult archive(UUID promptId);
+
+    SpeakingPromptReviewResult restore(UUID promptId);
 }

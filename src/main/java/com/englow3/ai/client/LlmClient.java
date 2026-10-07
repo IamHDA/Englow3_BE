@@ -54,8 +54,18 @@ public class LlmClient {
      *             carrying whether the request is worth repeating
      */
     public String generate(String systemPrompt, String userPrompt, double temperature, int maxOutputTokens) {
+        return request(systemPrompt, userPrompt, temperature, maxOutputTokens, false);
+    }
+
+    public String generateStructured(String systemPrompt, String userPrompt, int maxOutputTokens) {
+        return request(systemPrompt, userPrompt, 0.1, maxOutputTokens, true);
+    }
+
+    private String request(String systemPrompt, String userPrompt, double temperature, int maxOutputTokens,
+            boolean jsonOutput) {
         Map<String, Object> body = Map.of("model", defaultModel, "system_prompt", systemPrompt, "user_prompt",
-                userPrompt, "temperature", temperature, "max_output_tokens", maxOutputTokens, "json_output", false);
+                userPrompt, "temperature", temperature, "max_output_tokens", maxOutputTokens, "json_output",
+                jsonOutput);
 
         try {
             return restClient.post().uri(GENERATE_PATH).contentType(MediaType.APPLICATION_JSON).body(body).retrieve()

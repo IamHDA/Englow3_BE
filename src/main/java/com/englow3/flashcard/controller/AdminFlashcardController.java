@@ -145,9 +145,49 @@ class AdminFlashcardController {
         return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.publish(id)));
     }
 
+    @PostMapping("/sets/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    ResponseEntity<ContentReviewResponse> restore(@PathVariable UUID id) {
+        return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.restore(id)));
+    }
+
     @PostMapping("/sets/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     ResponseEntity<ContentReviewResponse> archive(@PathVariable UUID id) {
         return ResponseEntity.ok(ContentReviewResponse.from(adminFlashcardService.archive(id)));
+    }
+
+    @GetMapping("/sets/{id}/authoring")
+    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(
+                com.englow3.flashcard.dto.response.AuthoringResponse.from(adminFlashcardService.authoringDetail(id)));
+    }
+
+    @PostMapping("/sets/authoring")
+    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> createAuthoring(
+            @Valid @RequestBody com.englow3.flashcard.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.flashcard.dto.response.AuthoringResponse
+                .from(adminFlashcardService.saveAuthoring(authoringCommand(null, request))));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/sets/{id}/authoring")
+    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody com.englow3.flashcard.dto.request.SaveAuthoringRequest request) {
+        return ResponseEntity.ok(com.englow3.flashcard.dto.response.AuthoringResponse
+                .from(adminFlashcardService.saveAuthoring(authoringCommand(id, request))));
+    }
+
+    private com.englow3.flashcard.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
+            com.englow3.flashcard.dto.request.SaveAuthoringRequest r) {
+        var m = r.metadata();
+        return new com.englow3.flashcard.dto.command.SaveAuthoringCommand(id, r.version(),
+                new com.englow3.flashcard.dto.command.CreateFlashcardSetCommand(m.slug(), m.name(), m.description(),
+                        m.topic(), m.targetLevel()),
+                r.content().cards().stream()
+                        .map(c -> new com.englow3.flashcard.dto.command.AddFlashcardsCommand.NewCard(c.lemma(),
+                                c.partOfSpeech(), c.senseLabel(), c.ipaUs(), c.ipaUk(), c.audioUsObjectKey(),
+                                c.audioUkObjectKey(), c.definitionEn(), c.definitionVi(), c.exampleSentence(),
+                                c.exampleTranslationVi(), c.mnemonicTipVi(), c.cefrLevel()))
+                        .toList());
     }
 }

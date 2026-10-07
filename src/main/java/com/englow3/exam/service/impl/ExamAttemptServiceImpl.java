@@ -71,13 +71,17 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final Clock clock;
     private final String examBucket;
     private final Duration mediaUrlTtl;
+    private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
     public ExamAttemptServiceImpl(ExamRepository examRepo, ExamAttemptRepository attemptRepo,
             AttemptAnswerRepository answerRepo, AttemptAnswerOptionRepository answerOptionRepo,
             LearnerExamPaperQuery paperQuery, ExamGradingQuery gradingQuery, UserDirectory userDirectory,
             PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl,
+            com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo,
+            com.fasterxml.jackson.databind.ObjectMapper mapper) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
         this.answerRepo = answerRepo;
@@ -90,6 +94,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.clock = clock;
         this.examBucket = examBucket;
         this.mediaUrlTtl = mediaUrlTtl;
+        this.draftRepo = draftRepo;
+        this.mapper = mapper;
     }
 
     @Transactional(readOnly = true)
@@ -113,7 +119,11 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (active.isPresent() && now.isBefore(active.get().getExpiresAt())) {
             return ExamAttemptResult.started(active.get(), true);
         }
-        active.ifPresent(attempt -> attempt.expire(now));
+        active.ifPresent(attempt -> {
+            ExamAttempt locked = attemptRepo.findByIdForUpdate(attempt.getId()).orElseThrow();
+            if (locked.getStatus() == ExamAttemptStatus.IN_PROGRESS)
+                scoreAttempt(locked, storedAnswers(locked.getId()), locked.getExpiresAt());
+        });
         if (active.isPresent()) {
             attemptRepo.flush();
         }
@@ -140,24 +150,27 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(command.attemptId()),
                 command.attemptId());
         Instant now = clock.instant();
-        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
+        if (attempt.getStatus() == ExamAttemptStatus.SCORED)
+            return scoredResult(attempt);
+        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS)
             throw new ConflictException("ATTEMPT_ALREADY_FINALIZED", "This exam attempt has already been finalized");
-        }
-        if (!now.isBefore(attempt.getExpiresAt())) {
-            throw new ConflictException("ATTEMPT_EXPIRED", "This exam attempt has expired");
-        }
+        if (!now.isBefore(attempt.getExpiresAt()))
+            return scoreAttempt(attempt, storedAnswers(attempt.getId()), attempt.getExpiresAt());
+        return scoreAttempt(attempt, command.answers(), now);
+    }
 
+    private ExamAttemptResult scoreAttempt(ExamAttempt attempt, List<SubmittedAnswer> submittedAnswers, Instant now) {
         List<GradingQuestion> questions = gradingQuery.load(attempt.getExamId());
         Map<UUID, GradingQuestion> questionById = questions.stream().collect(
                 Collectors.toMap(GradingQuestion::id, Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        validateSubmission(command.answers(), questionById);
+        validateSubmission(submittedAnswers, questionById);
 
         BigDecimal rawScore = BigDecimal.ZERO;
         int correctCount = 0;
         List<AttemptAnswer> storedAnswers = new ArrayList<>();
         List<AttemptAnswerOption> storedOptions = new ArrayList<>();
 
-        for (SubmittedAnswer submitted : command.answers()) {
+        for (SubmittedAnswer submitted : submittedAnswers) {
             GradingQuestion question = questionById.get(submitted.questionId());
             Set<UUID> selectedIds = new HashSet<>(submitted.selectedOptionIds());
             Set<UUID> correctIds = question.options().stream().filter(option -> option.correct())
@@ -187,9 +200,16 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         return ExamAttemptResult.scored(attempt, buildReview(questions, storedAnswers, storedOptions));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ExamAttemptResult result(UUID attemptId) {
-        ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findById(attemptId), attemptId);
+        ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(attemptId), attemptId);
+        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt()))
+            return scoreAttempt(attempt, storedAnswers(attemptId), attempt.getExpiresAt());
+        return scoredResult(attempt);
+    }
+
+    private ExamAttemptResult scoredResult(ExamAttempt attempt) {
+        UUID attemptId = attempt.getId();
         if (attempt.getStatus() != ExamAttemptStatus.SCORED) {
             throw new ConflictException("ATTEMPT_RESULT_NOT_READY", "This exam attempt has not been scored yet");
         }
@@ -199,6 +219,55 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                 : answerOptionRepo.findByAttemptAnswerIdIn(answerIds);
         return ExamAttemptResult.scored(attempt,
                 buildReview(gradingQuery.load(attempt.getExamId()), answers, selectedOptions));
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.exam.dto.result.ExamDraftResult draft(UUID id) {
+        ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findById(id), id);
+        var saved = draftRepo.findById(id);
+        return new com.englow3.exam.dto.result.ExamDraftResult(storedAnswers(id),
+                saved.map(d -> d.getRevision()).orElse(0L),
+                saved.map(d -> d.getSavedAt()).orElse(attempt.getStartedAt()));
+    }
+
+    @Transactional
+    public com.englow3.exam.dto.result.ExamDraftResult saveDraft(com.englow3.exam.dto.command.SaveExamDraftCommand c) {
+        ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(c.attemptId()), c.attemptId());
+        Instant now = clock.instant();
+        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt()))
+            throw new ConflictException("ATTEMPT_EXPIRED", "Answers can only be saved before the deadline");
+        Map<UUID, GradingQuestion> questions = gradingQuery.load(attempt.getExamId()).stream()
+                .collect(Collectors.toMap(GradingQuestion::id, Function.identity()));
+        validateSubmission(c.answers(), questions);
+        var draft = draftRepo.findById(c.attemptId())
+                .orElseGet(() -> com.englow3.exam.entity.ExamAttemptDraft.empty(c.attemptId(), now));
+        try {
+            draft.replace(c.version(), mapper.writeValueAsString(c.answers()), now);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new IllegalStateException("Cannot serialize exam draft");
+        }
+        draftRepo.saveAndFlush(draft);
+        return new com.englow3.exam.dto.result.ExamDraftResult(c.answers(), draft.getRevision(), draft.getSavedAt());
+    }
+
+    @Transactional
+    public void finalizeExpired(UUID id) {
+        var candidate = attemptRepo.findByIdForUpdate(id);
+        if (candidate.isEmpty())
+            return;
+        var attempt = candidate.get();
+        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt()))
+            scoreAttempt(attempt, storedAnswers(id), attempt.getExpiresAt());
+    }
+
+    private List<SubmittedAnswer> storedAnswers(UUID id) {
+        String json = draftRepo.findById(id).map(d -> d.getAnswers()).orElse("[]");
+        try {
+            return mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<SubmittedAnswer>>() {
+            });
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new IllegalStateException("Stored exam draft is invalid");
+        }
     }
 
     private LearnerExamPaperResult toResult(LearnerExamPaperProjection paper) {

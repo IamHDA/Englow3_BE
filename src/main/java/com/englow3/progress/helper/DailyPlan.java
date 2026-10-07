@@ -51,7 +51,7 @@ public final class DailyPlan {
      * late is a card the schedule has lost - while a quiz or a dictation lesson is equally useful whenever it is done.
      */
     private static final List<DailyTaskKind> KIND_ORDER = List.of(DailyTaskKind.FLASHCARD_REVIEW,
-            DailyTaskKind.DICTATION, DailyTaskKind.QUIZ);
+            DailyTaskKind.DICTATION, DailyTaskKind.QUIZ, DailyTaskKind.WRITING, DailyTaskKind.SPEAKING);
 
     /**
      * @param finished
@@ -101,7 +101,7 @@ public final class DailyPlan {
             case FLASHCARD_REVIEW -> unitsRemaining * ExperiencePoints.FLASHCARD_REVIEW_XP;
             case DICTATION -> unitsRemaining * ExperiencePoints.DICTATION_SENTENCE_XP;
             // Per attempt, not per question: a long quiz is one submission.
-            case QUIZ -> ExperiencePoints.QUIZ_ATTEMPT_XP;
+            case QUIZ, WRITING, SPEAKING -> ExperiencePoints.QUIZ_ATTEMPT_XP;
         };
     }
 

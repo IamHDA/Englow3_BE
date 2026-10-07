@@ -18,6 +18,8 @@ import com.englow3.exam.entity.ExamAttemptStatus;
 import jakarta.persistence.LockModeType;
 
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
+    List<ExamAttempt> findTop50ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(ExamAttemptStatus status,
+            java.time.Instant now);
 
     Optional<ExamAttempt> findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(UUID userId, UUID examId,
             ExamAttemptStatus status);

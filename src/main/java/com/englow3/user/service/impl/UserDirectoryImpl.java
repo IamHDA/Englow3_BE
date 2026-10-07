@@ -38,6 +38,14 @@ public class UserDirectoryImpl implements UserDirectory {
      */
     private final Map<UUID, UUID> userIds = new ConcurrentHashMap<>();
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Map<UUID, String> displayNames(java.util.Collection<UUID> ids) {
+        if (ids.isEmpty())
+            return Map.of();
+        return userRepo.findAllById(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(user -> user.getId(), user -> user.getDisplayName()));
+    }
+
     /**
      * A valid token whose subject matches no row means the Supabase sync trigger did not fire - a real defect, and one
      * worth surfacing rather than papering over, so it is a 404 with a code that says what is missing. That answer is

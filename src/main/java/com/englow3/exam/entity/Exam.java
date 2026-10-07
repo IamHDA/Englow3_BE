@@ -25,6 +25,22 @@ import lombok.Getter;
 @Getter
 public class Exam extends BasePersistedEntity {
 
+    @jakarta.persistence.Version
+    private long authoringVersion;
+    @Column(name = "authoring_updated_at", nullable = false)
+    private Instant authoringUpdatedAt = Instant.now();
+
+    public void requireAuthoringVersion(long version) {
+        requireEditable();
+        if (authoringVersion != version)
+            throw new ConflictException("CONTENT_CHANGED", "This paper changed. Reload before saving again");
+    }
+
+    public void touchContent() {
+        requireEditable();
+        authoringUpdatedAt = Instant.now();
+    }
+
     @Column(nullable = false)
     private String title;
 
@@ -259,6 +275,18 @@ public class Exam extends BasePersistedEntity {
      * {@code on delete restrict}, so a paper anyone has ever sat cannot be removed - and one nobody has sat is still
      * worth keeping for the record.
      */
+    /**
+     * Undoes an archive. Back to where it was: a paper that had been published returns to the library as it was -
+     * published content is never edited, so it needs no second review - and one that never was goes back to draft.
+     * Archiving used to be one-way; a mistaken click could only be undone in the database.
+     */
+    public void restore() {
+        if (status != ExamStatus.ARCHIVED) {
+            throw new ConflictException("EXAM_NOT_ARCHIVED", "Only an archived paper can be restored");
+        }
+        this.status = publishedAt != null ? ExamStatus.PUBLISHED : ExamStatus.DRAFT;
+    }
+
     public void archive() {
         if (status == ExamStatus.ARCHIVED) {
             throw new ConflictException("EXAM_ALREADY_ARCHIVED", "This paper is already archived");

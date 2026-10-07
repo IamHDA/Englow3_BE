@@ -10,6 +10,11 @@ import com.englow3.flashcard.dto.result.*;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 
 public interface AdminFlashcardService {
+    com.englow3.flashcard.dto.result.AuthoringResult authoringDetail(UUID id);
+
+    com.englow3.flashcard.dto.result.AuthoringResult saveAuthoring(
+            com.englow3.flashcard.dto.command.SaveAuthoringCommand command);
+
     FlashcardSetSummaryResult createSet(CreateFlashcardSetCommand command);
 
     FlashcardSetSummaryResult addCards(AddFlashcardsCommand command);
@@ -29,4 +34,6 @@ public interface AdminFlashcardService {
     ContentReviewResult reject(UUID setId, String note);
 
     ContentReviewResult archive(UUID setId);
+
+    ContentReviewResult restore(UUID setId);
 }
