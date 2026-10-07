@@ -11,11 +11,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.exam.dto.command.StartExamAttemptCommand;
+import com.englow3.exam.dto.request.StartExamAttemptRequest;
 import com.englow3.exam.dto.response.ExamAttemptResponse;
+import com.englow3.exam.dto.response.ExamOutlineResponse;
 import com.englow3.exam.dto.response.LearnerExamResponse;
 import com.englow3.exam.dto.result.ExamAttemptResult;
 import com.englow3.exam.entity.CertificateType;
@@ -26,6 +30,7 @@ import com.englow3.exam.service.LearnerExamService;
 import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.page.PageResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -64,18 +69,27 @@ public class ExamController {
         return ResponseEntity.ok(LearnerExamResponse.from(learnerExamService.detail(id)));
     }
 
+    /** The paper's skills and parts with question counts - what a practice is picked from. */
+    @GetMapping("/{id}/outline")
+    public ResponseEntity<ExamOutlineResponse> getOutline(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamOutlineResponse.from(id, learnerExamService.outline(id)));
+    }
+
     @PostMapping("/{id}/attempts")
     @ApiResponse(responseCode = "200", description = "Existing attempt resumed")
     @ApiResponse(responseCode = "201", description = "New attempt created")
-    public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id) {
+    @ApiResponse(responseCode = "409", description = "Another attempt at this exam is open (ATTEMPT_IN_PROGRESS)")
+    public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id,
+            @RequestBody(required = false) @Valid StartExamAttemptRequest request) {
+        StartExamAttemptCommand command = request == null ? StartExamAttemptCommand.full(id) : request.toCommand(id);
         ExamAttemptResult result;
         try {
-            result = examAttemptService.start(id);
+            result = examAttemptService.start(command);
         } catch (DataIntegrityViolationException raced) {
             // Two starts at once - a double click, a second tab - both found nothing open and both inserted; the
             // partial unique index let one through. The loser asks again, in a fresh transaction, and is handed the
             // attempt the winner opened rather than a conflict.
-            result = examAttemptService.start(id);
+            result = examAttemptService.start(command);
         }
         return ResponseEntity.status(result.resumed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(ExamAttemptResponse.from(result));

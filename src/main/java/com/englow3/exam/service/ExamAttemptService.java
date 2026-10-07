@@ -20,6 +20,8 @@ public interface ExamAttemptService {
 
     ExamAttemptResult start(UUID examId);
 
+    ExamAttemptResult start(com.englow3.exam.dto.command.StartExamAttemptCommand command);
+
     LearnerExamPaperResult paperForAttempt(UUID attemptId);
 
     ExamAttemptResult submit(SubmitExamAttemptCommand command);

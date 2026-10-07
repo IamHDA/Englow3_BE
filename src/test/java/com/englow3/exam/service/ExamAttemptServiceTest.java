@@ -61,12 +61,14 @@ class ExamAttemptServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
+    private final com.englow3.exam.query.ExamOutlineQuery outlineQuery = mock(
+            com.englow3.exam.query.ExamOutlineQuery.class);
     private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo = mock(
             com.englow3.exam.repository.ExamAttemptDraftRepository.class);
     private final ExamAttemptService service = new com.englow3.exam.service.impl.ExamAttemptServiceImpl(examRepo,
             attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder,
             presignedUrls, CLOCK, "exams", java.time.Duration.ofHours(1), draftRepo,
-            new com.fasterxml.jackson.databind.ObjectMapper());
+            new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery);
 
     private final UUID userId = UUID.randomUUID();
 

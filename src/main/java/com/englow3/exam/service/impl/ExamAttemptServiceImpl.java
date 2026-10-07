@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.exam.dto.command.StartExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand.SubmittedAnswer;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
@@ -36,11 +37,13 @@ import com.englow3.exam.entity.AttemptAnswer;
 import com.englow3.exam.entity.AttemptAnswerOption;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamAttempt;
+import com.englow3.exam.entity.ExamAttemptMode;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.query.ExamGradingQuery;
+import com.englow3.exam.query.ExamOutlineQuery;
 import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.LearnerExamPaperQuery;
 import com.englow3.exam.repository.AttemptAnswerOptionRepository;
@@ -73,6 +76,10 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final Duration mediaUrlTtl;
     private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
+    private final ExamOutlineQuery outlineQuery;
+
+    /** The longest clock a learner can set on a practice. */
+    static final int MAX_PRACTICE_MINUTES = 300;
 
     public ExamAttemptServiceImpl(ExamRepository examRepo, ExamAttemptRepository attemptRepo,
             AttemptAnswerRepository answerRepo, AttemptAnswerOptionRepository answerOptionRepo,
@@ -81,7 +88,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl,
             com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo,
-            com.fasterxml.jackson.databind.ObjectMapper mapper) {
+            com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
         this.answerRepo = answerRepo;
@@ -96,6 +103,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.mediaUrlTtl = mediaUrlTtl;
         this.draftRepo = draftRepo;
         this.mapper = mapper;
+        this.outlineQuery = outlineQuery;
     }
 
     @Transactional(readOnly = true)
@@ -105,32 +113,122 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         Map<UUID, String> titles = page.getContent().isEmpty() ? Map.of()
                 : examRepo.findAllById(page.getContent().stream().map(ExamAttempt::getExamId).toList()).stream()
                         .collect(Collectors.toMap(Exam::getId, Exam::getTitle));
-        return page.map(attempt -> ExamAttemptResult.summary(attempt, titles.get(attempt.getExamId())));
+        Map<UUID, ExamOutlineQuery.OutlinePart> parts = outlineQuery.describe(page.getContent().stream()
+                .flatMap(attempt -> attempt.getPartIds().stream()).collect(Collectors.toSet()));
+        return page
+                .map(attempt -> ExamAttemptResult.summary(attempt, titles.get(attempt.getExamId())).withParts(parts));
     }
 
     @Transactional
     public ExamAttemptResult start(UUID examId) {
-        Exam exam = requirePublishedExam(examId);
+        return start(StartExamAttemptCommand.full(examId));
+    }
+
+    /**
+     * Opens a paper as a full attempt or as a practice of some of its parts.
+     * <p>
+     * Only one attempt per paper is ever open (the database enforces it). An open attempt that is exactly what was
+     * asked for is handed back. One that is not - a full test open while a practice is asked for, or a practice of
+     * other parts - is never silently swapped: the learner is told with {@code ATTEMPT_IN_PROGRESS} and chooses to
+     * resume it or to have it finalized from its saved answers and start afresh.
+     */
+    @Transactional
+    public ExamAttemptResult start(StartExamAttemptCommand command) {
+        Exam exam = requirePublishedExam(command.examId());
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = clock.instant();
+        PracticePlan practice = command.mode() == ExamAttemptMode.PRACTICE ? planPractice(exam, command) : null;
 
-        var active = attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, examId,
+        var active = attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, exam.getId(),
                 ExamAttemptStatus.IN_PROGRESS);
         if (active.isPresent() && now.isBefore(active.get().getExpiresAt())) {
-            return ExamAttemptResult.started(active.get(), true);
-        }
-        active.ifPresent(attempt -> {
-            ExamAttempt locked = attemptRepo.findByIdForUpdate(attempt.getId()).orElseThrow();
-            if (locked.getStatus() == ExamAttemptStatus.IN_PROGRESS)
+            ExamAttempt open = active.get();
+            boolean asked = practice == null ? open.matches(ExamAttemptMode.FULL, Set.of(), exam.getDurationSeconds())
+                    : open.matches(ExamAttemptMode.PRACTICE, practice.partIds(), practice.timeLimitSeconds());
+            if (asked || command.onOpen() == StartExamAttemptCommand.OpenAttempt.RESUME) {
+                return named(ExamAttemptResult.started(open, true));
+            }
+            if (command.onOpen() != StartExamAttemptCommand.OpenAttempt.REPLACE) {
+                throw new ConflictException("ATTEMPT_IN_PROGRESS", open.isPractice()
+                        ? "A practice of this exam is still open; resume it or finish it before starting another"
+                        : "A full attempt at this exam is still open; resume it or finish it before starting another");
+            }
+            // Finalized now, from what was saved - the same as submitting it, which is what the learner chose.
+            ExamAttempt locked = attemptRepo.findByIdForUpdate(open.getId()).orElseThrow();
+            if (locked.getStatus() == ExamAttemptStatus.IN_PROGRESS) {
+                scoreAttempt(locked, storedAnswers(locked.getId()), now);
+            }
+            attemptRepo.flush();
+        } else if (active.isPresent()) {
+            ExamAttempt locked = attemptRepo.findByIdForUpdate(active.get().getId()).orElseThrow();
+            if (locked.getStatus() == ExamAttemptStatus.IN_PROGRESS) {
                 scoreAttempt(locked, storedAnswers(locked.getId()), locked.getExpiresAt());
-        });
-        if (active.isPresent()) {
+            }
             attemptRepo.flush();
         }
 
-        int questionCount = Math.toIntExact(examRepo.countQuestions(examId));
-        ExamAttempt attempt = attemptRepo.save(ExamAttempt.start(exam, userId, questionCount, now));
-        return ExamAttemptResult.started(attempt, false);
+        ExamAttempt attempt;
+        if (practice == null) {
+            int questionCount = Math.toIntExact(examRepo.countQuestions(exam.getId()));
+            attempt = ExamAttempt.start(exam, userId, questionCount, now);
+        } else {
+            attempt = ExamAttempt.startPractice(exam, userId, practice.partIds(), practice.questionCount(),
+                    practice.maxRawScore(), practice.timeLimitSeconds(), now);
+        }
+        return named(ExamAttemptResult.started(attemptRepo.save(attempt), false));
+    }
+
+    /** The parts, totals and clock of a practice, checked against the paper before anything is written. */
+    private record PracticePlan(Set<UUID> partIds, int questionCount, BigDecimal maxRawScore,
+            Integer timeLimitSeconds) {
+    }
+
+    private PracticePlan planPractice(Exam exam, StartExamAttemptCommand command) {
+        if (exam.getExamType() == ExamType.PLACEMENT) {
+            throw new BadRequestException("PRACTICE_NOT_AVAILABLE",
+                    "A placement test can only be taken in full - it decides the learner's level");
+        }
+        if (command.partIds() == null || command.partIds().isEmpty()) {
+            throw new BadRequestException("PRACTICE_PARTS_REQUIRED", "Choose at least one part to practise");
+        }
+        Integer minutes = command.timeLimitMinutes();
+        if (minutes != null && (minutes < 1 || minutes > MAX_PRACTICE_MINUTES)) {
+            throw new BadRequestException("PRACTICE_TIME_LIMIT_INVALID",
+                    "A practice time limit is between 1 and %d minutes".formatted(MAX_PRACTICE_MINUTES));
+        }
+        Map<UUID, ExamOutlineQuery.OutlinePart> parts = outlineQuery.load(exam.getId()).stream()
+                .collect(Collectors.toMap(ExamOutlineQuery.OutlinePart::id, Function.identity()));
+        long questions = 0;
+        BigDecimal maxRawScore = BigDecimal.ZERO;
+        for (UUID partId : command.partIds()) {
+            ExamOutlineQuery.OutlinePart part = parts.get(partId);
+            if (part == null) {
+                throw new BadRequestException("PART_NOT_IN_EXAM",
+                        "Part %s does not belong to this exam".formatted(partId));
+            }
+            questions += part.questionCount();
+            maxRawScore = maxRawScore.add(part.maxRawScore());
+        }
+        if (questions == 0) {
+            throw new BadRequestException("PRACTICE_HAS_NO_QUESTIONS", "The chosen parts hold no questions");
+        }
+        return new PracticePlan(Set.copyOf(command.partIds()), Math.toIntExact(questions), maxRawScore,
+                minutes == null ? null : minutes * 60);
+    }
+
+    /** The attempt with its practised parts named, for the screens that list them. */
+    private ExamAttemptResult named(ExamAttemptResult result) {
+        if (result.parts().isEmpty()) {
+            return result;
+        }
+        return result.withParts(
+                outlineQuery.describe(result.parts().stream().map(ExamAttemptResult.AttemptPart::id).toList()));
+    }
+
+    /** What this attempt is graded on: the whole paper, or only the parts a practice covers. */
+    private List<GradingQuestion> gradingFor(ExamAttempt attempt) {
+        return attempt.isPractice() ? gradingQuery.load(attempt.getExamId(), attempt.getPartIds())
+                : gradingQuery.load(attempt.getExamId());
     }
 
     @Transactional(readOnly = true)
@@ -142,7 +240,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (!clock.instant().isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "This exam attempt has expired");
         }
-        return toResult(paperQuery.load(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId())));
+        var paper = attempt.isPractice() ? paperQuery.load(attempt.getExamId(), attempt.getPartIds())
+                : paperQuery.load(attempt.getExamId());
+        return toResult(paper.orElseThrow(() -> examNotFound(attempt.getExamId())));
     }
 
     @Transactional
@@ -160,7 +260,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     }
 
     private ExamAttemptResult scoreAttempt(ExamAttempt attempt, List<SubmittedAnswer> submittedAnswers, Instant now) {
-        List<GradingQuestion> questions = gradingQuery.load(attempt.getExamId());
+        List<GradingQuestion> questions = gradingFor(attempt);
         Map<UUID, GradingQuestion> questionById = questions.stream().collect(
                 Collectors.toMap(GradingQuestion::id, Function.identity(), (left, right) -> left, LinkedHashMap::new));
         validateSubmission(submittedAnswers, questionById);
@@ -193,11 +293,12 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         attempt.score(rawScore, correctCount, now);
 
         Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
-        if (exam.getExamType() == ExamType.PLACEMENT) {
+        // A practice never sets a level: it is a chosen slice of the paper, on a clock the learner picked.
+        if (exam.getExamType() == ExamType.PLACEMENT && !attempt.isPractice()) {
             placementRecorder.record(attempt.getUserId(), attempt.getId(), attempt.getScorePercentage());
         }
 
-        return ExamAttemptResult.scored(attempt, buildReview(questions, storedAnswers, storedOptions));
+        return named(ExamAttemptResult.scored(attempt, buildReview(questions, storedAnswers, storedOptions)));
     }
 
     @Transactional
@@ -217,8 +318,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         List<UUID> answerIds = answers.stream().map(AttemptAnswer::getId).toList();
         List<AttemptAnswerOption> selectedOptions = answerIds.isEmpty() ? List.of()
                 : answerOptionRepo.findByAttemptAnswerIdIn(answerIds);
-        return ExamAttemptResult.scored(attempt,
-                buildReview(gradingQuery.load(attempt.getExamId()), answers, selectedOptions));
+        return named(ExamAttemptResult.scored(attempt, buildReview(gradingFor(attempt), answers, selectedOptions)));
     }
 
     @Transactional(readOnly = true)
@@ -236,7 +336,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         Instant now = clock.instant();
         if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt()))
             throw new ConflictException("ATTEMPT_EXPIRED", "Answers can only be saved before the deadline");
-        Map<UUID, GradingQuestion> questions = gradingQuery.load(attempt.getExamId()).stream()
+        Map<UUID, GradingQuestion> questions = gradingFor(attempt).stream()
                 .collect(Collectors.toMap(GradingQuestion::id, Function.identity()));
         validateSubmission(c.answers(), questions);
         var draft = draftRepo.findById(c.attemptId())

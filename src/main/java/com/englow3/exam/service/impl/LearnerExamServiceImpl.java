@@ -22,6 +22,7 @@ import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
+import com.englow3.exam.query.ExamOutlineQuery;
 import com.englow3.exam.service.LearnerExamService;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
@@ -36,6 +37,7 @@ public class LearnerExamServiceImpl implements LearnerExamService {
     private final ExamRepository examRepo;
     private final ExamAttemptRepository attemptRepo;
     private final UserDirectory userDirectory;
+    private final ExamOutlineQuery outlineQuery;
 
     @Transactional(readOnly = true)
     public Page<LearnerExamListItemResult> search(ExamType examType, CertificateType certificateType,
@@ -68,6 +70,12 @@ public class LearnerExamServiceImpl implements LearnerExamService {
 
         return LearnerExamListItemResult.of(exam, examRepo.countQuestions(examId), best,
                 !attemptRepo.findExamIdsWithLiveAttempt(userId, ids).isEmpty());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExamOutlineQuery.OutlinePart> outline(UUID examId) {
+        requirePublishedExam(examId);
+        return outlineQuery.load(examId);
     }
 
     @Transactional(readOnly = true)

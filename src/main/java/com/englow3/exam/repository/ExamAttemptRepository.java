@@ -26,13 +26,14 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
 
     /**
      * The learner's best score on each of these papers, and how many times they have sat it. Batched so a page of exams
-     * costs one query rather than two per row.
+     * costs one query rather than two per row. Full attempts only: a practice of one part is not a score on the paper.
      */
     @Query("""
             select a.examId, max(a.scorePercentage), count(a)
               from ExamAttempt a
              where a.userId = :userId and a.examId in :examIds
                and a.status = com.englow3.exam.entity.ExamAttemptStatus.SCORED
+               and a.mode = com.englow3.exam.entity.ExamAttemptMode.FULL
              group by a.examId
             """)
     List<Object[]> findBestScoreByExam(@Param("userId") UUID userId, @Param("examIds") Collection<UUID> examIds);

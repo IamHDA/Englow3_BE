@@ -14,5 +14,7 @@ public interface LearnerExamService {
 
     LearnerExamListItemResult detail(UUID examId);
 
+    java.util.List<com.englow3.exam.query.ExamOutlineQuery.OutlinePart> outline(UUID examId);
+
     LearnerExamListItemResult placementExam();
 }

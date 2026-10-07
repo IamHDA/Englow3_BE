@@ -49,7 +49,7 @@ public class DailyPathQuery {
                   union all
                   select cast(submitted_at at time zone :zone as date)
                     from exam_attempts
-                   where user_id = :userId and submitted_at >= :from and status = 'SCORED'
+                   where user_id = :userId and submitted_at >= :from and status = 'SCORED' and mode = 'FULL'
                   union all
                   select cast(submitted_at at time zone :zone as date)
                     from assessment_attempts
@@ -74,7 +74,8 @@ public class DailyPathQuery {
                   (select count(*) from quiz_attempts
                     where user_id = :userId and submitted_at >= :from and status = 'SCORED') as quiz_attempts,
                   (select count(*) from exam_attempts
-                    where user_id = :userId and submitted_at >= :from and status = 'SCORED') as exam_attempts,
+                    where user_id = :userId and submitted_at >= :from and status = 'SCORED'
+                      and mode = 'FULL') as exam_attempts,
                   (select count(*) from assessment_attempts
                     where user_id = :userId and submitted_at >= :from and status <> 'DRAFT') as productive_attempts
                 """).param("userId", userId).param("from", SqlTime.at(from))

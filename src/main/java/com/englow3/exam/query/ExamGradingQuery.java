@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,12 +37,25 @@ public class ExamGradingQuery {
     }
 
     public List<GradingQuestion> load(UUID examId) {
-        List<Question> questions = em.createQuery("""
+        return grade(em.createQuery("""
                 select q from Question q, QuestionSet qs, SectionPart p, ExamSection s
                  where q.questionSetId = qs.id and qs.sectionPartId = p.id
                    and p.examSectionId = s.id and s.examId = :examId
                  order by s.orderNo, p.orderNo, qs.orderNo, q.orderNo
-                """, Question.class).setParameter("examId", examId).getResultList();
+                """, Question.class).setParameter("examId", examId).getResultList());
+    }
+
+    /** Only the questions in these parts of the paper - what a practice is graded on. */
+    public List<GradingQuestion> load(UUID examId, Collection<UUID> partIds) {
+        return grade(em.createQuery("""
+                select q from Question q, QuestionSet qs, SectionPart p, ExamSection s
+                 where q.questionSetId = qs.id and qs.sectionPartId = p.id
+                   and p.examSectionId = s.id and s.examId = :examId and p.id in :partIds
+                 order by s.orderNo, p.orderNo, qs.orderNo, q.orderNo
+                """, Question.class).setParameter("examId", examId).setParameter("partIds", partIds).getResultList());
+    }
+
+    private List<GradingQuestion> grade(List<Question> questions) {
         if (questions.isEmpty()) {
             return List.of();
         }

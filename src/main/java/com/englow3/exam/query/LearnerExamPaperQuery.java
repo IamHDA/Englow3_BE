@@ -7,8 +7,10 @@ import static java.util.stream.Collectors.toList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Repository;
 
@@ -34,6 +36,14 @@ public class LearnerExamPaperQuery {
     private final EntityManager em;
 
     public Optional<LearnerExamPaperProjection> load(UUID examId) {
+        return load(examId, null);
+    }
+
+    /**
+     * The paper restricted to these parts, for a practice. Sections left with no chosen part are dropped, so the
+     * sitting never shows a skill heading with nothing under it. A null set means the whole paper.
+     */
+    public Optional<LearnerExamPaperProjection> load(UUID examId, Set<UUID> partIds) {
         Exam exam = em.find(Exam.class, examId);
         if (exam == null) {
             return Optional.empty();
@@ -46,6 +56,11 @@ public class LearnerExamPaperQuery {
         List<SectionPart> parts = childrenOf(idsOf(sections, ExamSection::getId),
                 "select p from SectionPart p where p.examSectionId in :parentIds order by p.orderNo",
                 SectionPart.class);
+        if (partIds != null) {
+            parts = parts.stream().filter(part -> partIds.contains(part.getId())).toList();
+            Set<UUID> keptSections = parts.stream().map(SectionPart::getExamSectionId).collect(Collectors.toSet());
+            sections = sections.stream().filter(section -> keptSections.contains(section.getId())).toList();
+        }
         List<QuestionSet> sets = childrenOf(idsOf(parts, SectionPart::getId),
                 "select qs from QuestionSet qs where qs.sectionPartId in :parentIds order by qs.orderNo",
                 QuestionSet.class);
