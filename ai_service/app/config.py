@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=1_024, ge=64, le=4_096)
 
     speech_enabled: bool = False
+    # "azure" scores pronunciation per phoneme. "whisper" transcribes through an
+    # OpenAI-compatible endpoint (Groq by default, reusing the LLM key) and
+    # estimates pronunciation and fluency - see providers/whisper.py.
+    speech_provider: str = Field(default="azure", pattern="^(azure|whisper)$")
+    whisper_base_url: AnyHttpUrl | None = None
+    whisper_api_key: SecretStr = SecretStr("")
+    whisper_model: str = "whisper-large-v3-turbo"
     azure_speech_base_url: AnyHttpUrl = AnyHttpUrl("https://example.cognitiveservices.azure.com")
     azure_speech_api_key: SecretStr = SecretStr("")
 

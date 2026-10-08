@@ -101,6 +101,19 @@ class ExamContentServiceTest {
     }
 
     @Test
+    void refusesWritingAndSpeakingSectionsBecauseAMockExamOnlyScoresChoices() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        var writing = new UpdateExamContentCommand.SectionCommand(com.englow3.exam.entity.SectionType.WRITING, 1,
+                new java.math.BigDecimal("10"), false, null, List.of());
+
+        assertThatThrownBy(() -> service.replaceContent(new UpdateExamContentCommand(exam.getId(), List.of(writing))))
+                .isInstanceOf(com.englow3.shared.error.BadRequestException.class)
+                .extracting(e -> ((com.englow3.shared.error.BadRequestException) e).getCode())
+                .isEqualTo("EXAM_PRODUCTIVE_SECTION");
+    }
+
+    @Test
     void failsToReplaceContentOnAPaperThatDoesNotExist() {
         UUID missing = UUID.randomUUID();
         when(examRepo.findById(missing)).thenReturn(Optional.empty());

@@ -60,6 +60,18 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     @Query("select count(s) from ExamSection s where s.examId = :examId")
     long countSections(@Param("examId") UUID examId);
 
+    /**
+     * Sections a mock exam cannot score: Writing and Speaking need an essay or a recording and a rubric, which live in
+     * the assessment module. A paper holding one would show them as multiple choice.
+     */
+    @Query("""
+            select count(s) from ExamSection s
+             where s.examId = :examId
+               and s.sectionType in (com.englow3.exam.entity.SectionType.WRITING,
+                                     com.englow3.exam.entity.SectionType.SPEAKING)
+            """)
+    long countProductiveSections(@Param("examId") UUID examId);
+
     @Query("""
             select count(q) from Question q, QuestionSet qs, SectionPart sp, ExamSection s
              where q.questionSetId = qs.id and qs.sectionPartId = sp.id

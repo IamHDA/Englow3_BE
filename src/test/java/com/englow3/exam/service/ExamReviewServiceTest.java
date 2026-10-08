@@ -55,6 +55,19 @@ class ExamReviewServiceTest {
     }
 
     @Test
+    void refusesToPublishAPaperThatHoldsAWritingOrSpeakingSection() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.countProductiveSections(exam.getId())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.publish(new PublishExamCommand(exam.getId())))
+                .isInstanceOf(com.englow3.shared.error.ConflictException.class)
+                .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
+                .isEqualTo("EXAM_PRODUCTIVE_SECTION");
+        assertThat(exam.getStatus()).isEqualTo(ExamStatus.DRAFT);
+    }
+
+    @Test
     void archivesThePaperItWasGiven() {
         Exam exam = AdminExamServiceTest.draft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));

@@ -13,6 +13,7 @@ from app.errors import ServiceError
 from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
+from app.providers.whisper import WhisperSpeechProvider
 from app.schemas import (
     EmbeddingRequest,
     EmbeddingResponse,
@@ -38,7 +39,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         async with httpx.AsyncClient(timeout=timeout) as client:
             app.state.llm_provider = OpenAiCompatibleProvider(client, configured)
             app.state.embedding_provider = OpenAiCompatibleEmbeddingProvider(client, configured)
-            app.state.speech_provider = AzureSpeechProvider(client, configured)
+            app.state.speech_provider = (
+                WhisperSpeechProvider(client, configured)
+                if configured.speech_provider == "whisper"
+                else AzureSpeechProvider(client, configured)
+            )
             yield
 
     app = FastAPI(
@@ -154,7 +159,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 def _readiness(settings: Settings) -> dict[str, bool]:
     internal_auth = bool(settings.internal_api_key.get_secret_value())
     llm = not settings.llm_enabled or bool(settings.llm_api_key.get_secret_value())
-    speech = not settings.speech_enabled or bool(settings.azure_speech_api_key.get_secret_value())
+    speech_key = (
+        settings.whisper_api_key.get_secret_value() or settings.llm_api_key.get_secret_value()
+        if settings.speech_provider == "whisper"
+        else settings.azure_speech_api_key.get_secret_value()
+    )
+    speech = not settings.speech_enabled or bool(speech_key)
     embedding = not settings.embedding_enabled or bool(
         settings.embedding_api_key.get_secret_value()
     )

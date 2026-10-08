@@ -26,6 +26,7 @@ import com.englow3.exam.entity.Question;
 import com.englow3.exam.entity.QuestionOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
+import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
@@ -171,6 +172,12 @@ public class ExamContentServiceImpl implements ExamContentService {
         String prefix = examId + "/";
         requireUniqueOrderNo("section", sections, UpdateExamContentCommand.SectionCommand::orderNo);
         for (UpdateExamContentCommand.SectionCommand section : sections) {
+            // The sitting engine scores chosen options only. An essay or a recording needs a rubric and a grader,
+            // which the Writing & Speaking module has; authored here it would reach learners as multiple choice.
+            if (section.sectionType() == SectionType.WRITING || section.sectionType() == SectionType.SPEAKING) {
+                throw new BadRequestException("EXAM_PRODUCTIVE_SECTION",
+                        "Writing and Speaking are authored as Writing & Speaking tasks, not as mock exam sections");
+            }
             requireUniqueOrderNo("part", section.parts(), UpdateExamContentCommand.PartCommand::orderNo);
             for (UpdateExamContentCommand.PartCommand part : section.parts()) {
                 requireOwnedKey(prefix, part.audioObjectKey());
