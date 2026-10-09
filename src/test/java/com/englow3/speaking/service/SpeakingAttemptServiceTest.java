@@ -21,8 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import software.amazon.awssdk.services.s3.model.S3Exception;
-
 import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
@@ -34,8 +32,11 @@ import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
+import com.englow3.speaking.service.impl.SpeakingAttemptServiceImpl;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 class SpeakingAttemptServiceTest {
 
@@ -49,9 +50,8 @@ class SpeakingAttemptServiceTest {
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
-    private final SpeakingAttemptService service = new com.englow3.speaking.service.impl.SpeakingAttemptServiceImpl(
-            promptRepo, attemptRepo, wordRepo, aiJobQueue, userDirectory, objectStorage, presignedUrls,
-            new ObjectMapper());
+    private final SpeakingAttemptService service = new SpeakingAttemptServiceImpl(promptRepo, attemptRepo, wordRepo,
+            aiJobQueue, userDirectory, objectStorage, presignedUrls, new ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
     private SpeakingPrompt prompt;

@@ -1,44 +1,45 @@
 package com.englow3.flashcard.controller;
 
-import java.util.List;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.englow3.flashcard.entity.FlashcardSetStatus;
 import com.englow3.flashcard.dto.command.AddFlashcardsCommand;
 import com.englow3.flashcard.dto.command.CreateFlashcardSetCommand;
+import com.englow3.flashcard.dto.command.SaveAuthoringCommand;
 import com.englow3.flashcard.dto.request.AddFlashcardsRequest;
 import com.englow3.flashcard.dto.request.CreateFlashcardSetRequest;
 import com.englow3.flashcard.dto.request.RejectContentRequest;
+import com.englow3.flashcard.dto.request.SaveAuthoringRequest;
+import com.englow3.flashcard.dto.response.AuthoringResponse;
 import com.englow3.flashcard.dto.response.ContentReviewResponse;
 import com.englow3.flashcard.dto.response.FlashcardSetResponse;
-import com.englow3.shared.page.PageResponse;
-import com.englow3.flashcard.service.AdminFlashcardService;
-
 import com.englow3.flashcard.dto.result.FlashcardImportResult;
-
+import com.englow3.flashcard.entity.FlashcardSetStatus;
+import com.englow3.flashcard.service.AdminFlashcardService;
 import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.page.PageResponse;
 
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -158,36 +159,32 @@ class AdminFlashcardController {
     }
 
     @GetMapping("/sets/{id}/authoring")
-    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
-        return ResponseEntity.ok(
-                com.englow3.flashcard.dto.response.AuthoringResponse.from(adminFlashcardService.authoringDetail(id)));
+    ResponseEntity<AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(AuthoringResponse.from(adminFlashcardService.authoringDetail(id)));
     }
 
     @PostMapping("/sets/authoring")
-    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> createAuthoring(
-            @Valid @RequestBody com.englow3.flashcard.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.flashcard.dto.response.AuthoringResponse
-                .from(adminFlashcardService.saveAuthoring(authoringCommand(null, request))));
+    ResponseEntity<AuthoringResponse> createAuthoring(@Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(AuthoringResponse.from(adminFlashcardService.saveAuthoring(authoringCommand(null, request))));
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/sets/{id}/authoring")
-    ResponseEntity<com.englow3.flashcard.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
-            @Valid @RequestBody com.englow3.flashcard.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.ok(com.englow3.flashcard.dto.response.AuthoringResponse
-                .from(adminFlashcardService.saveAuthoring(authoringCommand(id, request))));
+    ResponseEntity<AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity
+                .ok(AuthoringResponse.from(adminFlashcardService.saveAuthoring(authoringCommand(id, request))));
     }
 
-    private com.englow3.flashcard.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
-            com.englow3.flashcard.dto.request.SaveAuthoringRequest r) {
+    private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
-        return new com.englow3.flashcard.dto.command.SaveAuthoringCommand(id, r.version(),
-                new com.englow3.flashcard.dto.command.CreateFlashcardSetCommand(m.slug(), m.name(), m.description(),
-                        m.topic(), m.targetLevel()),
+        return new SaveAuthoringCommand(id, r.version(),
+                new CreateFlashcardSetCommand(m.slug(), m.name(), m.description(), m.topic(), m.targetLevel()),
                 r.content().cards().stream()
-                        .map(c -> new com.englow3.flashcard.dto.command.AddFlashcardsCommand.NewCard(c.lemma(),
-                                c.partOfSpeech(), c.senseLabel(), c.ipaUs(), c.ipaUk(), c.audioUsObjectKey(),
-                                c.audioUkObjectKey(), c.definitionEn(), c.definitionVi(), c.exampleSentence(),
-                                c.exampleTranslationVi(), c.mnemonicTipVi(), c.cefrLevel()))
+                        .map(c -> new AddFlashcardsCommand.NewCard(c.lemma(), c.partOfSpeech(), c.senseLabel(),
+                                c.ipaUs(), c.ipaUk(), c.audioUsObjectKey(), c.audioUkObjectKey(), c.definitionEn(),
+                                c.definitionVi(), c.exampleSentence(), c.exampleTranslationVi(), c.mnemonicTipVi(),
+                                c.cefrLevel()))
                         .toList());
     }
 }

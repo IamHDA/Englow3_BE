@@ -19,21 +19,24 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.englow3.exam.dto.command.ApproveExamCommand;
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.CreateExamCommand;
 import com.englow3.exam.dto.command.ExamDetailCommand;
-import com.englow3.exam.dto.command.ApproveExamCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
 import com.englow3.exam.dto.command.RejectExamCommand;
-import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
-import com.englow3.exam.dto.command.UpdateExamContentCommand;
+import com.englow3.exam.dto.command.SaveAuthoringCommand;
 import com.englow3.exam.dto.command.SearchExamCommand;
+import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
 import com.englow3.exam.dto.command.UpdateExamCommand;
+import com.englow3.exam.dto.command.UpdateExamContentCommand;
 import com.englow3.exam.dto.request.CreateExamRequest;
 import com.englow3.exam.dto.request.RejectExamRequest;
-import com.englow3.exam.dto.request.UpdateExamContentRequest;
+import com.englow3.exam.dto.request.SaveAuthoringRequest;
 import com.englow3.exam.dto.request.SearchExamRequest;
+import com.englow3.exam.dto.request.UpdateExamContentRequest;
 import com.englow3.exam.dto.request.UpdateExamRequest;
+import com.englow3.exam.dto.response.AuthoringResponse;
 import com.englow3.exam.dto.response.ExamDetailResponse;
 import com.englow3.exam.dto.response.ExamListItemResponse;
 import com.englow3.exam.dto.response.ExamMediaResponse;
@@ -44,8 +47,8 @@ import com.englow3.exam.service.ExamContentService;
 import com.englow3.exam.service.ExamReviewService;
 import com.englow3.shared.page.PageResponse;
 
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 
 /**
  * Authoring and review.
@@ -168,29 +171,25 @@ class AdminExamController {
     }
 
     @GetMapping("/{id}/authoring")
-    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
-        return ResponseEntity
-                .ok(com.englow3.exam.dto.response.AuthoringResponse.from(adminExamService.authoringDetail(id)));
+    ResponseEntity<AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(AuthoringResponse.from(adminExamService.authoringDetail(id)));
     }
 
     @PostMapping("/authoring")
-    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> createAuthoring(
-            @Valid @RequestBody com.englow3.exam.dto.request.SaveAuthoringRequest r) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.exam.dto.response.AuthoringResponse
-                .from(adminExamService.saveAuthoring(authoringCommand(null, r))));
+    ResponseEntity<AuthoringResponse> createAuthoring(@Valid @RequestBody SaveAuthoringRequest r) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(AuthoringResponse.from(adminExamService.saveAuthoring(authoringCommand(null, r))));
     }
 
     @PutMapping("/{id}/authoring")
-    ResponseEntity<com.englow3.exam.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
-            @Valid @RequestBody com.englow3.exam.dto.request.SaveAuthoringRequest r) {
-        return ResponseEntity.ok(com.englow3.exam.dto.response.AuthoringResponse
-                .from(adminExamService.saveAuthoring(authoringCommand(id, r))));
+    ResponseEntity<AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody SaveAuthoringRequest r) {
+        return ResponseEntity.ok(AuthoringResponse.from(adminExamService.saveAuthoring(authoringCommand(id, r))));
     }
 
-    private com.englow3.exam.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
-            com.englow3.exam.dto.request.SaveAuthoringRequest r) {
+    private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
-        return new com.englow3.exam.dto.command.SaveAuthoringCommand(id, r.version(),
+        return new SaveAuthoringCommand(id, r.version(),
                 new CreateExamCommand(m.title(), m.description(), m.examType(), m.certificateType(),
                         m.certificateVariant(), m.targetLevel(), m.durationSeconds(), m.maxRawScore(), m.passScore()),
                 UpdateExamContentCommand.of(id, r.content()));

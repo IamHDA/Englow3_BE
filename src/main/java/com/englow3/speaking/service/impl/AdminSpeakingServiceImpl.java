@@ -1,6 +1,7 @@
 package com.englow3.speaking.service.impl;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -8,19 +9,22 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.speaking.dto.command.CreateSpeakingPromptCommand;
+import com.englow3.speaking.dto.command.SaveAuthoringCommand;
+import com.englow3.speaking.dto.result.AuthoringResult;
 import com.englow3.speaking.dto.result.SpeakingPromptReviewResult;
 import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
+import com.englow3.speaking.service.AdminSpeakingService;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
-import com.englow3.speaking.service.*;
 
 /** Authoring prompts, and the review workflow every other content type already runs. */
 @Service
@@ -109,32 +113,29 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     /** Tips arrive as a list and are stored as JSON, so the serialisation happens once, here. */
     private String tipsJson(CreateSpeakingPromptCommand command) {
         try {
-            return objectMapper.writeValueAsString(command.tips() == null ? java.util.List.of() : command.tips());
+            return objectMapper.writeValueAsString(command.tips() == null ? List.of() : command.tips());
         } catch (JsonProcessingException impossible) {
             throw new IllegalStateException("Could not serialise the prompt tips", impossible);
         }
     }
 
     @Transactional(readOnly = true)
-    public com.englow3.speaking.dto.result.AuthoringResult authoringDetail(UUID id) {
+    public AuthoringResult authoringDetail(UUID id) {
         var item = requirePrompt(id);
-        return new com.englow3.speaking.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
-                item.getReviewNote(),
+        return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReviewNote(),
                 new CreateSpeakingPromptCommand(item.getSlug(), item.getTitle(), item.getCategory(),
                         item.getTargetLevel(), item.getReferenceText(), item.getIpaTranscript(),
                         item.getTranslationVi(), item.getPhonemeTarget(), parseTips(item.getTips())));
     }
 
     @Transactional
-    public com.englow3.speaking.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.speaking.dto.command.SaveAuthoringCommand command) {
+    public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
         UUID id = command.id();
         if (id == null) {
             id = create(command.metadata()).id();
         } else {
             if (command.version() == null) {
-                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
-                        "A version is required when editing");
+                throw new BadRequestException("CONTENT_VERSION_REQUIRED", "A version is required when editing");
             }
             var item = requirePrompt(id);
             if (promptRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
@@ -148,11 +149,10 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
         return authoringDetail(id);
     }
 
-    private java.util.List<String> parseTips(String json) {
+    private List<String> parseTips(String json) {
         try {
-            return objectMapper.readValue(json,
-                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
-                    });
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+            });
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException("Invalid stored coaching notes", e);
         }

@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from conftest import make_group, make_item, make_options, make_passage  # noqa: E402
+from conftest import make_group, make_item  # noqa: E402
 from schemas import QuestionType  # noqa: E402
 from validators.part_rules import PART_RULES, check_group  # noqa: E402
 

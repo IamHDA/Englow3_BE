@@ -35,6 +35,7 @@ import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
+import com.englow3.exam.service.impl.AdminExamServiceImpl;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
@@ -47,9 +48,8 @@ class AdminExamServiceTest {
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
-    private final AdminExamService service = new com.englow3.exam.service.impl.AdminExamServiceImpl(examRepo,
-            examPaperQuery, userDirectory, presignedUrls, EXAM_BUCKET, mock(ExamContentService.class),
-            Duration.ofHours(1));
+    private final AdminExamService service = new AdminExamServiceImpl(examRepo, examPaperQuery, userDirectory,
+            presignedUrls, EXAM_BUCKET, mock(ExamContentService.class), Duration.ofHours(1));
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach

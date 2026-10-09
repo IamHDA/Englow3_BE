@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,8 +39,7 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
         if (setIds.isEmpty()) {
             return Map.of();
         }
-        return countBySetIdsRaw(setIds).stream()
-                .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+        return countBySetIdsRaw(setIds).stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     }
 
     /** Cards in a set the learner has never reviewed, in the set's order, only as many as asked for. */

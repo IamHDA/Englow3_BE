@@ -24,9 +24,10 @@ class AssessmentEvidenceTest {
         assertThatCode(() -> AssessmentEvidence.validate(mapper, AssessmentSkill.SPEAKING,
                 "{\"criteria\":[{\"audioStart\":2,\"audioEnd\":5}]}", null, 320044L)).doesNotThrowAnyException();
         for (String range : new String[] { "\"audioStart\":2", "\"audioStart\":6,\"audioEnd\":5",
-                "\"audioStart\":2,\"audioEnd\":11" })
+                "\"audioStart\":2,\"audioEnd\":11" }) {
             assertThatThrownBy(() -> AssessmentEvidence.validate(mapper, AssessmentSkill.SPEAKING,
                     "{\"criteria\":[{" + range + "}]}", null, 320044L)).isInstanceOf(BadRequestException.class);
+        }
     }
 
     @Test

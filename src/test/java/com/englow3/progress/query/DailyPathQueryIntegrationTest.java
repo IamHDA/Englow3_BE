@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -136,7 +137,7 @@ class DailyPathQueryIntegrationTest extends PostgresIntegrationTest {
             fixture.reviewLog(learner, card, set, "GOOD", daysAgo(5));
             fixture.reviewLog(learner, card, set, "GOOD", daysAgo(1));
 
-            assertThat(query.studyDays(learner, EPOCH)).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+            assertThat(query.studyDays(learner, EPOCH)).isSortedAccordingTo(Comparator.reverseOrder());
         }
     }
 

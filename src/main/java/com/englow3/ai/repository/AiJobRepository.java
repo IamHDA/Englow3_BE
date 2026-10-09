@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.ai.entity.AiJob;
+import com.englow3.ai.entity.AiJobStatus;
 
 public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:userId,0)) as text)", nativeQuery = true)
@@ -47,7 +48,7 @@ public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
      */
     @Query("""
             select j from AiJob j
-             where j.status = com.englow3.ai.entity.AiJobStatus.RUNNING
+             where j.status = AiJobStatus.RUNNING
                and j.startedAt <= :threshold
             """)
     List<AiJob> findStalled(@Param("threshold") Instant threshold);

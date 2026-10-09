@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.englow3.speaking.dto.result.*;
+import com.englow3.speaking.dto.result.SpeakingPromptResult;
 
 public interface SpeakingService {
     Page<SpeakingPromptResult> searchPublished(String category, String title, Pageable pageable);

@@ -15,8 +15,23 @@ on:
       - dev
 
 jobs:
+  # A push to main, dev or testing deploys, so it must pass the same checks a
+  # pull request does first. Before this the two workflows ran side by side and
+  # a red build still went out. Pull requests run CI through its own trigger
+  # and only dry-run the image build here.
+  verify:
+    name: Verify
+    if: ${{ github.event_name == 'push' }}
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   build-and-push:
     name: Build & Push ${{ matrix.service }} Image
+    needs: verify
+    # `verify` is skipped on pull requests, which must still build; it must not
+    # have failed on a push.
+    if: ${{ !cancelled() && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

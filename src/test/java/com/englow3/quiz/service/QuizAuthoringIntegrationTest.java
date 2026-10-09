@@ -1,20 +1,32 @@
 package com.englow3.quiz.service;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import java.time.Instant;
-import java.util.*;
-import org.junit.jupiter.api.*;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import com.englow3.quiz.dto.command.*;
-import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.*;
+
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewOption;
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewPair;
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewQuestion;
+import com.englow3.quiz.dto.command.CreateQuizCommand;
+import com.englow3.quiz.dto.command.SaveAuthoringCommand;
 import com.englow3.quiz.entity.QuizQuestionType;
-import com.englow3.shared.error.*;
-import com.englow3.support.*;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.support.LearnerFixture;
+import com.englow3.support.PostgresIntegrationTest;
 
 class QuizAuthoringIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -37,8 +49,9 @@ class QuizAuthoringIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         SecurityContextHolder.clearContext();
-        if (quiz != null)
+        if (quiz != null) {
             jdbc.sql("delete from quizzes where id=:id").param("id", quiz).update();
+        }
         jdbc.sql("delete from users where id=:id").param("id", author).update();
     }
 

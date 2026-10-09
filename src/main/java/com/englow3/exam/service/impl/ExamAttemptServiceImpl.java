@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -21,33 +22,37 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.exam.dto.command.SaveExamDraftCommand;
 import com.englow3.exam.dto.command.StartExamAttemptCommand;
-import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand.SubmittedAnswer;
-import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
+import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Part;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Question;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection.QuestionSet;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection.Section;
-import com.englow3.exam.dto.result.ExamAttemptResult;
+import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
 import com.englow3.exam.dto.result.ExamAttemptResult.OptionReviewResult;
 import com.englow3.exam.dto.result.ExamAttemptResult.QuestionReviewResult;
+import com.englow3.exam.dto.result.ExamAttemptResult;
+import com.englow3.exam.dto.result.ExamDraftResult;
 import com.englow3.exam.dto.result.LearnerExamPaperResult;
 import com.englow3.exam.entity.AttemptAnswer;
 import com.englow3.exam.entity.AttemptAnswerOption;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamAttempt;
+import com.englow3.exam.entity.ExamAttemptDraft;
 import com.englow3.exam.entity.ExamAttemptMode;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.QuestionType;
+import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.ExamGradingQuery;
 import com.englow3.exam.query.ExamOutlineQuery;
-import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.LearnerExamPaperQuery;
 import com.englow3.exam.repository.AttemptAnswerOptionRepository;
 import com.englow3.exam.repository.AttemptAnswerRepository;
+import com.englow3.exam.repository.ExamAttemptDraftRepository;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.service.ExamAttemptService;
@@ -74,7 +79,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final Clock clock;
     private final String examBucket;
     private final Duration mediaUrlTtl;
-    private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo;
+    private final ExamAttemptDraftRepository draftRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
     private final ExamOutlineQuery outlineQuery;
 
@@ -86,8 +91,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             LearnerExamPaperQuery paperQuery, ExamGradingQuery gradingQuery, UserDirectory userDirectory,
             PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl,
-            com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo,
+            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl, ExamAttemptDraftRepository draftRepo,
             com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
@@ -250,12 +254,15 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(command.attemptId()),
                 command.attemptId());
         Instant now = clock.instant();
-        if (attempt.getStatus() == ExamAttemptStatus.SCORED)
+        if (attempt.getStatus() == ExamAttemptStatus.SCORED) {
             return scoredResult(attempt);
-        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS)
+        }
+        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
             throw new ConflictException("ATTEMPT_ALREADY_FINALIZED", "This exam attempt has already been finalized");
-        if (!now.isBefore(attempt.getExpiresAt()))
+        }
+        if (!now.isBefore(attempt.getExpiresAt())) {
             return scoreAttempt(attempt, storedAnswers(attempt.getId()), attempt.getExpiresAt());
+        }
         return scoreAttempt(attempt, command.answers(), now);
     }
 
@@ -304,8 +311,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     @Transactional
     public ExamAttemptResult result(UUID attemptId) {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(attemptId), attemptId);
-        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt()))
+        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt())) {
             return scoreAttempt(attempt, storedAnswers(attemptId), attempt.getExpiresAt());
+        }
         return scoredResult(attempt);
     }
 
@@ -322,42 +330,43 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     }
 
     @Transactional(readOnly = true)
-    public com.englow3.exam.dto.result.ExamDraftResult draft(UUID id) {
+    public ExamDraftResult draft(UUID id) {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findById(id), id);
         var saved = draftRepo.findById(id);
-        return new com.englow3.exam.dto.result.ExamDraftResult(storedAnswers(id),
-                saved.map(d -> d.getRevision()).orElse(0L),
+        return new ExamDraftResult(storedAnswers(id), saved.map(d -> d.getRevision()).orElse(0L),
                 saved.map(d -> d.getSavedAt()).orElse(attempt.getStartedAt()));
     }
 
     @Transactional
-    public com.englow3.exam.dto.result.ExamDraftResult saveDraft(com.englow3.exam.dto.command.SaveExamDraftCommand c) {
+    public ExamDraftResult saveDraft(SaveExamDraftCommand c) {
         ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(c.attemptId()), c.attemptId());
         Instant now = clock.instant();
-        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt()))
+        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "Answers can only be saved before the deadline");
+        }
         Map<UUID, GradingQuestion> questions = gradingFor(attempt).stream()
                 .collect(Collectors.toMap(GradingQuestion::id, Function.identity()));
         validateSubmission(c.answers(), questions);
-        var draft = draftRepo.findById(c.attemptId())
-                .orElseGet(() -> com.englow3.exam.entity.ExamAttemptDraft.empty(c.attemptId(), now));
+        var draft = draftRepo.findById(c.attemptId()).orElseGet(() -> ExamAttemptDraft.empty(c.attemptId(), now));
         try {
             draft.replace(c.version(), mapper.writeValueAsString(c.answers()), now);
         } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
             throw new IllegalStateException("Cannot serialize exam draft");
         }
         draftRepo.saveAndFlush(draft);
-        return new com.englow3.exam.dto.result.ExamDraftResult(c.answers(), draft.getRevision(), draft.getSavedAt());
+        return new ExamDraftResult(c.answers(), draft.getRevision(), draft.getSavedAt());
     }
 
     @Transactional
     public void finalizeExpired(UUID id) {
         var candidate = attemptRepo.findByIdForUpdate(id);
-        if (candidate.isEmpty())
+        if (candidate.isEmpty()) {
             return;
+        }
         var attempt = candidate.get();
-        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt()))
+        if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS && !clock.instant().isBefore(attempt.getExpiresAt())) {
             scoreAttempt(attempt, storedAnswers(id), attempt.getExpiresAt());
+        }
     }
 
     private List<SubmittedAnswer> storedAnswers(UUID id) {
@@ -465,7 +474,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                 .orElseThrow(() -> examNotFound(examId));
     }
 
-    private ExamAttempt requireOwnedAttempt(java.util.Optional<ExamAttempt> candidate, UUID attemptId) {
+    private ExamAttempt requireOwnedAttempt(Optional<ExamAttempt> candidate, UUID attemptId) {
         UUID userId = userDirectory.requireCurrentUserId();
         return candidate.filter(attempt -> attempt.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("EXAM_ATTEMPT_NOT_FOUND",

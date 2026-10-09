@@ -9,7 +9,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand;
 import com.englow3.quiz.dto.command.CreateQuizCommand;
+import com.englow3.quiz.dto.command.SaveAuthoringCommand;
+import com.englow3.quiz.dto.result.AuthoringResult;
 import com.englow3.quiz.dto.result.ContentReviewResult;
 import com.englow3.quiz.dto.result.QuizSummaryResult;
 import com.englow3.quiz.entity.Quiz;
@@ -17,6 +20,8 @@ import com.englow3.quiz.entity.QuizStatus;
 import com.englow3.quiz.repository.QuizQuestionRepository;
 import com.englow3.quiz.repository.QuizRepository;
 import com.englow3.quiz.service.AdminQuizService;
+import com.englow3.quiz.service.QuizQuestionAuthoringService;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
@@ -32,7 +37,7 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     private final QuizQuestionRepository questionRepo;
     private final UserDirectory userDirectory;
     private final Clock clock;
-    private final com.englow3.quiz.service.QuizQuestionAuthoringService questionAuthoring;
+    private final QuizQuestionAuthoringService questionAuthoring;
 
     @Transactional
     public QuizSummaryResult create(CreateQuizCommand command) {
@@ -105,25 +110,22 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     }
 
     @Transactional(readOnly = true)
-    public com.englow3.quiz.dto.result.AuthoringResult authoringDetail(UUID id) {
+    public AuthoringResult authoringDetail(UUID id) {
         var item = requireQuiz(id);
-        return new com.englow3.quiz.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
-                item.getReview().getReviewNote(),
+        return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReview().getReviewNote(),
                 new CreateQuizCommand(item.getSlug(), item.getTitle(), item.getDescription(), item.getCategory(),
                         item.getTargetLevel(), item.getTimeLimitSeconds(), item.getPassingScorePercent()),
                 questionAuthoring.authoringQuestions(id));
     }
 
     @Transactional
-    public com.englow3.quiz.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.quiz.dto.command.SaveAuthoringCommand command) {
+    public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
         UUID id = command.id();
         if (id == null) {
             id = create(command.metadata()).id();
         } else {
             if (command.version() == null) {
-                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
-                        "A version is required when editing");
+                throw new BadRequestException("CONTENT_VERSION_REQUIRED", "A version is required when editing");
             }
             var item = requireQuiz(id);
             if (quizRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
@@ -132,8 +134,7 @@ public class AdminQuizServiceImpl implements AdminQuizService {
             item.updateDraft(command.metadata(), command.version(), clock.instant());
             quizRepo.flush();
         }
-        questionAuthoring
-                .replaceQuestions(new com.englow3.quiz.dto.command.AddQuizQuestionsCommand(id, command.questions()));
+        questionAuthoring.replaceQuestions(new AddQuizQuestionsCommand(id, command.questions()));
         quizRepo.flush();
         return authoringDetail(id);
     }

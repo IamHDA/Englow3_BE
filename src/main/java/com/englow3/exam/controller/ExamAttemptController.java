@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.exam.dto.request.SaveExamDraftRequest;
 import com.englow3.exam.dto.request.SubmitExamAttemptRequest;
 import com.englow3.exam.dto.response.ExamAttemptResponse;
+import com.englow3.exam.dto.response.ExamDraftResponse;
 import com.englow3.exam.dto.response.LearnerExamPaperResponse;
 import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.page.PageResponse;
@@ -43,15 +45,14 @@ public class ExamAttemptController {
     }
 
     @GetMapping("/{id}/draft")
-    public ResponseEntity<com.englow3.exam.dto.response.ExamDraftResponse> draft(@PathVariable UUID id) {
-        return ResponseEntity.ok(com.englow3.exam.dto.response.ExamDraftResponse.from(examAttemptService.draft(id)));
+    public ResponseEntity<ExamDraftResponse> draft(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamDraftResponse.from(examAttemptService.draft(id)));
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/{id}/draft")
-    public ResponseEntity<com.englow3.exam.dto.response.ExamDraftResponse> saveDraft(@PathVariable UUID id,
-            @Valid @RequestBody com.englow3.exam.dto.request.SaveExamDraftRequest request) {
-        return ResponseEntity.ok(com.englow3.exam.dto.response.ExamDraftResponse
-                .from(examAttemptService.saveDraft(request.toCommand(id))));
+    public ResponseEntity<ExamDraftResponse> saveDraft(@PathVariable UUID id,
+            @Valid @RequestBody SaveExamDraftRequest request) {
+        return ResponseEntity.ok(ExamDraftResponse.from(examAttemptService.saveDraft(request.toCommand(id))));
     }
 
     @PostMapping("/{id}/submit")

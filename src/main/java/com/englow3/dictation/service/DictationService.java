@@ -6,7 +6,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.englow3.dictation.dto.command.SubmitDictationCommand;
-import com.englow3.dictation.dto.result.*;
+import com.englow3.dictation.dto.result.DictationLessonDetailResult;
+import com.englow3.dictation.dto.result.DictationLessonSummaryResult;
+import com.englow3.dictation.dto.result.DictationSubmissionResult;
 
 public interface DictationService {
     Page<DictationLessonSummaryResult> searchPublished(String topic, String title, Pageable pageable);

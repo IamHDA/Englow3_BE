@@ -1,7 +1,10 @@
 package com.englow3.assessment.dto.result;
 
 import java.util.UUID;
-import com.englow3.assessment.entity.*;
+
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTask;
+import com.englow3.assessment.entity.AssessmentTaskStatus;
 
 public record AssessmentTaskResult(UUID id, AssessmentSkill skill, String title, String taskType, String instructions,
         String rubricNotes, String sampleAnswer, int minimumWords, int timeLimitSeconds, AssessmentTaskStatus status,

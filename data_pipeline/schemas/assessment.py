@@ -66,11 +66,20 @@ class ShadowingSegment(StrictModel):
     text: str = Field(min_length=3)
     start_ms: int | None = Field(default=None, ge=0)
     end_ms: int | None = Field(default=None, ge=0)
+    # Nghĩa tiếng Việt của câu, hiện cho người học sau khi kiểm tra đáp án.
+    translation_vi: str | None = Field(default=None, min_length=1)
+
+
+# Chủ đề mà thư viện nghe chép lọc theo (DictationImport.TOPICS ở backend).
+ShadowingTopic = Literal["Daily Conversation", "Travel", "Work", "IELTS", "TOEIC", "News", "Academic English"]
 
 
 class ShadowingClip(StrictModel):
     """§Phase 8C — 20–30 đoạn 30–60 giây, có timestamp từng câu."""
     clip_id: str = Field(min_length=1)
+    # Tên tình huống ("Ở hiệu thuốc") - đặt bối cảnh, không lộ câu nào trong bài.
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    topic: ShadowingTopic | None = None
     cefr_level: CEFRLevel
     accent: Accent
     script: str = Field(min_length=20)

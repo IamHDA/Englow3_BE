@@ -20,6 +20,7 @@ import com.englow3.ai.entity.AiJobStatus;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.repository.AiJobRepository;
 import com.englow3.ai.service.AiJobWorkerQueue;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.time.StudyCalendar;
 
 import lombok.RequiredArgsConstructor;
@@ -57,8 +58,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
             return;
         }
         if (!hasDailyAllowance(requestedByUserId)) {
-            throw new com.englow3.shared.error.ConflictException("ASSESSMENT_DAILY_LIMIT",
-                    "Today's AI allowance has been reached");
+            throw new ConflictException("ASSESSMENT_DAILY_LIMIT", "Today's AI allowance has been reached");
         }
         enqueue(AiJobType.PRODUCTIVE_ASSESSMENT, "ASSESSMENT_ATTEMPT", attemptId, inputPayload, idempotencyKey,
                 promptVersion, requestedByUserId);

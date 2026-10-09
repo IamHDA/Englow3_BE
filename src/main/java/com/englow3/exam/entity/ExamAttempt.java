@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -150,7 +151,7 @@ public class ExamAttempt {
         if (mode == ExamAttemptMode.FULL) {
             return true;
         }
-        return partIds.equals(requestedParts) && java.util.Objects.equals(timeLimitSeconds, requestedLimitSeconds);
+        return partIds.equals(requestedParts) && Objects.equals(timeLimitSeconds, requestedLimitSeconds);
     }
 
     public void score(BigDecimal rawScore, int correctAnswerCount, Instant now) {

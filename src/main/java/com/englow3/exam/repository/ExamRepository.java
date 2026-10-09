@@ -12,9 +12,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.englow3.exam.entity.CertificateType;
+import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.SectionType;
+import com.englow3.exam.entity.TargetLevel;
 
 public interface ExamRepository extends JpaRepository<Exam, UUID> {
 
@@ -46,10 +50,9 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
               and (:title is null or lower(e.title) like lower(concat('%', cast(:title as String), '%')))
             """)
     Page<Exam> searchCatalogue(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
-            @Param("certificateType") com.englow3.exam.entity.CertificateType certificateType,
-            @Param("certificateVariant") com.englow3.exam.entity.CertificateVariant certificateVariant,
-            @Param("targetLevel") com.englow3.exam.entity.TargetLevel targetLevel, @Param("title") String title,
-            Pageable pageable);
+            @Param("certificateType") CertificateType certificateType,
+            @Param("certificateVariant") CertificateVariant certificateVariant,
+            @Param("targetLevel") TargetLevel targetLevel, @Param("title") String title, Pageable pageable);
 
     /**
      * The three figures {@code Exam.publish(...)} weighs, as three plain scalars. They were one projection record and
@@ -67,8 +70,8 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     @Query("""
             select count(s) from ExamSection s
              where s.examId = :examId
-               and s.sectionType in (com.englow3.exam.entity.SectionType.WRITING,
-                                     com.englow3.exam.entity.SectionType.SPEAKING)
+               and s.sectionType in (SectionType.WRITING,
+                                     SectionType.SPEAKING)
             """)
     long countProductiveSections(@Param("examId") UUID examId);
 
@@ -97,6 +100,22 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
      * broken one.
      */
     Optional<Exam> findFirstByExamTypeAndStatusOrderByPublishedAtDesc(ExamType examType, ExamStatus status);
+
+    /**
+     * Sections whose questions do not add up to the points the section declares, by order number. Scoring awards each
+     * question its own points, so a section that declares more than its questions carry can never be earned in full,
+     * and one that declares less lets the learner score above the paper's maximum.
+     */
+    @Query("""
+            select s.orderNo from ExamSection s
+             where s.examId = :examId
+               and s.maxRawScore <> (select coalesce(sum(q.maxRawScore), 0)
+                                       from Question q, QuestionSet qs, SectionPart sp
+                                      where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+                                        and sp.examSectionId = s.id)
+             order by s.orderNo
+            """)
+    List<Integer> findSectionOrderNosOffTheirScale(@Param("examId") UUID examId);
 
     @Query("select coalesce(sum(s.maxRawScore), 0) from ExamSection s where s.examId = :examId")
     BigDecimal sumSectionScores(@Param("examId") UUID examId);

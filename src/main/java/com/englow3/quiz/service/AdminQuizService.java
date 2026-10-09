@@ -5,15 +5,17 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.englow3.quiz.dto.command.*;
-import com.englow3.quiz.dto.result.*;
+import com.englow3.quiz.dto.command.CreateQuizCommand;
+import com.englow3.quiz.dto.command.SaveAuthoringCommand;
+import com.englow3.quiz.dto.result.AuthoringResult;
+import com.englow3.quiz.dto.result.ContentReviewResult;
+import com.englow3.quiz.dto.result.QuizSummaryResult;
 import com.englow3.quiz.entity.QuizStatus;
 
 public interface AdminQuizService {
-    com.englow3.quiz.dto.result.AuthoringResult authoringDetail(UUID id);
+    AuthoringResult authoringDetail(UUID id);
 
-    com.englow3.quiz.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.quiz.dto.command.SaveAuthoringCommand command);
+    AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 
     QuizSummaryResult create(CreateQuizCommand command);
 

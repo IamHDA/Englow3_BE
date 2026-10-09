@@ -186,10 +186,10 @@ def test_guarded_write_accepts_varied_content(tmp_path):
          "They negotiate contracts each spring.", "Họ đàm phán hợp đồng mỗi mùa xuân."),
     ]
     payload = {"flashcards": [
-        {"lemma": l, "pos": "noun", "sense_label_en": l,
+        {"lemma": lemma, "pos": "noun", "sense_label_en": lemma,
          "definition": {"en": de, "vi": dv},
          "examples": [{"sentence": se, "translation": sv}]}
-        for l, de, dv, se, sv in varied]}
+        for lemma, de, dv, se, sv in varied]}
 
     out = tmp_path / "ok.json"
     guarded_write_batch(payload, out, quiet=True)

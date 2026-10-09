@@ -2,8 +2,10 @@ package com.englow3.assessment.dto.response;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.englow3.assessment.entity.*;
+
 import com.englow3.assessment.dto.result.AssessmentAttemptResult;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
 
 public record AssessmentAttemptResponse(UUID id, UUID taskId, AssessmentSkill skill, AssessmentTaskResponse task,
         AssessmentAttemptStatus status, String answerText, String audioUrl, String recognizedText, String report,

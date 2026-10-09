@@ -19,11 +19,14 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.exam.dto.command.ArchiveExamCommand;
 import com.englow3.exam.dto.command.PublishExamCommand;
+import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
 import com.englow3.exam.dto.result.ExamResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.QuestionRepository;
+import com.englow3.exam.service.impl.ExamReviewServiceImpl;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
 
@@ -33,8 +36,8 @@ class ExamReviewServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final QuestionRepository questionRepo = mock(QuestionRepository.class);
-    private final ExamReviewService service = new com.englow3.exam.service.impl.ExamReviewServiceImpl(examRepo,
-            questionRepo, mock(UserDirectory.class), CLOCK);
+    private final ExamReviewService service = new ExamReviewServiceImpl(examRepo, questionRepo,
+            mock(UserDirectory.class), CLOCK);
 
     @BeforeEach
     void completeQuestions() {
@@ -61,9 +64,24 @@ class ExamReviewServiceTest {
         when(examRepo.countProductiveSections(exam.getId())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.publish(new PublishExamCommand(exam.getId())))
-                .isInstanceOf(com.englow3.shared.error.ConflictException.class)
-                .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
                 .isEqualTo("EXAM_PRODUCTIVE_SECTION");
+        assertThat(exam.getStatus()).isEqualTo(ExamStatus.DRAFT);
+    }
+
+    /** A section that declares 100 points over questions worth 20 would score every learner at a fifth of the truth. */
+    @Test
+    void refusesEveryStepOfPublicationWhileASectionIsOffItsScale() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.findSectionOrderNosOffTheirScale(exam.getId())).thenReturn(List.of(2));
+
+        assertThatThrownBy(() -> service.publish(new PublishExamCommand(exam.getId())))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("EXAM_SECTION_SCORE_MISMATCH");
+        assertThatThrownBy(() -> service.submitForReview(new SubmitExamForReviewCommand(exam.getId())))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("EXAM_SECTION_SCORE_MISMATCH");
         assertThat(exam.getStatus()).isEqualTo(ExamStatus.DRAFT);
     }
 

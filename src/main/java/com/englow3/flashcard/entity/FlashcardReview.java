@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.englow3.flashcard.helper.FlashcardSrs;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,9 +16,9 @@ import lombok.Getter;
 
 /**
  * Where SM-2 has got to for one learner and one card. The scheduling arithmetic is not here: it lives in
- * {@link com.englow3.flashcard.helper.FlashcardSrs}, which is a pure function of the current state and the rating. This
- * class holds the state and applies the answer it is handed, so the algorithm can be tested without a database and
- * changed without touching persistence.
+ * {@link FlashcardSrs}, which is a pure function of the current state and the rating. This class holds the state and
+ * applies the answer it is handed, so the algorithm can be tested without a database and changed without touching
+ * persistence.
  */
 @Entity
 @Table(name = "flashcard_reviews")

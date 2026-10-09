@@ -2,11 +2,17 @@ package com.englow3.exam.entity;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.englow3.shared.error.ConflictException;
-import jakarta.persistence.*;
-import lombok.Getter;
+
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+
+import com.englow3.shared.error.ConflictException;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Getter;
 
 @Entity
 @Table(name = "exam_attempt_drafts")
@@ -34,8 +40,9 @@ public class ExamAttemptDraft {
     }
 
     public void replace(long expected, String answers, Instant now) {
-        if (expected != revision)
+        if (expected != revision) {
             throw new ConflictException("EXAM_DRAFT_CHANGED", "Another tab changed the answers. Reload the draft");
+        }
         this.answers = answers;
         this.savedAt = now;
         revision++;

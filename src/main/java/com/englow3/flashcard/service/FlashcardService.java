@@ -7,7 +7,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
-import com.englow3.flashcard.dto.result.*;
+import com.englow3.flashcard.dto.result.FlashcardResult;
+import com.englow3.flashcard.dto.result.FlashcardReviewResult;
+import com.englow3.flashcard.dto.result.FlashcardSetDetailResult;
+import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
 
 public interface FlashcardService {
     Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, Pageable pageable);

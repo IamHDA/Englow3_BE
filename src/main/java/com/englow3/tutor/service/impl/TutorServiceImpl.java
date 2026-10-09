@@ -23,13 +23,14 @@ import com.englow3.tutor.entity.TutorMessageRole;
 import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
+import com.englow3.tutor.service.TutorPrompt;
+import com.englow3.tutor.service.TutorService;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
-import com.englow3.tutor.service.*;
 
 /**
  * The tutor conversation. Asking is synchronous, answering is not: the question is stored and queued, and the screen

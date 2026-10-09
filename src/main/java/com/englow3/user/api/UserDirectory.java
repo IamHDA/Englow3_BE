@@ -1,11 +1,13 @@
 package com.englow3.user.api;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 
 public interface UserDirectory {
     UUID requireCurrentUserId();
 
-    default java.util.Map<UUID, String> displayNames(java.util.Collection<UUID> ids) {
-        return java.util.Map.of();
+    default Map<UUID, String> displayNames(Collection<UUID> ids) {
+        return Map.of();
     }
 }

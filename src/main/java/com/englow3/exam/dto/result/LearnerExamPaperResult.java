@@ -10,6 +10,9 @@ import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionOption;
+import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.entity.SectionType;
@@ -51,7 +54,7 @@ public record LearnerExamPaperResult(UUID id, String title, String description, 
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
             String audioUrl, String imageUrl, List<QuestionResult> questions) {
 
-        public static QuestionSetResult of(com.englow3.exam.entity.QuestionSet set, String audioUrl, String imageUrl,
+        public static QuestionSetResult of(QuestionSet set, String audioUrl, String imageUrl,
                 List<QuestionResult> questions) {
             return new QuestionSetResult(set.getId(), set.getTitle(), set.getInstruction(), set.getOrderNo(),
                     set.getContent(), audioUrl, imageUrl, questions);
@@ -62,7 +65,7 @@ public record LearnerExamPaperResult(UUID id, String title, String description, 
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore,
             List<QuestionOptionResult> options) {
 
-        public static QuestionResult of(com.englow3.exam.entity.Question question, List<QuestionOptionResult> options) {
+        public static QuestionResult of(Question question, List<QuestionOptionResult> options) {
             return new QuestionResult(question.getId(), question.getQuestionType(), question.getContent(),
                     question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
                     question.getOrderNo(), question.getMaxRawScore(), options);
@@ -71,7 +74,7 @@ public record LearnerExamPaperResult(UUID id, String title, String description, 
 
     public record QuestionOptionResult(UUID id, String content, int orderNo) {
 
-        public static QuestionOptionResult of(com.englow3.exam.entity.QuestionOption option) {
+        public static QuestionOptionResult of(QuestionOption option) {
             return new QuestionOptionResult(option.getId(), option.getContent(), option.getOrderNo());
         }
     }

@@ -2,16 +2,18 @@ package com.englow3.quiz.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.englow3.quiz.dto.command.AddQuizQuestionsCommand;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewOption;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewPair;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewQuestion;
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand;
 import com.englow3.quiz.dto.result.QuizSummaryResult;
 import com.englow3.quiz.entity.Quiz;
 import com.englow3.quiz.entity.QuizQuestion;
@@ -229,10 +231,8 @@ public class QuizQuestionAuthoringServiceImpl implements QuizQuestionAuthoringSe
 
     /** Compared the way the grader compares: case and surrounding space do not matter. */
     private static Map<String, Long> counts(List<String> words) {
-        return words.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        word -> word.trim().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT),
-                        java.util.stream.Collectors.counting()));
+        return words.stream().collect(Collectors.groupingBy(
+                word -> word.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT), Collectors.counting()));
     }
 
     private Quiz requireQuiz(UUID quizId) {

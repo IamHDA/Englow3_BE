@@ -18,15 +18,17 @@ public final class AssessmentEvidence {
                 if (!quote.isMissingNode() && !quote.isNull()
                         && (!quote.isTextual() || quote.asText().isBlank() || quote.asText().length() > 500
                                 || skill != AssessmentSkill.WRITING || answer == null
-                                || !answer.contains(quote.asText())))
+                                || !answer.contains(quote.asText()))) {
                     throw invalid();
+                }
                 JsonNode start = c.path("audioStart"), end = c.path("audioEnd");
                 if ((!start.isMissingNode() && !start.isNull()) || (!end.isMissingNode() && !end.isNull())) {
                     // Learner recordings are PCM16 mono WAV at 16 kHz, encoded by the recording flow.
                     double maximum = wavBytes == null ? 0 : Math.max(0, (wavBytes - 44) / 32000.0);
                     if (skill != AssessmentSkill.SPEAKING || !start.isNumber() || !end.isNumber()
-                            || start.asDouble() < 0 || end.asDouble() <= start.asDouble() || end.asDouble() > maximum)
+                            || start.asDouble() < 0 || end.asDouble() <= start.asDouble() || end.asDouble() > maximum) {
                         throw invalid();
+                    }
                 }
             }
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {

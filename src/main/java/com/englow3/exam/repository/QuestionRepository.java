@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SkillType;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
@@ -61,7 +62,7 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
             and (
                 (select count(o) from QuestionOption o where o.questionId = q.id) < 2
                 or (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) = 0
-                or (q.questionType = com.englow3.exam.entity.QuestionType.SINGLE_CHOICE
+                or (q.questionType = QuestionType.SINGLE_CHOICE
                     and (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) > 1)
             )
             order by q.orderNo

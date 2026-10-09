@@ -1,9 +1,16 @@
 package com.englow3.assessment.service;
 
 import java.util.UUID;
-import com.englow3.assessment.dto.result.*;
-import com.englow3.assessment.entity.*;
-import org.springframework.data.domain.*;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import com.englow3.assessment.dto.result.AssessmentAttemptResult;
+import com.englow3.assessment.dto.result.AssessmentCapabilities;
+import com.englow3.assessment.dto.result.AssessmentTaskResult;
+import com.englow3.assessment.dto.result.AssessmentUploadResult;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
 
 public interface AssessmentService {
     AssessmentCapabilities capabilities();

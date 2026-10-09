@@ -3,6 +3,7 @@ package com.englow3.quiz.entity;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.englow3.quiz.dto.command.CreateQuizCommand;
 import com.englow3.shared.error.ConflictException;
 
 import jakarta.persistence.Column;
@@ -158,7 +159,7 @@ public class Quiz {
         }
     }
 
-    public void updateDraft(com.englow3.quiz.dto.command.CreateQuizCommand source, long expectedVersion, Instant now) {
+    public void updateDraft(CreateQuizCommand source, long expectedVersion, Instant now) {
         if ((status != QuizStatus.DRAFT && status != QuizStatus.REJECTED) || publishedAt != null) {
             throw new ConflictException("CONTENT_NOT_EDITABLE",
                     "Only an unpublished draft or rejected item can be edited");

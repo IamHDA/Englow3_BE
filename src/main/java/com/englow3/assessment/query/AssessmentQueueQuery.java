@@ -1,15 +1,22 @@
 package com.englow3.assessment.query;
 
-import java.util.UUID;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import com.englow3.assessment.entity.AssessmentSkill;
-import com.englow3.assessment.entity.AssessmentAttemptStatus;
-import com.englow3.assessment.dto.result.AssessmentSubmissionSummary;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-import org.springframework.data.domain.*;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Component;
+
+import com.englow3.assessment.dto.result.AssessmentSubmissionSummary;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
+
+import lombok.RequiredArgsConstructor;
 
 /** Declared read-only reporting join to user identity; assessment writes only its own tables. */
 @Component
@@ -20,7 +27,7 @@ public class AssessmentQueueQuery {
     public Page<AssessmentSubmissionSummary> search(UUID author, AssessmentAttemptStatus status, AssessmentSkill skill,
             String term, boolean oldest, Pageable requested) {
         Pageable page = PageRequest.of(requested.getPageNumber(), Math.min(requested.getPageSize(), 50));
-        String search = term == null ? "" : term.strip().toLowerCase(java.util.Locale.ROOT);
+        String search = term == null ? "" : term.strip().toLowerCase(Locale.ROOT);
         Map<String, Object> params = Map.of("allAuthors", author == null, "author",
                 author == null ? new UUID(0, 0) : author, "status", status == null ? "" : status.name(), "skill",
                 skill == null ? "" : skill.name(), "term",

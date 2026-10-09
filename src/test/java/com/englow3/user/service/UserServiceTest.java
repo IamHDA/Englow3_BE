@@ -31,6 +31,7 @@ import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.Gender;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.impl.UserServiceImpl;
 
 class UserServiceTest {
     private static final String BUCKET = "images";
@@ -41,8 +42,7 @@ class UserServiceTest {
 
     private final ObjectStorageClient objectStorageClient = mock(ObjectStorageClient.class);
 
-    private final UserService service = new com.englow3.user.service.impl.UserServiceImpl(userRepo, currentUser,
-            objectStorageClient, BUCKET);
+    private final UserService service = new UserServiceImpl(userRepo, currentUser, objectStorageClient, BUCKET);
 
     private final UUID userId = UUID.randomUUID();
 

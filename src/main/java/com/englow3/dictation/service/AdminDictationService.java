@@ -5,15 +5,19 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.englow3.dictation.dto.command.*;
-import com.englow3.dictation.dto.result.*;
+import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
+import com.englow3.dictation.dto.command.CreateDictationLessonCommand;
+import com.englow3.dictation.dto.command.SaveAuthoringCommand;
+import com.englow3.dictation.dto.result.AuthoringResult;
+import com.englow3.dictation.dto.result.ContentReviewResult;
+import com.englow3.dictation.dto.result.DictationImportResult;
+import com.englow3.dictation.dto.result.DictationLessonSummaryResult;
 import com.englow3.dictation.entity.DictationLessonStatus;
 
 public interface AdminDictationService {
-    com.englow3.dictation.dto.result.AuthoringResult authoringDetail(UUID id);
+    AuthoringResult authoringDetail(UUID id);
 
-    com.englow3.dictation.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.dictation.dto.command.SaveAuthoringCommand command);
+    AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 
     DictationLessonSummaryResult create(CreateDictationLessonCommand command);
 

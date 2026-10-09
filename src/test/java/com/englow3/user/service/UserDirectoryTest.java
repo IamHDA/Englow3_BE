@@ -19,14 +19,14 @@ import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.api.UserDirectory;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.impl.UserDirectoryImpl;
 
 class UserDirectoryTest {
     private final UserRepository userRepo = mock(UserRepository.class);
 
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final UserDirectory userDirectory = new com.englow3.user.service.impl.UserDirectoryImpl(userRepo,
-            currentUser);
+    private final UserDirectory userDirectory = new UserDirectoryImpl(userRepo, currentUser);
 
     private final UUID authProviderId = UUID.randomUUID();
 

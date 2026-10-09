@@ -1,5 +1,6 @@
 package com.englow3.exam.repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -13,13 +14,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.exam.entity.ExamAttempt;
+import com.englow3.exam.entity.ExamAttemptMode;
 import com.englow3.exam.entity.ExamAttemptStatus;
 
 import jakarta.persistence.LockModeType;
 
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
-    List<ExamAttempt> findTop50ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(ExamAttemptStatus status,
-            java.time.Instant now);
+    List<ExamAttempt> findTop50ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(ExamAttemptStatus status, Instant now);
 
     Optional<ExamAttempt> findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(UUID userId, UUID examId,
             ExamAttemptStatus status);
@@ -32,8 +33,8 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
             select a.examId, max(a.scorePercentage), count(a)
               from ExamAttempt a
              where a.userId = :userId and a.examId in :examIds
-               and a.status = com.englow3.exam.entity.ExamAttemptStatus.SCORED
-               and a.mode = com.englow3.exam.entity.ExamAttemptMode.FULL
+               and a.status = ExamAttemptStatus.SCORED
+               and a.mode = ExamAttemptMode.FULL
              group by a.examId
             """)
     List<Object[]> findBestScoreByExam(@Param("userId") UUID userId, @Param("examIds") Collection<UUID> examIds);
@@ -42,7 +43,7 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
     @Query("""
             select a.examId from ExamAttempt a
              where a.userId = :userId and a.examId in :examIds
-               and a.status = com.englow3.exam.entity.ExamAttemptStatus.IN_PROGRESS
+               and a.status = ExamAttemptStatus.IN_PROGRESS
             """)
     List<UUID> findExamIdsWithLiveAttempt(@Param("userId") UUID userId, @Param("examIds") Collection<UUID> examIds);
 

@@ -1,11 +1,17 @@
 package com.englow3.assessment.service;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import java.time.Instant;
-import java.util.*;
-import org.junit.jupiter.api.*;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -13,15 +19,19 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import com.englow3.assessment.dto.command.AssessmentTaskCommand;
-import com.englow3.assessment.entity.*;
-import com.englow3.shared.error.*;
-import com.englow3.support.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.englow3.shared.storage.ObjectStorageClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+
+import com.englow3.assessment.dto.command.AssessmentTaskCommand;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.progress.query.DailyPathQuery;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.ForbiddenException;
+import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.support.LearnerFixture;
+import com.englow3.support.PostgresIntegrationTest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -31,7 +41,7 @@ class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     AssessmentNotificationService notifications;
     @Autowired
-    com.englow3.progress.query.DailyPathQuery progress;
+    DailyPathQuery progress;
     @Autowired
     JdbcClient jdbc;
     @MockitoBean
@@ -54,10 +64,12 @@ class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
             jdbc.sql("delete from assessment_reviews where attempt_id=:id").param("id", attempt).update();
             jdbc.sql("delete from assessment_attempts where id=:id").param("id", attempt).update();
         }
-        if (task != null)
+        if (task != null) {
             jdbc.sql("delete from assessment_tasks where id=:id").param("id", task).update();
-        for (UUID id : List.of(staff, admin, user, other))
+        }
+        for (UUID id : List.of(staff, admin, user, other)) {
             jdbc.sql("delete from users where id=:id").param("id", id).update();
+        }
     }
 
     @ParameterizedTest
@@ -106,15 +118,19 @@ class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
         String report = """
                 {"criteria":[{"key":"TASK_RESPONSE","score":6,"feedback":"An argument is present"},{"key":"COHERENCE_COHESION","score":6,"feedback":"Ideas connect"},{"key":"LEXICAL_RESOURCE","score":6,"feedback":"Vocabulary is clear"},{"key":"GRAMMATICAL_RANGE","score":6,"feedback":"Sentences are grammatical"}],"summary":"Practice more examples","strengths":["Clear ideas"],"improvements":["Expand support"]}
                 """;
-        if (skill == AssessmentSkill.SPEAKING)
+        if (skill == AssessmentSkill.SPEAKING) {
             report = report.replace("TASK_RESPONSE", "FLUENCY_COHERENCE").replace("COHERENCE_COHESION",
                     "PRONUNCIATION");
+        }
         var graded = authoring.grade(attempt, report, "Reviewed the full response",
                 skill == AssessmentSkill.SPEAKING ? "Transcribed response" : null);
         assertThat(graded.source()).isEqualTo("HUMAN");
         signIn(user, "LEARNER");
         assertThat(learner.attempt(attempt).task().sampleAnswer()).isEqualTo("Sample answer");
         assertThat(new ObjectMapper().readTree(learner.attempt(attempt).report()).path("overall").asInt()).isEqualTo(6);
+        // The learner reads the overall band and the feedback, but not the band of each criterion.
+        assertThat(learner.attempt(attempt).report()).doesNotContain("\"score\"").contains("An argument is present");
+        assertThat(graded.report()).contains("\"score\"");
         assertThat(jdbc.sql("select count(*) from assessment_reviews where attempt_id=:id").param("id", attempt)
                 .query(Integer.class).single()).isEqualTo(1);
         var before = progress.activityTotals(user, Instant.EPOCH).productiveAttempts();

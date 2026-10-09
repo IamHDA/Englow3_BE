@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.speaking.entity.SpeakingAttempt;
+import com.englow3.speaking.entity.SpeakingAttemptStatus;
 
 public interface SpeakingAttemptRepository extends JpaRepository<SpeakingAttempt, UUID> {
 
@@ -28,7 +30,7 @@ public interface SpeakingAttemptRepository extends JpaRepository<SpeakingAttempt
     @Query("""
             select a.speakingPromptId, max(a.pronunciationPercent) from SpeakingAttempt a
             where a.userId = :userId and a.speakingPromptId in :promptIds
-              and a.status = com.englow3.speaking.entity.SpeakingAttemptStatus.ASSESSED
+              and a.status = SpeakingAttemptStatus.ASSESSED
             group by a.speakingPromptId
             """)
     List<Object[]> bestScoresRaw(@Param("userId") UUID userId, @Param("promptIds") Collection<UUID> promptIds);
@@ -38,7 +40,7 @@ public interface SpeakingAttemptRepository extends JpaRepository<SpeakingAttempt
             return Map.of();
         }
         return bestScoresRaw(userId, promptIds).stream().filter(row -> row[1] != null)
-                .collect(java.util.stream.Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));
+                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));
     }
 
 }

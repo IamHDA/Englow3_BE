@@ -3,11 +3,13 @@ package com.englow3.speaking.entity;
 import java.time.Instant;
 import java.util.UUID;
 
-import com.englow3.shared.error.BadRequestException;
-import com.englow3.shared.error.ConflictException;
-
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.speaking.dto.command.CreateSpeakingPromptCommand;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -157,8 +159,7 @@ public class SpeakingPrompt {
         this.reviewNote = note.strip();
     }
 
-    public void updateDraft(com.englow3.speaking.dto.command.CreateSpeakingPromptCommand source, long expectedVersion,
-            Instant now, String tipsJson) {
+    public void updateDraft(CreateSpeakingPromptCommand source, long expectedVersion, Instant now, String tipsJson) {
         if ((status != SpeakingPromptStatus.DRAFT && status != SpeakingPromptStatus.REJECTED) || publishedAt != null) {
             throw new ConflictException("CONTENT_NOT_EDITABLE",
                     "Only an unpublished draft or rejected item can be edited");

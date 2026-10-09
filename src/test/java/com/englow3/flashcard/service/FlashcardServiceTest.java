@@ -9,11 +9,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Optional;
-import java.util.List;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +22,14 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
 import com.englow3.flashcard.entity.Flashcard;
+import com.englow3.flashcard.entity.FlashcardReviewLog;
 import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.ReviewRating;
 import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardReviewLogRepository;
 import com.englow3.flashcard.repository.FlashcardReviewRepository;
 import com.englow3.flashcard.repository.FlashcardSetRepository;
+import com.englow3.flashcard.service.impl.FlashcardServiceImpl;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
@@ -46,9 +49,8 @@ class FlashcardServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
-    private final FlashcardService service = new com.englow3.flashcard.service.impl.FlashcardServiceImpl(setRepo,
-            cardRepo, reviewRepo, reviewLogRepo, userDirectory, presignedUrls, CLOCK, "learning",
-            java.time.Duration.ofHours(3));
+    private final FlashcardService service = new FlashcardServiceImpl(setRepo, cardRepo, reviewRepo, reviewLogRepo,
+            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();
     private Flashcard card;
@@ -69,7 +71,7 @@ class FlashcardServiceTest {
     private void setIsPublished(boolean published) {
         FlashcardSet set = FlashcardSet.draft("core-500", "Core 500", "", "general", "B1", UUID.randomUUID());
         if (published) {
-            set.publish(1, java.time.Instant.now());
+            set.publish(1, Instant.now());
         }
         when(setRepo.findById(card.getFlashcardSetId())).thenReturn(Optional.of(set));
     }
@@ -91,9 +93,9 @@ class FlashcardServiceTest {
         when(reviewRepo.findDueCardsInSet(eq(userId), eq(card.getFlashcardSetId()), any(), any()))
                 .thenReturn(List.of());
         when(cardRepo.findUnseenInSet(eq(userId), eq(card.getFlashcardSetId()), any())).thenReturn(List.of(card));
-        when(presignedUrls.resolve("learning", "audio/us.mp3", java.time.Duration.ofHours(3)))
+        when(presignedUrls.resolve("learning", "audio/us.mp3", Duration.ofHours(3)))
                 .thenReturn("https://storage.example/us");
-        when(presignedUrls.resolve("learning", "audio/uk.mp3", java.time.Duration.ofHours(3)))
+        when(presignedUrls.resolve("learning", "audio/uk.mp3", Duration.ofHours(3)))
                 .thenReturn("https://storage.example/uk");
 
         var result = service.studyQueue(card.getFlashcardSetId(), 1).get(0);
@@ -149,7 +151,7 @@ class FlashcardServiceTest {
 
         service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.GOOD, -30));
 
-        var saved = org.mockito.ArgumentCaptor.forClass(com.englow3.flashcard.entity.FlashcardReviewLog.class);
+        var saved = org.mockito.ArgumentCaptor.forClass(FlashcardReviewLog.class);
         verify(reviewLogRepo).save(saved.capture());
         assertThat(saved.getValue().getTimeSpentSeconds()).isZero();
     }

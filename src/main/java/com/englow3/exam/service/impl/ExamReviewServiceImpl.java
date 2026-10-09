@@ -1,6 +1,7 @@
 package com.englow3.exam.service.impl;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     public ExamResult publish(PublishExamCommand command) {
         Exam exam = requireExam(command.examId());
         requireChoiceOnly(exam);
+        requireQuestionsToMatchSections(exam);
         exam.publish(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), questionRepo.findIncompleteQuestionOrderNos(exam.getId()),
                 clock.instant());
@@ -46,6 +48,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     public ExamResult submitForReview(SubmitExamForReviewCommand command) {
         Exam exam = requireExam(command.examId());
         requireChoiceOnly(exam);
+        requireQuestionsToMatchSections(exam);
         exam.submitForReview(examRepo.countSections(exam.getId()), examRepo.countQuestions(exam.getId()),
                 examRepo.sumSectionScores(exam.getId()), questionRepo.findIncompleteQuestionOrderNos(exam.getId()),
                 clock.instant());
@@ -56,6 +59,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     public ExamResult approve(ApproveExamCommand command) {
         Exam exam = requireExam(command.examId());
         requireChoiceOnly(exam);
+        requireQuestionsToMatchSections(exam);
         exam.approve(userDirectory.requireCurrentUserId(), examRepo.countSections(exam.getId()),
                 examRepo.countQuestions(exam.getId()), examRepo.sumSectionScores(exam.getId()),
                 questionRepo.findIncompleteQuestionOrderNos(exam.getId()), clock.instant());
@@ -70,6 +74,20 @@ public class ExamReviewServiceImpl implements ExamReviewService {
         if (examRepo.countProductiveSections(exam.getId()) > 0) {
             throw new ConflictException("EXAM_PRODUCTIVE_SECTION",
                     "Writing and Speaking sections cannot be published in a mock exam; use Writing & Speaking tasks");
+        }
+    }
+
+    /**
+     * The paper's own totals can agree with each other while the questions underneath do not: a learner's percentage is
+     * points earned over the points the paper declares, so questions that carry less (or more) than their section
+     * declares make every result wrong. Checked from the questions up, at the same moments as the other publication
+     * rules.
+     */
+    private void requireQuestionsToMatchSections(Exam exam) {
+        List<Integer> off = examRepo.findSectionOrderNosOffTheirScale(exam.getId());
+        if (!off.isEmpty()) {
+            throw new ConflictException("EXAM_SECTION_SCORE_MISMATCH",
+                    "The questions of section(s) %s do not add up to the points those sections declare".formatted(off));
         }
     }
 

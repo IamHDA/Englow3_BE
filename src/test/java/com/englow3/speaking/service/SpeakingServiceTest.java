@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
+import com.englow3.speaking.service.impl.SpeakingServiceImpl;
 import com.englow3.user.api.UserDirectory;
 
 class SpeakingServiceTest {
@@ -22,8 +23,7 @@ class SpeakingServiceTest {
     private final SpeakingPromptRepository promptRepo = mock(SpeakingPromptRepository.class);
     private final SpeakingAttemptRepository attemptRepo = mock(SpeakingAttemptRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
-    private final SpeakingService service = new com.englow3.speaking.service.impl.SpeakingServiceImpl(promptRepo,
-            attemptRepo, userDirectory);
+    private final SpeakingService service = new SpeakingServiceImpl(promptRepo, attemptRepo, userDirectory);
 
     @Test
     void returnsPublishedPromptDetailWithTheLearnersBestScore() {

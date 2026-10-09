@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -109,7 +110,7 @@ public class DailyPathServiceImpl implements DailyPathService {
         // as "you did this today, and this is how it went".
         quizzesToday.stream()
                 .collect(Collectors.toMap(DailyPathQuery.AttemptedQuiz::quizId, Function.identity(),
-                        (left, right) -> score(left) >= score(right) ? left : right, java.util.LinkedHashMap::new))
+                        (left, right) -> score(left) >= score(right) ? left : right, LinkedHashMap::new))
                 .values().forEach(quiz -> finished.add(new DailyPlan.Finished(DailyTaskKind.QUIZ, quiz.quizId(),
                         quiz.title(), 1, quiz.scorePercent())));
 
@@ -124,10 +125,11 @@ public class DailyPathServiceImpl implements DailyPathService {
 
         productiveTasks.forEach(task -> {
             var kind = task.skill().equals("WRITING") ? DailyTaskKind.WRITING : DailyTaskKind.SPEAKING;
-            if (task.submittedToday())
+            if (task.submittedToday()) {
                 finished.add(new DailyPlan.Finished(kind, task.id(), task.title(), 1, null));
-            else if (task.unsubmitted())
+            } else if (task.unsubmitted()) {
                 candidates.add(new DailyPlan.Candidate(kind, task.id(), task.title(), 1, 0, null));
+            }
         });
         return DailyPlan.build(finished, candidates);
     }

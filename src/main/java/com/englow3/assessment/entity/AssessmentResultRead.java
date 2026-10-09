@@ -2,7 +2,10 @@ package com.englow3.assessment.entity;
 
 import java.time.Instant;
 import java.util.UUID;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.Getter;
 
 @Entity

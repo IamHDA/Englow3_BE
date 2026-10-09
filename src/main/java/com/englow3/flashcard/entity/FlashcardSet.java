@@ -3,6 +3,7 @@ package com.englow3.flashcard.entity;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.englow3.flashcard.dto.command.CreateFlashcardSetCommand;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.ForbiddenException;
 
@@ -166,8 +167,7 @@ public class FlashcardSet {
         }
     }
 
-    public void updateDraft(com.englow3.flashcard.dto.command.CreateFlashcardSetCommand source, long expectedVersion,
-            Instant now) {
+    public void updateDraft(CreateFlashcardSetCommand source, long expectedVersion, Instant now) {
         if ((status != FlashcardSetStatus.DRAFT && status != FlashcardSetStatus.REJECTED) || publishedAt != null) {
             throw new ConflictException("CONTENT_NOT_EDITABLE",
                     "Only an unpublished draft or rejected item can be edited");

@@ -7,15 +7,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
-import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.service.AiJobWorkerQueue;
 
 /**
@@ -35,7 +38,7 @@ class AiJobWorkerTest {
         return new AiJobWorker(queue, List.of(handlers), 5, Duration.ofMinutes(5));
     }
 
-    private static AiJobHandler handlerThat(java.util.function.Function<UUID, AiJobHandler.Outcome> behaviour) {
+    private static AiJobHandler handlerThat(Function<UUID, AiJobHandler.Outcome> behaviour) {
         return new AiJobHandler() {
             @Override
             public String handles() {
@@ -144,10 +147,10 @@ class AiJobWorkerTest {
     /** A handler that only records calls to onGaveUp, so the tests can say who was told what. */
     private static final class Recording implements AiJobHandler {
 
-        final java.util.List<String> gaveUp = new java.util.ArrayList<>();
-        private final java.util.function.Function<UUID, Outcome> behaviour;
+        final List<String> gaveUp = new ArrayList<>();
+        private final Function<UUID, Outcome> behaviour;
 
-        Recording(java.util.function.Function<UUID, Outcome> behaviour) {
+        Recording(Function<UUID, Outcome> behaviour) {
             this.behaviour = behaviour;
         }
 
@@ -221,11 +224,11 @@ class AiJobWorkerTest {
     @Test
     void tellsTheHandlerWhenAReclaimUsedTheLastRetry() {
         AiJob finished = job();
-        finished.claim(java.time.Instant.now());
+        finished.claim(Instant.now());
         for (int i = 0; i < 3; i++) {
-            finished.fail("X", "x", true, java.time.Instant.now());
+            finished.fail("X", "x", true, Instant.now());
             if (!finished.finished()) {
-                finished.claim(java.time.Instant.now());
+                finished.claim(Instant.now());
             }
         }
         AiJob stillGoing = job();

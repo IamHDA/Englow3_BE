@@ -58,6 +58,12 @@ spring:
           audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
 
 springdoc:
+  # Off unless asked for: the spec maps every endpoint and DTO, which a public deployment has no reason to publish.
+  # Local development and BFF type generation set API_DOCS_ENABLED=true.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
   use-fqn: true
   default-produces-media-type: application/json
   default-flat-param-object: true
@@ -131,6 +137,8 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      # Without a role, "authorized" means any signed-in learner, who would see database and disk details.
+      roles: ADMIN
       probes:
         enabled: true
   endpoints:

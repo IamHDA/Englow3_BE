@@ -1,10 +1,15 @@
 package com.englow3.flashcard.service.impl;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.flashcard.dto.command.AddFlashcardsCommand;
 import com.englow3.flashcard.dto.command.CreateFlashcardSetCommand;
+import com.englow3.flashcard.dto.command.SaveAuthoringCommand;
+import com.englow3.flashcard.dto.result.AuthoringResult;
 import com.englow3.flashcard.dto.result.ContentReviewResult;
+import com.englow3.flashcard.dto.result.FlashcardImportResult;
 import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
 import com.englow3.flashcard.entity.Flashcard;
 import com.englow3.flashcard.entity.FlashcardSet;
@@ -22,12 +30,13 @@ import com.englow3.flashcard.helper.FlashcardImport;
 import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardSetRepository;
 import com.englow3.flashcard.service.AdminFlashcardService;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.flashcard.dto.result.FlashcardImportResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -45,7 +54,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final com.englow3.shared.storage.PresignedUrlResolver presignedUrls;
+    private final PresignedUrlResolver presignedUrls;
     @org.springframework.beans.factory.annotation.Value("${app.storage.learning-bucket}")
     private String learningBucket;
 
@@ -200,10 +209,9 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     }
 
     @Transactional(readOnly = true)
-    public com.englow3.flashcard.dto.result.AuthoringResult authoringDetail(UUID id) {
+    public AuthoringResult authoringDetail(UUID id) {
         var item = requireSet(id);
-        return new com.englow3.flashcard.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
-                item.getReview().getReviewNote(),
+        return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReview().getReviewNote(),
                 new CreateFlashcardSetCommand(item.getSlug(), item.getName(), item.getDescription(), item.getTopic(),
                         item.getTargetLevel()),
                 cardRepo.findByFlashcardSetIdOrderByOrderNo(id).stream()
@@ -215,24 +223,21 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
                 mediaUrls(id));
     }
 
-    private java.util.Map<String, String> mediaUrls(UUID id) {
+    private Map<String, String> mediaUrls(UUID id) {
         return cardRepo.findByFlashcardSetIdOrderByOrderNo(id).stream()
-                .flatMap(c -> java.util.stream.Stream.of(c.getAudioUsObjectKey(), c.getAudioUkObjectKey()))
-                .filter(java.util.Objects::nonNull).filter(k -> !k.isBlank()).distinct()
-                .collect(java.util.stream.Collectors.toMap(java.util.function.Function.identity(),
-                        key -> presignedUrls.resolve(learningBucket, key, java.time.Duration.ofHours(1))));
+                .flatMap(c -> Stream.of(c.getAudioUsObjectKey(), c.getAudioUkObjectKey())).filter(Objects::nonNull)
+                .filter(k -> !k.isBlank()).distinct().collect(Collectors.toMap(Function.identity(),
+                        key -> presignedUrls.resolve(learningBucket, key, Duration.ofHours(1))));
     }
 
     @Transactional
-    public com.englow3.flashcard.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.flashcard.dto.command.SaveAuthoringCommand command) {
+    public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
         UUID id = command.id();
         if (id == null) {
             id = createSet(command.metadata()).id();
         } else {
             if (command.version() == null) {
-                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
-                        "A version is required when editing");
+                throw new BadRequestException("CONTENT_VERSION_REQUIRED", "A version is required when editing");
             }
             var item = requireSet(id);
             if (setRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {

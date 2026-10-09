@@ -45,11 +45,13 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http.cors(Customizer.withDefaults()).csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        auth -> auth
-                                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info",
-                                        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                                .permitAll().anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
+                                "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll()
+                        // A second gate behind each admin controller's @PreAuthorize: a controller added under
+                        // /api/admin without one is closed to learners rather than open to every signed-in user.
+                        .requestMatchers("/api/admin/**").hasAnyRole("STAFF", "ADMIN").anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter()))
                         .authenticationEntryPoint((request, response, ex) -> writeError(objectMapper, response,
                                 HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "A valid access token is required"))

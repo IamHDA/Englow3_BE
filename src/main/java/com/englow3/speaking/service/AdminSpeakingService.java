@@ -6,14 +6,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.englow3.speaking.dto.command.CreateSpeakingPromptCommand;
+import com.englow3.speaking.dto.command.SaveAuthoringCommand;
+import com.englow3.speaking.dto.result.AuthoringResult;
 import com.englow3.speaking.dto.result.SpeakingPromptReviewResult;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 
 public interface AdminSpeakingService {
-    com.englow3.speaking.dto.result.AuthoringResult authoringDetail(UUID id);
+    AuthoringResult authoringDetail(UUID id);
 
-    com.englow3.speaking.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.speaking.dto.command.SaveAuthoringCommand command);
+    AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 
     SpeakingPromptReviewResult create(CreateSpeakingPromptCommand command);
 

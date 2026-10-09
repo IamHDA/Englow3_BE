@@ -1,20 +1,27 @@
 package com.englow3.dictation.service.impl;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
 import com.englow3.dictation.dto.command.AddDictationSentencesCommand.NewSentence;
+import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
 import com.englow3.dictation.dto.command.CreateDictationLessonCommand;
+import com.englow3.dictation.dto.command.SaveAuthoringCommand;
+import com.englow3.dictation.dto.result.AuthoringResult;
 import com.englow3.dictation.dto.result.ContentReviewResult;
+import com.englow3.dictation.dto.result.DictationImportResult;
 import com.englow3.dictation.dto.result.DictationLessonSummaryResult;
 import com.englow3.dictation.entity.DictationLesson;
 import com.englow3.dictation.entity.DictationLessonStatus;
@@ -24,12 +31,13 @@ import com.englow3.dictation.helper.DictationScorer;
 import com.englow3.dictation.repository.DictationLessonRepository;
 import com.englow3.dictation.repository.DictationSentenceRepository;
 import com.englow3.dictation.service.AdminDictationService;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
-import com.englow3.dictation.dto.result.DictationImportResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,7 +52,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     private final CurrentUser currentUser;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final com.englow3.shared.storage.PresignedUrlResolver presignedUrls;
+    private final PresignedUrlResolver presignedUrls;
     @org.springframework.beans.factory.annotation.Value("${app.storage.learning-bucket}")
     private String learningBucket;
 
@@ -122,14 +130,14 @@ public class AdminDictationServiceImpl implements AdminDictationService {
 
     private void store(DictationImport.Lesson lesson, UUID authorId) {
         DictationLesson saved = lessonRepo.save(
-                DictationLesson.draft(lesson.slug(), lesson.title(), "shadowing", lesson.targetLevel(), authorId));
+                DictationLesson.draft(lesson.slug(), lesson.title(), lesson.topic(), lesson.targetLevel(), authorId));
 
         List<DictationSentence> sentences = new ArrayList<>();
         int orderNo = 1;
         for (DictationImport.Segment segment : lesson.segments()) {
-            sentences.add(DictationSentence.of(saved.getId(), orderNo++, segment.text(), null, lesson.audioObjectKey(),
-                    lesson.durationSeconds(), DictationScorer.words(segment.text()).size(), null, null, null,
-                    segment.startMs(), segment.endMs()));
+            sentences.add(DictationSentence.of(saved.getId(), orderNo++, segment.text(), segment.translationVi(),
+                    lesson.audioObjectKey(), lesson.durationSeconds(), DictationScorer.words(segment.text()).size(),
+                    null, null, null, segment.startMs(), segment.endMs()));
         }
         sentenceRepo.saveAll(sentences);
     }
@@ -209,38 +217,34 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     }
 
     @Transactional(readOnly = true)
-    public com.englow3.dictation.dto.result.AuthoringResult authoringDetail(UUID id) {
+    public AuthoringResult authoringDetail(UUID id) {
         var item = requireLesson(id);
-        return new com.englow3.dictation.dto.result.AuthoringResult(id, item.getVersion(), item.getStatus().name(),
-                item.getReview().getReviewNote(),
+        return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReview().getReviewNote(),
                 new CreateDictationLessonCommand(item.getSlug(), item.getTitle(), item.getTopic(),
                         item.getTargetLevel()),
                 sentenceRepo.findByDictationLessonIdOrderByOrderNo(id).stream()
-                        .map(c -> new com.englow3.dictation.dto.command.SaveAuthoringCommand.Sentence(c.getText(),
-                                c.getTranslationVi(), c.getAudioObjectKey(), c.getAudioDurationSeconds(),
-                                c.getHintFirstLetters(), c.getHintRevealWord(), c.getHintPartialTranscript(),
-                                c.getAudioStartMs(), c.getAudioEndMs()))
+                        .map(c -> new SaveAuthoringCommand.Sentence(c.getText(), c.getTranslationVi(),
+                                c.getAudioObjectKey(), c.getAudioDurationSeconds(), c.getHintFirstLetters(),
+                                c.getHintRevealWord(), c.getHintPartialTranscript(), c.getAudioStartMs(),
+                                c.getAudioEndMs()))
                         .toList(),
                 mediaUrls(id));
     }
 
-    private java.util.Map<String, String> mediaUrls(UUID id) {
+    private Map<String, String> mediaUrls(UUID id) {
         return sentenceRepo.findByDictationLessonIdOrderByOrderNo(id).stream().map(c -> c.getAudioObjectKey())
-                .filter(java.util.Objects::nonNull).filter(k -> !k.isBlank()).distinct()
-                .collect(java.util.stream.Collectors.toMap(java.util.function.Function.identity(),
-                        key -> presignedUrls.resolve(learningBucket, key, java.time.Duration.ofHours(1))));
+                .filter(Objects::nonNull).filter(k -> !k.isBlank()).distinct().collect(Collectors.toMap(
+                        Function.identity(), key -> presignedUrls.resolve(learningBucket, key, Duration.ofHours(1))));
     }
 
     @Transactional
-    public com.englow3.dictation.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.dictation.dto.command.SaveAuthoringCommand command) {
+    public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
         UUID id = command.id();
         if (id == null) {
             id = create(command.metadata()).id();
         } else {
             if (command.version() == null) {
-                throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
-                        "A version is required when editing");
+                throw new BadRequestException("CONTENT_VERSION_REQUIRED", "A version is required when editing");
             }
             var item = requireLesson(id);
             if (lessonRepo.existsBySlugAndIdNot(command.metadata().slug(), id)) {
@@ -251,7 +255,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
         }
         sentenceRepo.deleteAllInBatch(sentenceRepo.findByDictationLessonIdOrderByOrderNo(id));
         int order = 1;
-        var rows = new java.util.ArrayList<DictationSentence>();
+        var rows = new ArrayList<DictationSentence>();
         for (var c : command.sentences()) {
             rows.add(DictationSentence.of(id, order++, c.text(), c.translationVi(), c.audioObjectKey(),
                     c.audioDurationSeconds(), DictationScorer.words(c.text()).size(), c.hintFirstLetters(),

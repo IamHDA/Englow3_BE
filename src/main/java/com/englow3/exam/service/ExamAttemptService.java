@@ -5,14 +5,17 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.englow3.exam.dto.command.SaveExamDraftCommand;
+import com.englow3.exam.dto.command.StartExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.result.ExamAttemptResult;
+import com.englow3.exam.dto.result.ExamDraftResult;
 import com.englow3.exam.dto.result.LearnerExamPaperResult;
 
 public interface ExamAttemptService {
-    com.englow3.exam.dto.result.ExamDraftResult draft(UUID id);
+    ExamDraftResult draft(UUID id);
 
-    com.englow3.exam.dto.result.ExamDraftResult saveDraft(com.englow3.exam.dto.command.SaveExamDraftCommand command);
+    ExamDraftResult saveDraft(SaveExamDraftCommand command);
 
     void finalizeExpired(UUID id);
 
@@ -20,7 +23,7 @@ public interface ExamAttemptService {
 
     ExamAttemptResult start(UUID examId);
 
-    ExamAttemptResult start(com.englow3.exam.dto.command.StartExamAttemptCommand command);
+    ExamAttemptResult start(StartExamAttemptCommand command);
 
     LearnerExamPaperResult paperForAttempt(UUID attemptId);
 

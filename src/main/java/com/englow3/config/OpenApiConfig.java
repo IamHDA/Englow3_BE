@@ -2,6 +2,7 @@ package com.englow3.config;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -20,11 +21,11 @@ import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
-import io.swagger.v3.oas.models.Operation;
 
 /**
  * The spec is generated from the controllers themselves - this declares only what reflection cannot see: the bearer
@@ -54,7 +55,7 @@ class OpenApiConfig {
     OpenApiCustomizer requiredResponseProperties() {
         return openApi -> {
             Map<String, Schema> schemas = openApi.getComponents().getSchemas();
-            Set<Schema> responseSchemas = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<Schema> responseSchemas = Collections.newSetFromMap(new IdentityHashMap<>());
             openApi.getPaths().values().stream().flatMap(pathItem -> pathItem.readOperations().stream())
                     .flatMap(operation -> operation.getResponses().entrySet().stream())
                     .filter(entry -> entry.getKey().startsWith("2")).map(Map.Entry::getValue)

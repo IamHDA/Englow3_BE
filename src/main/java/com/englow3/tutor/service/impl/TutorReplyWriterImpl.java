@@ -8,9 +8,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorMessageRepository;
+import com.englow3.tutor.service.TutorPrompt;
+import com.englow3.tutor.service.TutorReplyWriter;
 
 import lombok.RequiredArgsConstructor;
-import com.englow3.tutor.service.*;
 
 /**
  * The single write at the end of a reply.

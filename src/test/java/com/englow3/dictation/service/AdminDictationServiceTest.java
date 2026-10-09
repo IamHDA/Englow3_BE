@@ -9,20 +9,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.Instant;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
 import com.englow3.dictation.dto.command.AddDictationSentencesCommand.NewSentence;
+import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
 import com.englow3.dictation.dto.command.CreateDictationLessonCommand;
 import com.englow3.dictation.entity.DictationLesson;
 import com.englow3.dictation.entity.DictationLessonStatus;
@@ -30,10 +31,12 @@ import com.englow3.dictation.entity.DictationSentence;
 import com.englow3.dictation.helper.DictationScorer;
 import com.englow3.dictation.repository.DictationLessonRepository;
 import com.englow3.dictation.repository.DictationSentenceRepository;
+import com.englow3.dictation.service.impl.AdminDictationServiceImpl;
 import com.englow3.shared.error.ConflictException;
-import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.error.ForbiddenException;
+import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -50,9 +53,8 @@ class AdminDictationServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final AdminDictationService service = new com.englow3.dictation.service.impl.AdminDictationServiceImpl(
-            lessonRepo, sentenceRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK,
-            mock(com.englow3.shared.storage.PresignedUrlResolver.class));
+    private final AdminDictationService service = new AdminDictationServiceImpl(lessonRepo, sentenceRepo, userDirectory,
+            currentUser, new ObjectMapper(), CLOCK, mock(PresignedUrlResolver.class));
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;
@@ -162,7 +164,7 @@ class AdminDictationServiceTest {
         /** Staff adding to a live lesson would put lines in front of learners that no reviewer has heard. */
         @Test
         void refusesStaffAppendingToAPublishedLesson() {
-            lesson.publish(1L, java.time.Instant.now());
+            lesson.publish(1L, Instant.now());
             when(currentUser.hasRole("ADMIN")).thenReturn(false);
 
             assertThatThrownBy(() -> service.addSentences(new AddDictationSentencesCommand(lesson.getId(),
@@ -173,7 +175,7 @@ class AdminDictationServiceTest {
 
         @Test
         void refusesAppendingToALessonUnderReview() {
-            lesson.submitForReview(1L, java.time.Instant.now());
+            lesson.submitForReview(1L, Instant.now());
             when(currentUser.hasRole("ADMIN")).thenReturn(true);
 
             assertThatThrownBy(() -> service.addSentences(new AddDictationSentencesCommand(lesson.getId(),
@@ -267,7 +269,7 @@ class AdminDictationServiceTest {
         void listsDraftsAlongsideEverythingElse() {
             when(lessonRepo.searchForAuthoring(any(), any(), any()))
                     .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(lesson)));
-            when(sentenceRepo.countByLessonIds(anyList())).thenReturn(java.util.Map.of(lesson.getId(), 8L));
+            when(sentenceRepo.countByLessonIds(anyList())).thenReturn(Map.of(lesson.getId(), 8L));
 
             var page = service.searchForAuthoring(null, null, org.springframework.data.domain.Pageable.unpaged());
 
@@ -280,7 +282,7 @@ class AdminDictationServiceTest {
         void showsALessonWithNoSentencesAsEmpty() {
             when(lessonRepo.searchForAuthoring(any(), any(), any()))
                     .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(lesson)));
-            when(sentenceRepo.countByLessonIds(anyList())).thenReturn(java.util.Map.of());
+            when(sentenceRepo.countByLessonIds(anyList())).thenReturn(Map.of());
 
             var page = service.searchForAuthoring(null, null, org.springframework.data.domain.Pageable.unpaged());
 

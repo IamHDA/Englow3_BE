@@ -5,23 +5,25 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand;
 import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand.SubmittedAnswer;
-import com.englow3.quiz.dto.result.QuizAttemptResult;
+import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand;
 import com.englow3.quiz.dto.result.QuizAttemptResult.QuestionReviewResult;
+import com.englow3.quiz.dto.result.QuizAttemptResult;
 import com.englow3.quiz.dto.result.QuizPaperResult;
-import com.englow3.quiz.dto.result.QuizQuestionResult;
 import com.englow3.quiz.dto.result.QuizQuestionResult.OptionResult;
+import com.englow3.quiz.dto.result.QuizQuestionResult;
 import com.englow3.quiz.entity.Quiz;
 import com.englow3.quiz.entity.QuizAttempt;
 import com.englow3.quiz.entity.QuizAttemptAnswer;
@@ -33,8 +35,8 @@ import com.englow3.quiz.entity.QuizQuestionToken;
 import com.englow3.quiz.entity.QuizQuestionType;
 import com.englow3.quiz.entity.QuizStatus;
 import com.englow3.quiz.entity.QuizTokenRole;
-import com.englow3.quiz.helper.QuizGrader;
 import com.englow3.quiz.helper.QuizGrader.GradableQuestion;
+import com.englow3.quiz.helper.QuizGrader;
 import com.englow3.quiz.repository.QuizAttemptAnswerRepository;
 import com.englow3.quiz.repository.QuizAttemptRepository;
 import com.englow3.quiz.repository.QuizQuestionOptionRepository;
@@ -220,10 +222,10 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
      */
     private static List<String> shuffled(List<String> answerOrder, UUID attemptId, QuizQuestion question) {
         List<String> dealt = new ArrayList<>(answerOrder);
-        java.util.Collections.shuffle(dealt,
+        Collections.shuffle(dealt,
                 new Random(attemptId.getMostSignificantBits() ^ question.getId().getMostSignificantBits()));
         if (dealt.size() > 1 && dealt.equals(answerOrder)) {
-            java.util.Collections.rotate(dealt, 1);
+            Collections.rotate(dealt, 1);
         }
         return dealt;
     }
@@ -239,7 +241,7 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
                 groupBy(pairRepo.findByQuizQuestionIdInOrderByOrderNo(ids), QuizQuestionPair::getQuizQuestionId));
     }
 
-    private static <T> Map<UUID, List<T>> groupBy(Collection<T> items, java.util.function.Function<T, UUID> key) {
+    private static <T> Map<UUID, List<T>> groupBy(Collection<T> items, Function<T, UUID> key) {
         Map<UUID, List<T>> grouped = new HashMap<>();
         items.forEach(item -> grouped.computeIfAbsent(key.apply(item), ignored -> new ArrayList<>()).add(item));
         return grouped;
@@ -294,7 +296,7 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
         }
 
         String userAnswerText(QuizQuestion question, String response) {
-            if (question.getQuestionType() != com.englow3.quiz.entity.QuizQuestionType.MULTIPLE_CHOICE) {
+            if (question.getQuestionType() != QuizQuestionType.MULTIPLE_CHOICE) {
                 return response;
             }
             return optionsOf(question).stream().filter(option -> option.getId().toString().equals(response))

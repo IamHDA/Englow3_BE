@@ -32,8 +32,9 @@ public class Exam extends BasePersistedEntity {
 
     public void requireAuthoringVersion(long version) {
         requireEditable();
-        if (authoringVersion != version)
+        if (authoringVersion != version) {
             throw new ConflictException("CONTENT_CHANGED", "This paper changed. Reload before saving again");
+        }
     }
 
     public void touchContent() {

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,16 +38,25 @@ public final class DictationImport {
     private DictationImport() {
     }
 
-    /** One sentence, as a window into the clip's recording. */
-    public record Segment(int orderNo, String text, Integer startMs, Integer endMs) {
+    /** One sentence, as a window into the clip's recording, with its Vietnamese meaning when the batch has one. */
+    public record Segment(int orderNo, String text, Integer startMs, Integer endMs, String translationVi) {
     }
+
+    /**
+     * The topics the learner library filters by. A batch that names one files its lessons there; a batch that names
+     * none keeps the old catch-all, and one that names anything else is a typo worth refusing rather than a lesson no
+     * filter will ever show.
+     */
+    public static final Set<String> TOPICS = Set.of("Daily Conversation", "Travel", "Work", "IELTS", "TOEIC", "News",
+            "Academic English");
+    static final String DEFAULT_TOPIC = "shadowing";
 
     /**
      * @param audioObjectKey
      *            the clip's own recording. Every sentence points at it and differs only by where it starts.
      */
-    public record Lesson(String slug, String title, String targetLevel, String audioObjectKey, int durationSeconds,
-            List<Segment> segments) {
+    public record Lesson(String slug, String title, String topic, String targetLevel, String audioObjectKey,
+            int durationSeconds, List<Segment> segments) {
     }
 
     public record Rejection(int index, String clipId, String reason) {
@@ -118,6 +128,10 @@ public final class DictationImport {
         if (text(clip, "audio_url") == null) {
             return "No audio";
         }
+        String topic = text(clip, "topic");
+        if (topic != null && !TOPICS.contains(topic)) {
+            return "Unknown topic: " + topic;
+        }
         if (segments(clip).isEmpty()) {
             return "No segments";
         }
@@ -125,7 +139,8 @@ public final class DictationImport {
     }
 
     private static Lesson lessonFrom(JsonNode clip, String clipId) {
-        return new Lesson(clipId, title(clip, clipId), text(clip, "cefr_level"),
+        String topic = text(clip, "topic");
+        return new Lesson(clipId, title(clip, clipId), topic == null ? DEFAULT_TOPIC : topic, text(clip, "cefr_level"),
                 PipelineObjectKey.objectKey(text(clip, "audio_url")),
                 // Milliseconds on the wire, seconds in the column. Rounded up: a clip of 4.2 seconds reported as 4
                 // would have the player stop before the last word.
@@ -140,6 +155,11 @@ public final class DictationImport {
      * can read. The number from the id and the accent say which clip it is and nothing more.
      */
     private static String title(JsonNode clip, String clipId) {
+        // A batch may name the situation ("At the pharmacy") - a title that sets the scene without the script.
+        String given = text(clip, "title");
+        if (given != null) {
+            return given.length() > 200 ? given.substring(0, 200) : given;
+        }
         Matcher number = TRAILING_NUMBER.matcher(clipId);
         // Leading zeros dropped as text, not by parsing: an id may end in more digits than an int holds.
         String name = number.find() ? "Bài nghe " + number.group(1).replaceFirst("^0+(?=\\d)", "") : clipId;
@@ -170,7 +190,8 @@ public final class DictationImport {
             if ((startMs == null) != (endMs == null) || (startMs != null && endMs <= startMs)) {
                 continue;
             }
-            segments.add(new Segment(segment.path("order").asInt(segments.size() + 1), text, startMs, endMs));
+            segments.add(new Segment(segment.path("order").asInt(segments.size() + 1), text, startMs, endMs,
+                    text(segment, "translation_vi")));
         }
 
         return List.copyOf(segments);

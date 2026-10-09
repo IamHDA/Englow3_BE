@@ -1,29 +1,46 @@
 package com.englow3.assessment.service.impl;
 
-import java.time.*;
-import java.util.*;
-import com.englow3.assessment.dto.result.*;
-import com.englow3.assessment.entity.*;
-import com.englow3.assessment.helper.AssessmentRubric;
-import com.englow3.assessment.repository.*;
-import com.englow3.assessment.service.AssessmentService;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import com.englow3.ai.api.AiJobQueue;
-import com.englow3.shared.error.*;
+import com.englow3.assessment.dto.result.AssessmentAttemptResult;
+import com.englow3.assessment.dto.result.AssessmentCapabilities;
+import com.englow3.assessment.dto.result.AssessmentTaskResult;
+import com.englow3.assessment.dto.result.AssessmentUploadResult;
+import com.englow3.assessment.entity.AssessmentAttempt;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTask;
+import com.englow3.assessment.entity.AssessmentTaskStatus;
+import com.englow3.assessment.helper.AssessmentResultMapper;
+import com.englow3.assessment.helper.AssessmentRubric;
+import com.englow3.assessment.repository.AssessmentAttemptRepository;
+import com.englow3.assessment.repository.AssessmentTaskRepository;
+import com.englow3.assessment.service.AssessmentService;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.*;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 @RequiredArgsConstructor
 public class AssessmentServiceImpl implements AssessmentService {
     private final AssessmentTaskRepository taskRepo;
-    private final com.englow3.assessment.helper.AssessmentResultMapper resultMapper;
+    private final AssessmentResultMapper resultMapper;
     private final AssessmentAttemptRepository attemptRepo;
     private final UserDirectory userDirectory;
     private final AiJobQueue queue;
@@ -59,8 +76,9 @@ public class AssessmentServiceImpl implements AssessmentService {
             attemptRepo.lockRequest("assessment:" + user + ":" + clientKey);
             Optional<AssessmentAttempt> prior = attemptRepo.findByUserIdAndClientKey(user, clientKey);
             if (prior.isPresent()) {
-                if (!prior.get().getTaskId().equals(taskId))
+                if (!prior.get().getTaskId().equals(taskId)) {
                     throw new ConflictException("REQUEST_REUSED", "This request belongs to another task");
+                }
                 return prior.get();
             }
             AssessmentTask task = publishedTask(taskId);
@@ -68,11 +86,13 @@ public class AssessmentServiceImpl implements AssessmentService {
             String key = null;
             if (task.getSkill() == AssessmentSkill.SPEAKING) {
                 if (!"audio/wav".equals(contentType) || contentLength == null || contentLength < 45
-                        || contentLength > 10485760)
+                        || contentLength > 10485760) {
                     throw new BadRequestException("RECORDING_INVALID", "Upload WAV audio between 45 bytes and 10 MB");
+                }
                 key = "productive/" + user + "/" + id + ".wav";
-            } else if (contentType != null || contentLength != null)
+            } else if (contentType != null || contentLength != null) {
                 throw new BadRequestException("WRITING_AUDIO_INVALID", "Writing attempts do not contain audio");
+            }
             return attemptRepo.saveAndFlush(AssessmentAttempt.draft(id, user, taskId, clientKey, task.getSkill(),
                     json(AssessmentTaskResult.from(task, true)), key, contentType, contentLength));
         });
@@ -87,8 +107,9 @@ public class AssessmentServiceImpl implements AssessmentService {
         UUID user = userDirectory.requireCurrentUserId();
         AssessmentAttempt a = transactionTemplate.execute(tx -> {
             AssessmentAttempt locked = owned(id, user, true);
-            if (locked.getSkill() != AssessmentSkill.WRITING || text == null || text.length() > 12000)
+            if (locked.getSkill() != AssessmentSkill.WRITING || text == null || text.length() > 12000) {
                 throw new BadRequestException("ANSWER_INVALID", "Writing text must be at most 12000 characters");
+            }
             locked.saveAnswer(text, version);
             return attemptRepo.saveAndFlush(locked);
         });
@@ -98,8 +119,9 @@ public class AssessmentServiceImpl implements AssessmentService {
     public AssessmentAttemptResult submit(UUID id) {
         UUID user = userDirectory.requireCurrentUserId();
         AssessmentAttempt candidate = transactionTemplate.execute(tx -> owned(id, user, false));
-        if (candidate.getStatus() != AssessmentAttemptStatus.DRAFT)
+        if (candidate.getStatus() != AssessmentAttemptStatus.DRAFT) {
             return result(candidate, false);
+        }
         String sealedKey = candidate.getSkill() == AssessmentSkill.SPEAKING
                 ? "productive-sealed/" + user + "/" + id + "/" + UUID.randomUUID() + ".wav"
                 : null;
@@ -109,8 +131,9 @@ public class AssessmentServiceImpl implements AssessmentService {
                 storage.copy(bucket, candidate.getAudioObjectKey(), sealedKey);
                 var metadata = storage.metadata(bucket, sealedKey);
                 if (metadata.contentLength() != candidate.getAudioContentLength()
-                        || !"audio/wav".equals(metadata.contentType()))
+                        || !"audio/wav".equals(metadata.contentType())) {
                     throw new BadRequestException("RECORDING_INVALID", "The recording changed during submission");
+                }
             } catch (RuntimeException failure) {
                 removeUnusedRecording(sealedKey);
                 throw failure;
@@ -120,27 +143,33 @@ public class AssessmentServiceImpl implements AssessmentService {
         try {
             a = transactionTemplate.execute(tx -> {
                 AssessmentAttempt locked = owned(id, user, true);
-                if (locked.getStatus() != AssessmentAttemptStatus.DRAFT)
+                if (locked.getStatus() != AssessmentAttemptStatus.DRAFT) {
                     return locked;
+                }
                 if (locked.getSkill() == AssessmentSkill.WRITING
-                        && AssessmentRubric.wordCount(locked.getAnswerText()) < 20)
+                        && AssessmentRubric.wordCount(locked.getAnswerText()) < 20) {
                     throw new BadRequestException("ANSWER_TOO_SHORT", "Write at least 20 words before submitting");
+                }
                 boolean automatic = automatic(locked.getSkill());
                 checkQuota(user, automatic);
-                if (sealedKey != null)
+                if (sealedKey != null) {
                     locked.sealRecording(sealedKey);
+                }
                 locked.submit(automatic, clock.instant());
-                if (automatic)
+                if (automatic) {
                     enqueue(locked);
+                }
                 return attemptRepo.saveAndFlush(locked);
             });
         } catch (RuntimeException failure) {
-            if (sealedKey != null)
+            if (sealedKey != null) {
                 removeUnusedRecording(sealedKey);
+            }
             throw failure;
         }
-        if (sealedKey != null && !sealedKey.equals(a.getAudioObjectKey()))
+        if (sealedKey != null && !sealedKey.equals(a.getAudioObjectKey())) {
             removeUnusedRecording(sealedKey);
+        }
         return result(a, false);
     }
 
@@ -159,8 +188,9 @@ public class AssessmentServiceImpl implements AssessmentService {
             boolean automatic = automatic(locked.getSkill());
             checkQuota(user, automatic);
             locked.retry(automatic);
-            if (automatic)
+            if (automatic) {
                 enqueue(locked);
+            }
             return attemptRepo.saveAndFlush(locked);
         });
         return result(a, false);
@@ -198,9 +228,10 @@ public class AssessmentServiceImpl implements AssessmentService {
     }
 
     private void checkQuota(UUID user, boolean automatic) {
-        if (automatic && !queue.hasDailyAllowance(user))
+        if (automatic && !queue.hasDailyAllowance(user)) {
             throw new ConflictException("ASSESSMENT_DAILY_LIMIT",
                     "Today's AI allowance has been reached. Save the draft and try tomorrow");
+        }
     }
 
     private void enqueue(AssessmentAttempt a) {
@@ -219,12 +250,14 @@ public class AssessmentServiceImpl implements AssessmentService {
     private void checkAudio(AssessmentAttempt a) {
         try {
             var metadata = storage.metadata(bucket, a.getAudioObjectKey());
-            if (metadata.contentLength() != a.getAudioContentLength() || !"audio/wav".equals(metadata.contentType()))
+            if (metadata.contentLength() != a.getAudioContentLength() || !"audio/wav".equals(metadata.contentType())) {
                 throw new BadRequestException("RECORDING_INVALID",
                         "Uploaded recording does not match its declared type and size");
+            }
         } catch (S3Exception e) {
-            if (e.statusCode() == 404)
+            if (e.statusCode() == 404) {
                 throw new ConflictException("RECORDING_MISSING", "Upload your recording before submitting");
+            }
             throw e;
         }
     }

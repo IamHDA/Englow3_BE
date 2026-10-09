@@ -232,7 +232,7 @@ def main() -> int:
         shortfall[lv] = miss
         n_tsl = sum(1 for e in take if e["tsl_rank"] is not None)
         print(f"{lv:6}{len(pool):9}{quota[lv]:10}{len(take):7}{miss:8}{n_tsl:7}")
-    total_q = sum(quota[l] for l in CEFR_ORDER)
+    total_q = sum(quota[level] for level in CEFR_ORDER)
     print(f"{'TỔNG':6}{len(entries):9}{total_q:10}{len(selected):7}"
           f"{sum(shortfall.values()):8}"
           f"{sum(1 for e in selected if e['tsl_rank'] is not None):7}")

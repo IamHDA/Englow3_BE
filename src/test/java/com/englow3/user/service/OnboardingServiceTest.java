@@ -37,6 +37,7 @@ import com.englow3.user.entity.User;
 import com.englow3.user.repository.LearnerProfileRepository;
 import com.englow3.user.repository.LearningPurposeRepository;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.impl.OnboardingServiceImpl;
 
 /**
  * Orchestration only. The rules inside User are covered by UserTest - this class asserts which entity call the service
@@ -55,8 +56,8 @@ class OnboardingServiceTest {
 
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final OnboardingService service = new com.englow3.user.service.impl.OnboardingServiceImpl(userRepo,
-            learnerProfileRepo, learningPurposeRepo,
+    private final OnboardingService service = new OnboardingServiceImpl(userRepo, learnerProfileRepo,
+            learningPurposeRepo,
 
             currentUser);
 
@@ -207,6 +208,19 @@ class OnboardingServiceTest {
                     new BigDecimal("7.0"), LocalDate.now().plusMonths(6)))).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("TARGET_SCORE_NOT_APPLICABLE");
+        }
+
+        /** The two scores were once saved the wrong way round: a learner at 400 aiming for 800 read back 800 → 400. */
+        @Test
+        void keepsTheCurrentAndTargetScoresWhereTheLearnerPutThem() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.declareCurrentLevel(CertificateLevel.B1);
+
+            service.setLearningGoal(new SetLearningGoalCommand(CertificateType.TOEIC, new BigDecimal("400"),
+                    new BigDecimal("800"), LocalDate.now().plusMonths(6)));
+
+            assertThat(profile.getCurrentScore()).isEqualByComparingTo("400");
+            assertThat(profile.getTargetScore()).isEqualByComparingTo("800");
         }
 
         /** Without a purpose the flow cannot know whether a certificate step belonged in between. */

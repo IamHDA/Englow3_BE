@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -86,6 +87,31 @@ class DictationImportTest {
             assertThat(DictationImport.ceilSeconds(1)).isEqualTo(1);
             assertThat(DictationImport.ceilSeconds(0)).isZero();
         }
+
+        /** A batch that says nothing about topic keeps the old catch-all, so earlier batches import as before. */
+        @Test
+        void filesAClipWithNoTopicUnderTheCatchAll() {
+            var lesson = DictationImport.read(MAPPER, ONE_CLIP).lessons().get(0);
+
+            assertThat(lesson.topic()).isEqualTo("shadowing");
+            assertThat(lesson.segments()).extracting(DictationImport.Segment::translationVi).containsOnlyNulls();
+        }
+
+        /** The topic is what the library filters by, and the title names the situation without quoting a line. */
+        @Test
+        void takesTheTopicTitleAndTranslationsTheBatchGives() {
+            String json = ONE_CLIP
+                    .replace("\"cefr_level\":\"A2\"",
+                            "\"cefr_level\":\"A2\",\"topic\":\"Travel\",\"title\":\"Ở sân bay\"")
+                    .replace("\"end_ms\":2100}", "\"end_ms\":2100,\"translation_vi\":\"Cổng ở đâu?\"}");
+
+            var lesson = DictationImport.read(MAPPER, json).lessons().get(0);
+
+            assertThat(lesson.topic()).isEqualTo("Travel");
+            assertThat(lesson.title()).isEqualTo("Ở sân bay");
+            assertThat(lesson.segments()).extracting(DictationImport.Segment::translationVi)
+                    .containsExactly("Cổng ở đâu?", null);
+        }
     }
 
     @Nested
@@ -104,6 +130,16 @@ class DictationImportTest {
                 assertThat(rejection.clipId()).isEqualTo("airport-01");
                 assertThat(rejection.reason()).isEqualTo("No audio");
             });
+        }
+
+        /** A misspelt topic would be a lesson no filter ever shows; better refused where the typo can be seen. */
+        @Test
+        void refusesATopicTheLibraryDoesNotHave() {
+            var report = DictationImport.read(MAPPER,
+                    ONE_CLIP.replace("\"cefr_level\":\"A2\"", "\"cefr_level\":\"A2\",\"topic\":\"Travelling\""));
+
+            assertThat(report.rejections()).singleElement()
+                    .satisfies(rejection -> assertThat(rejection.reason()).isEqualTo("Unknown topic: Travelling"));
         }
 
         @Test
@@ -182,7 +218,7 @@ class DictationImportTest {
             JsonNode clip = schema().path("$defs").path("ShadowingClip");
 
             assertThat(clip.path("properties").fieldNames()).toIterable().contains("clip_id", "cefr_level", "script",
-                    "segments", "audio_url", "duration_ms");
+                    "segments", "audio_url", "duration_ms", "topic", "title");
             // audio_url is not required, which is why a clip without one is a rejection rather than a broken row.
             assertThat(clip.path("required")).extracting(JsonNode::asText).contains("clip_id", "cefr_level", "script",
                     "segments");
@@ -194,8 +230,19 @@ class DictationImportTest {
             JsonNode segment = schema().path("$defs").path("ShadowingSegment");
 
             assertThat(segment.path("properties").fieldNames()).toIterable().contains("order", "text", "start_ms",
-                    "end_ms");
+                    "end_ms", "translation_vi");
             assertThat(segment.path("required")).extracting(JsonNode::asText).contains("order", "text");
+        }
+
+        /** The topics a batch may name are exactly the ones the library filters by. */
+        @Test
+        @EnabledIf("schemaIsPresent")
+        void namesTheSameTopicsAsTheLibrary() throws Exception {
+            JsonNode topic = schema().path("$defs").path("ShadowingClip").path("properties").path("topic");
+            var names = new HashSet<String>();
+            topic.findValues("enum").forEach(values -> values.forEach(value -> names.add(value.asText())));
+
+            assertThat(names).isEqualTo(DictationImport.TOPICS);
         }
 
         /** The batch is an object with a clips array, not a bare list - unlike the flashcard batch. */

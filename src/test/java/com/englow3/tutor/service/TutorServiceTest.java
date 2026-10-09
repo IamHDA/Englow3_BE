@@ -10,8 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.Instant;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -23,8 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.api.AiJobQueue;
+import com.englow3.ai.entity.AiJobType;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.tutor.dto.command.ReportTutorMessageCommand;
@@ -34,6 +34,7 @@ import com.englow3.tutor.entity.TutorMessage;
 import com.englow3.tutor.entity.TutorMessageStatus;
 import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
+import com.englow3.tutor.service.impl.TutorServiceImpl;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -52,8 +53,8 @@ class TutorServiceTest {
     private final AiJobQueue aiJobQueue = mock(AiJobQueue.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final TutorService service = new com.englow3.tutor.service.impl.TutorServiceImpl(conversationRepo,
-            messageRepo, aiJobQueue, userDirectory, new ObjectMapper(), CLOCK);
+    private final TutorService service = new TutorServiceImpl(conversationRepo, messageRepo, aiJobQueue, userDirectory,
+            new ObjectMapper(), CLOCK);
 
     private final UUID userId = UUID.randomUUID();
     private TutorConversation conversation;

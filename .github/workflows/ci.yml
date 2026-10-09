@@ -1,20 +1,17 @@
 name: Backend CI
 
 on:
-  # testing is where work lands before dev, so it is the branch where a break
-  # is cheapest to find. It was not watched at all, which made it the one
-  # branch people push to and nothing checks.
-  push:
-    branches:
-      - main
-      - dev
-      - testing
-
   pull_request:
     branches:
       - main
       - dev
       - testing
+
+  # A push is validated by `cd.yml`, which calls this workflow first and builds
+  # the image only if it passes. A push trigger here as well would run the
+  # suite twice, and the two runs share a concurrency group - one would cancel
+  # the other.
+  workflow_call:
 
 concurrency:
   # One run per branch. A validation run superseded by a newer commit is

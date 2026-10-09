@@ -5,15 +5,19 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.englow3.flashcard.dto.command.*;
-import com.englow3.flashcard.dto.result.*;
+import com.englow3.flashcard.dto.command.AddFlashcardsCommand;
+import com.englow3.flashcard.dto.command.CreateFlashcardSetCommand;
+import com.englow3.flashcard.dto.command.SaveAuthoringCommand;
+import com.englow3.flashcard.dto.result.AuthoringResult;
+import com.englow3.flashcard.dto.result.ContentReviewResult;
+import com.englow3.flashcard.dto.result.FlashcardImportResult;
+import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 
 public interface AdminFlashcardService {
-    com.englow3.flashcard.dto.result.AuthoringResult authoringDetail(UUID id);
+    AuthoringResult authoringDetail(UUID id);
 
-    com.englow3.flashcard.dto.result.AuthoringResult saveAuthoring(
-            com.englow3.flashcard.dto.command.SaveAuthoringCommand command);
+    AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 
     FlashcardSetSummaryResult createSet(CreateFlashcardSetCommand command);
 

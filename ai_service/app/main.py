@@ -50,6 +50,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="Englow AI Service",
         version="1.0.0",
         docs_url=None if configured.environment == "production" else "/docs",
+        # The schema behind /docs: hidden with it, or production still lists every internal route.
+        openapi_url=None if configured.environment == "production" else "/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
     )

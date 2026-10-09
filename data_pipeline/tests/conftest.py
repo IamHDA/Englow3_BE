@@ -26,7 +26,7 @@ def make_option(label: str, correct: bool = False, text: str | None = None) -> O
 
 def make_options(n: int = 4, n_correct: int = 1) -> list[Option]:
     labels = ["A", "B", "C", "D"][:n]
-    return [make_option(l, correct=(i < n_correct)) for i, l in enumerate(labels)]
+    return [make_option(label, correct=(i < n_correct)) for i, label in enumerate(labels)]
 
 
 def make_item(

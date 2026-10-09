@@ -1,17 +1,38 @@
 package com.englow3.assessment.controller;
 
+import java.util.List;
 import java.util.UUID;
-import com.englow3.assessment.dto.command.AssessmentTaskCommand;
-import com.englow3.assessment.dto.request.*;
-import com.englow3.assessment.dto.response.*;
-import com.englow3.assessment.entity.*;
-import com.englow3.assessment.service.AssessmentAuthoringService;
-import com.englow3.shared.page.PageResponse;
-import org.springframework.data.domain.*;
+
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.englow3.assessment.dto.command.AssessmentTaskCommand;
+import com.englow3.assessment.dto.request.AssessmentNoteRequest;
+import com.englow3.assessment.dto.request.AssessmentReviewRequest;
+import com.englow3.assessment.dto.request.AssessmentTaskRequest;
+import com.englow3.assessment.dto.response.AssessmentAttemptResponse;
+import com.englow3.assessment.dto.response.AssessmentReviewResponse;
+import com.englow3.assessment.dto.response.AssessmentSubmissionSummaryResponse;
+import com.englow3.assessment.dto.response.AssessmentTaskResponse;
+import com.englow3.assessment.dto.response.AssessmentWorkloadResponse;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTaskStatus;
+import com.englow3.assessment.service.AssessmentAuthoringService;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.page.PageResponse;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -46,7 +67,7 @@ public class AssessmentAuthoringController {
     }
 
     @GetMapping("/submissions/{id}/reviews")
-    public ResponseEntity<java.util.List<AssessmentReviewResponse>> reviews(@PathVariable UUID id) {
+    public ResponseEntity<List<AssessmentReviewResponse>> reviews(@PathVariable UUID id) {
         return ResponseEntity.ok(service.reviews(id).stream().map(AssessmentReviewResponse::from).toList());
     }
 
@@ -91,9 +112,9 @@ public class AssessmentAuthoringController {
             @RequestParam(required = false) AssessmentAttemptStatus status,
             @RequestParam(required = false) AssessmentSkill skill, @RequestParam(defaultValue = "") String term,
             @RequestParam(defaultValue = "true") boolean oldest, @PageableDefault(size = 12) Pageable page) {
-        if (term.length() > 200)
-            throw new com.englow3.shared.error.BadRequestException("SEARCH_TOO_LONG",
-                    "Search must be at most 200 characters");
+        if (term.length() > 200) {
+            throw new BadRequestException("SEARCH_TOO_LONG", "Search must be at most 200 characters");
+        }
         return ResponseEntity.ok(PageResponse.from(service.searchSubmissions(status, skill, term, oldest, page)
                 .map(AssessmentSubmissionSummaryResponse::from)));
     }

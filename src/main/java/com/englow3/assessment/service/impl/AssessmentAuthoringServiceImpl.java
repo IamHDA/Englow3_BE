@@ -1,20 +1,44 @@
 package com.englow3.assessment.service.impl;
 
 import java.time.Clock;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import com.englow3.assessment.dto.command.AssessmentTaskCommand;
-import com.englow3.assessment.dto.result.*;
-import com.englow3.assessment.entity.*;
+import com.englow3.assessment.dto.result.AssessmentAttemptResult;
+import com.englow3.assessment.dto.result.AssessmentReviewResult;
+import com.englow3.assessment.dto.result.AssessmentSubmissionSummary;
+import com.englow3.assessment.dto.result.AssessmentTaskResult;
+import com.englow3.assessment.dto.result.AssessmentWorkloadResult;
+import com.englow3.assessment.entity.AssessmentAttempt;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentReview;
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTask;
+import com.englow3.assessment.entity.AssessmentTaskStatus;
+import com.englow3.assessment.helper.AssessmentEvidence;
+import com.englow3.assessment.helper.AssessmentResultMapper;
 import com.englow3.assessment.helper.AssessmentRubric;
-import com.englow3.assessment.repository.*;
+import com.englow3.assessment.query.AssessmentQueueQuery;
+import com.englow3.assessment.query.AssessmentWorkloadQuery;
+import com.englow3.assessment.repository.AssessmentAttemptRepository;
+import com.englow3.assessment.repository.AssessmentReviewRepository;
+import com.englow3.assessment.repository.AssessmentTaskRepository;
 import com.englow3.assessment.service.AssessmentAuthoringService;
-import com.englow3.shared.error.*;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.ForbiddenException;
+import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.data.domain.*;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -23,11 +47,11 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     private final AssessmentTaskRepository taskRepo;
     private final AssessmentAttemptRepository attemptRepo;
     private final AssessmentReviewRepository reviewRepo;
-    private final com.englow3.assessment.query.AssessmentWorkloadQuery workloadQuery;
-    private final com.englow3.assessment.query.AssessmentQueueQuery queueQuery;
+    private final AssessmentWorkloadQuery workloadQuery;
+    private final AssessmentQueueQuery queueQuery;
     private final UserDirectory users;
     private final CurrentUser currentUser;
-    private final com.englow3.assessment.helper.AssessmentResultMapper resultMapper;
+    private final AssessmentResultMapper resultMapper;
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
@@ -72,8 +96,9 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
         UUID author = users.requireCurrentUserId();
         return transactionTemplate.execute(tx -> {
             AssessmentTask task = task(id, author);
-            if (task.getVersion() != version)
+            if (task.getVersion() != version) {
                 throw new ConflictException("TASK_CHANGED", "The task changed. Reload before editing");
+            }
             task.edit(c);
             return AssessmentTaskResult.from(taskRepo.saveAndFlush(task), true);
         });
@@ -135,14 +160,16 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
         UUID author = users.requireCurrentUserId();
         AssessmentAttempt a = transactionTemplate.execute(tx -> {
             AssessmentAttempt attempt = reviewable(id, author);
-            if (version != null && version != attempt.getVersion())
+            if (version != null && version != attempt.getVersion()) {
                 throw new ConflictException("GRADE_CHANGED",
                         "Another reviewer changed this submission. Reload before publishing");
+            }
             String normalized = AssessmentRubric.validate(mapper, attempt.getSkill(), report);
-            com.englow3.assessment.helper.AssessmentEvidence.validate(mapper, attempt.getSkill(), normalized,
-                    attempt.getAnswerText(), attempt.getAudioContentLength());
-            if (note == null || note.isBlank())
+            AssessmentEvidence.validate(mapper, attempt.getSkill(), normalized, attempt.getAnswerText(),
+                    attempt.getAudioContentLength());
+            if (note == null || note.isBlank()) {
                 throw new BadRequestException("REVIEW_NOTE_REQUIRED", "Explain the assessment");
+            }
             String previous = attempt.getReport();
             attempt.finishHuman(normalized, transcript == null ? attempt.getRecognizedText() : transcript,
                     clock.instant(), currentUser.hasRole("ADMIN"));
@@ -156,21 +183,24 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
         AssessmentAttempt a = attemptRepo.lockById(id)
                 .orElseThrow(() -> new NotFoundException("ATTEMPT_NOT_FOUND", "Submission not found"));
         task(a.getTaskId(), author);
-        if (a.getStatus() == AssessmentAttemptStatus.DRAFT)
+        if (a.getStatus() == AssessmentAttemptStatus.DRAFT) {
             throw new NotFoundException("ATTEMPT_NOT_FOUND", "Submission not found");
+        }
         return a;
     }
 
     private AssessmentTask task(UUID id, UUID author) {
         AssessmentTask task = taskRepo.lockById(id)
                 .orElseThrow(() -> new NotFoundException("TASK_NOT_FOUND", "Task not found"));
-        if (!currentUser.hasRole("ADMIN") && !task.getCreatedByUserId().equals(author))
+        if (!currentUser.hasRole("ADMIN") && !task.getCreatedByUserId().equals(author)) {
             throw new ForbiddenException("TASK_NOT_OWNED", "Staff can only manage their own tasks");
+        }
         return task;
     }
 
     private void requireAdmin() {
-        if (!currentUser.hasRole("ADMIN"))
+        if (!currentUser.hasRole("ADMIN")) {
             throw new ForbiddenException("ADMIN_REQUIRED", "Only administrators can review or archive tasks");
+        }
     }
 }

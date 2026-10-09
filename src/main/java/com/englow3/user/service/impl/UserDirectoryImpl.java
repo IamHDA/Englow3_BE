@@ -1,15 +1,17 @@
 package com.englow3.user.service.impl;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
-import com.englow3.user.repository.UserRepository;
 import com.englow3.user.api.UserDirectory;
+import com.englow3.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,11 +41,12 @@ public class UserDirectoryImpl implements UserDirectory {
     private final Map<UUID, UUID> userIds = new ConcurrentHashMap<>();
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public Map<UUID, String> displayNames(java.util.Collection<UUID> ids) {
-        if (ids.isEmpty())
+    public Map<UUID, String> displayNames(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
             return Map.of();
+        }
         return userRepo.findAllById(ids).stream()
-                .collect(java.util.stream.Collectors.toMap(user -> user.getId(), user -> user.getDisplayName()));
+                .collect(Collectors.toMap(user -> user.getId(), user -> user.getDisplayName()));
     }
 
     /**

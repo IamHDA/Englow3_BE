@@ -2,6 +2,7 @@ package com.englow3.quiz.helper;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import com.englow3.quiz.entity.QuizQuestionType;
 
@@ -62,7 +63,7 @@ public final class QuizGrader {
      * and shortens nothing.
      */
     private static List<String> splitMatching(String answer) {
-        return List.of(answer.split(java.util.regex.Pattern.quote(MATCHING_SEPARATOR), -1));
+        return List.of(answer.split(Pattern.quote(MATCHING_SEPARATOR), -1));
     }
 
     private static boolean equalWordSequence(List<String> expected, List<String> actual) {

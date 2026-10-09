@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Limit;
@@ -124,7 +125,7 @@ public class FlashcardServiceImpl implements FlashcardService {
         List<FlashcardResult> unseen = cardRepo.findUnseenInSet(userId, setId, Limit.of(limit - due.size())).stream()
                 .map(card -> resultOf(card, null)).toList();
 
-        return java.util.stream.Stream.concat(due.stream(), unseen.stream()).toList();
+        return Stream.concat(due.stream(), unseen.stream()).toList();
     }
 
     /**

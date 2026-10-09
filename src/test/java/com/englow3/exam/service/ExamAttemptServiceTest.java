@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -19,8 +20,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
+import com.englow3.exam.dto.command.SaveExamDraftCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand.SubmittedAnswer;
+import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
 import com.englow3.exam.dto.result.ExamAttemptResult;
 import com.englow3.exam.entity.CertificateType;
@@ -28,21 +30,26 @@ import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamAttempt;
+import com.englow3.exam.entity.ExamAttemptDraft;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.SkillType;
 import com.englow3.exam.entity.TargetLevel;
-import com.englow3.exam.query.ExamGradingQuery;
 import com.englow3.exam.query.ExamGradingQuery.GradingOption;
 import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
+import com.englow3.exam.query.ExamGradingQuery;
+import com.englow3.exam.query.ExamOutlineQuery;
 import com.englow3.exam.query.LearnerExamPaperQuery;
 import com.englow3.exam.repository.AttemptAnswerOptionRepository;
 import com.englow3.exam.repository.AttemptAnswerRepository;
+import com.englow3.exam.repository.ExamAttemptDraftRepository;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
+import com.englow3.exam.service.impl.ExamAttemptServiceImpl;
 import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.PlacementRecorder;
@@ -61,14 +68,11 @@ class ExamAttemptServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PlacementRecorder placementRecorder = mock(PlacementRecorder.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
-    private final com.englow3.exam.query.ExamOutlineQuery outlineQuery = mock(
-            com.englow3.exam.query.ExamOutlineQuery.class);
-    private final com.englow3.exam.repository.ExamAttemptDraftRepository draftRepo = mock(
-            com.englow3.exam.repository.ExamAttemptDraftRepository.class);
-    private final ExamAttemptService service = new com.englow3.exam.service.impl.ExamAttemptServiceImpl(examRepo,
-            attemptRepo, answerRepo, answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder,
-            presignedUrls, CLOCK, "exams", java.time.Duration.ofHours(1), draftRepo,
-            new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery);
+    private final ExamOutlineQuery outlineQuery = mock(ExamOutlineQuery.class);
+    private final ExamAttemptDraftRepository draftRepo = mock(ExamAttemptDraftRepository.class);
+    private final ExamAttemptService service = new ExamAttemptServiceImpl(examRepo, attemptRepo, answerRepo,
+            answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder, presignedUrls, CLOCK, "exams",
+            Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery);
 
     private final UUID userId = UUID.randomUUID();
 
@@ -125,13 +129,13 @@ class ExamAttemptServiceTest {
         when(attemptRepo.findById(attempt.getId())).thenReturn(Optional.of(attempt));
         when(paperQuery.load(exam.getId()))
                 .thenReturn(Optional.of(new LearnerExamPaperProjection(exam, List.of(section))));
-        when(presignedUrls.resolve("exams", "parts/audio.mp3", java.time.Duration.ofHours(1)))
+        when(presignedUrls.resolve("exams", "parts/audio.mp3", Duration.ofHours(1)))
                 .thenReturn("https://storage.example/parts-audio");
-        when(presignedUrls.resolve("exams", "parts/image.png", java.time.Duration.ofHours(1)))
+        when(presignedUrls.resolve("exams", "parts/image.png", Duration.ofHours(1)))
                 .thenReturn("https://storage.example/parts-image");
-        when(presignedUrls.resolve("exams", "sets/audio.mp3", java.time.Duration.ofHours(1)))
+        when(presignedUrls.resolve("exams", "sets/audio.mp3", Duration.ofHours(1)))
                 .thenReturn("https://storage.example/sets-audio");
-        when(presignedUrls.resolve("exams", "sets/image.png", java.time.Duration.ofHours(1)))
+        when(presignedUrls.resolve("exams", "sets/image.png", Duration.ofHours(1)))
                 .thenReturn("https://storage.example/sets-image");
 
         var result = service.paperForAttempt(attempt.getId());
@@ -208,7 +212,7 @@ class ExamAttemptServiceTest {
         UUID questionId = UUID.randomUUID(), correct = UUID.randomUUID(), wrong = UUID.randomUUID();
         var question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
-        var draft = com.englow3.exam.entity.ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant().minusSeconds(1));
+        var draft = ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant().minusSeconds(1));
         draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
                 List.of(new SubmittedAnswer(questionId, List.of(correct)))), CLOCK.instant().minusSeconds(1));
         when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
@@ -242,11 +246,9 @@ class ExamAttemptServiceTest {
         Exam exam = publishedExam();
         ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(7200));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
-        assertThatThrownBy(() -> service
-                .saveDraft(new com.englow3.exam.dto.command.SaveExamDraftCommand(attempt.getId(), 0, List.of())))
-                        .isInstanceOf(com.englow3.shared.error.ConflictException.class)
-                        .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
-                        .isEqualTo("ATTEMPT_EXPIRED");
+        assertThatThrownBy(() -> service.saveDraft(new SaveExamDraftCommand(attempt.getId(), 0, List.of())))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("ATTEMPT_EXPIRED");
         verify(draftRepo, never()).saveAndFlush(any());
     }
 
@@ -254,16 +256,14 @@ class ExamAttemptServiceTest {
     void staleAutosaveCannotReplaceTheOtherTabsAcceptedAnswers() {
         Exam exam = publishedExam();
         ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
-        var draft = com.englow3.exam.entity.ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant());
+        var draft = ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant());
         draft.replace(0, "[]", CLOCK.instant());
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
         when(gradingQuery.load(exam.getId())).thenReturn(List.of());
         when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
-        assertThatThrownBy(() -> service
-                .saveDraft(new com.englow3.exam.dto.command.SaveExamDraftCommand(attempt.getId(), 0, List.of())))
-                        .isInstanceOf(com.englow3.shared.error.ConflictException.class)
-                        .extracting(e -> ((com.englow3.shared.error.ConflictException) e).getCode())
-                        .isEqualTo("EXAM_DRAFT_CHANGED");
+        assertThatThrownBy(() -> service.saveDraft(new SaveExamDraftCommand(attempt.getId(), 0, List.of())))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("EXAM_DRAFT_CHANGED");
         assertThat(draft.getRevision()).isEqualTo(1);
         verify(draftRepo, never()).saveAndFlush(any());
     }

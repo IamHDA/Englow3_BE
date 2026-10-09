@@ -1,23 +1,34 @@
 package com.englow3.assessment.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
-import java.time.*;
-import java.util.*;
-import org.junit.jupiter.api.*;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static org.mockito.Mockito.*;
+
+import java.time.Clock;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.transaction.*;
-import org.springframework.transaction.support.*;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import com.englow3.assessment.entity.*;
-import com.englow3.assessment.repository.*;
-import com.englow3.assessment.helper.AssessmentResultMapper;
-import com.englow3.assessment.service.impl.AssessmentServiceImpl;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import com.englow3.ai.api.AiJobQueue;
-import com.englow3.shared.error.*;
+import com.englow3.assessment.entity.AssessmentAttempt;
+import com.englow3.assessment.entity.AssessmentAttemptStatus;
+import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.helper.AssessmentResultMapper;
+import com.englow3.assessment.repository.AssessmentAttemptRepository;
+import com.englow3.assessment.repository.AssessmentTaskRepository;
+import com.englow3.assessment.service.impl.AssessmentServiceImpl;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
+import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;

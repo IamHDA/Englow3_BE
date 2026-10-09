@@ -8,29 +8,31 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import com.englow3.flashcard.dto.command.AddFlashcardsCommand;
 import com.englow3.flashcard.dto.command.AddFlashcardsCommand.NewCard;
+import com.englow3.flashcard.dto.command.AddFlashcardsCommand;
 import com.englow3.flashcard.dto.command.CreateFlashcardSetCommand;
 import com.englow3.flashcard.entity.Flashcard;
 import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardSetRepository;
+import com.englow3.flashcard.service.impl.AdminFlashcardServiceImpl;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,9 +49,8 @@ class AdminFlashcardServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
-    private final AdminFlashcardService service = new com.englow3.flashcard.service.impl.AdminFlashcardServiceImpl(
-            setRepo, cardRepo, userDirectory, currentUser, new ObjectMapper(), CLOCK,
-            mock(com.englow3.shared.storage.PresignedUrlResolver.class));
+    private final AdminFlashcardService service = new AdminFlashcardServiceImpl(setRepo, cardRepo, userDirectory,
+            currentUser, new ObjectMapper(), CLOCK, mock(PresignedUrlResolver.class));
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;
@@ -107,7 +108,7 @@ class AdminFlashcardServiceTest {
         /** Appending is additive - a new card is simply unseen by every learner, so a live set can still grow. */
         @Test
         void letsAnAdministratorAppendToAPublishedSet() {
-            set.publish(1L, java.time.Instant.now());
+            set.publish(1L, Instant.now());
             when(currentUser.hasRole("ADMIN")).thenReturn(true);
             when(cardRepo.findMaxOrderNo(set.getId())).thenReturn(Optional.of(1));
 
@@ -120,7 +121,7 @@ class AdminFlashcardServiceTest {
         /** Staff adding to a live set would put cards in front of learners that no reviewer has seen. */
         @Test
         void refusesStaffAppendingToAPublishedSet() {
-            set.publish(1L, java.time.Instant.now());
+            set.publish(1L, Instant.now());
             when(currentUser.hasRole("ADMIN")).thenReturn(false);
 
             assertThatThrownBy(() -> service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta")))))
@@ -132,7 +133,7 @@ class AdminFlashcardServiceTest {
         /** What is approved has to be what was reviewed, so a set under review is frozen - for everyone. */
         @Test
         void refusesAppendingToASetUnderReview() {
-            set.submitForReview(1L, java.time.Instant.now());
+            set.submitForReview(1L, Instant.now());
             when(currentUser.hasRole("ADMIN")).thenReturn(true);
 
             assertThatThrownBy(() -> service.addCards(new AddFlashcardsCommand(set.getId(), List.of(card("delta")))))

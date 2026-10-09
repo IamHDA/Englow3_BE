@@ -1,7 +1,11 @@
 package com.englow3.assessment.helper;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.shared.error.BadRequestException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,9 +15,10 @@ class AssessmentRubricTest {
 
     @Test
     void rejectsEmptyAndNullProviderReports() {
-        for (String content : java.util.List.of("", "null", "[]"))
+        for (String content : List.of("", "null", "[]")) {
             assertThrows(BadRequestException.class,
                     () -> AssessmentRubric.validate(mapper, AssessmentSkill.WRITING, content));
+        }
     }
 
     static String report(String first, double score) {

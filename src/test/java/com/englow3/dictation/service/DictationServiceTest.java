@@ -3,8 +3,8 @@ package com.englow3.dictation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,11 +13,12 @@ import static org.mockito.Mockito.when;
 import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -32,6 +33,7 @@ import com.englow3.dictation.entity.DictationSentence;
 import com.englow3.dictation.repository.DictationAttemptRepository;
 import com.englow3.dictation.repository.DictationLessonRepository;
 import com.englow3.dictation.repository.DictationSentenceRepository;
+import com.englow3.dictation.service.impl.DictationServiceImpl;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
@@ -53,8 +55,8 @@ class DictationServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
-    private final DictationService service = new com.englow3.dictation.service.impl.DictationServiceImpl(lessonRepo,
-            sentenceRepo, attemptRepo, userDirectory, presignedUrls, CLOCK, "learning", java.time.Duration.ofHours(3));
+    private final DictationService service = new DictationServiceImpl(lessonRepo, sentenceRepo, attemptRepo,
+            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3));
 
     private final UUID userId = UUID.randomUUID();
     private DictationLesson lesson;
@@ -71,7 +73,7 @@ class DictationServiceTest {
         when(sentenceRepo.findByDictationLessonIdOrderByOrderNo(lesson.getId())).thenReturn(List.of(sentence));
         when(attemptRepo.findBestAccuracyBySentence(any(), anyList())).thenReturn(List.of());
         when(attemptRepo.findLastPractisedAtByLesson(any(), anyCollection())).thenReturn(List.of());
-        when(presignedUrls.resolve("learning", "dictation/airport/1.mp3", java.time.Duration.ofHours(3)))
+        when(presignedUrls.resolve("learning", "dictation/airport/1.mp3", Duration.ofHours(3)))
                 .thenReturn("https://storage.example/dictation/airport/1.mp3");
     }
 

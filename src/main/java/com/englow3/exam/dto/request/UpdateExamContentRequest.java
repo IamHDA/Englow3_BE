@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
@@ -16,9 +17,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 /**
  * The whole content tree of a paper, replacing everything below {@code exams} in one call - see
- * {@code AdminExamService.replaceContent}. Nested rather than five files, the same choice
- * {@link com.englow3.exam.dto.result.ExamDetailResult} already made: each level is only ever the field type of the
- * level above it.
+ * {@code AdminExamService.replaceContent}. Nested rather than five files, the same choice {@link ExamDetailResult}
+ * already made: each level is only ever the field type of the level above it.
  * <p>
  * This is also the wizard's autosave, so every list here is {@code @NotNull} but never {@code @NotEmpty} - a section
  * with no part yet, or a question with no option yet, is a normal mid-draft shape, not an error. Only fields the

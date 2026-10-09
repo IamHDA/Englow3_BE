@@ -12,6 +12,8 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.entity.SectionType;
@@ -67,8 +69,8 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
             String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResult> questions) {
 
-        public static QuestionSetResult of(com.englow3.exam.entity.QuestionSet questionSet, String audioUrl,
-                String imageUrl, List<QuestionResult> questions) {
+        public static QuestionSetResult of(QuestionSet questionSet, String audioUrl, String imageUrl,
+                List<QuestionResult> questions) {
             return new QuestionSetResult(questionSet.getId(), questionSet.getTitle(), questionSet.getInstruction(),
                     questionSet.getOrderNo(), questionSet.getContent(), audioUrl, imageUrl,
                     questionSet.getSourceQuestionSetId(), questions);
@@ -80,7 +82,7 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
             UUID sourceQuestionId, List<QuestionOptionResult> options) {
 
-        public static QuestionResult of(com.englow3.exam.entity.Question question, List<QuestionOptionResult> options) {
+        public static QuestionResult of(Question question, List<QuestionOptionResult> options) {
             return new QuestionResult(question.getId(), question.getQuestionType(), question.getContent(),
                     question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
                     question.getOrderNo(), question.getMaxRawScore(), question.getExplanation(),

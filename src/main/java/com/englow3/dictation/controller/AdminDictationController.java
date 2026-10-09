@@ -4,38 +4,41 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.englow3.dictation.entity.DictationLessonStatus;
 import com.englow3.dictation.dto.command.AddDictationSentencesCommand;
 import com.englow3.dictation.dto.command.CreateDictationLessonCommand;
+import com.englow3.dictation.dto.command.SaveAuthoringCommand;
 import com.englow3.dictation.dto.request.AddDictationSentencesRequest;
 import com.englow3.dictation.dto.request.CreateDictationLessonRequest;
 import com.englow3.dictation.dto.request.RejectContentRequest;
+import com.englow3.dictation.dto.request.SaveAuthoringRequest;
+import com.englow3.dictation.dto.response.AuthoringResponse;
 import com.englow3.dictation.dto.response.ContentReviewResponse;
 import com.englow3.dictation.dto.response.DictationLessonResponse;
-import com.englow3.shared.page.PageResponse;
 import com.englow3.dictation.dto.result.DictationImportResult;
-import com.englow3.shared.error.BadRequestException;
+import com.englow3.dictation.entity.DictationLessonStatus;
 import com.englow3.dictation.service.AdminDictationService;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.page.PageResponse;
 
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -142,35 +145,31 @@ class AdminDictationController {
     }
 
     @GetMapping("/lessons/{id}/authoring")
-    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
-        return ResponseEntity.ok(
-                com.englow3.dictation.dto.response.AuthoringResponse.from(adminDictationService.authoringDetail(id)));
+    ResponseEntity<AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(AuthoringResponse.from(adminDictationService.authoringDetail(id)));
     }
 
     @PostMapping("/lessons/authoring")
-    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> createAuthoring(
-            @Valid @RequestBody com.englow3.dictation.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.dictation.dto.response.AuthoringResponse
-                .from(adminDictationService.saveAuthoring(authoringCommand(null, request))));
+    ResponseEntity<AuthoringResponse> createAuthoring(@Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(AuthoringResponse.from(adminDictationService.saveAuthoring(authoringCommand(null, request))));
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/lessons/{id}/authoring")
-    ResponseEntity<com.englow3.dictation.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
-            @Valid @RequestBody com.englow3.dictation.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.ok(com.englow3.dictation.dto.response.AuthoringResponse
-                .from(adminDictationService.saveAuthoring(authoringCommand(id, request))));
+    ResponseEntity<AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity
+                .ok(AuthoringResponse.from(adminDictationService.saveAuthoring(authoringCommand(id, request))));
     }
 
-    private com.englow3.dictation.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
-            com.englow3.dictation.dto.request.SaveAuthoringRequest r) {
+    private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
-        return new com.englow3.dictation.dto.command.SaveAuthoringCommand(id, r.version(),
-                new com.englow3.dictation.dto.command.CreateDictationLessonCommand(m.slug(), m.title(), m.topic(),
-                        m.targetLevel()),
+        return new SaveAuthoringCommand(id, r.version(),
+                new CreateDictationLessonCommand(m.slug(), m.title(), m.topic(), m.targetLevel()),
                 r.sentences().stream()
-                        .map(c -> new com.englow3.dictation.dto.command.SaveAuthoringCommand.Sentence(c.text(),
-                                c.translationVi(), c.audioObjectKey(), c.audioDurationSeconds(), c.hintFirstLetters(),
-                                c.hintRevealWord(), c.hintPartialTranscript(), c.audioStartMs(), c.audioEndMs()))
+                        .map(c -> new SaveAuthoringCommand.Sentence(c.text(), c.translationVi(), c.audioObjectKey(),
+                                c.audioDurationSeconds(), c.hintFirstLetters(), c.hintRevealWord(),
+                                c.hintPartialTranscript(), c.audioStartMs(), c.audioEndMs()))
                         .toList());
     }
 }

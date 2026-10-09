@@ -115,7 +115,7 @@ public class OnboardingServiceImpl implements OnboardingService {
         requireScoreOnScale(command.certificateType(), command.currentScore(), "CURRENT_SCORE_OUT_OF_RANGE");
         requireScoreOnScale(command.certificateType(), command.targetScore(), "TARGET_SCORE_OUT_OF_RANGE");
 
-        profile.setGoal(command.certificateType(), command.targetScore(), command.currentScore(), command.targetDate());
+        profile.setGoal(command.certificateType(), command.currentScore(), command.targetScore(), command.targetDate());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
 
         return state(user, profile);

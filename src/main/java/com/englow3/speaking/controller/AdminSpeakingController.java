@@ -18,14 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.englow3.shared.page.PageResponse;
 import com.englow3.speaking.dto.command.CreateSpeakingPromptCommand;
+import com.englow3.speaking.dto.command.SaveAuthoringCommand;
 import com.englow3.speaking.dto.request.CreateSpeakingPromptRequest;
 import com.englow3.speaking.dto.request.RejectSpeakingPromptRequest;
+import com.englow3.speaking.dto.request.SaveAuthoringRequest;
+import com.englow3.speaking.dto.response.AuthoringResponse;
 import com.englow3.speaking.dto.response.SpeakingPromptReviewResponse;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.service.AdminSpeakingService;
 
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -96,31 +99,27 @@ class AdminSpeakingController {
     }
 
     @GetMapping("/prompts/{id}/authoring")
-    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> authoring(@PathVariable UUID id) {
-        return ResponseEntity
-                .ok(com.englow3.speaking.dto.response.AuthoringResponse.from(adminSpeakingService.authoringDetail(id)));
+    ResponseEntity<AuthoringResponse> authoring(@PathVariable UUID id) {
+        return ResponseEntity.ok(AuthoringResponse.from(adminSpeakingService.authoringDetail(id)));
     }
 
     @PostMapping("/prompts/authoring")
-    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> createAuthoring(
-            @Valid @RequestBody com.englow3.speaking.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(com.englow3.speaking.dto.response.AuthoringResponse
-                .from(adminSpeakingService.saveAuthoring(authoringCommand(null, request))));
+    ResponseEntity<AuthoringResponse> createAuthoring(@Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(AuthoringResponse.from(adminSpeakingService.saveAuthoring(authoringCommand(null, request))));
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/prompts/{id}/authoring")
-    ResponseEntity<com.englow3.speaking.dto.response.AuthoringResponse> updateAuthoring(@PathVariable UUID id,
-            @Valid @RequestBody com.englow3.speaking.dto.request.SaveAuthoringRequest request) {
-        return ResponseEntity.ok(com.englow3.speaking.dto.response.AuthoringResponse
-                .from(adminSpeakingService.saveAuthoring(authoringCommand(id, request))));
+    ResponseEntity<AuthoringResponse> updateAuthoring(@PathVariable UUID id,
+            @Valid @RequestBody SaveAuthoringRequest request) {
+        return ResponseEntity
+                .ok(AuthoringResponse.from(adminSpeakingService.saveAuthoring(authoringCommand(id, request))));
     }
 
-    private com.englow3.speaking.dto.command.SaveAuthoringCommand authoringCommand(UUID id,
-            com.englow3.speaking.dto.request.SaveAuthoringRequest r) {
+    private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
-        return new com.englow3.speaking.dto.command.SaveAuthoringCommand(id, r.version(),
-                new com.englow3.speaking.dto.command.CreateSpeakingPromptCommand(m.slug(), m.title(), m.category(),
-                        m.targetLevel(), m.referenceText(), m.ipaTranscript(), m.translationVi(), m.phonemeTarget(),
-                        m.tips()));
+        return new SaveAuthoringCommand(id, r.version(),
+                new CreateSpeakingPromptCommand(m.slug(), m.title(), m.category(), m.targetLevel(), m.referenceText(),
+                        m.ipaTranscript(), m.translationVi(), m.phonemeTarget(), m.tips()));
     }
 }

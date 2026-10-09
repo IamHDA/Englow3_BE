@@ -1,15 +1,18 @@
 package com.englow3.dictation.service.impl;
 
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.UUID;
-import org.springframework.stereotype.Service;
+
 import org.springframework.beans.factory.annotation.Value;
-import com.englow3.dictation.service.DictationMediaService;
+import org.springframework.stereotype.Service;
+
 import com.englow3.dictation.dto.result.DictationMediaResult;
-import com.englow3.shared.storage.ObjectStorageClient;
+import com.englow3.dictation.service.DictationMediaService;
 import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.storage.AudioFileHeader;
+import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 
 @Service
@@ -34,8 +37,9 @@ public class DictationMediaServiceImpl implements DictationMediaService {
             buffered.mark(12);
             byte[] header = buffered.readNBytes(12);
             buffered.reset();
-            if (!com.englow3.shared.storage.AudioFileHeader.matches(header, type))
+            if (!AudioFileHeader.matches(header, type)) {
                 throw new BadRequestException("DICTATION_MEDIA_INVALID", "The file does not match its audio format");
+            }
             String key = "dictation/authoring/" + users.requireCurrentUserId() + "/" + UUID.randomUUID()
                     + ("audio/wav".equals(type) ? ".wav" : ".mp3");
             storage.upload(bucket, key, buffered, length, type);

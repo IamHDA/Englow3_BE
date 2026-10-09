@@ -1,11 +1,20 @@
 package com.englow3.assessment.entity;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
+
 import com.englow3.assessment.dto.command.AssessmentTaskCommand;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 @Entity
@@ -52,24 +61,29 @@ public class AssessmentTask {
     }
 
     public void edit(AssessmentTaskCommand command) {
-        if (status != AssessmentTaskStatus.DRAFT && status != AssessmentTaskStatus.REJECTED)
+        if (status != AssessmentTaskStatus.DRAFT && status != AssessmentTaskStatus.REJECTED) {
             throw new ConflictException("TASK_NOT_EDITABLE", "Only draft or rejected tasks can be edited");
-        if (command.skill() != skill)
+        }
+        if (command.skill() != skill) {
             throw new BadRequestException("TASK_SKILL_IMMUTABLE", "Create a new task to change its skill");
+        }
         apply(command);
     }
 
     private void apply(AssessmentTaskCommand c) {
         if (c.skill() == null || c.title() == null || c.title().isBlank() || c.instructions() == null
-                || c.instructions().isBlank())
+                || c.instructions().isBlank()) {
             throw new BadRequestException("TASK_CONTENT_REQUIRED", "Task title and instructions are required");
-        boolean valid = c.skill() == AssessmentSkill.WRITING
-                ? java.util.Set.of("TASK_1", "TASK_2").contains(c.taskType())
-                : java.util.Set.of("PART_1", "PART_2", "PART_3").contains(c.taskType());
-        if (!valid)
+        }
+        boolean valid = c.skill() == AssessmentSkill.WRITING ? Set.of("TASK_1", "TASK_2").contains(c.taskType())
+                : Set.of("PART_1", "PART_2", "PART_3").contains(c.taskType());
+        if (!valid) {
             throw new BadRequestException("TASK_TYPE_INVALID", "Task type does not match the skill");
-        if (c.minimumWords() < 0 || c.minimumWords() > 1000 || c.timeLimitSeconds() < 30 || c.timeLimitSeconds() > 3600)
+        }
+        if (c.minimumWords() < 0 || c.minimumWords() > 1000 || c.timeLimitSeconds() < 30
+                || c.timeLimitSeconds() > 3600) {
             throw new BadRequestException("TASK_LIMIT_INVALID", "Task limits are invalid");
+        }
         skill = c.skill();
         title = c.title().strip();
         taskType = c.taskType();
@@ -81,8 +95,9 @@ public class AssessmentTask {
     }
 
     public void submit() {
-        if (status != AssessmentTaskStatus.DRAFT && status != AssessmentTaskStatus.REJECTED)
+        if (status != AssessmentTaskStatus.DRAFT && status != AssessmentTaskStatus.REJECTED) {
             throw new ConflictException("TASK_NOT_SUBMITTABLE", "This task cannot be submitted");
+        }
         status = AssessmentTaskStatus.PENDING_REVIEW;
     }
 
@@ -96,8 +111,9 @@ public class AssessmentTask {
 
     public void reject(UUID reviewer, String note) {
         requirePending();
-        if (note == null || note.isBlank())
+        if (note == null || note.isBlank()) {
             throw new BadRequestException("REVIEW_NOTE_REQUIRED", "Explain the requested changes");
+        }
         status = AssessmentTaskStatus.REJECTED;
         reviewedByUserId = reviewer;
         reviewNote = note.strip();
@@ -116,13 +132,15 @@ public class AssessmentTask {
     }
 
     public void archive() {
-        if (status != AssessmentTaskStatus.PUBLISHED)
+        if (status != AssessmentTaskStatus.PUBLISHED) {
             throw new ConflictException("TASK_NOT_PUBLISHED", "Only published tasks can be archived");
+        }
         status = AssessmentTaskStatus.ARCHIVED;
     }
 
     private void requirePending() {
-        if (status != AssessmentTaskStatus.PENDING_REVIEW)
+        if (status != AssessmentTaskStatus.PENDING_REVIEW) {
             throw new ConflictException("TASK_NOT_PENDING", "Task is not awaiting review");
+        }
     }
 }

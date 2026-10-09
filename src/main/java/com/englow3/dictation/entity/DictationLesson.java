@@ -3,6 +3,7 @@ package com.englow3.dictation.entity;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.englow3.dictation.dto.command.CreateDictationLessonCommand;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.ForbiddenException;
 
@@ -156,8 +157,7 @@ public class DictationLesson {
         }
     }
 
-    public void updateDraft(com.englow3.dictation.dto.command.CreateDictationLessonCommand source, long expectedVersion,
-            Instant now) {
+    public void updateDraft(CreateDictationLessonCommand source, long expectedVersion, Instant now) {
         if ((status != DictationLessonStatus.DRAFT && status != DictationLessonStatus.REJECTED)
                 || publishedAt != null) {
             throw new ConflictException("CONTENT_NOT_EDITABLE",

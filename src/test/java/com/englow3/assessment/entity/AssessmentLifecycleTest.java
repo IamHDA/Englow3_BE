@@ -1,11 +1,15 @@
 package com.englow3.assessment.entity;
 
 import static org.junit.jupiter.api.Assertions.*;
+
 import java.time.Instant;
 import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
+
 import com.englow3.assessment.dto.command.AssessmentTaskCommand;
-import com.englow3.shared.error.*;
+import com.englow3.shared.error.BadRequestException;
+import com.englow3.shared.error.ConflictException;
 
 class AssessmentLifecycleTest {
     private AssessmentTask task() {

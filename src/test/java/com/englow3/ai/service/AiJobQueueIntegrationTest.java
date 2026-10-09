@@ -2,6 +2,7 @@ package com.englow3.ai.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -139,7 +140,7 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
         AiJob claimed = workerQueue.claimBatch(1000).stream()
                 .filter(candidate -> candidate.getTargetId().equals(target)).findFirst().orElseThrow();
         AiJob job = claimed;
-        workerQueue.reclaimStalled(java.time.Duration.ZERO);
+        workerQueue.reclaimStalled(Duration.ZERO);
 
         boolean gaveUp = workerQueue.record(job.getId(), claimed.getStartedAt(),
                 AiJobHandler.Outcome.transientFailure("PROVIDER_TIMEOUT", "late"));

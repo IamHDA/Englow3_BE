@@ -7,9 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -18,8 +15,12 @@ import com.englow3.exam.dto.request.SubmitExamAttemptRequest;
 import com.englow3.flashcard.dto.request.AddFlashcardsRequest;
 import com.englow3.quiz.dto.request.AddQuizQuestionsRequest;
 import com.englow3.quiz.dto.request.SubmitQuizAttemptRequest;
+import com.englow3.speaking.dto.request.CreateSpeakingPromptRequest;
 import com.englow3.user.dto.request.SelectLearningPurposesRequest;
 import com.englow3.user.dto.request.SelectTargetSkillsRequest;
+
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 /**
  * A list with a null in it - {@code "answers": [null]} - passed validation, because {@code @Valid} on an element only
@@ -73,9 +74,9 @@ class RequestNullElementsTest {
     /** Every other kind of content already insisted on a CEFR band; a speaking prompt took any two characters. */
     @Test
     void refusesASpeakingPromptLevelThatIsNotACefrBand() {
-        assertThat(VALIDATOR.validate(new com.englow3.speaking.dto.request.CreateSpeakingPromptRequest("slug", "Title",
-                "Sounds", "ZZ", "Hello there.", null, null, null, null))).isNotEmpty();
-        assertThat(VALIDATOR.validate(new com.englow3.speaking.dto.request.CreateSpeakingPromptRequest("slug", "Title",
-                "Sounds", "B1", "Hello there.", null, null, null, null))).isEmpty();
+        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Sounds", "ZZ", "Hello there.",
+                null, null, null, null))).isNotEmpty();
+        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Sounds", "B1", "Hello there.",
+                null, null, null, null))).isEmpty();
     }
 }

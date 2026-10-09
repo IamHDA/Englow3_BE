@@ -121,7 +121,7 @@ def main() -> int:
     if not stats:
         print("  (không có asset audio nào)")
     if diffs:
-        print(f"\n  Ví dụ lệch thời lượng (khai → thật):")
+        print("\n  Ví dụ lệch thời lượng (khai → thật):")
         for name, old, new in diffs[:5]:
             print(f"    {name:38} {old:6d} → {new:6d} ms")
     return 0

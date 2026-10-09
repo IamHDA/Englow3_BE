@@ -24,6 +24,7 @@ import com.englow3.exam.dto.projection.AdminExamPaperProjection;
 import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.dto.result.ExamMediaResult;
 import com.englow3.exam.entity.Exam;
+import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
@@ -31,6 +32,8 @@ import com.englow3.exam.repository.QuestionOptionRepository;
 import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.exam.repository.QuestionSetRepository;
 import com.englow3.exam.repository.SectionPartRepository;
+import com.englow3.exam.service.impl.ExamContentServiceImpl;
+import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
@@ -48,9 +51,9 @@ class ExamContentServiceTest {
     private final QuestionOptionRepository questionOptionRepo = mock(QuestionOptionRepository.class);
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
-    private final ExamContentService service = new com.englow3.exam.service.impl.ExamContentServiceImpl(examRepo,
-            examSectionRepo, sectionPartRepo, questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery,
-            objectStorage, mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
+    private final ExamContentService service = new ExamContentServiceImpl(examRepo, examSectionRepo, sectionPartRepo,
+            questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery, objectStorage,
+            mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
 
     @Test
     void uploadsMediaThroughTheObjectStorageClient() {
@@ -104,12 +107,11 @@ class ExamContentServiceTest {
     void refusesWritingAndSpeakingSectionsBecauseAMockExamOnlyScoresChoices() {
         Exam exam = AdminExamServiceTest.draft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
-        var writing = new UpdateExamContentCommand.SectionCommand(com.englow3.exam.entity.SectionType.WRITING, 1,
+        var writing = new UpdateExamContentCommand.SectionCommand(SectionType.WRITING, 1,
                 new java.math.BigDecimal("10"), false, null, List.of());
 
         assertThatThrownBy(() -> service.replaceContent(new UpdateExamContentCommand(exam.getId(), List.of(writing))))
-                .isInstanceOf(com.englow3.shared.error.BadRequestException.class)
-                .extracting(e -> ((com.englow3.shared.error.BadRequestException) e).getCode())
+                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                 .isEqualTo("EXAM_PRODUCTIVE_SECTION");
     }
 

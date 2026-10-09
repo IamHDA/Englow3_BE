@@ -14,6 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.flashcard.entity.FlashcardReview;
+import com.englow3.flashcard.entity.FlashcardReviewStatus;
 
 public interface FlashcardReviewRepository extends JpaRepository<FlashcardReview, UUID> {
 
@@ -40,7 +41,7 @@ public interface FlashcardReviewRepository extends JpaRepository<FlashcardReview
 
     @Query("""
             select count(r) from FlashcardReview r
-            where r.userId = :userId and r.status = com.englow3.flashcard.entity.FlashcardReviewStatus.MASTERED
+            where r.userId = :userId and r.status = FlashcardReviewStatus.MASTERED
               and r.flashcardId in (select c.id from Flashcard c where c.flashcardSetId = :setId)
             """)
     long countMasteredInSet(@Param("userId") UUID userId, @Param("setId") UUID setId);
@@ -52,7 +53,7 @@ public interface FlashcardReviewRepository extends JpaRepository<FlashcardReview
     @Query("""
             select c.flashcardSetId,
                    sum(case when r.dueAt <= :now then 1 else 0 end),
-                   sum(case when r.status = com.englow3.flashcard.entity.FlashcardReviewStatus.MASTERED then 1 else 0 end)
+                   sum(case when r.status = FlashcardReviewStatus.MASTERED then 1 else 0 end)
             from FlashcardReview r, Flashcard c
             where r.flashcardId = c.id and r.userId = :userId and c.flashcardSetId in :setIds
             group by c.flashcardSetId

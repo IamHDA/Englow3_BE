@@ -5,7 +5,9 @@ import java.util.UUID;
 
 import com.englow3.tutor.dto.command.ReportTutorMessageCommand;
 import com.englow3.tutor.dto.command.SendTutorMessageCommand;
-import com.englow3.tutor.dto.result.*;
+import com.englow3.tutor.dto.result.TutorConversationResult;
+import com.englow3.tutor.dto.result.TutorConversationSummaryResult;
+import com.englow3.tutor.dto.result.TutorMessageResult;
 
 public interface TutorService {
     TutorConversationResult send(SendTutorMessageCommand command);

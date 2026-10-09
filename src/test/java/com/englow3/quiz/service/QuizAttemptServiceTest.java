@@ -10,17 +10,17 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand;
 import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand.SubmittedAnswer;
+import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand;
 import com.englow3.quiz.dto.result.QuizAttemptResult;
 import com.englow3.quiz.dto.result.QuizPaperResult;
 import com.englow3.quiz.entity.Quiz;
@@ -38,6 +38,7 @@ import com.englow3.quiz.repository.QuizQuestionPairRepository;
 import com.englow3.quiz.repository.QuizQuestionRepository;
 import com.englow3.quiz.repository.QuizQuestionTokenRepository;
 import com.englow3.quiz.repository.QuizRepository;
+import com.englow3.quiz.service.impl.QuizAttemptServiceImpl;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
 
@@ -54,8 +55,8 @@ class QuizAttemptServiceTest {
     private final QuizAttemptAnswerRepository attemptAnswerRepo = mock(QuizAttemptAnswerRepository.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
-    private final QuizAttemptService service = new com.englow3.quiz.service.impl.QuizAttemptServiceImpl(quizRepo,
-            questionRepo, optionRepo, tokenRepo, pairRepo, attemptRepo, attemptAnswerRepo, userDirectory, CLOCK);
+    private final QuizAttemptService service = new QuizAttemptServiceImpl(quizRepo, questionRepo, optionRepo, tokenRepo,
+            pairRepo, attemptRepo, attemptAnswerRepo, userDirectory, CLOCK);
 
     private final UUID userId = UUID.randomUUID();
     private Quiz quiz;

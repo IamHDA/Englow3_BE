@@ -2,6 +2,7 @@ package com.englow3.dictation.helper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class MissedWordCounterTest {
      */
     @Test
     void putsTheWorstAccuracyFirstRatherThanTheMostMisses() {
-        List<String[]> attempts = new java.util.ArrayList<>();
+        List<String[]> attempts = new ArrayList<>();
         attempts.add(attempt("alpha", "wrong"));
         attempts.add(attempt("alpha", "wrong"));
         for (int i = 0; i < 27; i++) {

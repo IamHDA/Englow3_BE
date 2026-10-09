@@ -17,10 +17,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import com.englow3.quiz.dto.command.AddQuizQuestionsCommand;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewOption;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewPair;
 import com.englow3.quiz.dto.command.AddQuizQuestionsCommand.NewQuestion;
+import com.englow3.quiz.dto.command.AddQuizQuestionsCommand;
 import com.englow3.quiz.entity.Quiz;
 import com.englow3.quiz.entity.QuizQuestionToken;
 import com.englow3.quiz.entity.QuizQuestionType;
@@ -30,6 +30,7 @@ import com.englow3.quiz.repository.QuizQuestionPairRepository;
 import com.englow3.quiz.repository.QuizQuestionRepository;
 import com.englow3.quiz.repository.QuizQuestionTokenRepository;
 import com.englow3.quiz.repository.QuizRepository;
+import com.englow3.quiz.service.impl.QuizQuestionAuthoringServiceImpl;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 
@@ -40,8 +41,8 @@ class QuizQuestionAuthoringServiceTest {
     private final QuizQuestionOptionRepository optionRepo = mock(QuizQuestionOptionRepository.class);
     private final QuizQuestionTokenRepository tokenRepo = mock(QuizQuestionTokenRepository.class);
     private final QuizQuestionPairRepository pairRepo = mock(QuizQuestionPairRepository.class);
-    private final QuizQuestionAuthoringService service = new com.englow3.quiz.service.impl.QuizQuestionAuthoringServiceImpl(
-            quizRepo, questionRepo, optionRepo, tokenRepo, pairRepo);
+    private final QuizQuestionAuthoringService service = new QuizQuestionAuthoringServiceImpl(quizRepo, questionRepo,
+            optionRepo, tokenRepo, pairRepo);
 
     private Quiz quiz;
 

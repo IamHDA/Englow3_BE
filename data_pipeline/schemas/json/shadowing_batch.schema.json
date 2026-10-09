@@ -148,6 +148,22 @@
           "default": null,
           "title": "Duration Ms"
         },
+        "practice_modes": {
+          "items": {
+            "enum": [
+              "shadowing",
+              "dictation"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Practice Modes",
+          "type": "array"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "draft"
+        },
         "script": {
           "minLength": 20,
           "title": "Script",
@@ -160,6 +176,41 @@
           "minItems": 1,
           "title": "Segments",
           "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "topic": {
+          "anyOf": [
+            {
+              "enum": [
+                "Daily Conversation",
+                "Travel",
+                "Work",
+                "IELTS",
+                "TOEIC",
+                "News",
+                "Academic English"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Topic"
         }
       },
       "required": [
@@ -211,6 +262,19 @@
           "minLength": 3,
           "title": "Text",
           "type": "string"
+        },
+        "translation_vi": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Vi"
         }
       },
       "required": [
