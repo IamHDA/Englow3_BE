@@ -32,8 +32,8 @@ public final class DictationImport {
 
     private static final Pattern TRAILING_NUMBER = Pattern.compile("(\\d+)$");
 
-    private static final Map<String, String> ACCENTS = Map.of("us", "Mỹ", "uk", "Anh", "gb", "Anh", "au", "Úc", "ca",
-            "Canada");
+    private static final Map<String, String> ACCENTS = Map.of("us", "US", "uk", "UK", "gb", "UK", "au", "Australian",
+            "ca", "Canadian");
 
     private DictationImport() {
     }
@@ -162,9 +162,9 @@ public final class DictationImport {
         }
         Matcher number = TRAILING_NUMBER.matcher(clipId);
         // Leading zeros dropped as text, not by parsing: an id may end in more digits than an int holds.
-        String name = number.find() ? "Bài nghe " + number.group(1).replaceFirst("^0+(?=\\d)", "") : clipId;
+        String name = number.find() ? "Listening " + number.group(1).replaceFirst("^0+(?=\\d)", "") : clipId;
         String accent = ACCENTS.get(String.valueOf(text(clip, "accent")).toLowerCase(Locale.ROOT));
-        return accent == null ? name : name + " · giọng " + accent;
+        return accent == null ? name : name + " · " + accent + " accent";
     }
 
     /**

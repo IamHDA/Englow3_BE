@@ -68,7 +68,7 @@ class DictationImportTest {
         void titlesTheLessonWithoutGivingAwayTheScript() {
             String title = DictationImport.read(MAPPER, ONE_CLIP).lessons().get(0).title();
 
-            assertThat(title).isEqualTo("Bài nghe 1 · giọng Mỹ");
+            assertThat(title).isEqualTo("Listening 1 · US accent");
             assertThat(title).doesNotContain("airport");
         }
 
@@ -77,7 +77,8 @@ class DictationImportTest {
         void titlesAClipWhoseNumberIsLongerThanAnInt() {
             String json = ONE_CLIP.replace("\"clip_id\":\"airport-01\"", "\"clip_id\":\"clip-000368347456064\"");
 
-            assertThat(DictationImport.read(MAPPER, json).lessons().get(0).title()).startsWith("Bài nghe 368347456064");
+            assertThat(DictationImport.read(MAPPER, json).lessons().get(0).title())
+                    .startsWith("Listening 368347456064");
         }
 
         /** A clip of 8.4 seconds reported as 8 would have the player stop before the last word. */
