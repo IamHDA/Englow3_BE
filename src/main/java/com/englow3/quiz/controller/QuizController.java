@@ -24,6 +24,7 @@ import com.englow3.shared.page.PageResponse;
 
 import lombok.RequiredArgsConstructor;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -37,8 +38,8 @@ class QuizController {
     ResponseEntity<PageResponse<QuizSummaryResponse>> search(@RequestParam(required = false) String category,
             @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "title", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse
-                .from(quizService.searchPublished(category, title, pageable).map(QuizSummaryResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(
+                quizService.searchPublished(category, title, StablePage.of(pageable)).map(QuizSummaryResponse::from)));
     }
 
     /** 201 for a new attempt, 200 for one that was already open - same convention as an exam. */

@@ -37,6 +37,7 @@ import com.englow3.shared.page.PageResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/admin/quizzes")
@@ -57,7 +58,8 @@ class AdminQuizController {
             @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(PageResponse
-                .from(adminQuizService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+                .from(adminQuizService.searchForAuthoring(status, title, StablePage.of(pageable, Sort.by("title")))
+                        .map(ContentReviewResponse::from)));
     }
 
     @PostMapping

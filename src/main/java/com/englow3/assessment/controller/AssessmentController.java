@@ -28,6 +28,7 @@ import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/assessments")
@@ -42,8 +43,10 @@ public class AssessmentController {
 
     @GetMapping("/tasks")
     public ResponseEntity<PageResponse<AssessmentTaskResponse>> tasks(
-            @RequestParam(required = false) AssessmentSkill skill, @PageableDefault(size = 12) Pageable page) {
-        return ResponseEntity.ok(PageResponse.from(service.catalog(skill, page).map(AssessmentTaskResponse::from)));
+            @RequestParam(required = false) AssessmentSkill skill,
+            @PageableDefault(size = 12, sort = { "skill", "taskType", "title" }) Pageable page) {
+        return ResponseEntity
+                .ok(PageResponse.from(service.catalog(skill, StablePage.of(page)).map(AssessmentTaskResponse::from)));
     }
 
     @GetMapping("/tasks/{id}")

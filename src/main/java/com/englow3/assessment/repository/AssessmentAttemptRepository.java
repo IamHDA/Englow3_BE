@@ -34,10 +34,10 @@ public interface AssessmentAttemptRepository extends JpaRepository<AssessmentAtt
     @Query("select a from AssessmentAttempt a where a.id=:id")
     Optional<AssessmentAttempt> lockById(@Param("id") UUID id);
 
-    @Query("select a from AssessmentAttempt a where a.userId=:user and (:task is null or a.taskId=:task) order by a.createdAt desc")
+    @Query("select a from AssessmentAttempt a where a.userId=:user and (:task is null or a.taskId=:task) order by a.createdAt desc, a.id")
     Page<AssessmentAttempt> history(@Param("user") UUID user, @Param("task") UUID task, Pageable pageable);
 
-    @Query("select a from AssessmentAttempt a, AssessmentTask t where a.taskId=t.id and (:author is null or t.createdByUserId=:author) and (:status is null or a.status=:status) and a.status<>com.englow3.assessment.entity.AssessmentAttemptStatus.DRAFT order by a.submittedAt desc")
+    @Query("select a from AssessmentAttempt a, AssessmentTask t where a.taskId=t.id and (:author is null or t.createdByUserId=:author) and (:status is null or a.status=:status) and a.status<>com.englow3.assessment.entity.AssessmentAttemptStatus.DRAFT order by a.submittedAt desc, a.id")
     Page<AssessmentAttempt> reviewQueue(@Param("author") UUID author, @Param("status") AssessmentAttemptStatus status,
             Pageable pageable);
 }

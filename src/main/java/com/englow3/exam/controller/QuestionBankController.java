@@ -16,6 +16,7 @@ import com.englow3.exam.service.QuestionBankService;
 import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
+import com.englow3.shared.page.StablePage;
 
 /**
  * The bank is not a store of its own - it is every question ever authored, searchable, and "choosing" one is a copy
@@ -40,7 +41,7 @@ class QuestionBankController {
         SearchQuestionBankCommand command = new SearchQuestionBankCommand(request.skillType(),
                 request.difficultyLevel(), request.keyword());
 
-        return ResponseEntity.ok(PageResponse
-                .from(questionBankService.searchQuestionBank(command, pageable).map(QuestionBankItemResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(questionBankService
+                .searchQuestionBank(command, StablePage.of(pageable)).map(QuestionBankItemResponse::from)));
     }
 }

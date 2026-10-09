@@ -40,6 +40,7 @@ import com.englow3.shared.page.PageResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/admin/dictation")
@@ -58,8 +59,9 @@ class AdminDictationController {
     ResponseEntity<PageResponse<ContentReviewResponse>> search(
             @RequestParam(required = false) DictationLessonStatus status, @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                adminDictationService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+        return ResponseEntity.ok(PageResponse
+                .from(adminDictationService.searchForAuthoring(status, title, StablePage.of(pageable, Sort.by("slug")))
+                        .map(ContentReviewResponse::from)));
     }
 
     /** Says what a generated shadowing batch would do, and writes nothing. */

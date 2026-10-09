@@ -27,6 +27,7 @@ import com.englow3.speaking.service.SpeakingAttemptService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 /**
  * Speaking practice for a learner.
@@ -47,8 +48,8 @@ public class SpeakingController {
     public ResponseEntity<PageResponse<SpeakingPromptResponse>> prompts(@RequestParam(required = false) String category,
             @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "title", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse
-                .from(speakingService.searchPublished(category, title, pageable).map(SpeakingPromptResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(speakingService
+                .searchPublished(category, title, StablePage.of(pageable)).map(SpeakingPromptResponse::from)));
     }
 
     @GetMapping("/prompts/{id}")

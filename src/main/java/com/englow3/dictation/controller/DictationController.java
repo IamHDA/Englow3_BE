@@ -27,6 +27,7 @@ import com.englow3.dictation.service.DictationStatsService;
 import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/dictation")
@@ -47,10 +48,10 @@ class DictationController {
 
     @GetMapping("/lessons")
     ResponseEntity<PageResponse<DictationLessonResponse>> lessons(@RequestParam(required = false) String topic,
-            @RequestParam(required = false) String title,
-            @PageableDefault(size = 20, sort = "title", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse
-                .from(dictationService.searchPublished(topic, title, pageable).map(DictationLessonResponse::from)));
+            @RequestParam(required = false) String title, @PageableDefault(size = 20, sort = { "targetLevel",
+                    "title" }, direction = Sort.Direction.ASC) Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(dictationService
+                .searchPublished(topic, title, StablePage.of(pageable)).map(DictationLessonResponse::from)));
     }
 
     @GetMapping("/lessons/{id}")

@@ -49,6 +49,7 @@ import com.englow3.shared.page.PageResponse;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
+import com.englow3.shared.page.StablePage;
 
 /**
  * Authoring and review.
@@ -89,8 +90,9 @@ class AdminExamController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         SearchExamCommand command = new SearchExamCommand(request.status(), request.examType(), request.title());
 
-        return ResponseEntity
-                .ok(PageResponse.from(adminExamService.search(command, pageable).map(ExamListItemResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(adminExamService
+                .search(command, StablePage.of(pageable, StablePage.byTitleNaturally("e", Sort.Direction.ASC)))
+                .map(ExamListItemResponse::from)));
     }
 
     /** The whole paper, media signed for an hour - long enough to read a full TOEIC paper before publishing it. */

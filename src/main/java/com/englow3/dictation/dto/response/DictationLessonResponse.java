@@ -8,11 +8,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record DictationLessonResponse(UUID id, String slug, String title, String topic,
         @Schema(nullable = true) String targetLevel, long sentenceCount, long completedSentenceCount,
-        int totalDurationSeconds, @Schema(nullable = true) Instant lastPractisedAt) {
+        int totalDurationSeconds, @Schema(nullable = true) Instant lastPractisedAt,
+        @Schema(nullable = true) Instant publishedAt) {
 
     public static DictationLessonResponse from(DictationLessonSummaryResult result) {
         return new DictationLessonResponse(result.id(), result.slug(), result.title(), result.topic(),
                 result.targetLevel(), result.sentenceCount(), result.completedSentenceCount(),
-                result.totalDurationSeconds(), result.lastPractisedAt());
+                result.totalDurationSeconds(), result.lastPractisedAt(), result.publishedAt());
     }
 }

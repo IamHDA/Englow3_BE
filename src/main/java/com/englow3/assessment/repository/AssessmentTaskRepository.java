@@ -17,7 +17,7 @@ import com.englow3.assessment.entity.AssessmentTaskStatus;
 import jakarta.persistence.LockModeType;
 
 public interface AssessmentTaskRepository extends JpaRepository<AssessmentTask, UUID> {
-    @Query("select t from AssessmentTask t where (:skill is null or t.skill=:skill) and (:status is null or t.status=:status) and (:author is null or t.createdByUserId=:author) order by t.createdAt desc")
+    @Query("select t from AssessmentTask t where (:skill is null or t.skill=:skill) and (:status is null or t.status=:status) and (:author is null or t.createdByUserId=:author)")
     Page<AssessmentTask> search(@Param("skill") AssessmentSkill skill, @Param("status") AssessmentTaskStatus status,
             @Param("author") UUID author, Pageable pageable);
 

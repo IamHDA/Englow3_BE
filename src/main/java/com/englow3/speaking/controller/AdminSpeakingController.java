@@ -30,6 +30,7 @@ import com.englow3.speaking.service.AdminSpeakingService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 /**
  * Authoring and review, split the same way as every other content type: staff write and submit, administrators decide.
@@ -58,8 +59,9 @@ class AdminSpeakingController {
     ResponseEntity<PageResponse<SpeakingPromptReviewResponse>> search(
             @RequestParam(required = false) SpeakingPromptStatus status, @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(adminSpeakingService.searchForAuthoring(status, title, pageable)
-                .map(SpeakingPromptReviewResponse::from)));
+        return ResponseEntity.ok(PageResponse
+                .from(adminSpeakingService.searchForAuthoring(status, title, StablePage.of(pageable, Sort.by("title")))
+                        .map(SpeakingPromptReviewResponse::from)));
     }
 
     @PostMapping("/prompts/{id}/submit-for-review")

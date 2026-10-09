@@ -41,6 +41,7 @@ import com.englow3.shared.page.PageResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
 
 /**
  * The authoring side. It exists now, ahead of a screen to drive it, because module-map.md requires runtime content to
@@ -63,8 +64,9 @@ class AdminFlashcardController {
     ResponseEntity<PageResponse<ContentReviewResponse>> search(
             @RequestParam(required = false) FlashcardSetStatus status, @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(
-                adminFlashcardService.searchForAuthoring(status, title, pageable).map(ContentReviewResponse::from)));
+        return ResponseEntity.ok(PageResponse
+                .from(adminFlashcardService.searchForAuthoring(status, title, StablePage.of(pageable, Sort.by("name")))
+                        .map(ContentReviewResponse::from)));
     }
 
     @PostMapping("/sets")

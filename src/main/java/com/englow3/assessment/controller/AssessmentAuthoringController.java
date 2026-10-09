@@ -35,6 +35,8 @@ import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.englow3.shared.page.StablePage;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/admin/assessments")
@@ -51,9 +53,10 @@ public class AssessmentAuthoringController {
     @GetMapping("/tasks")
     public ResponseEntity<PageResponse<AssessmentTaskResponse>> tasks(
             @RequestParam(required = false) AssessmentSkill skill,
-            @RequestParam(required = false) AssessmentTaskStatus status, @PageableDefault(size = 12) Pageable page) {
-        return ResponseEntity
-                .ok(PageResponse.from(service.tasks(skill, status, page).map(AssessmentTaskResponse::from)));
+            @RequestParam(required = false) AssessmentTaskStatus status,
+            @PageableDefault(size = 12, sort = "createdAt", direction = Sort.Direction.DESC) Pageable page) {
+        return ResponseEntity.ok(PageResponse.from(
+                service.tasks(skill, status, StablePage.of(page, Sort.by("title"))).map(AssessmentTaskResponse::from)));
     }
 
     @PostMapping("/tasks")

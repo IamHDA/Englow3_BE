@@ -26,6 +26,7 @@ import com.englow3.flashcard.service.FlashcardStatsService;
 import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
+import com.englow3.shared.page.StablePage;
 
 @RestController
 @RequestMapping("/api/flashcards")
@@ -55,8 +56,8 @@ public class FlashcardController {
     public ResponseEntity<PageResponse<FlashcardSetResponse>> sets(@RequestParam(required = false) String topic,
             @RequestParam(required = false) String title,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse
-                .from(flashcardService.searchPublishedSets(topic, title, pageable).map(FlashcardSetResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(flashcardService
+                .searchPublishedSets(topic, title, StablePage.of(pageable)).map(FlashcardSetResponse::from)));
     }
 
     @GetMapping("/sets/{id}")
