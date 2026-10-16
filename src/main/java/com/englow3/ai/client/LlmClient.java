@@ -30,7 +30,7 @@ public class LlmClient {
             @Value("${app.ai.internal-api-key:}") String internalApiKey,
             @Value("${app.ai.default-model}") String defaultModel,
             @Value("${app.ai.connect-timeout:5s}") Duration connectTimeout,
-            @Value("${app.ai.read-timeout:45s}") Duration readTimeout) {
+            @Value("${app.ai.read-timeout:55s}") Duration readTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         // Set explicitly for the same reason as the speech client: the default is no timeout at all, and a worker
         // blocked on a provider that stopped answering holds its job RUNNING until the stall reconciler notices.
@@ -74,7 +74,9 @@ public class LlmClient {
                     .onStatus(HttpStatusCode::isError, (request, response) -> {
                         throw new LlmException("TUTOR_GENERATION_REJECTED",
                                 "ai_service answered %s".formatted(response.getStatusCode()),
-                                SpeechAssessmentClient.retryable(response.getStatusCode()));
+                                AiServiceFailure.retryable(response.getBody(),
+                                        SpeechAssessmentClient.retryable(response.getStatusCode())))
+                                                .retryAfter(response.getHeaders().getFirst("Retry-After"));
                     }).body(String.class);
         } catch (RestClientException transportFailure) {
             // Nothing came back at all: a timeout, a refused connection, a DNS failure. None of them says anything

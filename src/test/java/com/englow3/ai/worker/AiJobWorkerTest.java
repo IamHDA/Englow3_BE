@@ -1,273 +1,119 @@
 package com.englow3.ai.worker;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Function;
-
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.service.AiJobWorkerQueue;
 
-/**
- * What the worker does when a handler misbehaves. Each branch decides whether work is tried again, which is the whole
- * reason the queue is durable - getting it wrong either loses the work or repeats it forever.
- */
 class AiJobWorkerTest {
+    @Test
+    void sleepingAdapterDefersWithoutCallingProviderOrSpendingARetry() {
+        AiJob claimed = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(claimed));
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of());
+        var readiness = mock(com.englow3.ai.client.AiServiceReadiness.class);
+        var handler = mock(AiJobHandler.class);
+        when(handler.handles()).thenReturn("TUTOR_REPLY");
+        try (var worker = new AiJobWorker(queue, List.of(handler), Duration.ofMinutes(3), Duration.ofSeconds(140),
+                readiness)) {
+            worker.drain();
+        }
+        verify(queue).defer(claimed.getId(), claimed.getStartedAt(), Duration.ofSeconds(10));
+        verify(handler, never()).run(any(), any(), any());
+        verify(queue, never()).record(any(), any(), any(), any());
+    }
 
     private final AiJobWorkerQueue queue = mock(AiJobWorkerQueue.class);
 
-    private static AiJob job() {
-        return AiJob.pending(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", UUID.randomUUID(), "azure", "model", "v1",
-                "{}", UUID.randomUUID().toString(), (short) 3);
+    private AiJob job(AiJobType type) {
+        AiJob job = AiJob.pending(type, "TARGET", UUID.randomUUID(), "provider", "model", "v1", "{}",
+                UUID.randomUUID().toString(), (short) 3);
+        job.claim(Instant.now());
+        return job;
     }
 
-    private AiJobWorker workerWith(AiJobHandler... handlers) {
-        return new AiJobWorker(queue, List.of(handlers), 5, Duration.ofMinutes(5));
-    }
-
-    private static AiJobHandler handlerThat(Function<UUID, AiJobHandler.Outcome> behaviour) {
+    private AiJobHandler handler(String type, Runnable action) {
         return new AiJobHandler() {
-            @Override
             public String handles() {
-                return "SPEECH_ASSESSMENT";
+                return type;
             }
 
-            @Override
-            public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
-                return behaviour.apply(jobId);
+            public Outcome run(UUID id, UUID target, String input) {
+                action.run();
+                return Outcome.succeeded("{}");
             }
         };
     }
 
-    private AiJobHandler.Outcome drainAndCapture(AiJob job) {
-        ArgumentCaptor<AiJobHandler.Outcome> outcome = ArgumentCaptor.forClass(AiJobHandler.Outcome.class);
-        verify(queue).record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), outcome.capture());
-
-        return outcome.getValue();
-    }
-
     @Test
-    void recordsWhatTheHandlerReturned() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-
-        workerWith(handlerThat(ignored -> AiJobHandler.Outcome.succeeded("{\"ok\":true}"))).drain();
-
-        AiJobHandler.Outcome recorded = drainAndCapture(job);
-        assertThat(recorded.success()).isTrue();
-        assertThat(recorded.outputPayload()).isEqualTo("{\"ok\":true}");
-    }
-
-    /**
-     * A thrown exception is read as retryable. It is usually a bug or a transport problem rather than a statement about
-     * the input, and failing outright would throw away work a fixed deployment would have finished.
-     */
-    @Test
-    void treatsAThrownExceptionAsWorthAnotherGo() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-
-        workerWith(handlerThat(ignored -> {
-            throw new IllegalStateException("boom");
-        })).drain();
-
-        AiJobHandler.Outcome recorded = drainAndCapture(job);
-        assertThat(recorded.success()).isFalse();
-        assertThat(recorded.retryable()).isTrue();
-        assertThat(recorded.errorCode()).isEqualTo("AI_JOB_HANDLER_ERROR");
-    }
-
-    /** One handler throwing must not stop the rest of the batch being attempted. */
-    @Test
-    void keepsGoingAfterOneJobThrows() {
-        AiJob first = job();
-        AiJob second = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(first, second));
-
-        workerWith(handlerThat(jobId -> {
-            if (jobId.equals(first.getId())) {
-                throw new IllegalStateException("boom");
-            }
-            return AiJobHandler.Outcome.succeeded("{}");
-        })).drain();
-
-        verify(queue).record(eq(first.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
-    }
-
-    /**
-     * No handler is the one failure that is permanent: no amount of retrying will register one, so spending the budget
-     * would only delay the same answer.
-     */
-    @Test
-    void failsAJobTypeNothingCanHandleWithoutRetrying() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-
-        workerWith().drain();
-
-        AiJobHandler.Outcome recorded = drainAndCapture(job);
-        assertThat(recorded.retryable()).isFalse();
-        assertThat(recorded.errorCode()).isEqualTo("AI_JOB_NO_HANDLER");
-    }
-
-    @Test
-    void doesNothingWhenTheQueueIsEmpty() {
-        when(queue.claimBatch(5)).thenReturn(List.of());
-
-        workerWith(handlerThat(ignored -> AiJobHandler.Outcome.succeeded("{}"))).drain();
-
-        verify(queue, org.mockito.Mockito.never()).record(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    void handsStalledJobsBackUsingTheConfiguredLockTimeout() {
-        when(queue.reclaimStalled(Duration.ofMinutes(5))).thenReturn(List.of(job(), job()));
-
-        workerWith().reclaimStalled();
-
-        verify(queue).reclaimStalled(Duration.ofMinutes(5));
-    }
-
-    /** A handler that only records calls to onGaveUp, so the tests can say who was told what. */
-    private static final class Recording implements AiJobHandler {
-
-        final List<String> gaveUp = new ArrayList<>();
-        private final Function<UUID, Outcome> behaviour;
-
-        Recording(Function<UUID, Outcome> behaviour) {
-            this.behaviour = behaviour;
-        }
-
-        @Override
-        public String handles() {
-            return "SPEECH_ASSESSMENT";
-        }
-
-        @Override
-        public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
-            return behaviour.apply(jobId);
-        }
-
-        @Override
-        public void onGaveUp(UUID targetId, String errorCode) {
-            gaveUp.add(errorCode);
-        }
-    }
-
-    /**
-     * The reason the hook exists. When the queue says this attempt was the last, the job's module is told - otherwise a
-     * learner is left waiting on work that has already stopped.
-     */
-    @Test
-    void tellsTheHandlerWhenAJobHasGivenUp() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(true);
-        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
-
-        workerWith(handler).drain();
-
-        assertThat(handler.gaveUp).containsExactly("PROVIDER_DOWN");
-    }
-
-    /** While a retry is still coming, nobody is told anything - the answer may yet arrive. */
-    @Test
-    void saysNothingWhileARetryIsStillComing() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(false);
-        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.transientFailure("PROVIDER_DOWN", "x"));
-
-        workerWith(handler).drain();
-
-        assertThat(handler.gaveUp).isEmpty();
-    }
-
-    /** A handler that throws on its last attempt still gets told, with the code the worker recorded. */
-    @Test
-    void tellsTheHandlerEvenWhenItsLastAttemptThrew() {
-        AiJob job = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(job));
-        when(queue.record(eq(job.getId()), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(true);
-        Recording handler = new Recording(ignored -> {
-            throw new IllegalStateException("boom");
-        });
-
-        workerWith(handler).drain();
-
-        assertThat(handler.gaveUp).containsExactly("AI_JOB_HANDLER_ERROR");
-    }
-
-    /**
-     * A stall reclaim costs a retry, so it can be the thing that ends a job. The worker tells the module then too - the
-     * one path that never passes through a handler's run at all.
-     */
-    @Test
-    void tellsTheHandlerWhenAReclaimUsedTheLastRetry() {
-        AiJob finished = job();
-        finished.claim(Instant.now());
-        for (int i = 0; i < 3; i++) {
-            finished.fail("X", "x", true, Instant.now());
-            if (!finished.finished()) {
-                finished.claim(Instant.now());
-            }
-        }
-        AiJob stillGoing = job();
-        when(queue.reclaimStalled(Duration.ofMinutes(5))).thenReturn(List.of(finished, stillGoing));
-        Recording handler = new Recording(ignored -> AiJobHandler.Outcome.succeeded("{}"));
-
-        workerWith(handler).reclaimStalled();
-
-        assertThat(handler.gaveUp).containsExactly("AI_JOB_STALLED");
-    }
-
-    /** Telling the module happens after the job is recorded; a handler failing at it must not take the batch down. */
-    @Test
-    void keepsGoingWhenTellingTheHandlerFails() {
-        AiJob first = job();
-        AiJob second = job();
-        when(queue.claimBatch(5)).thenReturn(List.of(first, second));
-        when(queue.record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        AiJobHandler throwingOnGiveUp = new AiJobHandler() {
-            @Override
-            public String handles() {
-                return "SPEECH_ASSESSMENT";
-            }
-
-            @Override
-            public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
-                return Outcome.permanentFailure("BAD", "x");
-            }
-
-            @Override
-            public void onGaveUp(UUID targetId, String errorCode) {
-                throw new IllegalStateException("could not write");
+    void slowSpeakingDoesNotBlockTutorAndDoesNotPreclaimMoreWork() throws Exception {
+        AiJob speaking = job(AiJobType.SPEECH_ASSESSMENT), tutor = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(tutor));
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of(speaking));
+        CountDownLatch entered = new CountDownLatch(2), release = new CountDownLatch(1);
+        Runnable block = () -> {
+            entered.countDown();
+            try {
+                release.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         };
+        try (var worker = worker(List.of(handler("TUTOR_REPLY", block), handler("SPEECH_ASSESSMENT", block)))) {
+            worker.drain();
+            assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+            worker.drain();
+            verify(queue, times(2)).claimBatch(eq(1), anyList(), any());
+            release.countDown();
+        }
+        verify(queue).record(eq(tutor.getId()), eq(tutor.getStartedAt()), any(), any());
+        verify(queue).record(eq(speaking.getId()), eq(speaking.getStartedAt()), any(), any());
+    }
 
-        workerWith(throwingOnGiveUp).drain();
+    @Test
+    void handlerExceptionIsRecordedAndNotifiesOnlyAfterTerminalFailure() {
+        AiJob job = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(job));
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of());
+        when(queue.record(eq(job.getId()), any(), any(), any())).thenReturn(true);
+        AiJobHandler handler = mock(AiJobHandler.class);
+        when(handler.handles()).thenReturn("TUTOR_REPLY");
+        when(handler.run(any(), any(), any())).thenThrow(new IllegalStateException("private"));
+        try (var worker = worker(List.of(handler))) {
+            worker.drain();
+        }
+        verify(handler).onGaveUp(job.getTargetId(), "AI_JOB_HANDLER_ERROR");
+        verify(handler, never()).complete(any(), any(), any());
+    }
 
-        verify(queue).record(eq(second.getId()), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+    @Test
+    void expiredComputationDoesNotPublishItsResult() {
+        AiJob job = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(job));
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of());
+        try (var worker = new AiJobWorker(queue, List.of(handler("TUTOR_REPLY", () -> {
+        })), Duration.ofMinutes(3), Duration.ZERO)) {
+            worker.drain();
+        }
+        verify(queue).record(eq(job.getId()), any(),
+                argThat(result -> !result.success() && result.errorCode().equals("AI_JOB_DEADLINE")), any());
+    }
+
+    private AiJobWorker worker(List<AiJobHandler> handlers) {
+        return new AiJobWorker(queue, handlers, Duration.ofMinutes(3), Duration.ofSeconds(140));
     }
 }

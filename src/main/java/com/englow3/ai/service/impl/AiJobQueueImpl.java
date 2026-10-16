@@ -154,6 +154,36 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
         return claimed;
     }
 
+    @Override
+    @Transactional
+    public List<AiJob> claimBatch(int limit, List<String> types, Duration lease) {
+        if (limit < 1 || types.isEmpty())
+            return List.of();
+        Instant now = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        List<AiJob> claimed = jobRepo.lockNextByTypes(now, limit, types);
+        claimed.forEach(job -> {
+            job.claim(now);
+            job.renewLease(now.plus(lease));
+            log.info("AI job claimed id={} type={} queueMs={}", job.getId(), job.getJobType(),
+                    job.getCreatedAt() == null ? 0 : Duration.between(job.getCreatedAt(), now).toMillis());
+        });
+        return claimed;
+    }
+
+    @Override
+    @Transactional
+    public boolean heartbeat(UUID jobId, Instant claimedAt, Duration lease) {
+        return jobRepo.heartbeat(jobId, claimedAt, clock.instant().plus(lease)) == 1;
+    }
+
+    @Override
+    @Transactional
+    public void defer(UUID jobId, Instant claimedAt, Duration delay) {
+        jobRepo.lockById(jobId)
+                .filter(job -> job.getStatus() == AiJobStatus.RUNNING && sameInstant(job.getStartedAt(), claimedAt))
+                .ifPresent(job -> job.releaseUntil(clock.instant().plus(delay)));
+    }
+
     /**
      * Writes the result of one attempt. Separate transaction from the claim, and from the provider call.
      *
@@ -176,8 +206,15 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Override
     @Transactional
     public boolean record(UUID jobId, Instant claimedAt, AiJobHandler.Outcome outcome) {
+        return record(jobId, claimedAt, outcome, () -> {
+        });
+    }
+
+    @Override
+    @Transactional
+    public boolean record(UUID jobId, Instant claimedAt, AiJobHandler.Outcome outcome, Runnable complete) {
         Instant now = clock.instant();
-        return jobRepo.findById(jobId).map(job -> {
+        return jobRepo.lockById(jobId).map(job -> {
             if (job.getStatus() != AiJobStatus.RUNNING
                     || (claimedAt != null && !sameInstant(job.getStartedAt(), claimedAt))) {
                 log.warn("Dropped a late outcome for AI job {}: it is {} and no longer under that claim", jobId,
@@ -185,9 +222,15 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
                 return false;
             }
             if (outcome.success()) {
+                complete.run();
                 job.succeed(outcome.outputPayload(), now);
             } else {
                 job.fail(outcome.errorCode(), outcome.errorMessage(), outcome.retryable(), now);
+                if (outcome.retryable())
+                    job.deferRetry(now.plus(com.englow3.ai.service.RetryBackoff.delayAfter(job.getRetryCount() - 1))
+                            .plusMillis(java.util.concurrent.ThreadLocalRandom.current().nextLong(1000)));
+                if (outcome.retryAfter() != null)
+                    job.deferRetry(now.plus(outcome.retryAfter()));
             }
             return job.getStatus() == AiJobStatus.FAILED;
         }).orElse(false);
@@ -197,7 +240,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Transactional
     public List<AiJob> reclaimStalled(Duration lockTimeout) {
         Instant now = clock.instant();
-        List<AiJob> stalled = jobRepo.findStalled(now.minus(lockTimeout));
+        List<AiJob> stalled = jobRepo.lockStalled(now, now.minus(lockTimeout));
         stalled.forEach(job -> job.reclaim(now));
 
         // Returned rather than counted: a reclaim costs a retry, so one of these may have just run out, and the worker

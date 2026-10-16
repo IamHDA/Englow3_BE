@@ -80,6 +80,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          build-args: RELEASE_SHA=${{ github.sha }}
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -142,11 +143,52 @@ jobs:
           DEPLOY_HOOK="$HOOK_SECRET"
           [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$HOOK_VAR"
           if [ -z "$DEPLOY_HOOK" ]; then
-            echo "No testing Render deploy hook configured; the :testing image is pushed but nothing redeploys it."
-            exit 0
+            echo "::error::Configure RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL; the testing image was built but has not been deployed."
+            exit 1
           fi
           curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
           echo "Testing backend Render deployment triggered."
+
+      - name: Trigger testing AI deployment
+        shell: bash
+        env:
+          AI_HOOK: ${{ secrets.RENDER_AI_TESTING_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AI_HOOK" ]; then
+            echo "::error::Configure RENDER_AI_TESTING_DEPLOY_HOOK_URL for the testing AI service."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$AI_HOOK" >/dev/null
+
+      - name: Verify testing services are ready
+        shell: bash
+        env:
+          AI_HEALTH_URL: ${{ vars.AI_TESTING_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AI_HEALTH_URL" ]; then
+            echo "::error::Configure AI_TESTING_HEALTH_URL (https://AI-testing-host/health/ready)."
+            exit 1
+          fi
+          check_ready() {
+            for attempt in $(seq 1 24); do
+              if curl --fail --silent --show-error --max-time 5 "$1" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("status", "").lower() == "up"' 2>/dev/null; then
+                if curl --fail --silent --show-error --max-time 5 "$2" | python3 -c 'import json,os,sys; data=json.load(sys.stdin); assert (data.get("release") or data.get("app",{}).get("release")) == os.environ["GITHUB_SHA"]' 2>/dev/null; then
+                  return 0
+                fi
+              fi
+              sleep 10
+            done
+            return 1
+          }
+          check_ready 'https://englow3-backend-testing.onrender.com/actuator/health/readiness' 'https://englow3-backend-testing.onrender.com/actuator/info' &
+          backend_check=$!
+          check_ready "$AI_HEALTH_URL" "${AI_HEALTH_URL%/health/ready}/version" &
+          ai_check=$!
+          wait "$backend_check"
+          wait "$ai_check"
+          echo "Testing services passed readiness checks." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-vps:
     name: Deploy to VPS via SSH

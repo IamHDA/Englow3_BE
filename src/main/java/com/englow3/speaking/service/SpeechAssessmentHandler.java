@@ -72,16 +72,22 @@ public class SpeechAssessmentHandler implements AiJobHandler {
         try {
             String response = speechClient.assess(audio, request.path("contentType").asText(),
                     request.path("locale").asText(), request.path("referenceText").asText());
-            writer.storeAssessment(attemptId, SpeechAssessmentParser.parse(objectMapper, response));
+            SpeechAssessmentParser.parse(objectMapper, response);
 
             return Outcome.succeeded(response);
         } catch (SpeechAssessmentException providerFailure) {
-            return finish(providerFailure.getCode(), providerFailure.getMessage(), providerFailure.isRetryable());
+            return finish(providerFailure.getCode(), providerFailure.getMessage(), providerFailure.isRetryable())
+                    .retryAfter(providerFailure.getRetryAfter());
         } catch (DomainException unusable) {
             // The provider answered, but with something that is not a usable assessment. Repeating it produces the
             // same answer, so this ends here rather than three attempts later.
             return finish(unusable.getCode(), unusable.getMessage(), false);
         }
+    }
+
+    @Override
+    public void complete(UUID targetId, String inputPayload, String outputPayload) {
+        writer.storeAssessment(targetId, SpeechAssessmentParser.parse(objectMapper, outputPayload));
     }
 
     /**

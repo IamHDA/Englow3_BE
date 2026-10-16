@@ -18,7 +18,7 @@ from typing import Any
 import httpx
 
 from app.config import Settings
-from app.errors import ProviderError, is_retryable_http_status
+from app.errors import ProviderError, is_retryable_http_status, retry_after_seconds
 from app.schemas import SpeechAssessmentResponse, WordAssessment
 
 # Comfortable conversational English for an exam answer, in words per minute.
@@ -166,6 +166,7 @@ class WhisperSpeechProvider:
                 message=f"Speech provider answered {response.status_code}",
                 status_code=502,
                 retryable=is_retryable_http_status(response.status_code),
+                retry_after_seconds=retry_after_seconds(response.headers.get("retry-after")),
             )
         try:
             body = response.json()

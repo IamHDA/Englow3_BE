@@ -14,6 +14,15 @@ public class SpeechAssessmentException extends RuntimeException {
 
     private final String code;
     private final boolean retryable;
+    private java.time.Duration retryAfter;
+
+    public SpeechAssessmentException retryAfter(String seconds) {
+        try {
+            retryAfter = java.time.Duration.ofSeconds(Math.min(600, Math.max(1, Long.parseLong(seconds))));
+        } catch (RuntimeException ignored) {
+            /* No usable provider hint. */ }
+        return this;
+    }
 
     public SpeechAssessmentException(String code, String message, boolean retryable) {
         super(message);

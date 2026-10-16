@@ -7,12 +7,39 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobStatus;
 
 public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select j from AiJob j where j.id = :id")
+    Optional<AiJob> lockById(@Param("id") UUID id);
+
+    @Query(value = """
+            select * from ai_jobs where status = 'PENDING'
+              and job_type in (:types)
+              and (next_retry_at is null or next_retry_at <= :now)
+            order by created_at, id limit :limit for update skip locked
+            """, nativeQuery = true)
+    List<AiJob> lockNextByTypes(@Param("now") Instant now, @Param("limit") int limit,
+            @Param("types") List<String> types);
+
+    @Modifying
+    @Query("update AiJob j set j.leaseUntil = :until where j.id = :id and j.status = AiJobStatus.RUNNING and j.startedAt = :claimedAt")
+    int heartbeat(@Param("id") UUID id, @Param("claimedAt") Instant claimedAt, @Param("until") Instant until);
+
+    @Query(value = """
+            select * from ai_jobs where status = 'RUNNING'
+              and (lease_until <= :now or (lease_until is null and started_at <= :threshold))
+            order by started_at limit 100 for update skip locked
+            """, nativeQuery = true)
+    List<AiJob> lockStalled(@Param("now") Instant now, @Param("threshold") Instant threshold);
+
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:userId,0)) as text)", nativeQuery = true)
     String lockProductiveBudget(@Param("userId") String userId);
 

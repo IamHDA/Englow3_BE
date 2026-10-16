@@ -23,6 +23,10 @@ public interface AiJobHandler {
      */
     Outcome run(UUID jobId, UUID targetId, String inputPayload);
 
+    /** Persist the computed result only after the worker has locked its current claim. No external I/O here. */
+    default void complete(UUID targetId, String inputPayload, String outputPayload) {
+    }
+
     /**
      * Called once, when the queue has recorded this job as finished without a result - whatever the reason: a failure
      * the handler called permanent, the last retry of a transient one, a stall reclaimed one time too many, or the
@@ -42,7 +46,17 @@ public interface AiJobHandler {
      *            whether the same request could work later. False for anything the input itself makes impossible - a
      *            recording in a format the provider does not accept will not become acceptable in ten minutes.
      */
-    record Outcome(boolean success, String outputPayload, String errorCode, String errorMessage, boolean retryable) {
+    record Outcome(boolean success, String outputPayload, String errorCode, String errorMessage, boolean retryable,
+            java.time.Duration retryAfter) {
+
+        public Outcome(boolean success, String outputPayload, String errorCode, String errorMessage,
+                boolean retryable) {
+            this(success, outputPayload, errorCode, errorMessage, retryable, null);
+        }
+
+        public Outcome retryAfter(java.time.Duration delay) {
+            return new Outcome(success, outputPayload, errorCode, errorMessage, retryable, delay);
+        }
 
         public static Outcome succeeded(String outputPayload) {
             return new Outcome(true, outputPayload, null, null, false);

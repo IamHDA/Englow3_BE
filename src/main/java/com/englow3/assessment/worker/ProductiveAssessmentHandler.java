@@ -80,18 +80,35 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
                     mapper.writeValueAsString(evidence), 3000);
             String content = mapper.readTree(raw).path("content").asText("");
             String normalized = AssessmentRubric.validate(mapper, skill, content);
-            writer.complete(targetId, input.path("revision").asInt(), normalized, transcript);
-            return Outcome.succeeded(normalized);
+            var result = mapper.createObjectNode();
+            result.set("report", mapper.readTree(normalized));
+            result.put("transcript", transcript);
+            return Outcome.succeeded(result.toString());
         } catch (LlmException e) {
-            return e.isRetryable() ? Outcome.transientFailure(e.getCode(), "The grading provider is unavailable")
+            return e.isRetryable()
+                    ? Outcome.transientFailure(e.getCode(), "The grading provider is unavailable")
+                            .retryAfter(e.getRetryAfter())
                     : Outcome.permanentFailure(e.getCode(), "The grading provider rejected the request");
         } catch (SpeechAssessmentException e) {
             return e.isRetryable() ? Outcome.transientFailure(e.getCode(), "Speech assessment is unavailable")
+                    .retryAfter(e.getRetryAfter())
                     : Outcome.permanentFailure(e.getCode(), "Speech could not be assessed");
         } catch (DomainException e) {
             return Outcome.permanentFailure(e.getCode(), e.getMessage());
         } catch (com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException e) {
             return Outcome.permanentFailure("ASSESSMENT_PAYLOAD_INVALID", "The grading response is invalid");
+        }
+    }
+
+    @Override
+    public void complete(UUID targetId, String inputPayload, String outputPayload) {
+        try {
+            JsonNode input = mapper.readTree(inputPayload);
+            JsonNode result = mapper.readTree(outputPayload);
+            writer.complete(targetId, input.path("revision").asInt(), result.path("report").toString(),
+                    result.path("transcript").isTextual() ? result.path("transcript").asText() : null);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalArgumentException("Invalid assessment completion", invalid);
         }
     }
 

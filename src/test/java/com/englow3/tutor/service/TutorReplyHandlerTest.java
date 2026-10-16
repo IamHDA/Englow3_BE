@@ -47,7 +47,11 @@ class TutorReplyHandlerTest {
     }
 
     private Outcome run(AiJob job) {
-        return handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
+        Outcome result = handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
+        org.mockito.Mockito.verifyNoInteractions(writer);
+        if (result.success())
+            handler.complete(job.getTargetId(), job.getInputPayload(), result.outputPayload());
+        return result;
     }
 
     @Test

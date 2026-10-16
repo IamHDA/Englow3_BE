@@ -75,7 +75,13 @@ class TutorPipelineIntegrationTest extends PostgresIntegrationTest {
      * asserts only on its own learner's rows, and the only handler registered is the tutor one.
      */
     private void drain(UUID pendingMessageId) {
-        new AiJobWorker(queue, List.of(handler), 100, Duration.ofMinutes(5)).drain();
+        var job = queue.claimBatch(1000, List.of("TUTOR_REPLY"), Duration.ofMinutes(3)).stream()
+                .filter(candidate -> candidate.getTargetId().equals(pendingMessageId)).findFirst().orElseThrow();
+        var outcome = handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
+        if (queue.record(job.getId(), job.getStartedAt(), outcome,
+                () -> handler.complete(job.getTargetId(), job.getInputPayload(), outcome.outputPayload()))) {
+            handler.onGaveUp(job.getTargetId(), outcome.errorCode());
+        }
     }
 
     @Test

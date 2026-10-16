@@ -5,6 +5,8 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.slf4j.MDC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceIdFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(TraceIdFilter.class);
 
     public static final String TRACE_ID = "traceId";
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
@@ -33,9 +36,13 @@ public class TraceIdFilter extends OncePerRequestFilter {
         String requestId = request.getHeader(REQUEST_ID_HEADER);
         MDC.put(TRACE_ID, requestId != null && SAFE_REQUEST_ID.matcher(requestId).matches() ? requestId
                 : UUID.randomUUID().toString().substring(0, 8));
+        long start = System.nanoTime();
+        response.setHeader(REQUEST_ID_HEADER, MDC.get(TRACE_ID));
         try {
             chain.doFilter(request, response);
         } finally {
+            log.info("HTTP method={} route={} status={} durationMs={}", request.getMethod(), request.getServletPath(),
+                    response.getStatus(), (System.nanoTime() - start) / 1_000_000);
             MDC.remove(TRACE_ID);
         }
     }

@@ -70,17 +70,23 @@ public class TutorReplyHandler implements AiJobHandler {
         try {
             String response = llmClient.generate(request.path("systemPrompt").asText(),
                     request.path("userPrompt").asText(), TEMPERATURE, MAX_OUTPUT_TOKENS);
-            Reply reply = parse(response);
-            writer.storeReply(messageId, reply.content(), reply.model(), reply.inputTokens(), reply.outputTokens());
+            parse(response);
 
             return Outcome.succeeded(response);
         } catch (LlmException providerFailure) {
-            return finish(providerFailure.getCode(), providerFailure.getMessage(), providerFailure.isRetryable());
+            return finish(providerFailure.getCode(), providerFailure.getMessage(), providerFailure.isRetryable())
+                    .retryAfter(providerFailure.getRetryAfter());
         } catch (DomainException unusable) {
             // The provider answered with something that is not a usable reply. Asking again produces the same
             // answer, so this ends here rather than three attempts later.
             return finish(unusable.getCode(), unusable.getMessage(), false);
         }
+    }
+
+    @Override
+    public void complete(UUID targetId, String inputPayload, String outputPayload) {
+        Reply reply = parse(outputPayload);
+        writer.storeReply(targetId, reply.content(), reply.model(), reply.inputTokens(), reply.outputTokens());
     }
 
     /**

@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -36,13 +38,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             configured.read_timeout_seconds,
             connect=configured.connect_timeout_seconds,
         )
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        speech_timeout = httpx.Timeout(
+            configured.speech_timeout_seconds, connect=configured.connect_timeout_seconds
+        )
+        async with (
+            httpx.AsyncClient(timeout=timeout) as client,
+            httpx.AsyncClient(timeout=speech_timeout) as speech_client,
+        ):
             app.state.llm_provider = OpenAiCompatibleProvider(client, configured)
             app.state.embedding_provider = OpenAiCompatibleEmbeddingProvider(client, configured)
             app.state.speech_provider = (
-                WhisperSpeechProvider(client, configured)
+                WhisperSpeechProvider(speech_client, configured)
                 if configured.speech_provider == "whisper"
-                else AzureSpeechProvider(client, configured)
+                else AzureSpeechProvider(speech_client, configured)
             )
             yield
 
@@ -57,10 +65,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.dependency_overrides[get_settings] = lambda: configured
 
+    @app.middleware("http")
+    async def request_timing(request: Request, call_next):
+        start = time.monotonic()
+        response = await call_next(request)
+        duration = (time.monotonic() - start) * 1000
+        response.headers["Server-Timing"] = f"ai;dur={duration:.1f}"
+        logger.info(
+            "AI request path=%s status=%s duration_ms=%.1f",
+            request.url.path,
+            response.status_code,
+            duration,
+        )
+        return response
+
     @app.exception_handler(ServiceError)
     async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
+            headers={"Retry-After": str(exc.retry_after_seconds)}
+            if exc.retry_after_seconds
+            else None,
             content={
                 "code": exc.code,
                 "message": exc.message,
@@ -95,6 +120,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def live() -> dict[str, str]:
         return {"status": "up"}
 
+    @app.get("/version", include_in_schema=False)
+    async def version() -> dict[str, str]:
+        return {"release": configured.release_sha}
+
     @app.get("/health/ready", include_in_schema=False)
     async def ready() -> JSONResponse:
         checks = _readiness(configured)
@@ -113,7 +142,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=internal,
     )
     async def generate(request: Request, body: LlmGenerateRequest) -> LlmGenerateResponse:
-        return await request.app.state.llm_provider.generate(body)
+        try:
+            async with asyncio.timeout(configured.read_timeout_seconds):
+                return await request.app.state.llm_provider.generate(body)
+        except TimeoutError as exc:
+            raise ServiceError("AI_PROVIDER_TIMEOUT", "Generation timed out", 504, True) from exc
 
     @app.post(
         "/internal/v1/embeddings",
@@ -122,7 +155,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=internal,
     )
     async def embed(request: Request, body: EmbeddingRequest) -> EmbeddingResponse:
-        return await request.app.state.embedding_provider.embed(body)
+        try:
+            async with asyncio.timeout(configured.read_timeout_seconds):
+                return await request.app.state.embedding_provider.embed(body)
+        except TimeoutError as exc:
+            raise ServiceError("AI_PROVIDER_TIMEOUT", "Embedding timed out", 504, True) from exc
 
     @app.post(
         "/internal/v1/speech/assess",
@@ -151,9 +188,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ServiceError("EMPTY_AUDIO", "Audio is empty", 422)
         if len(payload) > configured.max_audio_bytes:
             raise ServiceError("AUDIO_TOO_LARGE", "Audio exceeds the configured size limit", 413)
-        return await request.app.state.speech_provider.assess(
-            payload, content_type, locale, reference_text
-        )
+        try:
+            async with asyncio.timeout(configured.speech_timeout_seconds):
+                return await request.app.state.speech_provider.assess(
+                    payload, content_type, locale, reference_text
+                )
+        except TimeoutError as exc:
+            raise ServiceError("SPEECH_TIMEOUT", "Speech assessment timed out", 504, True) from exc
 
     return app
 

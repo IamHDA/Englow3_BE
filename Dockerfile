@@ -11,6 +11,8 @@ RUN mvn clean package -DskipTests
 
 # Stage 2: Runtime image
 FROM eclipse-temurin:21-jre-alpine
+ARG RELEASE_SHA=unknown
+ENV RELEASE_SHA=${RELEASE_SHA}
 WORKDIR /app
 
 # Create non-root user for security

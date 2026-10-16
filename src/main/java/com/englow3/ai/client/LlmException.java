@@ -14,6 +14,15 @@ public class LlmException extends RuntimeException {
 
     private final String code;
     private final boolean retryable;
+    private java.time.Duration retryAfter;
+
+    public LlmException retryAfter(String seconds) {
+        try {
+            retryAfter = java.time.Duration.ofSeconds(Math.min(600, Math.max(1, Long.parseLong(seconds))));
+        } catch (RuntimeException ignored) {
+            /* No usable provider hint. */ }
+        return this;
+    }
 
     public LlmException(String code, String message, boolean retryable) {
         super(message);

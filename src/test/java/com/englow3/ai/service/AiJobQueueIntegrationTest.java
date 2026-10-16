@@ -167,4 +167,77 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     private String statusOf(UUID jobId) {
         return jdbc.sql("select status from ai_jobs where id = :id").param("id", jobId).query(String.class).single();
     }
+
+    @Test
+    void concurrentWorkersClaimDifferentRows() throws Exception {
+        ask(learner);
+        ask(learner);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor
+                    .submit(() -> workerQueue.claimBatch(1, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)));
+            var second = executor
+                    .submit(() -> workerQueue.claimBatch(1, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)));
+            assertThat(first.get()).hasSize(1);
+            assertThat(second.get()).hasSize(1);
+            assertThat(first.get().getFirst().getId()).isNotEqualTo(second.get().getFirst().getId());
+        }
+    }
+
+    @Test
+    void providerRetryAfterIsPreservedAndPreflightDeferralDoesNotSpendRetryCount() {
+        UUID target = UUID.randomUUID();
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        var claimed = workerQueue.claimBatch(1000, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)).stream()
+                .filter(job -> job.getTargetId().equals(target)).findFirst().orElseThrow();
+        workerQueue.defer(claimed.getId(), claimed.getStartedAt(), Duration.ofSeconds(10));
+        assertThat(jdbc.sql("select retry_count from ai_jobs where id = :id").param("id", claimed.getId())
+                .query(Integer.class).single()).isZero();
+        jdbc.sql("update ai_jobs set next_retry_at = null where id = :id").param("id", claimed.getId()).update();
+        var next = workerQueue.claimBatch(1000, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)).stream()
+                .filter(job -> job.getId().equals(claimed.getId())).findFirst().orElseThrow();
+        workerQueue.record(next.getId(), next.getStartedAt(),
+                AiJobHandler.Outcome.transientFailure("RATE_LIMIT", "later").retryAfter(Duration.ofSeconds(60)));
+        assertThat(jdbc.sql("select next_retry_at > now() + interval '55 seconds' from ai_jobs where id = :id")
+                .param("id", next.getId()).query(Boolean.class).single()).isTrue();
+    }
+
+    @Test
+    void expiredClaimCannotPublishBusinessChangesAfterReclaim() {
+        UUID target = UUID.randomUUID();
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        AiJob claimed = workerQueue.claimBatch(1000, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)).stream()
+                .filter(candidate -> candidate.getTargetId().equals(target)).findFirst().orElseThrow();
+        jdbc.sql("update ai_jobs set lease_until = now() - interval '1 second' where id = :id")
+                .param("id", claimed.getId()).update();
+        workerQueue.reclaimStalled(Duration.ofSeconds(30));
+        var published = new java.util.concurrent.atomic.AtomicBoolean();
+        workerQueue.record(claimed.getId(), claimed.getStartedAt(), AiJobHandler.Outcome.succeeded("{}"),
+                () -> published.set(true));
+        assertThat(published).isFalse();
+        assertThat(workerQueue.heartbeat(claimed.getId(), claimed.getStartedAt(), Duration.ofSeconds(30))).isFalse();
+    }
+
+    @Test
+    void businessWriteAndJobCompletionRollbackTogether() {
+        UUID target = UUID.randomUUID();
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        AiJob claimed = workerQueue.claimBatch(1000, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)).stream()
+                .filter(candidate -> candidate.getTargetId().equals(target)).findFirst().orElseThrow();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> workerQueue.record(claimed.getId(),
+                claimed.getStartedAt(), AiJobHandler.Outcome.succeeded("{}"), () -> {
+                    throw new IllegalStateException("write failed");
+                })).isInstanceOf(IllegalStateException.class);
+        assertThat(statusOf(claimed.getId())).isEqualTo("RUNNING");
+        assertThat(workerQueue.heartbeat(claimed.getId(), claimed.getStartedAt(), Duration.ofMinutes(1))).isTrue();
+    }
+
+    @Test
+    void typedClaimNeverConsumesAnotherLanesJobs() {
+        UUID target = UUID.randomUUID();
+        queue.enqueueTutorReply(target, "{}", "tutor:" + target, "v1", learner);
+        assertThat(workerQueue.claimBatch(1000, java.util.List.of("SPEECH_ASSESSMENT"), Duration.ofSeconds(30)))
+                .allMatch(job -> job.getJobType() == com.englow3.ai.entity.AiJobType.SPEECH_ASSESSMENT);
+        assertThat(workerQueue.claimBatch(1000, java.util.List.of("TUTOR_REPLY"), Duration.ofSeconds(30)))
+                .anyMatch(job -> job.getTargetId().equals(target));
+    }
 }

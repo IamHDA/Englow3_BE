@@ -93,7 +93,10 @@ class ProductiveAssessmentHandlerTest {
                 .thenReturn(mapper.createObjectNode().put("content", report).toString());
         var result = handler.run(UUID.randomUUID(), id, input("WRITING"));
         assertTrue(result.success());
-        assertEquals(6, mapper.readTree(result.outputPayload()).path("overall").asInt());
-        verify(writer).complete(eq(id), eq(3), eq(result.outputPayload()), isNull());
+        verifyNoInteractions(writer);
+        assertEquals(6, mapper.readTree(result.outputPayload()).path("report").path("overall").asInt());
+        handler.complete(id, input("WRITING"), result.outputPayload());
+        verify(writer).complete(eq(id), eq(3), eq(mapper.readTree(result.outputPayload()).path("report").toString()),
+                isNull());
     }
 }

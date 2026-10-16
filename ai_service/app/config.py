@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     environment: str = Field(default="development", pattern="^(development|test|production)$")
+    release_sha: str = "unknown"
     internal_api_key: SecretStr = SecretStr("")
 
     llm_enabled: bool = False
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
 
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     read_timeout_seconds: float = Field(default=45.0, gt=0, le=300)
+    speech_timeout_seconds: float = Field(default=60.0, gt=0, le=180)
     max_audio_bytes: int = Field(default=10_485_760, ge=1, le=52_428_800)
 
 

@@ -97,8 +97,31 @@ public class AiJob {
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 
+    public void deferRetry(Instant until) {
+        if (status == AiJobStatus.PENDING && (nextRetryAt == null || until.isAfter(nextRetryAt)))
+            nextRetryAt = until;
+    }
+
+    public void releaseUntil(Instant until) {
+        if (status != AiJobStatus.RUNNING)
+            throw new IllegalStateException("Only a running claim can be deferred");
+        status = AiJobStatus.PENDING;
+        nextRetryAt = until;
+        leaseUntil = null;
+    }
+
     @Column(name = "started_at")
     private Instant startedAt;
+
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+
+    public void renewLease(Instant until) {
+        if (status != AiJobStatus.RUNNING) {
+            throw new IllegalStateException("Only a running job has a lease");
+        }
+        this.leaseUntil = until;
+    }
 
     @Column(name = "completed_at")
     private Instant completedAt;

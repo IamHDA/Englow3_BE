@@ -33,7 +33,7 @@ public class SpeechAssessmentClient {
     public SpeechAssessmentClient(@Value("${app.ai.base-url}") String baseUrl,
             @Value("${app.ai.internal-api-key:}") String internalApiKey,
             @Value("${app.ai.connect-timeout:5s}") Duration connectTimeout,
-            @Value("${app.ai.speech-read-timeout:240s}") Duration readTimeout) {
+            @Value("${app.ai.speech-read-timeout:70s}") Duration readTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         // Both timeouts set explicitly: the default is none at all, and a worker blocked forever on a provider that
         // stopped answering holds its job RUNNING until the stall reconciler notices - minutes of nothing.
@@ -70,7 +70,8 @@ public class SpeechAssessmentClient {
                     .onStatus(HttpStatusCode::isError, (request, response) -> {
                         throw new SpeechAssessmentException("SPEECH_ASSESSMENT_REJECTED",
                                 "ai_service answered %s".formatted(response.getStatusCode()),
-                                retryable(response.getStatusCode()));
+                                AiServiceFailure.retryable(response.getBody(), retryable(response.getStatusCode())))
+                                        .retryAfter(response.getHeaders().getFirst("Retry-After"));
                     }).body(String.class);
         } catch (RestClientException transportFailure) {
             // Nothing came back at all: a timeout, a refused connection, a DNS failure. Always worth another go -

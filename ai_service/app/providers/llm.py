@@ -3,7 +3,7 @@ from typing import Any
 import httpx
 
 from app.config import Settings
-from app.errors import ProviderError, is_retryable_http_status
+from app.errors import ProviderError, is_retryable_http_status, retry_after_seconds
 from app.schemas import LlmGenerateRequest, LlmGenerateResponse
 
 
@@ -73,6 +73,7 @@ class OpenAiCompatibleProvider:
                 message="The LLM provider rejected the request",
                 status_code=502,
                 retryable=is_retryable_http_status(status),
+                retry_after_seconds=retry_after_seconds(exc.response.headers.get("retry-after")),
             ) from exc
         except httpx.RequestError as exc:
             raise ProviderError(
