@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.englow3.speaking.service.SpeechAssessmentHandlerTest
+-------------------------------------------------------------------------------
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.115 s -- in com.englow3.speaking.service.SpeechAssessmentHandlerTest

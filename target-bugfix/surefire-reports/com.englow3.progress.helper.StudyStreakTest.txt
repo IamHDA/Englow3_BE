@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.englow3.progress.helper.StudyStreakTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.englow3.progress.helper.StudyStreakTest

@@ -40,8 +40,30 @@ in the same module and differ only by controller (`/api/admin/**` with
 
 ## user
 
+<<<<<<< Updated upstream
 Covers identity, learner profile, and the **onboarding flow**. Onboarding is a
 set of use cases inside this module, not a module of its own.
+=======
+- **Tables:** `exams`, `exam_sections`, `section_parts`, `question_sets`,
+  `question_set_options`, `questions`, `question_options`,
+  `question_matching_answers`, `question_accepted_answers`, `grading_criteria`,
+  `score_conversions`, `exam_attempts`, `attempt_section_results`,
+  `attempt_answers`, `attempt_answer_options`, and
+  `attempt_answer_criterion_scores`, and `exam_attempt_drafts`.
+- **Deadline:** draft replacements lock the owning attempt and check the server
+  deadline plus draft revision. A scheduled, idempotent finalizer grades only
+  the last accepted snapshot when a browser is absent. Result reads also finalize
+  expired live attempts; late client answers never enter the graded snapshot.
+- **Modes:** one active attempt per learner, paper and mode. FULL and PRACTICE
+  may remain open independently; replacing one never finalizes the other.
+  Active-attempt previews are read-only and do not start or reset a clock.
+- **Entry points:** administrator authoring APIs, learner catalogue and safe paper
+  delivery, plus the start, submit, grade, and result lifecycle for exam attempts.
+- **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
+  may use the module's read-only `query/` package.
+- **Files:** question media and private attempt media are exam-owned even when the
+  shared storage client performs the I/O.
+>>>>>>> Stashed changes
 
 - **Subdomain:** **core** for the personalised path - placement, goal, and the skill recommendations derived from results are one of the two things the product competes on. Supporting for the rest: identity, avatar/banner, and profile editing are plain CRUD and should stay that way. That is why the onboarding flow carries entity rules and nothing else in the module does.
 - **Owns writes to:** `users`, `learner_profiles`, `user_learning_purposes`, `user_target_skills`, `learning_purposes`

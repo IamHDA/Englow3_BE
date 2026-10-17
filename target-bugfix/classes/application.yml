@@ -1,0 +1,153 @@
+spring:
+  application:
+    name: englow3-be
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/englow3}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      # Supabase's pooler in session mode admits 15 clients in total, for every
+      # backend sharing the database. Hikari's default of 10, held open from the
+      # start, let two deployments take 20 - so whichever came second waited on
+      # connections it could not get, or failed to start at all. Five covers
+      # this application's load; raise it only alongside the pooler's limit.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      # Give idle connections back rather than holding the pooler's slots.
+      idle-timeout: 120000
+      # Something between here and the pooler drops a connection left idle
+      # for under a minute; the next request then failed on it or waited for a
+      # new one. A ping every 30s keeps the ones we hold alive.
+      keepalive-time: 30000
+      # Report "no connection" after 10s instead of the 30s default, so a
+      # starved pool shows up as an error rather than as a page that hangs.
+      connection-timeout: 10000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: englow3
+
+  flyway:
+    enabled: true
+    schemas: englow3
+    default-schema: englow3
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      # 12MB: the design allows up to 10MB audio for exam listening tracks.
+      max-file-size: 12MB
+      max-request-size: 13MB
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SUPABASE_ISSUER_URI}
+          jwk-set-uri: ${SUPABASE_JWKS_URI}
+          jws-algorithms: ES256
+          audiences: ${SUPABASE_JWT_AUDIENCE:authenticated}
+
+springdoc:
+  # Off unless asked for: the spec maps every endpoint and DTO, which a public deployment has no reason to publish.
+  # Local development and BFF type generation set API_DOCS_ENABLED=true.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+  use-fqn: true
+  default-produces-media-type: application/json
+  default-flat-param-object: true
+
+app:
+  assessment:
+    automatic-writing: ${ASSESSMENT_AUTOMATIC_WRITING:false}
+    automatic-speaking: ${ASSESSMENT_AUTOMATIC_SPEAKING:false}
+  # The day every daily figure is counted in - streaks, today's tasks and quests, per-day charts, the AI allowance.
+  # The learners' zone, not UTC: see StudyCalendar.
+  calendar:
+    zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.104.183.3:4000}
+
+  storage:
+    # One bucket per domain: the module that owns a file names its own bucket, so shared/storage never has to pick a
+    # default. A third domain is one more line here and no change to ObjectStorageClient.
+    avatar-bucket: ${STORAGE_AVATAR_BUCKET:avatars}
+    exam-bucket: ${STORAGE_EXAM_BUCKET:exams}
+    exam-media-url-ttl: ${STORAGE_EXAM_MEDIA_URL_TTL:PT3H}
+    learning-bucket: ${STORAGE_LEARNING_BUCKET:learning}
+    learning-media-url-ttl: ${STORAGE_LEARNING_MEDIA_URL_TTL:PT3H}
+    speaking-bucket: ${STORAGE_SPEAKING_BUCKET:speaking}
+    # Long enough to finish one upload, short enough that a leaked URL is worth little.
+    speaking-upload-url-ttl: ${STORAGE_SPEAKING_UPLOAD_URL_TTL:PT15M}
+    speaking-media-url-ttl: ${STORAGE_SPEAKING_MEDIA_URL_TTL:PT3H}
+
+    # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
+    # against. On Supabase the two differ in path shape, not just in host.
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/avatars}
+
+    s3:
+      endpoint: ${S3_ENDPOINT:http://localhost:9000}
+      region: ${S3_REGION:us-east-1}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+
+  ai:
+    enabled: ${AI_ENABLED:false}
+    provider: ${AI_PROVIDER:ai-service}
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
+    internal-api-key: ${AI_SERVICE_INTERNAL_API_KEY:}
+    default-model: ${AI_DEFAULT_MODEL:openai/gpt-oss-20b}
+    connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
+    read-timeout: ${AI_READ_TIMEOUT:55s}
+    speech-read-timeout: ${AI_SPEECH_READ_TIMEOUT:70s}
+    daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    worker:
+      enabled: ${AI_WORKER_ENABLED:true}
+      fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
+      lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:3m}
+      max-run: ${AI_WORKER_MAX_RUN:140s}
+      reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:30s}
+
+  speech:
+    locale: ${SPEECH_LOCALE:en-US}
+
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+
+management:
+  info:
+    env:
+      enabled: true
+  endpoint:
+    health:
+      show-details: when_authorized
+      # Without a role, "authorized" means any signed-in learner, who would see database and disk details.
+      roles: ADMIN
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+info:
+  app:
+    release: ${RELEASE_SHA:unknown}

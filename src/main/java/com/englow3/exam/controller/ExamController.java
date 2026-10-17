@@ -1,0 +1,110 @@
+package com.englow3.exam.controller;
+
+import java.util.UUID;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.englow3.exam.dto.command.StartExamAttemptCommand;
+import com.englow3.exam.dto.request.StartExamAttemptRequest;
+import com.englow3.exam.dto.response.ExamAttemptResponse;
+import com.englow3.exam.dto.response.ExamOutlineResponse;
+import com.englow3.exam.dto.response.LearnerExamResponse;
+import com.englow3.exam.dto.result.ExamAttemptResult;
+import com.englow3.exam.entity.CertificateType;
+import com.englow3.exam.entity.CertificateVariant;
+import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.TargetLevel;
+import com.englow3.exam.service.LearnerExamService;
+import com.englow3.exam.service.ExamAttemptService;
+import com.englow3.shared.page.PageResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
+import com.englow3.exam.helper.ExamCatalogueSort;
+import com.englow3.shared.page.StablePage;
+import org.springframework.data.domain.PageRequest;
+
+@RestController
+@RequestMapping("/api/exams")
+public class ExamController {
+
+    private final LearnerExamService learnerExamService;
+    private final ExamAttemptService examAttemptService;
+
+    public ExamController(LearnerExamService learnerExamService, ExamAttemptService examAttemptService) {
+        this.learnerExamService = learnerExamService;
+        this.examAttemptService = examAttemptService;
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<LearnerExamResponse>> search(@RequestParam(required = false) ExamType examType,
+            @RequestParam(required = false) CertificateType certificateType,
+            @RequestParam(required = false) CertificateVariant certificateVariant,
+            @RequestParam(required = false) TargetLevel targetLevel, @RequestParam(required = false) String title,
+            @RequestParam(required = false) ExamCatalogueSort sortBy, @PageableDefault(size = 20) Pageable pageable) {
+        // The order is the catalogue's own choice (sortBy), not a free column name from the query string.
+        Pageable ordered = StablePage.of(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                (sortBy == null ? ExamCatalogueSort.NEWEST : sortBy).toSort()));
+        return ResponseEntity.ok(PageResponse.from(
+                learnerExamService.search(examType, certificateType, certificateVariant, targetLevel, title, ordered)
+                        .map(LearnerExamResponse::from)));
+    }
+
+    /**
+     * Mapped before {@code /{id}} on purpose: a literal segment and a UUID placeholder both match "placement", and
+     * Spring resolves the more specific pattern first only because this one has no variable.
+     */
+    @GetMapping("/placement")
+    public ResponseEntity<LearnerExamResponse> placement() {
+        return ResponseEntity.ok(LearnerExamResponse.from(learnerExamService.placementExam()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<LearnerExamResponse> getById(@PathVariable UUID id) {
+        return ResponseEntity.ok(LearnerExamResponse.from(learnerExamService.detail(id)));
+    }
+
+    /** The paper's skills and parts with question counts - what a practice is picked from. */
+    @GetMapping("/{id}/outline")
+    public ResponseEntity<ExamOutlineResponse> getOutline(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamOutlineResponse.from(id, learnerExamService.outline(id)));
+    }
+
+    @GetMapping("/{id}/active-attempts")
+    public ResponseEntity<java.util.List<ExamAttemptResponse>> activeAttempts(@PathVariable UUID id,
+            @RequestParam com.englow3.exam.entity.ExamAttemptMode mode) {
+        return ResponseEntity
+                .ok(examAttemptService.activeAttempt(id, mode).stream().map(ExamAttemptResponse::from).toList());
+    }
+
+    @PostMapping("/{id}/attempts")
+    @ApiResponse(responseCode = "200", description = "Existing attempt resumed")
+    @ApiResponse(responseCode = "201", description = "New attempt created")
+    @ApiResponse(responseCode = "409", description = "Another attempt at this exam is open (ATTEMPT_IN_PROGRESS)")
+    public ResponseEntity<ExamAttemptResponse> startAttempt(@PathVariable UUID id,
+            @RequestBody(required = false) @Valid StartExamAttemptRequest request) {
+        StartExamAttemptCommand command = request == null ? StartExamAttemptCommand.full(id) : request.toCommand(id);
+        ExamAttemptResult result;
+        try {
+            result = examAttemptService.start(command);
+        } catch (DataIntegrityViolationException raced) {
+            // Two starts at once - a double click, a second tab - both found nothing open and both inserted; the
+            // partial unique index let one through. The loser asks again, in a fresh transaction, and is handed the
+            // attempt the winner opened rather than a conflict.
+            result = examAttemptService.start(command);
+        }
+        return ResponseEntity.status(result.resumed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(ExamAttemptResponse.from(result));
+    }
+}

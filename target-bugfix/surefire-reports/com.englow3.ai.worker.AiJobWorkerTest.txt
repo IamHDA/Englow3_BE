@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.englow3.ai.worker.AiJobWorkerTest
+-------------------------------------------------------------------------------
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.977 s -- in com.englow3.ai.worker.AiJobWorkerTest
