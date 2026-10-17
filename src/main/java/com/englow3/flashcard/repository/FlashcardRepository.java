@@ -15,6 +15,8 @@ import org.springframework.data.repository.query.Param;
 import com.englow3.flashcard.entity.Flashcard;
 
 public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
+    org.springframework.data.domain.Page<Flashcard> findByFlashcardSetId(UUID flashcardSetId,
+            org.springframework.data.domain.Pageable pageable);
 
     List<Flashcard> findByFlashcardSetIdOrderByOrderNo(UUID flashcardSetId);
 

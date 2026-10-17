@@ -38,6 +38,9 @@ answers, and section results.
   expired live attempts; late client answers never enter the graded snapshot.
 - **Entry points:** administrator authoring APIs, learner catalogue and safe paper
   delivery, plus the start, submit, grade, and result lifecycle for exam attempts.
+- **Modes:** one active attempt per learner, paper and mode. FULL and PRACTICE
+  may remain open independently; replacing one never finalizes the other.
+  Active-attempt previews are read-only and do not start or reset a clock.
 - **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the

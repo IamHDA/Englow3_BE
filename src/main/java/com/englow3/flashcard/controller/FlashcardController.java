@@ -54,17 +54,31 @@ public class FlashcardController {
 
     @GetMapping("/sets")
     public ResponseEntity<PageResponse<FlashcardSetResponse>> sets(@RequestParam(required = false) String topic,
-            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String title, @RequestParam(defaultValue = "due") String sortBy,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(flashcardService
-                .searchPublishedSets(topic, title, StablePage.of(pageable)).map(FlashcardSetResponse::from)));
+                .searchPublishedSets(topic, title, sortBy, StablePage.of(pageable)).map(FlashcardSetResponse::from)));
+    }
+
+    @GetMapping("/sets/catalogue-info")
+    public ResponseEntity<FlashcardCatalogueInfoResponse> catalogueInfo() {
+        var info = flashcardService.catalogueInfo();
+        return ResponseEntity.ok(new FlashcardCatalogueInfoResponse(info.topics(), info.totalDueCount()));
+    }
+
+    @GetMapping("/sets/{id}/summary")
+    public ResponseEntity<FlashcardSetResponse> setSummary(@PathVariable UUID id) {
+        return ResponseEntity.ok(FlashcardSetResponse.from(flashcardService.setSummary(id)));
     }
 
     @GetMapping("/sets/{id}")
-    public ResponseEntity<FlashcardSetDetailResponse> setDetail(@PathVariable UUID id) {
-        var detail = flashcardService.setDetail(id);
+    public ResponseEntity<FlashcardSetDetailResponse> setDetail(@PathVariable UUID id,
+            @PageableDefault(size = 30) Pageable pageable) {
+        var detail = flashcardService.setDetail(id, org.springframework.data.domain.PageRequest
+                .of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("orderNo").and(Sort.by("id"))));
         return ResponseEntity.ok(new FlashcardSetDetailResponse(FlashcardSetResponse.from(detail.set()),
-                detail.cards().stream().map(FlashcardResponse::from).toList()));
+                detail.cards().stream().map(FlashcardResponse::from).toList(), detail.page(), detail.size(),
+                detail.totalItems(), detail.totalPages()));
     }
 
     /** What to study now: due cards first, then unseen ones to fill the session. */
@@ -89,6 +103,10 @@ public class FlashcardController {
                 flashcardService.rate(new RateFlashcardCommand(id, request.rating(), request.timeSpentSeconds()))));
     }
 
-    public record FlashcardSetDetailResponse(FlashcardSetResponse set, List<FlashcardResponse> cards) {
+    public record FlashcardCatalogueInfoResponse(List<String> topics, long totalDueCount) {
+    }
+
+    public record FlashcardSetDetailResponse(FlashcardSetResponse set, List<FlashcardResponse> cards, int page,
+            int size, long totalItems, int totalPages) {
     }
 }

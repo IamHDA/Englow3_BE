@@ -22,8 +22,8 @@ import jakarta.persistence.LockModeType;
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
     List<ExamAttempt> findTop50ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(ExamAttemptStatus status, Instant now);
 
-    Optional<ExamAttempt> findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(UUID userId, UUID examId,
-            ExamAttemptStatus status);
+    Optional<ExamAttempt> findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(UUID userId, UUID examId,
+            ExamAttemptMode mode, ExamAttemptStatus status);
 
     /**
      * The learner's best score on each of these papers, and how many times they have sat it. Batched so a page of exams

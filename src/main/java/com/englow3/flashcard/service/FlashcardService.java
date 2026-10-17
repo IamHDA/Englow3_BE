@@ -13,9 +13,13 @@ import com.englow3.flashcard.dto.result.FlashcardSetDetailResult;
 import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
 
 public interface FlashcardService {
-    Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, Pageable pageable);
+    Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, String sort, Pageable pageable);
 
-    FlashcardSetDetailResult setDetail(UUID setId);
+    FlashcardSetDetailResult setDetail(UUID setId, Pageable pageable);
+
+    FlashcardSetSummaryResult setSummary(UUID setId);
+
+    com.englow3.flashcard.dto.result.FlashcardCatalogueInfoResult catalogueInfo();
 
     List<FlashcardResult> studyQueue(UUID setId, int limit);
 

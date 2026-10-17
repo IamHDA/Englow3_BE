@@ -81,6 +81,13 @@ public class ExamController {
         return ResponseEntity.ok(ExamOutlineResponse.from(id, learnerExamService.outline(id)));
     }
 
+    @GetMapping("/{id}/active-attempts")
+    public ResponseEntity<java.util.List<ExamAttemptResponse>> activeAttempts(@PathVariable UUID id,
+            @RequestParam com.englow3.exam.entity.ExamAttemptMode mode) {
+        return ResponseEntity
+                .ok(examAttemptService.activeAttempt(id, mode).stream().map(ExamAttemptResponse::from).toList());
+    }
+
     @PostMapping("/{id}/attempts")
     @ApiResponse(responseCode = "200", description = "Existing attempt resumed")
     @ApiResponse(responseCode = "201", description = "New attempt created")

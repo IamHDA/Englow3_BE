@@ -50,7 +50,8 @@ class FlashcardServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final FlashcardService service = new FlashcardServiceImpl(setRepo, cardRepo, reviewRepo, reviewLogRepo,
-            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3));
+            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3),
+            mock(com.englow3.flashcard.query.FlashcardCatalogueQuery.class));
 
     private final UUID userId = UUID.randomUUID();
     private Flashcard card;
@@ -84,6 +85,20 @@ class FlashcardServiceTest {
 
         assertThat(result.flashcardId()).isEqualTo(card.getId());
         verify(reviewLogRepo).save(any());
+    }
+
+    @Test
+    void detailLoadsOnlyTheRequestedCardPageAndKeepsTheWholeSetCount() {
+        setIsPublished(true);
+        var page = org.springframework.data.domain.PageRequest.of(1, 30);
+        when(cardRepo.findByFlashcardSetId(card.getFlashcardSetId(), page))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(card), page, 300));
+        var detail = service.setDetail(card.getFlashcardSetId(), page);
+        assertThat(detail.cards()).hasSize(1);
+        assertThat(detail.page()).isEqualTo(1);
+        assertThat(detail.totalPages()).isEqualTo(10);
+        assertThat(detail.set().cardCount()).isEqualTo(300);
+        org.mockito.Mockito.verify(cardRepo, org.mockito.Mockito.never()).findByFlashcardSetIdOrderByOrderNo(any());
     }
 
     @Test

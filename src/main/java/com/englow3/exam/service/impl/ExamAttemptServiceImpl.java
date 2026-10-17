@@ -128,13 +128,20 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         return start(StartExamAttemptCommand.full(examId));
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Optional<ExamAttemptResult> activeAttempt(UUID examId, ExamAttemptMode mode) {
+        requirePublishedExam(examId);
+        return attemptRepo
+                .findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userDirectory.requireCurrentUserId(),
+                        examId, mode, ExamAttemptStatus.IN_PROGRESS)
+                .filter(attempt -> clock.instant().isBefore(attempt.getExpiresAt()))
+                .map(attempt -> named(ExamAttemptResult.started(attempt, true)));
+    }
+
     /**
      * Opens a paper as a full attempt or as a practice of some of its parts.
      * <p>
-     * Only one attempt per paper is ever open (the database enforces it). An open attempt that is exactly what was
-     * asked for is handed back. One that is not - a full test open while a practice is asked for, or a practice of
-     * other parts - is never silently swapped: the learner is told with {@code ATTEMPT_IN_PROGRESS} and chooses to
-     * resume it or to have it finalized from its saved answers and start afresh.
+     * Each mode has its own active attempt. Replacement is explicit even when the configuration is unchanged.
      */
     @Transactional
     public ExamAttemptResult start(StartExamAttemptCommand command) {
@@ -143,13 +150,14 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         Instant now = clock.instant();
         PracticePlan practice = command.mode() == ExamAttemptMode.PRACTICE ? planPractice(exam, command) : null;
 
-        var active = attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, exam.getId(),
-                ExamAttemptStatus.IN_PROGRESS);
+        var active = attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                command.mode(), ExamAttemptStatus.IN_PROGRESS);
         if (active.isPresent() && now.isBefore(active.get().getExpiresAt())) {
             ExamAttempt open = active.get();
             boolean asked = practice == null ? open.matches(ExamAttemptMode.FULL, Set.of(), exam.getDurationSeconds())
                     : open.matches(ExamAttemptMode.PRACTICE, practice.partIds(), practice.timeLimitSeconds());
-            if (asked || command.onOpen() == StartExamAttemptCommand.OpenAttempt.RESUME) {
+            if ((asked && command.onOpen() != StartExamAttemptCommand.OpenAttempt.REPLACE)
+                    || command.onOpen() == StartExamAttemptCommand.OpenAttempt.RESUME) {
                 return named(ExamAttemptResult.started(open, true));
             }
             if (command.onOpen() != StartExamAttemptCommand.OpenAttempt.REPLACE) {
@@ -171,6 +179,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             attemptRepo.flush();
         }
 
+        if (command.onOpen() == StartExamAttemptCommand.OpenAttempt.RESUME) {
+            throw new ConflictException("ATTEMPT_NO_LONGER_ACTIVE", "This attempt is no longer available to resume");
+        }
         ExamAttempt attempt;
         if (practice == null) {
             int questionCount = Math.toIntExact(examRepo.countQuestions(exam.getId()));

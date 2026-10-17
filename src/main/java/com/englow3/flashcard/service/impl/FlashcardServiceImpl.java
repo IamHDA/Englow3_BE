@@ -54,12 +54,14 @@ public class FlashcardServiceImpl implements FlashcardService {
     private final Clock clock;
     private final String learningBucket;
     private final Duration mediaUrlTtl;
+    private final com.englow3.flashcard.query.FlashcardCatalogueQuery catalogueQuery;
 
     public FlashcardServiceImpl(FlashcardSetRepository setRepo, FlashcardRepository cardRepo,
             FlashcardReviewRepository reviewRepo, FlashcardReviewLogRepository reviewLogRepo,
             UserDirectory userDirectory, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.learning-bucket}") String learningBucket,
-            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl) {
+            @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl,
+            com.englow3.flashcard.query.FlashcardCatalogueQuery catalogueQuery) {
         this.setRepo = setRepo;
         this.cardRepo = cardRepo;
         this.reviewRepo = reviewRepo;
@@ -69,39 +71,42 @@ public class FlashcardServiceImpl implements FlashcardService {
         this.clock = clock;
         this.learningBucket = learningBucket;
         this.mediaUrlTtl = mediaUrlTtl;
+        this.catalogueQuery = catalogueQuery;
     }
 
     @Transactional(readOnly = true)
-    public Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, Pageable pageable) {
+    public Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, String sort,
+            Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = clock.instant();
 
-        Page<FlashcardSet> page = setRepo.searchByStatus(FlashcardSetStatus.PUBLISHED, topic, title, pageable);
-        List<UUID> setIds = page.getContent().stream().map(FlashcardSet::getId).toList();
-        Map<UUID, Long> cardCounts = countCardsFor(setIds);
-        Map<UUID, Instant> lastStudied = lastStudiedFor(userId, setIds);
-
-        // Due and mastered for the whole page in one query: per set it was two round trips each, and with the
-        // database a region away a page of twenty took seconds.
-        Map<UUID, long[]> progress = reviewRepo.countDueAndMasteredBySet(userId, setIds, now);
-        return page.map(set -> {
-            long[] dueAndMastered = progress.getOrDefault(set.getId(), new long[2]);
-            return FlashcardSetSummaryResult.of(set, cardCounts.getOrDefault(set.getId(), 0L), dueAndMastered[0],
-                    dueAndMastered[1], lastStudied.get(set.getId()));
-        });
+        return catalogueQuery.search(userId, now, topic, title, sort, pageable);
     }
 
     @Transactional(readOnly = true)
-    public FlashcardSetDetailResult setDetail(UUID setId) {
+    public FlashcardSetDetailResult setDetail(UUID setId, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = clock.instant();
         FlashcardSet set = requirePublishedSet(setId);
 
-        List<Flashcard> cards = cardRepo.findByFlashcardSetIdOrderByOrderNo(setId);
+        var cardPage = cardRepo.findByFlashcardSetId(setId, pageable);
+        List<Flashcard> cards = cardPage.getContent();
         Map<UUID, FlashcardReview> reviews = reviewsFor(userId, cards);
 
-        return new FlashcardSetDetailResult(summaryOf(set, userId, cards.size(), now),
-                cards.stream().map(card -> resultOf(card, reviews.get(card.getId()))).toList());
+        return new FlashcardSetDetailResult(summaryOf(set, userId, cardPage.getTotalElements(), now),
+                cards.stream().map(card -> resultOf(card, reviews.get(card.getId()))).toList(), cardPage.getNumber(),
+                cardPage.getSize(), cardPage.getTotalElements(), cardPage.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
+    public FlashcardSetSummaryResult setSummary(UUID setId) {
+        UUID userId = userDirectory.requireCurrentUserId();
+        return summaryOf(requirePublishedSet(setId), userId, cardRepo.countByFlashcardSetId(setId), clock.instant());
+    }
+
+    @Transactional(readOnly = true)
+    public com.englow3.flashcard.dto.result.FlashcardCatalogueInfoResult catalogueInfo() {
+        return catalogueQuery.information(userDirectory.requireCurrentUserId(), clock.instant());
     }
 
     /**
@@ -176,11 +181,6 @@ public class FlashcardServiceImpl implements FlashcardService {
         }
         return reviewRepo.findByUserIdAndFlashcardIdIn(userId, cards.stream().map(Flashcard::getId).toList()).stream()
                 .collect(Collectors.toMap(FlashcardReview::getFlashcardId, Function.identity()));
-    }
-
-    /** The empty-input guard and the row mapping moved into the repository, where the admin list needs them too. */
-    private Map<UUID, Long> countCardsFor(Collection<UUID> setIds) {
-        return cardRepo.countBySetIds(setIds);
     }
 
     private FlashcardSet requirePublishedSet(UUID setId) {

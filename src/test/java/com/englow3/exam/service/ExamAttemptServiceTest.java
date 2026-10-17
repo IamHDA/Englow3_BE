@@ -86,8 +86,9 @@ class ExamAttemptServiceTest {
     void startsANewAttemptFromThePublishedPaperSnapshot() {
         Exam exam = publishedExam();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
-        when(attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, exam.getId(),
-                ExamAttemptStatus.IN_PROGRESS)).thenReturn(Optional.empty());
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.empty());
         when(examRepo.countQuestions(exam.getId())).thenReturn(2L);
 
         ExamAttemptResult result = service.start(exam.getId());
@@ -99,12 +100,68 @@ class ExamAttemptServiceTest {
     }
 
     @Test
+    void aPracticeDoesNotBlockStartingAFullAttempt() {
+        Exam exam = publishedExam();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.countQuestions(exam.getId())).thenReturn(2L);
+        var practice = ExamAttempt.startPractice(exam, userId, java.util.Set.of(UUID.randomUUID()), 1, BigDecimal.ONE,
+                600, CLOCK.instant());
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.PRACTICE, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(practice));
+
+        var result = service.start(exam.getId());
+
+        assertThat(result.mode()).isEqualTo(com.englow3.exam.entity.ExamAttemptMode.FULL);
+        assertThat(result.id()).isNotEqualTo(practice.getId());
+        assertThat(practice.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
+        verify(attemptRepo).findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void explicitReplacementCreatesANewAttemptEvenWithTheSameConfiguration() {
+        Exam exam = publishedExam();
+        var active = ExamAttempt.start(exam, userId, 2, CLOCK.instant());
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.countQuestions(exam.getId())).thenReturn(2L);
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(active));
+        when(attemptRepo.findByIdForUpdate(active.getId())).thenReturn(Optional.of(active));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+
+        var result = service.start(new com.englow3.exam.dto.command.StartExamAttemptCommand(exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, null, null,
+                com.englow3.exam.dto.command.StartExamAttemptCommand.OpenAttempt.REPLACE));
+
+        assertThat(result.id()).isNotEqualTo(active.getId());
+        assertThat(result.resumed()).isFalse();
+        assertThat(active.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
+    }
+
+    @Test
+    void previewingAnActiveAttemptDoesNotCreateOrFinalizeIt() {
+        Exam exam = publishedExam();
+        var active = ExamAttempt.start(exam, userId, 2, CLOCK.instant());
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(active));
+        assertThat(service.activeAttempt(exam.getId(), com.englow3.exam.entity.ExamAttemptMode.FULL))
+                .hasValueSatisfying(result -> assertThat(result.id()).isEqualTo(active.getId()));
+        assertThat(active.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
+        verify(attemptRepo, never()).save(any());
+    }
+
+    @Test
     void returnsTheExistingUnexpiredAttemptInsteadOfCreatingAnother() {
         Exam exam = publishedExam();
         ExamAttempt active = ExamAttempt.start(exam, userId, 2, Instant.now());
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
-        when(attemptRepo.findFirstByUserIdAndExamIdAndStatusOrderByStartedAtDesc(userId, exam.getId(),
-                ExamAttemptStatus.IN_PROGRESS)).thenReturn(Optional.of(active));
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(active));
 
         ExamAttemptResult result = service.start(exam.getId());
 

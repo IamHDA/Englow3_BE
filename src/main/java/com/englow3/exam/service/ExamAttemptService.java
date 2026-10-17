@@ -1,6 +1,7 @@
 package com.englow3.exam.service;
 
 import java.util.UUID;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,8 +12,11 @@ import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.exam.dto.result.ExamAttemptResult;
 import com.englow3.exam.dto.result.ExamDraftResult;
 import com.englow3.exam.dto.result.LearnerExamPaperResult;
+import com.englow3.exam.entity.ExamAttemptMode;
 
 public interface ExamAttemptService {
+    Optional<ExamAttemptResult> activeAttempt(UUID examId, ExamAttemptMode mode);
+
     ExamDraftResult draft(UUID id);
 
     ExamDraftResult saveDraft(SaveExamDraftCommand command);
