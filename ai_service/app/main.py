@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -8,7 +9,7 @@ from typing import Annotated
 import httpx
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import Settings, get_settings
 from app.errors import ServiceError
@@ -147,6 +148,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return await request.app.state.llm_provider.generate(body)
         except TimeoutError as exc:
             raise ServiceError("AI_PROVIDER_TIMEOUT", "Generation timed out", 504, True) from exc
+
+    @app.post("/internal/v1/llm/stream", dependencies=internal)
+    async def stream_generation(request: Request, body: LlmGenerateRequest) -> StreamingResponse:
+        async def events():
+            try:
+                async with asyncio.timeout(configured.read_timeout_seconds):
+                    async for event in request.app.state.llm_provider.stream(body):
+                        yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+            except TimeoutError:
+                yield 'data: {"error":{"code":"AI_PROVIDER_TIMEOUT","retryable":true}}\n\n'
+            except ServiceError as exc:
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "error": {
+                                "code": exc.code,
+                                "retryable": exc.retryable,
+                                "retry_after_seconds": exc.retry_after_seconds,
+                            }
+                        }
+                    )
+                    + "\n\n"
+                )
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
 
     @app.post(
         "/internal/v1/embeddings",

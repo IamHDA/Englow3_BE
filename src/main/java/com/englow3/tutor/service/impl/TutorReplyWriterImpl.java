@@ -26,6 +26,40 @@ public class TutorReplyWriterImpl implements TutorReplyWriter {
 
     private final TutorMessageRepository messageRepo;
     private final Clock clock;
+    private final com.englow3.tutor.repository.TutorMemoryRepository memories;
+    private final com.englow3.ai.api.AiJobQueue aiJobQueue;
+
+    @Transactional
+    public void storeSummaryReply(UUID messageId, int revision, long epoch, int throughOrder, String content,
+            String model, Integer inputTokens, Integer outputTokens) {
+        messageRepo
+                .lockById(messageId).filter(message -> message.isSummary()
+                        && message.getStatus() == TutorMessageStatus.PENDING && message.getRevision() == revision)
+                .ifPresent(message -> {
+                    message.attachSources("[]");
+                    message.answer(content, model, com.englow3.tutor.service.TutorMemoryPrompt.VERSION, inputTokens,
+                            outputTokens, clock.instant());
+                });
+        messageRepo.flush();
+        memories.complete(messageId, revision, epoch, throughOrder,
+                com.englow3.tutor.helper.TutorMemoryText.clip(content, 4000));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isPending(UUID messageId, int revision) {
+        return messageRepo.findById(messageId)
+                .filter(m -> m.getStatus() == TutorMessageStatus.PENDING && m.getRevision() == revision).isPresent();
+    }
+
+    @Transactional
+    public UUID startStream(UUID messageId, int revision) {
+        return messageRepo.lockById(messageId).map(message -> message.startStream(revision)).orElse(null);
+    }
+
+    @Transactional
+    public boolean partial(UUID messageId, int revision, UUID epoch, String text) {
+        return messageRepo.lockById(messageId).map(message -> message.partial(revision, epoch, text)).orElse(false);
+    }
 
     /**
      * Fills the pending turn.
@@ -36,14 +70,26 @@ public class TutorReplyWriterImpl implements TutorReplyWriter {
      */
     @Transactional
     public void storeReply(UUID messageId, String content, String model, Integer inputTokens, Integer outputTokens) {
-        messageRepo.findById(messageId).filter(message -> message.getStatus() == TutorMessageStatus.PENDING)
-                .ifPresent(message -> message.answer(content, model, TutorPrompt.VERSION, inputTokens, outputTokens,
-                        clock.instant()));
+        storeReply(messageId, 0, content, model, inputTokens, outputTokens);
+    }
+
+    @Transactional
+    public void storeReply(UUID messageId, int revision, String content, String model, Integer inputTokens,
+            Integer outputTokens) {
+        messageRepo.lockById(messageId).filter(
+                message -> message.getStatus() == TutorMessageStatus.PENDING && message.getRevision() == revision)
+                .ifPresent(message -> {
+                    message.attachSources(
+                            com.englow3.tutor.helper.TutorSources.cited(message.getSourcesJson(), content));
+                    message.answer(content, model, TutorPrompt.VERSION, inputTokens, outputTokens, clock.instant());
+                });
     }
 
     @Transactional
     public void markFailed(UUID messageId, String errorCode) {
-        messageRepo.findById(messageId).filter(message -> message.getStatus() == TutorMessageStatus.PENDING)
+        messageRepo.lockById(messageId)
+                .filter(message -> message.getStatus() == TutorMessageStatus.PENDING
+                        && aiJobQueue.hasFailedTutorReply(messageId, message.getRevision()))
                 .ifPresent(message -> message.fail(errorCode, clock.instant()));
     }
 }

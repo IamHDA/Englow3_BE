@@ -68,9 +68,11 @@ public class SpeechAssessmentClient {
                     // The distinction that matters is not "did it fail" but "would the same request work in a
                     // minute", and only the status says that - hence a handler rather than a catch on the default.
                     .onStatus(HttpStatusCode::isError, (request, response) -> {
-                        throw new SpeechAssessmentException("SPEECH_ASSESSMENT_REJECTED",
-                                "ai_service answered %s".formatted(response.getStatusCode()),
-                                AiServiceFailure.retryable(response.getBody(), retryable(response.getStatusCode())))
+                        var failure = AiServiceFailure.decode(response.getBody(),
+                                "AI_SERVICE_HTTP_" + response.getStatusCode().value(),
+                                retryable(response.getStatusCode()));
+                        throw new SpeechAssessmentException(failure.code(),
+                                "ai_service answered %s".formatted(response.getStatusCode()), failure.retryable())
                                         .retryAfter(response.getHeaders().getFirst("Retry-After"));
                     }).body(String.class);
         } catch (RestClientException transportFailure) {

@@ -1,6 +1,12 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=20_000)
 
 
 class LlmGenerateRequest(BaseModel):
@@ -12,13 +18,15 @@ class LlmGenerateRequest(BaseModel):
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=2_048, ge=1, le=32_768)
     json_output: bool = False
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+    messages: list[ChatTurn] | None = Field(default=None, min_length=1, max_length=21)
 
 
 class LlmGenerateResponse(BaseModel):
     content: str = Field(min_length=1)
     model: str = Field(min_length=1, max_length=200)
-    input_tokens: int = Field(default=0, ge=0)
-    output_tokens: int = Field(default=0, ge=0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
 
 
 class EmbeddingRequest(BaseModel):

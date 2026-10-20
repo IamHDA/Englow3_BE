@@ -19,7 +19,8 @@ class AiJobWorkerTest {
     @Test
     void sleepingAdapterDefersWithoutCallingProviderOrSpendingARetry() {
         AiJob claimed = job(AiJobType.TUTOR_REPLY);
-        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(claimed));
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
+                .thenReturn(List.of(claimed));
         when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
                 .thenReturn(List.of());
         var readiness = mock(com.englow3.ai.client.AiServiceReadiness.class);
@@ -59,7 +60,8 @@ class AiJobWorkerTest {
     @Test
     void slowSpeakingDoesNotBlockTutorAndDoesNotPreclaimMoreWork() throws Exception {
         AiJob speaking = job(AiJobType.SPEECH_ASSESSMENT), tutor = job(AiJobType.TUTOR_REPLY);
-        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(tutor));
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
+                .thenReturn(List.of(tutor));
         when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
                 .thenReturn(List.of(speaking));
         CountDownLatch entered = new CountDownLatch(2), release = new CountDownLatch(1);
@@ -85,15 +87,30 @@ class AiJobWorkerTest {
     @Test
     void handlerExceptionIsRecordedAndNotifiesOnlyAfterTerminalFailure() {
         AiJob job = job(AiJobType.TUTOR_REPLY);
-        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(job));
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
+                .thenReturn(List.of(job));
         when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
                 .thenReturn(List.of());
         when(queue.record(eq(job.getId()), any(), any(), any())).thenReturn(true);
         AiJobHandler handler = mock(AiJobHandler.class);
         when(handler.handles()).thenReturn("TUTOR_REPLY");
-        when(handler.run(any(), any(), any())).thenThrow(new IllegalStateException("private"));
-        try (var worker = worker(List.of(handler))) {
-            worker.drain();
+        String privateSentinel = "PRIVATE_LEARNER_CONTENT_MUST_NOT_BE_LOGGED";
+        when(handler.run(any(), any(), any())).thenThrow(new IllegalStateException(privateSentinel));
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AiJobWorker.class);
+        var capture = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        capture.start();
+        logger.addAppender(capture);
+        try {
+            try (var worker = worker(List.of(handler))) {
+                worker.drain();
+            }
+            assertThat(capture.list)
+                    .anyMatch(event -> event.getFormattedMessage().contains("exceptionType=IllegalStateException"));
+            assertThat(capture.list).noneMatch(event -> event.getFormattedMessage().contains(privateSentinel)
+                    || event.getThrowableProxy() != null);
+        } finally {
+            logger.detachAppender(capture);
+            capture.stop();
         }
         verify(handler).onGaveUp(job.getTargetId(), "AI_JOB_HANDLER_ERROR");
         verify(handler, never()).complete(any(), any(), any());
@@ -102,7 +119,8 @@ class AiJobWorkerTest {
     @Test
     void expiredComputationDoesNotPublishItsResult() {
         AiJob job = job(AiJobType.TUTOR_REPLY);
-        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY")), any())).thenReturn(List.of(job));
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
+                .thenReturn(List.of(job));
         when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
                 .thenReturn(List.of());
         try (var worker = new AiJobWorker(queue, List.of(handler("TUTOR_REPLY", () -> {

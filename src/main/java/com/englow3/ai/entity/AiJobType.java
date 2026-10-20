@@ -11,5 +11,8 @@ public enum AiJobType {
     SPEECH_ASSESSMENT,
 
     /** Answer a learner's question in a tutor conversation. Target is the pending assistant message. */
-    TUTOR_REPLY
+    TUTOR_REPLY,
+
+    /** Transcribe a private, bounded Tutor recording. No pronunciation score is produced. */
+    TUTOR_TRANSCRIPTION
 }

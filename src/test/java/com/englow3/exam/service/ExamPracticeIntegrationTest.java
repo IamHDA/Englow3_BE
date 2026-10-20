@@ -154,24 +154,25 @@ class ExamPracticeIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void anOpenAttemptOfAnotherKindIsNeitherReplacedNorReusedWithoutBeingAsked() {
+    void fullAndPracticeKeepIndependentActiveAttemptsAndReplacementIsExplicit() {
         ExamAttemptResult practice = practise(Set.of(partOne), null, null);
 
         assertThat(practise(Set.of(partOne), null, null).resumed()).isTrue();
-        assertThatThrownBy(() -> attempts.start(StartExamAttemptCommand.full(examId)))
-                .satisfies(failure -> assertThat(codeOf(failure)).isEqualTo("ATTEMPT_IN_PROGRESS"));
-        assertThatThrownBy(() -> practise(Set.of(partFive), null, null))
-                .satisfies(failure -> assertThat(codeOf(failure)).isEqualTo("ATTEMPT_IN_PROGRESS"));
-
-        ExamAttemptResult resumed = attempts
-                .start(new StartExamAttemptCommand(examId, ExamAttemptMode.FULL, Set.of(), null, OpenAttempt.RESUME));
-        assertThat(resumed.id()).isEqualTo(practice.id());
-
-        ExamAttemptResult full = attempts
-                .start(new StartExamAttemptCommand(examId, ExamAttemptMode.FULL, Set.of(), null, OpenAttempt.REPLACE));
+        ExamAttemptResult full = attempts.start(StartExamAttemptCommand.full(examId));
         assertThat(full.id()).isNotEqualTo(practice.id());
         assertThat(full.mode()).isEqualTo(ExamAttemptMode.FULL);
         assertThat(full.questionCount()).isEqualTo(4);
+        assertThatThrownBy(() -> practise(Set.of(partFive), null, null))
+                .satisfies(failure -> assertThat(codeOf(failure)).isEqualTo("ATTEMPT_IN_PROGRESS"));
+
+        ExamAttemptResult resumed = attempts.start(new StartExamAttemptCommand(examId, ExamAttemptMode.PRACTICE,
+                Set.of(partOne), null, OpenAttempt.RESUME));
+        assertThat(resumed.id()).isEqualTo(practice.id());
+
+        ExamAttemptResult replacement = attempts.start(new StartExamAttemptCommand(examId, ExamAttemptMode.PRACTICE,
+                Set.of(partFive), null, OpenAttempt.REPLACE));
+        assertThat(replacement.id()).isNotEqualTo(practice.id());
+        assertThat(attempts.activeAttempt(examId, ExamAttemptMode.FULL).orElseThrow().id()).isEqualTo(full.id());
         assertThat(attempts.result(practice.id()).status()).isEqualTo(ExamAttemptStatus.SCORED);
     }
 

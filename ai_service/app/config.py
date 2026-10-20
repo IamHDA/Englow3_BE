@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,7 @@ class Settings(BaseSettings):
     llm_enabled: bool = False
     llm_base_url: AnyHttpUrl = AnyHttpUrl("https://api.groq.com/openai/v1")
     llm_api_key: SecretStr = SecretStr("")
+    llm_reasoning_effort: Literal["low", "medium", "high"] = "medium"
 
     embedding_enabled: bool = False
     embedding_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")

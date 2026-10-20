@@ -30,6 +30,7 @@ import org.testcontainers.utility.MountableFile;
 public abstract class PostgresIntegrationTest {
 
     private static PostgreSQLContainer<?> postgres;
+    private static final String TEST_QUEUE_SCOPE = "test_" + java.util.UUID.randomUUID().toString().replace("-", "");
 
     /**
      * Skips rather than fails where there is no container runtime.
@@ -41,7 +42,7 @@ public abstract class PostgresIntegrationTest {
      */
     @BeforeAll
     static void requireDocker() {
-        Assumptions.assumeTrue(dockerIsAvailable(),
+        Assumptions.assumeTrue(localDatabaseUrl() != null || dockerIsAvailable(),
                 "No Docker environment - skipping the tests that need a real database");
     }
 
@@ -77,9 +78,12 @@ public abstract class PostgresIntegrationTest {
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> container().getJdbcUrl());
-        registry.add("spring.datasource.username", () -> container().getUsername());
-        registry.add("spring.datasource.password", () -> container().getPassword());
+        registry.add("spring.datasource.url",
+                () -> localDatabaseUrl() == null ? container().getJdbcUrl() : localDatabaseUrl());
+        registry.add("spring.datasource.username",
+                () -> localDatabaseUrl() == null ? container().getUsername() : "englow3");
+        registry.add("spring.datasource.password",
+                () -> localDatabaseUrl() == null ? container().getPassword() : "integration-test");
 
         // Flyway builds the schema; Hibernate must not also try. `validate` would be the stricter choice but fails on
         // details Flyway is allowed to differ on, and `none` keeps one owner of the schema.
@@ -88,6 +92,8 @@ public abstract class PostgresIntegrationTest {
 
         // The worker would otherwise start draining the queue underneath these tests.
         registry.add("app.ai.enabled", () -> "false");
+        registry.add("app.tutor.maintenance-enabled", () -> "false");
+        registry.add("app.ai.queue-scope", () -> TEST_QUEUE_SCOPE);
 
         // The only two settings with no default. They are deliberately required in production - an application that
         // silently starts with no token issuer would accept nothing and say nothing about why - so the context needs
@@ -100,5 +106,13 @@ public abstract class PostgresIntegrationTest {
         // for a second container to hold files no test reads.
         registry.add("app.storage.s3.access-key", () -> "integration-test");
         registry.add("app.storage.s3.secret-key", () -> "integration-test");
+    }
+
+    /** Opt-in for a dedicated local cluster; shared/remote databases must never be used by this suite. */
+    private static String localDatabaseUrl() {
+        String url = System.getProperty("englow.test.database.url");
+        if (url != null && !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]{4,5}/englow_test_[a-z0-9_]+"))
+            throw new IllegalArgumentException("Integration tests require a dedicated loopback englow_test_ database");
+        return url;
     }
 }

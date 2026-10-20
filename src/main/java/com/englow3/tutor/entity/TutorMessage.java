@@ -19,6 +19,12 @@ import lombok.Getter;
 @Table(name = "tutor_messages")
 @Getter
 public class TutorMessage {
+    @jakarta.persistence.Column(name = "is_summary", nullable = false)
+    private boolean summary;
+
+    public void markSummary() {
+        summary = true;
+    }
 
     @Id
     private UUID id;
@@ -63,10 +69,57 @@ public class TutorMessage {
     private String reportNote;
 
     @Column(name = "created_at", insertable = false, updatable = false)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
     private Instant createdAt;
 
     @Column(name = "answered_at")
     private Instant answeredAt;
+
+    @Column(nullable = false)
+    private int revision;
+    @Column(name = "restart_count", nullable = false)
+    private int restartCount;
+
+    @Column
+    private String correction;
+
+    @Column(name = "report_status")
+    private String reportStatus;
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "sources_json", columnDefinition = "jsonb", nullable = false)
+    private String sourcesJson = "[]";
+
+    public void attachSources(String json) {
+        requirePending("given source context");
+        sourcesJson = json;
+    }
+
+    public void reviewed(String status, String correction) {
+        this.reportStatus = status;
+        this.correction = correction;
+    }
+
+    @Column(name = "stream_epoch")
+    private UUID streamEpoch;
+
+    public UUID startStream(int expectedRevision) {
+        if (status != TutorMessageStatus.PENDING || revision != expectedRevision)
+            return null;
+        streamEpoch = UUID.randomUUID();
+        content = "";
+        return streamEpoch;
+    }
+
+    public boolean partial(int expectedRevision, UUID epoch, String text) {
+        if (status != TutorMessageStatus.PENDING || revision != expectedRevision
+                || !java.util.Objects.equals(streamEpoch, epoch))
+            return false;
+        if (text.length() > 200000)
+            throw new IllegalArgumentException("Reply too large");
+        content = text;
+        return true;
+    }
 
     protected TutorMessage() {
     }
@@ -148,6 +201,59 @@ public class TutorMessage {
         }
         this.reportedAt = now;
         this.reportNote = note == null || note.isBlank() ? null : note.strip();
+        this.reportStatus = "OPEN";
+    }
+
+    public void restart(boolean regenerate) {
+        if (role != TutorMessageRole.ASSISTANT || (regenerate ? status != TutorMessageStatus.READY
+                : status != TutorMessageStatus.FAILED && status != TutorMessageStatus.CANCELLED)) {
+            throw new ConflictException("TUTOR_REPLY_NOT_RETRYABLE", "This reply cannot be restarted");
+        }
+        if (restartCount >= 3) {
+            throw new ConflictException("TUTOR_RETRY_LIMIT", "Start a new question after three restarts");
+        }
+        revision++;
+        restartCount++;
+        streamEpoch = null;
+        status = TutorMessageStatus.PENDING;
+        content = null;
+        model = null;
+        errorCode = null;
+        inputTokens = null;
+        outputTokens = null;
+        answeredAt = null;
+        reportedAt = null;
+        reportNote = null;
+        reportStatus = null;
+        correction = null;
+        sourcesJson = "[]";
+    }
+
+    public void cancel(Instant now) {
+        requirePending("cancelled");
+        status = TutorMessageStatus.CANCELLED;
+        answeredAt = now;
+        errorCode = null;
+    }
+
+    public void selectAnswer(String text, String model, Integer input, Integer output, String sources,
+            String correction, Instant now) {
+        if (role != TutorMessageRole.ASSISTANT || status == TutorMessageStatus.PENDING)
+            throw new ConflictException("TUTOR_HISTORY_UNAVAILABLE", "Wait for this reply to finish");
+        revision++;
+        content = text;
+        status = TutorMessageStatus.READY;
+        this.model = model;
+        inputTokens = input;
+        outputTokens = output;
+        sourcesJson = sources;
+        this.correction = correction;
+        reportStatus = correction == null ? null : "RESOLVED";
+        reportedAt = null;
+        reportNote = null;
+        errorCode = null;
+        streamEpoch = null;
+        answeredAt = now;
     }
 
     private void requirePending(String verb) {

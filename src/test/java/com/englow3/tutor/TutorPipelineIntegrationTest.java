@@ -61,7 +61,11 @@ class TutorPipelineIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(tutorService, "enabled", true);
         SignedIn.as(jdbc, new LearnerFixture(jdbc).learner());
+        when(llm.generateTurns(anyString(), anyString(), org.mockito.ArgumentMatchers.anyList(), anyDouble(), anyInt()))
+                .thenAnswer(call -> llm.generate(call.getArgument(0), call.getArgument(1), call.getArgument(3),
+                        call.getArgument(4)));
         handler = new TutorReplyHandler(llm, writer, new ObjectMapper());
     }
 

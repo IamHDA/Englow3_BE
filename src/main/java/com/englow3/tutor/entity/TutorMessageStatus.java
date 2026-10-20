@@ -13,5 +13,5 @@ public enum TutorMessageStatus {
 
     READY,
 
-    FAILED
+    FAILED, CANCELLED
 }

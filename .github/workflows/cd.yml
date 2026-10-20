@@ -80,7 +80,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
-          build-args: RELEASE_SHA=${{ github.sha }}
+          # Release images explicitly opt into their branch's queue. Local builds
+          # keep the Dockerfile's local/disabled defaults; Render env overrides
+          # remain authoritative when explicitly configured.
+          build-args: |
+            RELEASE_SHA=${{ github.sha }}
+            AI_QUEUE_SCOPE=${{ github.base_ref || github.ref_name }}
+            AI_WORKER_ENABLED=${{ github.event_name == 'push' }}
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

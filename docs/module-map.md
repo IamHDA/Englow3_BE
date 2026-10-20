@@ -178,8 +178,12 @@ exercise and retain their existing percentage scores.
 
 Owns the AI tutor conversation.
 
-- **Tables:** `tutor_conversations`, `tutor_messages`.
-- **Entry points:** `/api/tutor`, every route scoped to the caller.
+- **Tables:** `tutor_conversations`, `tutor_messages`, `tutor_requests`,
+  `tutor_reply_versions`, `tutor_resources`, `tutor_reports`, `tutor_audit`,
+  `tutor_recordings`, `tutor_deleted_requests`, `tutor_policy`, and `tutor_memories`.
+- **Entry points:** `/api/tutor`, every route scoped to the caller; `/api/admin/tutor`
+  for assigned report review and approved learning materials. Staff never receive
+  an unfiltered learner conversation list.
 - **Asking is synchronous, answering is not:** the question is stored and queued,
   and the screen polls the turn it created. A question is written before anything
   is asked of a provider, so a provider outage never loses what the learner typed.
@@ -187,6 +191,34 @@ Owns the AI tutor conversation.
   own words if not. It does not count its own work: the budget is shared with
   speaking, and only the queue sees both.
 - **AI:** enqueues through `ai`. It never calls a provider itself.
+- **Delivery:** durable account/request UUID receipts, revision and stream-epoch
+  fences, immutable original answers with attached review corrections, and short
+  database transactions. Explicitly edited questions create a new conversation.
+- **Learning context:** reads minimal level/goal data through `user.api` and a
+  selected SCORED quiz question through `quiz.api.SubmittedQuizContextReader`,
+  completed Writing/Speaking through `assessment.api.SubmittedAssessmentContextReader`,
+  and a scored exam question through `exam.api.SubmittedExamContextReader`.
+  Each owner checks caller ownership and completion before exposing review data.
+  Exam context includes bounded related passage/instructions, not private media URLs;
+  productive context never exposes hidden criterion scores or reviewer-private fields.
+  Profile and document text stay in untrusted context, never system instructions.
+- **Knowledge:** Staff author/submit, Admin publish/withdraw; only published
+  resource versions are retrieved. Historical citations retain their version.
+- **Voice:** bounded private immutable WAV uploads; transcription uses the shared
+  queue. A transcript never becomes a question without learner confirmation.
+  Recordings expire after 24 hours. Cleanup and deletion intents run independently
+  of the AI provider flag and never make provider calls.
+- **Data:** owner-scoped paged JSON export; deleting Tutor data scrubs job content
+  through the AI API, erases reports/revisions, and queues file cleanup. Non-content
+  delivery tombstones last 30 days; daily allowance metadata is not refunded.
+- **Memory:** learner-requested summaries use ordinary receipt/quota/worker delivery,
+  bounded batches, versioned cursors and an epoch. Unverified notes stay in user
+  context. Clear/review corrections fence late writes through a conversation memory
+  advisory lock; correction races do not resurrect stale notes. Summaries are
+  excluded from ordinary history input to avoid recursive compression.
+- **Operations:** Admin metrics expose queue/end-to-end p95, terminal error codes
+  and known/missing token usage without returning raw prompts or answers.
+- **Release:** see `tutor-release-runbook.md`; memory, streaming and voice default off.
 
 ## `shared` and `config`
 

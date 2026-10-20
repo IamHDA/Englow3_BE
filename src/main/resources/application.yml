@@ -112,12 +112,21 @@ app:
     read-timeout: ${AI_READ_TIMEOUT:55s}
     speech-read-timeout: ${AI_SPEECH_READ_TIMEOUT:70s}
     daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    queue-scope: ${AI_QUEUE_SCOPE:local}
+    max-outstanding-jobs: ${AI_MAX_OUTSTANDING_JOBS:200}
     worker:
-      enabled: ${AI_WORKER_ENABLED:true}
+      enabled: ${AI_WORKER_ENABLED:false}
       fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
       lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:3m}
       max-run: ${AI_WORKER_MAX_RUN:140s}
       reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:30s}
+
+  tutor:
+    memory-enabled: ${TUTOR_MEMORY_ENABLED:false}
+    streaming-enabled: ${TUTOR_STREAMING_ENABLED:false}
+    voice-enabled: ${TUTOR_VOICE_ENABLED:false}
+    maintenance-enabled: ${TUTOR_MAINTENANCE_ENABLED:true}
+    audio-bucket: ${TUTOR_AUDIO_BUCKET:speaking}
 
   speech:
     locale: ${SPEECH_LOCALE:en-US}

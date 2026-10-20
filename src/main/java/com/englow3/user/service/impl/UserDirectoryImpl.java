@@ -33,6 +33,18 @@ public class UserDirectoryImpl implements UserDirectory {
     private final UserRepository userRepo;
     private final CurrentUser currentUser;
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public boolean isBackOfficeUser(UUID id) {
+        return userRepo.findById(id).map(user -> java.util.Set.of("ADMIN", "STAFF").contains(user.getRole().name()))
+                .orElse(false);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.List<StaffMember> backOfficeUsers() {
+        return userRepo.backOfficeUsers().stream().map(user -> new StaffMember(user.getId(), user.getDisplayName()))
+                .toList();
+    }
+
     /**
      * Auth provider id to internal id. The pair is written once by the Supabase sync trigger and nothing updates or
      * deletes a user row, so it cannot go stale. Almost every endpoint starts here, and against a database a region

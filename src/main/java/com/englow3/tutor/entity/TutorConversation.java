@@ -33,6 +33,50 @@ public class TutorConversation {
     @Column
     private String topic;
 
+    @Column(name = "use_learning_context", nullable = false)
+    private boolean useLearningContext = true;
+    private UUID quizAttemptId;
+    private UUID quizQuestionId;
+    private UUID assessmentAttemptId;
+    private UUID examAttemptId;
+    private UUID examQuestionId;
+
+    public void linkSubmittedAssessment(UUID attemptId) {
+        if (attemptId == null)
+            return;
+        if (quizAttemptId != null || examAttemptId != null
+                || (assessmentAttemptId != null && !assessmentAttemptId.equals(attemptId)))
+            throw new ConflictException("TUTOR_CONTEXT_CHANGE", "Start a new conversation for another submission");
+        assessmentAttemptId = attemptId;
+    }
+
+    public void linkSubmittedExam(UUID attemptId, UUID questionId) {
+        if ((attemptId == null) != (questionId == null))
+            throw new BadRequestException("TUTOR_CONTEXT_INVALID", "Choose both exam attempt and question");
+        if (attemptId == null)
+            return;
+        if (quizAttemptId != null || assessmentAttemptId != null
+                || (examAttemptId != null && (!examAttemptId.equals(attemptId) || !examQuestionId.equals(questionId))))
+            throw new ConflictException("TUTOR_CONTEXT_CHANGE", "Start a new conversation for another exam question");
+        examAttemptId = attemptId;
+        examQuestionId = questionId;
+    }
+
+    public void linkSubmittedQuiz(UUID attemptId, UUID questionId) {
+        if ((attemptId == null) != (questionId == null))
+            throw new BadRequestException("TUTOR_CONTEXT_INVALID", "Choose both the attempt and question");
+        if (quizAttemptId != null && (!quizAttemptId.equals(attemptId) || !quizQuestionId.equals(questionId)))
+            throw new ConflictException("TUTOR_CONTEXT_CHANGE", "Start a new conversation for another quiz question");
+        if (attemptId != null && (assessmentAttemptId != null || examAttemptId != null))
+            throw new ConflictException("TUTOR_CONTEXT_CHANGE", "Choose only one source context");
+        quizAttemptId = attemptId;
+        quizQuestionId = questionId;
+    }
+
+    public void configureLearningContext(boolean enabled) {
+        useLearningContext = enabled;
+    }
+
     /** Kept so the list can sort by activity without reading a single message. */
     @Column(name = "last_message_at", nullable = false)
     private Instant lastMessageAt;
@@ -44,6 +88,7 @@ public class TutorConversation {
     private Instant archivedAt;
 
     @Column(name = "created_at", insertable = false, updatable = false)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
     private Instant createdAt;
 
     protected TutorConversation() {
@@ -90,6 +135,17 @@ public class TutorConversation {
 
     public boolean isArchived() {
         return archivedAt != null;
+    }
+
+    public void rename(String title) {
+        if (title == null || title.isBlank() || title.strip().length() > MAX_TITLE_LENGTH) {
+            throw new BadRequestException("TUTOR_TITLE_INVALID", "Use a title between 1 and 200 characters");
+        }
+        this.title = title.strip();
+    }
+
+    public void restore() {
+        archivedAt = null;
     }
 
     /** An archived thread is a transcript, not somewhere to keep talking. */

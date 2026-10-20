@@ -53,19 +53,34 @@ class TutorServiceTest {
     private final AiJobQueue aiJobQueue = mock(AiJobQueue.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
 
+    private final com.englow3.tutor.service.TutorPolicyService policy = mock(
+            com.englow3.tutor.service.TutorPolicyService.class);
     private final TutorService service = new TutorServiceImpl(conversationRepo, messageRepo, aiJobQueue, userDirectory,
-            new ObjectMapper(), CLOCK);
+            new ObjectMapper(), CLOCK, mock(com.englow3.tutor.repository.TutorRequestRepository.class),
+            mock(com.englow3.tutor.repository.TutorReplyVersionRepository.class),
+            mock(com.englow3.user.api.LearnerContextReader.class),
+            mock(com.englow3.tutor.service.TutorKnowledgeService.class),
+            mock(com.englow3.tutor.repository.TutorReportRepository.class),
+            mock(com.englow3.tutor.repository.TutorDataRepository.class),
+            mock(com.englow3.quiz.api.SubmittedQuizContextReader.class), policy,
+            mock(com.englow3.assessment.api.SubmittedAssessmentContextReader.class),
+            mock(com.englow3.exam.api.SubmittedExamContextReader.class),
+            mock(com.englow3.tutor.repository.TutorMemoryRepository.class));
 
     private final UUID userId = UUID.randomUUID();
     private TutorConversation conversation;
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "enabled", true);
+        when(policy.accepting()).thenReturn(true);
+        when(policy.allowedModes()).thenReturn(List.of("GENERAL", "CORRECTION", "CONVERSATION", "PRACTICE"));
         conversation = TutorConversation.start(userId, "What is a gerund?", "grammar", Instant.now());
 
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(conversationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(conversationRepo.findByIdAndUserId(conversation.getId(), userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepo.lockOwned(conversation.getId(), userId)).thenReturn(Optional.of(conversation));
         when(messageRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(messageRepo.findByTutorConversationIdOrderByOrderNo(any())).thenReturn(List.of());
         // The budget is the queue's to count now; by default there is room left.
@@ -125,6 +140,8 @@ class TutorServiceTest {
             when(messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId()))
                     .thenReturn(List.of(TutorMessage.fromLearner(conversation.getId(), 1, "earlier"), answered));
 
+            conversation.recordTurn(Instant.now());
+            conversation.recordTurn(Instant.now());
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
             assertThat(savedMessages()).extracting(TutorMessage::getOrderNo).containsExactly(3, 4);
@@ -137,6 +154,8 @@ class TutorServiceTest {
                     .thenReturn(List.of(TutorMessage.fromLearner(conversation.getId(), 1, "earlier"),
                             TutorMessage.awaitingReply(conversation.getId(), 2)));
 
+            when(messageRepo.existsByTutorConversationIdAndStatus(conversation.getId(), TutorMessageStatus.PENDING))
+                    .thenReturn(true);
             assertThatThrownBy(
                     () -> service.send(new SendTutorMessageCommand(conversation.getId(), "And another?", null)))
                             .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
@@ -160,8 +179,9 @@ class TutorServiceTest {
         void sendsTheEarlierTurnsWithTheQuestion() {
             TutorMessage earlier = TutorMessage.awaitingReply(conversation.getId(), 2);
             earlier.answer("A verb used as a noun.", "m", "v1", 1, 1, Instant.now());
-            when(messageRepo.findByTutorConversationIdOrderByOrderNo(conversation.getId())).thenReturn(
-                    List.of(TutorMessage.fromLearner(conversation.getId(), 1, "What is a gerund?"), earlier));
+            when(messageRepo.recentContext(conversation.getId(), Integer.MAX_VALUE,
+                    org.springframework.data.domain.PageRequest.of(0, 10))).thenReturn(
+                            List.of(earlier, TutorMessage.fromLearner(conversation.getId(), 1, "What is a gerund?")));
 
             service.send(new SendTutorMessageCommand(conversation.getId(), "Give me an example.", null));
 
@@ -270,6 +290,7 @@ class TutorServiceTest {
             message.answer("A gerund is a verb used as a noun.", "gpt-4o-mini", "v1", 10, 20, Instant.now());
             when(messageRepo.findByIdAndTutorConversationId(message.getId(), conversation.getId()))
                     .thenReturn(Optional.of(message));
+            when(messageRepo.lockById(message.getId())).thenReturn(Optional.of(message));
             return message;
         }
 

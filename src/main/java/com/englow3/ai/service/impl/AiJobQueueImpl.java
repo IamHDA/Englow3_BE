@@ -42,6 +42,90 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     private final StudyCalendar calendar;
     private final Clock clock;
 
+    @Value("${app.ai.queue-scope:local}")
+    private String queueScope = "testing";
+    @Value("${app.ai.max-outstanding-jobs:200}")
+    private int maxOutstandingJobs = 200;
+
+    @Override
+    @Transactional(readOnly = true)
+    public Operations operations() {
+        var stats = jobRepo.queueStats(queueScope, calendar.startOfToday());
+        Metrics metrics = stats == null ? null
+                : new Metrics(stats.getSamples(), stats.getQueueP95Ms(), stats.getCompletionP95Ms(),
+                        stats.getKnownInputTokens(), stats.getKnownOutputTokens(), stats.getUnknownUsageJobs(),
+                        jobRepo.terminalFailures(queueScope, calendar.startOfToday()).stream()
+                                .map(f -> new FailureCount(f.getCode(), f.getCount())).toList());
+        return new Operations(jobRepo.countByQueueScopeAndStatus(queueScope, AiJobStatus.PENDING),
+                jobRepo.countByQueueScopeAndStatus(queueScope, AiJobStatus.RUNNING),
+                jobRepo.countByQueueScopeAndStatusAndCompletedAtGreaterThanEqual(queueScope, AiJobStatus.SUCCEEDED,
+                        calendar.startOfToday()),
+                jobRepo.countByQueueScopeAndStatusAndCompletedAtGreaterThanEqual(queueScope, AiJobStatus.FAILED,
+                        calendar.startOfToday()),
+                jobRepo.findFirstByQueueScopeAndStatusOrderByCreatedAtAsc(queueScope, AiJobStatus.PENDING)
+                        .map(AiJob::getCreatedAt).orElse(null),
+                queueScope, metrics);
+    }
+
+    @Override
+    @Transactional
+    public void lockBudget(UUID userId) {
+        jobRepo.lockProductiveBudget(userId.toString());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Usage usage(UUID userId) {
+        long used = jobRepo.countRequestedSince(userId, calendar.startOfToday());
+        return new Usage(dailyRequestLimit, (int) Math.min(Integer.MAX_VALUE, used),
+                calendar.today().plusDays(1).atStartOfDay(calendar.zone()).toInstant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasFailedTutorReply(UUID messageId, int revision) {
+        String key = "TUTOR_MESSAGE:" + messageId + (revision == 0 ? "" : ":" + revision);
+        return jobRepo.findByIdempotencyKey(key).filter(job -> queueScope.equals(job.getQueueScope()))
+                .map(job -> job.getStatus() == AiJobStatus.FAILED).orElse(false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasFailedTutorTranscription(UUID recordingId) {
+        return jobRepo.findByIdempotencyKey("TUTOR_AUDIO:" + recordingId)
+                .filter(job -> queueScope.equals(job.getQueueScope())).map(job -> job.getStatus() == AiJobStatus.FAILED)
+                .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public void enqueueTutorTranscription(UUID recordingId, String payload, String idempotencyKey, UUID userId) {
+        lockBudget(userId);
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isEmpty()) {
+            if (!hasDailyAllowance(userId))
+                throw new ConflictException("TUTOR_DAILY_LIMIT_REACHED",
+                        "Today's shared AI allowance has been reached");
+            if (jobRepo.countRequestedSince(userId, clock.instant().minusSeconds(60)) >= 10)
+                throw new ConflictException("TUTOR_RATE_LIMIT", "Please wait a minute before trying again");
+        }
+        enqueue(AiJobType.TUTOR_TRANSCRIPTION, "TUTOR_RECORDING", recordingId, payload, idempotencyKey,
+                "tutor-transcription-v1", userId);
+    }
+
+    @Override
+    @Transactional
+    public void purgeTutorRecording(UUID recordingId, UUID userId) {
+        jobRepo.lockOwnedTarget("TUTOR_RECORDING", recordingId, userId)
+                .forEach(job -> job.purgeContent(clock.instant()));
+    }
+
+    @Override
+    @Transactional
+    public void purgeTutorData(UUID userId) {
+        lockBudget(userId);
+        jobRepo.lockTutorDataForUser(userId).forEach(job -> job.purgeContent(clock.instant()));
+    }
+
     @Override
     @Transactional(readOnly = true)
     public boolean hasFailedProductiveAssessment(UUID attemptId, int revision) {
@@ -114,8 +198,14 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     private AiJob enqueue(AiJobType jobType, String targetType, UUID targetId, String inputPayload,
             String idempotencyKey, String promptVersion, UUID requestedByUserId) {
         return jobRepo.findByIdempotencyKey(idempotencyKey).orElseGet(() -> {
+            jobRepo.lockProductiveBudget("queue:" + queueScope);
+            long outstanding = jobRepo.countByQueueScopeAndStatus(queueScope, AiJobStatus.PENDING)
+                    + jobRepo.countByQueueScopeAndStatus(queueScope, AiJobStatus.RUNNING);
+            if (outstanding >= maxOutstandingJobs)
+                throw new ConflictException("AI_QUEUE_BUSY", "The AI queue is busy; please try again shortly");
             AiJob job = AiJob.pending(jobType, targetType, targetId, providerName, defaultModel, promptVersion,
                     inputPayload, idempotencyKey, MAX_RETRY_COUNT, requestedByUserId);
+            job.scopeTo(queueScope);
             try {
                 return jobRepo.saveAndFlush(job);
             } catch (DataIntegrityViolationException raced) {
@@ -128,6 +218,10 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Transactional
     public void enqueueSpeechAssessment(UUID attemptId, String inputPayload, String idempotencyKey,
             String promptVersion, UUID requestedByUserId) {
+        lockBudget(requestedByUserId);
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isEmpty() && !hasDailyAllowance(requestedByUserId)) {
+            throw new ConflictException("SPEECH_DAILY_LIMIT_REACHED", "Today's AI allowance has been reached");
+        }
         enqueue(AiJobType.SPEECH_ASSESSMENT, "SPEAKING_ATTEMPT", attemptId, inputPayload, idempotencyKey, promptVersion,
                 requestedByUserId);
     }
@@ -136,6 +230,15 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Transactional
     public void enqueueTutorReply(UUID messageId, String inputPayload, String idempotencyKey, String promptVersion,
             UUID requestedByUserId) {
+        lockBudget(requestedByUserId);
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isEmpty()) {
+            if (!hasDailyAllowance(requestedByUserId)) {
+                throw new ConflictException("TUTOR_DAILY_LIMIT_REACHED", "Today's AI allowance has been reached");
+            }
+            if (jobRepo.countRequestedSince(requestedByUserId, clock.instant().minusSeconds(60)) >= 10) {
+                throw new ConflictException("TUTOR_RATE_LIMIT", "Please wait a minute before asking again");
+            }
+        }
         enqueue(AiJobType.TUTOR_REPLY, "TUTOR_MESSAGE", messageId, inputPayload, idempotencyKey, promptVersion,
                 requestedByUserId);
     }
@@ -147,11 +250,8 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
      */
     @Transactional
     public List<AiJob> claimBatch(int limit) {
-        Instant now = clock.instant();
-        List<AiJob> claimed = jobRepo.lockNextPending(now, limit);
-        claimed.forEach(job -> job.claim(now));
-
-        return claimed;
+        return claimBatch(limit, java.util.Arrays.stream(AiJobType.values()).map(Enum::name).toList(),
+                Duration.ofMinutes(3));
     }
 
     @Override
@@ -160,7 +260,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
         if (limit < 1 || types.isEmpty())
             return List.of();
         Instant now = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
-        List<AiJob> claimed = jobRepo.lockNextByTypes(now, limit, types);
+        List<AiJob> claimed = jobRepo.lockNextByTypes(now, limit, types, queueScope);
         claimed.forEach(job -> {
             job.claim(now);
             job.renewLease(now.plus(lease));
@@ -240,7 +340,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Transactional
     public List<AiJob> reclaimStalled(Duration lockTimeout) {
         Instant now = clock.instant();
-        List<AiJob> stalled = jobRepo.lockStalled(now, now.minus(lockTimeout));
+        List<AiJob> stalled = jobRepo.lockStalled(now, now.minus(lockTimeout), queueScope);
         stalled.forEach(job -> job.reclaim(now));
 
         // Returned rather than counted: a reclaim costs a retry, so one of these may have just run out, and the worker

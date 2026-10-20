@@ -12,7 +12,11 @@ RUN mvn clean package -DskipTests
 # Stage 2: Runtime image
 FROM eclipse-temurin:21-jre-alpine
 ARG RELEASE_SHA=unknown
-ENV RELEASE_SHA=${RELEASE_SHA}
+ARG AI_QUEUE_SCOPE=local
+ARG AI_WORKER_ENABLED=false
+ENV RELEASE_SHA=${RELEASE_SHA} \
+    AI_QUEUE_SCOPE=${AI_QUEUE_SCOPE} \
+    AI_WORKER_ENABLED=${AI_WORKER_ENABLED}
 WORKDIR /app
 
 # Create non-root user for security

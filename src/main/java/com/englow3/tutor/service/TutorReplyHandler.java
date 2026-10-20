@@ -41,11 +41,13 @@ public class TutorReplyHandler implements AiJobHandler {
      * Enough for an explanation with an example, not enough for an essay. A learner reading on a phone will not finish
      * six paragraphs, and the ceiling is also what stops one question costing an unbounded amount.
      */
-    private static final int MAX_OUTPUT_TOKENS = 1_024;
+    private static final int MAX_OUTPUT_TOKENS = 2_048;
 
     private final LlmClient llmClient;
     private final TutorReplyWriter writer;
     private final ObjectMapper objectMapper;
+    @org.springframework.beans.factory.annotation.Value("${app.tutor.streaming-enabled:false}")
+    private boolean streamingEnabled;
 
     @Override
     public String handles() {
@@ -67,10 +69,51 @@ public class TutorReplyHandler implements AiJobHandler {
 
         UUID messageId = UUID.fromString(request.path("messageId").asText());
 
+        if (request.has("revision") && !writer.isPending(messageId, request.path("revision").asInt())) {
+            return Outcome.permanentFailure("TUTOR_REPLY_SUPERSEDED", "This reply was cancelled or replaced");
+        }
+
         try {
-            String response = llmClient.generate(request.path("systemPrompt").asText(),
-                    request.path("userPrompt").asText(), TEMPERATURE, MAX_OUTPUT_TOKENS);
-            parse(response);
+            String response;
+            if (request.path("messages").isArray()) {
+                java.util.List<LlmClient.Turn> turns = new java.util.ArrayList<>();
+                for (JsonNode turn : request.path("messages"))
+                    turns.add(new LlmClient.Turn(turn.path("role").asText(), turn.path("content").asText()));
+                if (streamingEnabled) {
+                    int revision = request.path("revision").asInt();
+                    UUID epoch = writer.startStream(messageId, revision);
+                    if (epoch == null)
+                        return Outcome.permanentFailure("TUTOR_REPLY_SUPERSEDED", "Reply no longer pending");
+                    long[] last = { System.nanoTime(), 0 };
+                    response = llmClient.generateStreaming(request.path("systemPrompt").asText(),
+                            request.path("userPrompt").asText(), turns, TEMPERATURE, MAX_OUTPUT_TOKENS, text -> {
+                                if (text.length() - last[1] >= 256 || System.nanoTime() - last[0] >= 500_000_000L) {
+                                    if (!writer.partial(messageId, revision, epoch, text))
+                                        throw new LlmException("TUTOR_REPLY_SUPERSEDED", "Reply was stopped", false);
+                                    last[0] = System.nanoTime();
+                                    last[1] = text.length();
+                                }
+                            });
+                } else {
+                    response = llmClient.generateTurns(request.path("systemPrompt").asText(),
+                            request.path("userPrompt").asText(), turns, TEMPERATURE, MAX_OUTPUT_TOKENS);
+                }
+            } else
+                response = llmClient.generate(request.path("systemPrompt").asText(),
+                        request.path("userPrompt").asText(), TEMPERATURE, MAX_OUTPUT_TOKENS);
+            Reply reply = parse(response);
+            var citations = java.util.regex.Pattern.compile("\\[S(\\d+)\\]").matcher(reply.content());
+            while (citations.find()) {
+                int index;
+                try {
+                    index = Integer.parseInt(citations.group(1));
+                } catch (NumberFormatException invalid) {
+                    throw new BadRequestException("TUTOR_CITATION_INVALID", "Invalid source reference");
+                }
+                if (index < 1 || index > request.path("sources").size())
+                    throw new BadRequestException("TUTOR_CITATION_INVALID",
+                            "The answer referenced an unavailable source");
+            }
 
             return Outcome.succeeded(response);
         } catch (LlmException providerFailure) {
@@ -86,7 +129,17 @@ public class TutorReplyHandler implements AiJobHandler {
     @Override
     public void complete(UUID targetId, String inputPayload, String outputPayload) {
         Reply reply = parse(outputPayload);
-        writer.storeReply(targetId, reply.content(), reply.model(), reply.inputTokens(), reply.outputTokens());
+        JsonNode request = readRequest(targetId, inputPayload);
+        if (request != null && "MEMORY".equals(request.path("purpose").asText())) {
+            writer.storeSummaryReply(targetId, request.path("revision").asInt(), request.path("memoryEpoch").asLong(),
+                    request.path("memoryThroughOrder").asInt(), reply.content(), reply.model(), reply.inputTokens(),
+                    reply.outputTokens());
+        } else if (request != null && request.has("revision")) {
+            writer.storeReply(targetId, request.path("revision").asInt(), reply.content(), reply.model(),
+                    reply.inputTokens(), reply.outputTokens());
+        } else {
+            writer.storeReply(targetId, reply.content(), reply.model(), reply.inputTokens(), reply.outputTokens());
+        }
     }
 
     /**

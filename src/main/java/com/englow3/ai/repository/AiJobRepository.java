@@ -16,29 +16,88 @@ import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobStatus;
 
 public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
+    interface QueueStats {
+        long getSamples();
+
+        Double getQueueP95Ms();
+
+        Double getCompletionP95Ms();
+
+        long getKnownInputTokens();
+
+        long getKnownOutputTokens();
+
+        long getUnknownUsageJobs();
+    }
+
+    interface FailureStats {
+        String getCode();
+
+        long getCount();
+    }
+
+    @Query(value = """
+            select count(*) as "samples",
+              percentile_cont(0.95) within group(order by greatest(0,extract(epoch from (started_at-created_at))*1000))
+                filter(where started_at is not null) as "queueP95Ms",
+              percentile_cont(0.95) within group(order by greatest(0,extract(epoch from (completed_at-created_at))*1000))
+                filter(where status='SUCCEEDED' and completed_at is not null) as "completionP95Ms",
+              coalesce(sum((output_payload->>'input_tokens')::bigint)
+                filter(where job_type='TUTOR_REPLY' and status='SUCCEEDED' and jsonb_typeof(output_payload->'input_tokens')='number'),0) as "knownInputTokens",
+              coalesce(sum((output_payload->>'output_tokens')::bigint)
+                filter(where job_type='TUTOR_REPLY' and status='SUCCEEDED' and jsonb_typeof(output_payload->'output_tokens')='number'),0) as "knownOutputTokens",
+              count(*) filter(where job_type='TUTOR_REPLY' and status='SUCCEEDED' and
+                (coalesce(jsonb_typeof(output_payload->'input_tokens'),'null')<>'number' or coalesce(jsonb_typeof(output_payload->'output_tokens'),'null')<>'number')) as "unknownUsageJobs"
+            from ai_jobs where queue_scope=:scope and created_at>=:since
+            """, nativeQuery = true)
+    QueueStats queueStats(@Param("scope") String scope, @Param("since") Instant since);
+
+    @Query(value = """
+            select coalesce(error_code,'UNKNOWN') as code,count(*) as count from ai_jobs
+            where queue_scope=:scope and status='FAILED' and completed_at>=:since
+              and error_code is distinct from 'AI_CONTENT_REMOVED'
+            group by error_code order by count(*) desc limit 10
+            """, nativeQuery = true)
+    List<FailureStats> terminalFailures(@Param("scope") String scope, @Param("since") Instant since);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select j from AiJob j where j.requestedByUserId = :user and j.targetType in ('TUTOR_MESSAGE', 'TUTOR_RECORDING') order by j.id")
+    List<AiJob> lockTutorDataForUser(@Param("user") UUID user);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select j from AiJob j where j.targetType = :type and j.targetId = :target and j.requestedByUserId = :user")
+    List<AiJob> lockOwnedTarget(@Param("type") String type, @Param("target") UUID target, @Param("user") UUID user);
+
+    long countByQueueScopeAndStatus(String queueScope, AiJobStatus status);
+
+    long countByQueueScopeAndStatusAndCompletedAtGreaterThanEqual(String queueScope, AiJobStatus status, Instant since);
+
+    Optional<AiJob> findFirstByQueueScopeAndStatusOrderByCreatedAtAsc(String queueScope, AiJobStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from AiJob j where j.id = :id")
     Optional<AiJob> lockById(@Param("id") UUID id);
 
     @Query(value = """
-            select * from ai_jobs where status = 'PENDING'
+            select * from ai_jobs where status = 'PENDING' and queue_scope = :scope
               and job_type in (:types)
               and (next_retry_at is null or next_retry_at <= :now)
             order by created_at, id limit :limit for update skip locked
             """, nativeQuery = true)
     List<AiJob> lockNextByTypes(@Param("now") Instant now, @Param("limit") int limit,
-            @Param("types") List<String> types);
+            @Param("types") List<String> types, @Param("scope") String scope);
 
     @Modifying
     @Query("update AiJob j set j.leaseUntil = :until where j.id = :id and j.status = AiJobStatus.RUNNING and j.startedAt = :claimedAt")
     int heartbeat(@Param("id") UUID id, @Param("claimedAt") Instant claimedAt, @Param("until") Instant until);
 
     @Query(value = """
-            select * from ai_jobs where status = 'RUNNING'
+            select * from ai_jobs where status = 'RUNNING' and queue_scope = :scope
               and (lease_until <= :now or (lease_until is null and started_at <= :threshold))
             order by started_at limit 100 for update skip locked
             """, nativeQuery = true)
-    List<AiJob> lockStalled(@Param("now") Instant now, @Param("threshold") Instant threshold);
+    List<AiJob> lockStalled(@Param("now") Instant now, @Param("threshold") Instant threshold,
+            @Param("scope") String scope);
 
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:userId,0)) as text)", nativeQuery = true)
     String lockProductiveBudget(@Param("userId") String userId);

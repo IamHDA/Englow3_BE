@@ -65,7 +65,7 @@ public class AiJobWorker implements AutoCloseable {
 
     @Scheduled(fixedDelayString = "${app.ai.worker.fixed-delay:2s}")
     public void drain() {
-        dispatch(tutorBusy, List.of("TUTOR_REPLY"));
+        dispatch(tutorBusy, List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION"));
         dispatch(gradingBusy, List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT"));
     }
 
@@ -97,7 +97,7 @@ public class AiJobWorker implements AutoCloseable {
                 queue.record(claimed.getId(), claimed.getStartedAt(),
                         AiJobHandler.Outcome.transientFailure("AI_WORKER_STOPPING", "Worker could not start"));
             }
-            log.error("AI dispatch failed for lane {}", types, failure);
+            log.error("AI dispatch failed for lane {} exceptionType={}", types, failure.getClass().getSimpleName());
         }
     }
 
@@ -122,7 +122,8 @@ public class AiJobWorker implements AutoCloseable {
                         "Processing exceeded its time budget");
             }
         } catch (RuntimeException failure) {
-            log.error("AI computation failed id={}", job.getId(), failure);
+            // Provider/parser exceptions can contain learner text or response bodies.
+            log.error("AI computation failed id={} exceptionType={}", job.getId(), failure.getClass().getSimpleName());
             outcome = AiJobHandler.Outcome.transientFailure("AI_JOB_HANDLER_ERROR", "Processing failed");
         }
         AiJobHandler.Outcome result = outcome;
@@ -134,7 +135,7 @@ public class AiJobWorker implements AutoCloseable {
                 gaveUp(job, result.errorCode());
         } catch (RuntimeException failure) {
             // A completion transaction rolled back. Its durable job remains recoverable.
-            log.error("AI completion failed id={}", job.getId(), failure);
+            log.error("AI completion failed id={} exceptionType={}", job.getId(), failure.getClass().getSimpleName());
         } finally {
             log.info("AI attempt finished id={} type={} durationMs={} success={}", job.getId(), job.getJobType(),
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start), result.success());
@@ -166,7 +167,8 @@ public class AiJobWorker implements AutoCloseable {
         try {
             handler.onGaveUp(job.getTargetId(), code);
         } catch (RuntimeException failure) {
-            log.error("AI terminal notification failed id={}", job.getId(), failure);
+            log.error("AI terminal notification failed id={} exceptionType={}", job.getId(),
+                    failure.getClass().getSimpleName());
         }
     }
 

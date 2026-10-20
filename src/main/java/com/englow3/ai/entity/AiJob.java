@@ -31,6 +31,16 @@ import lombok.Getter;
 @Getter
 public class AiJob {
 
+    @Column(name = "queue_scope", nullable = false, updatable = false)
+    private String queueScope = "testing";
+
+    public void scopeTo(String scope) {
+        if (status != AiJobStatus.PENDING || scope == null || !scope.matches("[A-Za-z0-9_-]{1,60}")) {
+            throw new IllegalArgumentException("Invalid queue scope");
+        }
+        queueScope = scope;
+    }
+
     @Id
     private UUID id;
 
@@ -67,7 +77,7 @@ public class AiJob {
 
     /** JSON, as text. The queue never reads inside it - only the handler for this job type knows the shape. */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "input_payload", nullable = false, updatable = false, columnDefinition = "jsonb")
+    @Column(name = "input_payload", nullable = false, columnDefinition = "jsonb")
     private String inputPayload;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -225,5 +235,19 @@ public class AiJob {
     /** True once the job will never be attempted again, either way. */
     public boolean finished() {
         return status == AiJobStatus.SUCCEEDED || status == AiJobStatus.FAILED;
+    }
+
+    /** Retain accounting metadata, erase private content, and reject any late worker completion. */
+    public void purgeContent(Instant now) {
+        inputPayload = "{}";
+        outputPayload = null;
+        if (!finished()) {
+            status = AiJobStatus.FAILED;
+            completedAt = now;
+            errorCode = "AI_CONTENT_REMOVED";
+        }
+        errorMessage = null;
+        nextRetryAt = null;
+        leaseUntil = null;
     }
 }
