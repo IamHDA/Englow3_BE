@@ -87,6 +87,7 @@ jobs:
             RELEASE_SHA=${{ github.sha }}
             AI_QUEUE_SCOPE=${{ github.base_ref || github.ref_name }}
             AI_WORKER_ENABLED=${{ github.event_name == 'push' }}
+            JVM_STARTUP_OPTIONS=${{ (github.base_ref || github.ref_name) == 'testing' && '-XX:TieredStopAtLevel=1' || '' }}
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

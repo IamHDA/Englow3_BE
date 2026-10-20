@@ -48,7 +48,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html")
-                        .permitAll()
+                        .permitAll().requestMatchers("/actuator/startup", "/actuator/metrics", "/actuator/metrics/**")
+                        .hasRole("ADMIN")
                         // A second gate behind each admin controller's @PreAuthorize: a controller added under
                         // /api/admin without one is closed to learners rather than open to every signed-in user.
                         .requestMatchers("/api/admin/**").hasAnyRole("STAFF", "ADMIN").anyRequest().authenticated())

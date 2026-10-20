@@ -19,6 +19,31 @@ import org.springframework.web.bind.annotation.RestController;
         "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
+    @Test
+    void diagnosticsRequireAuthentication() throws Exception {
+        for (String path : new String[] { "/actuator/startup", "/actuator/metrics",
+                "/actuator/metrics/hikaricp.connections.acquire" })
+            mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = { "LEARNER", "STAFF" })
+    void onlyAdminsCanReadStartupAndPoolDiagnostics(String role) throws Exception {
+        for (String path : new String[] { "/actuator/startup", "/actuator/metrics",
+                "/actuator/metrics/hikaricp.connections.acquire" })
+            mockMvc.perform(get(path)
+                    .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                            .user("test").roles(role)))
+                    .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
+    void adminCanReadStartupAndPoolDiagnostics() throws Exception {
+        for (String path : new String[] { "/actuator/startup", "/actuator/metrics",
+                "/actuator/metrics/hikaricp.connections.acquire" })
+            mockMvc.perform(get(path)).andExpect(status().isOk());
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,6 +74,10 @@ class SecurityConfigTest {
 
 @RestController
 class SecurityProbeController {
+    @GetMapping({ "/actuator/startup", "/actuator/metrics", "/actuator/metrics/hikaricp.connections.acquire" })
+    String diagnostics() {
+        return "diagnostics";
+    }
 
     @GetMapping({ "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness" })
     String health() {

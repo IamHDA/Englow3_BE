@@ -11,6 +11,9 @@ skills, and onboarding.
 - **Tables:** `users`, `learner_profiles`, `learning_purposes`,
   `user_learning_purposes`, `user_target_skills`, `user_tour_completions`.
 - **Entry points:** profile, onboarding, and role-specific website tour APIs.
+- **Bootstrap read:** `/api/user/me/bootstrap` returns the caller's account and
+  learner onboarding snapshot in one transaction. It does not create missing
+  profiles, cache another account's data, or load learner state for Staff/Admin.
 - **Authentication:** Supabase issues JWTs. The backend maps the token subject to
   `users.auth_provider_id`; application code does not manage passwords or sessions.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam

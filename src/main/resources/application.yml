@@ -155,7 +155,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,startup,metrics
+  metrics:
+    distribution:
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+        hikaricp.connections.acquire: 0.5,0.95,0.99
 
 info:
   app:
