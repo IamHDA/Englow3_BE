@@ -17,6 +17,45 @@ import com.englow3.ai.service.AiJobWorkerQueue;
 
 class AiJobWorkerTest {
     @Test
+    void shutdownIgnoresLateWakeSignalsWithoutLosingOrClaimingDurableWork() {
+        var worker = worker(List.of());
+        worker.close();
+        worker.queued(new com.englow3.ai.service.AiJobQueued());
+        verifyNoInteractions(queue);
+    }
+
+    @Test
+    void aCommittedSignalStartsWorkWithoutWaitingForTheScheduledSweep() throws Exception {
+        AiJob job = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any())).thenReturn(List.of(job),
+                List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of());
+        CountDownLatch started = new CountDownLatch(1);
+        try (var worker = worker(List.of(handler("TUTOR_REPLY", started::countDown)))) {
+            worker.queued(new com.englow3.ai.service.AiJobQueued());
+            assertThat(started.await(3, TimeUnit.SECONDS)).isTrue();
+        }
+        verify(queue).record(eq(job.getId()), eq(job.getStartedAt()), any(), any());
+    }
+
+    @Test
+    void completingOneJobStartsTheNextWithoutAnotherScheduledSweep() throws Exception {
+        AiJob first = job(AiJobType.TUTOR_REPLY), second = job(AiJobType.TUTOR_REPLY);
+        when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
+                .thenReturn(List.of(first), List.of(second), List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
+                .thenReturn(List.of());
+        CountDownLatch completed = new CountDownLatch(2);
+        try (var worker = worker(List.of(handler("TUTOR_REPLY", completed::countDown)))) {
+            worker.drain();
+            assertThat(completed.await(3, TimeUnit.SECONDS)).isTrue();
+        }
+        verify(queue).record(eq(first.getId()), eq(first.getStartedAt()), any(), any());
+        verify(queue).record(eq(second.getId()), eq(second.getStartedAt()), any(), any());
+    }
+
+    @Test
     void sleepingAdapterDefersWithoutCallingProviderOrSpendingARetry() {
         AiJob claimed = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))

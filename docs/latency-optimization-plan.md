@@ -96,3 +96,31 @@ network/capacity variation remains relevant. No AI inference is used by this tes
 - Testing promotion must verify the deployed SHA and repeat warm account timings.
   A public numeric startup timing enables a direct Render comparison without
   exposing detailed bean or pool diagnostics.
+
+## Testing measurements and AI dispatch follow-up
+
+The first testing release (`1651e2ac` BE, `56d3930` FE/BFF) passed both deployment
+pipelines and all 27 role/browser checks. Render reports 116.998s to application
+readiness, compared with the supplied 253.382s log. This is one deployment
+comparison and excludes the platform's container wake-up time. Three measured warm
+CurrentUser reads have a median of 1,172ms, versus the earlier 1,797ms sample;
+the combined bootstrap REST read has a median of 406ms. Small samples are not SLAs.
+
+The follow-up removes avoidable AI delivery waits without changing providers,
+models, teacher approval, or inference budgets:
+
+- Publish an internal wake signal after a new queue row is flushed. Handle it
+  after commit, asynchronously on the existing two-thread worker executor; rollback
+  and duplicate delivery must not trigger another notification.
+- Coalesce signals, retain separate Tutor/grading lanes and durable polling, and
+  check for the next job after a worker slot is freed. Scheduled polling remains
+  the recovery path for restarts, other instances and provider backoff.
+- Issue one bounded AI liveness wake-up in the background when BE is ready.
+  Share concurrent liveness probes, cache success for five seconds and failure for
+  one second. Do not invoke inference, change AI readiness, or add a keep-alive loop.
+- During the first 30 seconds of a healthy Tutor reply, check every 1.5 seconds.
+  Back off failures and longer work; preserve hidden/offline handling, the overall
+  deadline, account isolation and cancellation.
+- Verify transaction commit/rollback, worker concurrency/shutdown, probe caching,
+  and an eight-second simulated reply appearing by 9.5 seconds. These tests do not
+  measure or claim a reduction in the external provider's generation time.

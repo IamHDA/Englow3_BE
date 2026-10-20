@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ import com.englow3.ai.entity.AiJobStatus;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.repository.AiJobRepository;
 import com.englow3.ai.service.AiJobWorkerQueue;
+import com.englow3.ai.service.AiJobQueued;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.time.StudyCalendar;
 
@@ -41,6 +43,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     private final AiJobRepository jobRepo;
     private final StudyCalendar calendar;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     @Value("${app.ai.queue-scope:local}")
     private String queueScope = "testing";
@@ -207,7 +210,9 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
                     inputPayload, idempotencyKey, MAX_RETRY_COUNT, requestedByUserId);
             job.scopeTo(queueScope);
             try {
-                return jobRepo.saveAndFlush(job);
+                var saved = jobRepo.saveAndFlush(job);
+                events.publishEvent(new AiJobQueued());
+                return saved;
             } catch (DataIntegrityViolationException raced) {
                 return jobRepo.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> raced);
             }

@@ -118,6 +118,10 @@ and nothing about what any of those mean.
   `AiJobStatus` are internal AI models; they do not cross module boundaries.
 - **Dispatch:** the worker maps internal `AiJobType` values to a handler's stable
   job-type string; handlers do not see the internal enum.
+- **Latency:** a content-free `AiJobQueued` signal wakes the local worker only
+  after commit. Signals are coalesced on the bounded worker executor; completion
+  checks for the next job. The scheduled scan still recovers missed signals and
+  work from other instances. No provider I/O runs in an enqueue transaction.
 - **Retry:** the queue decides whether a failure is worth repeating; the handler
   reports which kind it was. A transient failure is left pending rather than shown
   to the learner as failed.

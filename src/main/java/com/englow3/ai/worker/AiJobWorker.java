@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,11 +20,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.client.AiServiceReadiness;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.service.AiJobWorkerQueue;
+import com.englow3.ai.service.AiJobQueued;
 
 import jakarta.annotation.PreDestroy;
 
@@ -41,6 +44,7 @@ public class AiJobWorker implements AutoCloseable {
     private final ScheduledExecutorService heartbeat = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean tutorBusy = new AtomicBoolean();
     private final AtomicBoolean gradingBusy = new AtomicBoolean();
+    private final AtomicBoolean wakeupQueued = new AtomicBoolean();
     private final Map<UUID, Running> running = new ConcurrentHashMap<>();
     private volatile boolean closing;
 
@@ -69,6 +73,26 @@ public class AiJobWorker implements AutoCloseable {
         dispatch(gradingBusy, List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT"));
     }
 
+    /** No database or provider I/O on the submitting request's after-commit callback. */
+    @TransactionalEventListener
+    public void queued(AiJobQueued event) {
+        wake();
+    }
+
+    private void wake() {
+        if (closing || !wakeupQueued.compareAndSet(false, true))
+            return;
+        try {
+            executor.execute(() -> {
+                wakeupQueued.set(false);
+                drain();
+            });
+        } catch (RejectedExecutionException stopping) {
+            // A committed job stays durable for the next worker even during graceful shutdown.
+            wakeupQueued.set(false);
+        }
+    }
+
     private void dispatch(AtomicBoolean busy, List<String> types) {
         if (closing || !busy.compareAndSet(false, true))
             return;
@@ -88,6 +112,7 @@ public class AiJobWorker implements AutoCloseable {
                 } finally {
                     running.remove(job.getId());
                     busy.set(false);
+                    wake();
                 }
             });
         } catch (RuntimeException failure) {
