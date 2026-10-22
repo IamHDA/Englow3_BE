@@ -14,7 +14,17 @@ import com.englow3.shared.page.StablePage;
  */
 public enum ExamCatalogueSort {
 
-    NEWEST, LEVEL_ASC, LEVEL_DESC, SCORE_DESC;
+    NEWEST, LEVEL_ASC, LEVEL_DESC,
+    /**
+     * The learner's own best score, highest first. Not a column of the paper - it depends on who is asking - so it is
+     * ordered by its own query, and {@link #toSort()} holds only the tie-break.
+     */
+    SCORE_DESC;
+
+    /** Whether the order depends on the learner, and so cannot be a sort on the paper's columns. */
+    public boolean isPerLearner() {
+        return this == SCORE_DESC;
+    }
 
     /** Sorts on the {@code Exam} entity as aliased {@code e} in the catalogue query. */
     public Sort toSort() {
@@ -23,7 +33,7 @@ public enum ExamCatalogueSort {
             case NEWEST -> Sort.by(Sort.Direction.DESC, "createdAt").and(byTitle);
             case LEVEL_ASC -> Sort.by(Sort.Direction.ASC, "targetLevel").and(byTitle);
             case LEVEL_DESC -> Sort.by(Sort.Direction.DESC, "targetLevel").and(byTitle);
-            case SCORE_DESC -> Sort.by(Sort.Direction.DESC, "maxRawScore").and(byTitle);
+            case SCORE_DESC -> byTitle;
         };
     }
 }

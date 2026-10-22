@@ -115,6 +115,23 @@ class DictationStatsQueryIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * The "practise again" button on a hard line has to open the lesson the line belongs to. It once pointed at one
+     * fixed address, so every hard line sent the learner to a page that did not exist.
+     */
+    @Test
+    void namesTheLessonOfEachDifficultLine() {
+        fixture.dictationAttempt(learner, lesson, sentence, "wrong", new BigDecimal("20.00"), daysAgo(1));
+        fixture.dictationAttempt(learner, lesson, sentence, "wrong again", new BigDecimal("30.00"), daysAgo(1));
+
+        var hard = dictationStats.difficultSentences(learner, 10);
+
+        assertThat(hard).singleElement().satisfies(line -> {
+            assertThat(line.sentenceId()).isEqualTo(sentence);
+            assertThat(line.lessonId()).isEqualTo(lesson);
+        });
+    }
+
+    /**
      * The review queue carries no transcript. It used to, and the screen graded against it in the browser without
      * telling the server - so a reviewed line was never recorded and came back on the next visit.
      */

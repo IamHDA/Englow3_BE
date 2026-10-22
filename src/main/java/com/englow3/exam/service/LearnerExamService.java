@@ -11,11 +11,13 @@ import com.englow3.exam.entity.CertificateType;
 import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
+import com.englow3.exam.helper.ExamCatalogueSort;
 import com.englow3.exam.query.ExamOutlineQuery;
 
 public interface LearnerExamService {
     Page<LearnerExamListItemResult> search(ExamType examType, CertificateType certificateType,
-            CertificateVariant certificateVariant, TargetLevel targetLevel, String title, Pageable pageable);
+            CertificateVariant certificateVariant, TargetLevel targetLevel, String title, ExamCatalogueSort sortBy,
+            Pageable pageable);
 
     LearnerExamListItemResult detail(UUID examId);
 

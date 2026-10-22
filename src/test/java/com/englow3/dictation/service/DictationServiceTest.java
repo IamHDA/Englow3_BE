@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
@@ -39,9 +38,10 @@ import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
 
 /**
- * The rule this service exists to enforce is that the transcript does not leave the server until the learner has
- * committed an answer. A screen that can read the answer is a screen that can show it, so the guard has to hold in what
- * is sent, not in what the interface chooses to draw.
+ * What this service owes the practice screen. The transcript goes down with the lesson so an answer is marked in the
+ * browser the moment it is typed (a product decision - a check that waits on a round trip for every line is the thing
+ * learners complained about). What stays server-side is the record: a submission is scored again from the stored
+ * transcript, so the score that is kept cannot be made up by the client.
  */
 class DictationServiceTest {
 
@@ -85,24 +85,15 @@ class DictationServiceTest {
     @Nested
     class TheAnswerKey {
 
-        /**
-         * The practice payload, checked by value rather than by field name. A partial transcript is in there on purpose
-         * - it is an authored hint - so the question is not "does any field look like the answer" but "is the answer
-         * itself in here", which is the thing a learner could read out of the response.
-         */
+        /** The screen marks answers itself, so the transcript and its translation travel with the practice payload. */
         @Test
-        void doesNotSendTheTranscriptWithThePracticePayload() {
+        void sendsTheTranscriptWithThePracticePayload() {
             lessonIsPublished();
 
-            var detail = service.lessonDetail(lesson.getId());
+            DictationSentenceResult result = service.lessonDetail(lesson.getId()).sentences().get(0);
 
-            assertThat(detail.sentences()).hasSize(1);
-            for (RecordComponent component : DictationSentenceResult.class.getRecordComponents()) {
-                Object value = readComponent(detail.sentences().get(0), component);
-                if (value instanceof String text) {
-                    assertThat(text).as("component %s", component.getName()).doesNotContain(TRANSCRIPT);
-                }
-            }
+            assertThat(result.text()).isEqualTo(TRANSCRIPT);
+            assertThat(result.translationVi()).isEqualTo("Con mèo ngồi trên tấm thảm.");
         }
 
         /** The hints still arrive - stripping the answer must not strip what the learner is meant to work from. */
@@ -118,7 +109,9 @@ class DictationServiceTest {
             assertThat(result.audioUrl()).isEqualTo("https://storage.example/dictation/airport/1.mp3");
         }
 
-        /** Submission is the first moment the learner is entitled to it, because they have already committed. */
+        /**
+         * The stored score comes from the server's own marking of the stored transcript, whatever the screen showed.
+         */
         @Test
         void sendsTheTranscriptBackOnceAnAnswerIsIn() {
             lessonIsPublished();
@@ -248,14 +241,6 @@ class DictationServiceTest {
 
             assertThat(detail.lesson().completedSentenceCount()).isZero();
             assertThat(detail.sentences().get(0).bestAccuracyPercent()).isEqualByComparingTo("66.67");
-        }
-    }
-
-    private static Object readComponent(DictationSentenceResult result, RecordComponent component) {
-        try {
-            return component.getAccessor().invoke(result);
-        } catch (ReflectiveOperationException unreachable) {
-            throw new IllegalStateException("Could not read %s".formatted(component.getName()), unreachable);
         }
     }
 }

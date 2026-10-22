@@ -82,6 +82,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final ExamAttemptDraftRepository draftRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
     private final ExamOutlineQuery outlineQuery;
+    private final Duration fullAttemptGrace;
 
     /** The longest clock a learner can set on a practice. */
     static final int MAX_PRACTICE_MINUTES = 300;
@@ -92,7 +93,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl, ExamAttemptDraftRepository draftRepo,
-            com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery) {
+            com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery,
+            @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
         this.answerRepo = answerRepo;
@@ -108,6 +110,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.draftRepo = draftRepo;
         this.mapper = mapper;
         this.outlineQuery = outlineQuery;
+        this.fullAttemptGrace = fullAttemptGrace;
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +138,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                 .findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userDirectory.requireCurrentUserId(),
                         examId, mode, ExamAttemptStatus.IN_PROGRESS)
                 .filter(attempt -> clock.instant().isBefore(attempt.getExpiresAt()))
+                .filter(attempt -> !attempt.isAbandoned(clock.instant(), fullAttemptGrace))
                 .map(attempt -> named(ExamAttemptResult.started(attempt, true)));
     }
 
@@ -152,6 +156,12 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
 
         var active = attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
                 command.mode(), ExamAttemptStatus.IN_PROGRESS);
+        if (active.isPresent() && active.get().isAbandoned(now, fullAttemptGrace)) {
+            // The real test is not picked up again after it was left: it ends, and this start is a fresh sitting.
+            finalizeAbandonedLocked(active.get().getId(), now);
+            attemptRepo.flush();
+            active = java.util.Optional.empty();
+        }
         if (active.isPresent() && now.isBefore(active.get().getExpiresAt())) {
             ExamAttempt open = active.get();
             boolean asked = practice == null ? open.matches(ExamAttemptMode.FULL, Set.of(), exam.getDurationSeconds())
@@ -185,7 +195,12 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         ExamAttempt attempt;
         if (practice == null) {
             int questionCount = Math.toIntExact(examRepo.countQuestions(exam.getId()));
-            attempt = ExamAttempt.start(exam, userId, questionCount, now);
+            // Out of what the questions carry, not the figure the paper declares: the two disagree on some older
+            // papers.
+            BigDecimal questionsWorth = examRepo.sumQuestionScores(exam.getId());
+            BigDecimal maxRawScore = questionsWorth != null && questionsWorth.signum() > 0 ? questionsWorth
+                    : exam.getMaxRawScore();
+            attempt = ExamAttempt.start(exam, userId, questionCount, maxRawScore, now);
         } else {
             attempt = ExamAttempt.startPractice(exam, userId, practice.partIds(), practice.questionCount(),
                     practice.maxRawScore(), practice.timeLimitSeconds(), now);
@@ -365,7 +380,43 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             throw new IllegalStateException("Cannot serialize exam draft");
         }
         draftRepo.saveAndFlush(draft);
+        attempt.touch(now);
         return new ExamDraftResult(c.answers(), draft.getRevision(), draft.getSavedAt());
+    }
+
+    /**
+     * The browser saying it is still on this sitting. Answers whether the sitting is still open, so a screen that was
+     * away past the grace period learns it was ended rather than finding out on its next save.
+     */
+    @Transactional
+    public boolean heartbeat(UUID attemptId) {
+        ExamAttempt attempt = requireOwnedAttempt(attemptRepo.findByIdForUpdate(attemptId), attemptId);
+        Instant now = clock.instant();
+        if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt())) {
+            return false;
+        }
+        if (attempt.isAbandoned(now, fullAttemptGrace)) {
+            finalizeAbandonedLocked(attemptId, now);
+            return false;
+        }
+        attempt.touch(now);
+        return true;
+    }
+
+    /** Ends a full sitting nobody has been at, scoring what was saved. The deadline worker's second job. */
+    @Transactional
+    public void finalizeAbandoned(UUID id) {
+        finalizeAbandonedLocked(id, clock.instant());
+    }
+
+    private void finalizeAbandonedLocked(UUID id, Instant now) {
+        var candidate = attemptRepo.findByIdForUpdate(id);
+        if (candidate.isEmpty() || !candidate.get().isAbandoned(now, fullAttemptGrace)) {
+            return;
+        }
+        ExamAttempt attempt = candidate.get();
+        // Dated to the last moment the learner was there, not to when the worker noticed.
+        scoreAttempt(attempt, storedAnswers(id), attempt.lastSeen());
     }
 
     @Transactional

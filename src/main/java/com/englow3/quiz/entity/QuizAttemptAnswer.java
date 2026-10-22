@@ -5,17 +5,14 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.englow3.shared.persistence.BasePersistedEntity;
 import lombok.Getter;
 
 @Entity
 @Table(name = "quiz_attempt_answers")
 @Getter
-public class QuizAttemptAnswer {
-
-    @Id
-    private UUID id;
+public class QuizAttemptAnswer extends BasePersistedEntity {
 
     @Column(name = "quiz_attempt_id", nullable = false, updatable = false)
     private UUID quizAttemptId;

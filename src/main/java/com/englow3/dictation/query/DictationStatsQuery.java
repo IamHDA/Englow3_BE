@@ -92,20 +92,21 @@ public class DictationStatsQuery {
     /** Lines the learner scores worst on, over lines they have tried more than once. */
     public List<DifficultSentence> difficultSentences(UUID userId, int limit) {
         return jdbcClient.sql("""
-                select s.id, s.text, l.topic,
+                select s.id, s.dictation_lesson_id, s.text, l.topic,
                        cast(round(avg(a.accuracy_percent)) as integer) as accuracy,
                        count(*) as attempts
                   from dictation_attempts a
                   join dictation_sentences s on s.id = a.dictation_sentence_id
                   join dictation_lessons l on l.id = s.dictation_lesson_id
                  where a.user_id = :userId
-                 group by s.id, s.text, l.topic
+                 group by s.id, s.dictation_lesson_id, s.text, l.topic
                 having count(*) > 1
                  order by avg(a.accuracy_percent) asc
                  limit :limit
                 """).param("userId", userId).param("limit", limit)
-                .query((rs, rowNum) -> new DifficultSentence(rs.getObject("id", UUID.class), rs.getString("text"),
-                        rs.getString("topic"), rs.getInt("accuracy"), rs.getLong("attempts")))
+                .query((rs, rowNum) -> new DifficultSentence(rs.getObject("id", UUID.class),
+                        rs.getObject("dictation_lesson_id", UUID.class), rs.getString("text"), rs.getString("topic"),
+                        rs.getInt("accuracy"), rs.getLong("attempts")))
                 .list();
     }
 
@@ -204,7 +205,7 @@ public class DictationStatsQuery {
     public record DailyAccuracy(LocalDate day, int accuracyPercent, long attemptCount) {
     }
 
-    public record DifficultSentence(UUID sentenceId, String text, String topic, int accuracyPercent,
+    public record DifficultSentence(UUID sentenceId, UUID lessonId, String text, String topic, int accuracyPercent,
             long attemptCount) {
     }
 

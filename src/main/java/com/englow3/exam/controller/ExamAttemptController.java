@@ -55,6 +55,16 @@ public class ExamAttemptController {
         return ResponseEntity.ok(ExamDraftResponse.from(examAttemptService.saveDraft(request.toCommand(id))));
     }
 
+    /** The browser is still on this full sitting; a sitting it stops reporting on is ended after a grace period. */
+    @PostMapping("/{id}/heartbeat")
+    public ResponseEntity<HeartbeatResponse> heartbeat(@PathVariable UUID id) {
+        return ResponseEntity.ok(new HeartbeatResponse(examAttemptService.heartbeat(id)));
+    }
+
+    /** Whether the sitting is still open. */
+    public record HeartbeatResponse(boolean open) {
+    }
+
     @PostMapping("/{id}/submit")
     public ResponseEntity<ExamAttemptResponse> submit(@PathVariable UUID id,
             @Valid @RequestBody SubmitExamAttemptRequest request) {

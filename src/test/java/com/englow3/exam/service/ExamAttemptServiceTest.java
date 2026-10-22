@@ -72,7 +72,8 @@ class ExamAttemptServiceTest {
     private final ExamAttemptDraftRepository draftRepo = mock(ExamAttemptDraftRepository.class);
     private final ExamAttemptService service = new ExamAttemptServiceImpl(examRepo, attemptRepo, answerRepo,
             answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder, presignedUrls, CLOCK, "exams",
-            Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery);
+            Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery,
+            Duration.ofMinutes(2));
 
     private final UUID userId = UUID.randomUUID();
 
@@ -330,5 +331,92 @@ class ExamAttemptServiceTest {
                 CertificateVariant.LR, TargetLevel.B1, 7200, new BigDecimal("2.00"), null, UUID.randomUUID());
         exam.publish(1, 2, new BigDecimal("2.00"), List.of(), Instant.now());
         return exam;
+    }
+
+    /**
+     * The real test is not picked up again once it was left: starting again ends the old sitting and begins a new one.
+     */
+    @Test
+    void aFullSittingLeftForLongerThanTheGraceIsEndedAndNotResumed() {
+        Exam exam = publishedExam();
+        Instant left = CLOCK.instant().minusSeconds(600);
+        ExamAttempt abandoned = ExamAttempt.start(exam, userId, 2, left);
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examRepo.countQuestions(exam.getId())).thenReturn(2L);
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(abandoned));
+        when(attemptRepo.findByIdForUpdate(abandoned.getId())).thenReturn(Optional.of(abandoned));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+
+        ExamAttemptResult fresh = service.start(exam.getId());
+
+        assertThat(fresh.id()).isNotEqualTo(abandoned.getId());
+        assertThat(fresh.resumed()).isFalse();
+        assertThat(abandoned.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
+        // Dated to when the learner was last there, not to this start.
+        assertThat(abandoned.getSubmittedAt()).isEqualTo(left);
+    }
+
+    /** A reload is not leaving: the sitting is picked up where it was while the grace period lasts. */
+    @Test
+    void aFullSittingSeenWithinTheGraceIsResumedAsBefore() {
+        Exam exam = publishedExam();
+        ExamAttempt present = ExamAttempt.start(exam, userId, 2, CLOCK.instant().minusSeconds(600));
+        present.touch(CLOCK.instant().minusSeconds(30));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(userId, exam.getId(),
+                com.englow3.exam.entity.ExamAttemptMode.FULL, ExamAttemptStatus.IN_PROGRESS))
+                        .thenReturn(Optional.of(present));
+
+        ExamAttemptResult result = service.start(exam.getId());
+
+        assertThat(result.id()).isEqualTo(present.getId());
+        assertThat(result.resumed()).isTrue();
+        assertThat(present.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void aHeartbeatKeepsTheSittingOpen() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 2, CLOCK.instant().minusSeconds(100));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+
+        assertThat(service.heartbeat(attempt.getId())).isTrue();
+
+        assertThat(attempt.lastSeen()).isEqualTo(CLOCK.instant());
+        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
+    }
+
+    /** A screen that was asleep past the grace period is told its sitting ended, rather than finding out on a save. */
+    @Test
+    void aHeartbeatAfterTheGraceFindsTheSittingEnded() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 2, CLOCK.instant().minusSeconds(900));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+
+        assertThat(service.heartbeat(attempt.getId())).isFalse();
+
+        assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
+    }
+
+    @Test
+    void theWorkerEndsASittingNobodyHasBeenAtAndLeavesAPresentOneAlone() {
+        Exam exam = publishedExam();
+        ExamAttempt gone = ExamAttempt.start(exam, userId, 2, CLOCK.instant().minusSeconds(900));
+        ExamAttempt here = ExamAttempt.start(exam, userId, 2, CLOCK.instant().minusSeconds(900));
+        here.touch(CLOCK.instant().minusSeconds(10));
+        when(attemptRepo.findByIdForUpdate(gone.getId())).thenReturn(Optional.of(gone));
+        when(attemptRepo.findByIdForUpdate(here.getId())).thenReturn(Optional.of(here));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of());
+
+        service.finalizeAbandoned(gone.getId());
+        service.finalizeAbandoned(here.getId());
+
+        assertThat(gone.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
+        assertThat(here.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
     }
 }

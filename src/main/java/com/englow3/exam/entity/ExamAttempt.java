@@ -65,6 +65,10 @@ public class ExamAttempt {
     @Column(name = "converted_score")
     private BigDecimal convertedScore;
 
+    /** The last time the browser said it was still on this sitting; null reads as the start. */
+    @Column(name = "last_seen_at")
+    private Instant lastSeenAt;
+
     @Column(name = "score_percentage")
     private BigDecimal scorePercentage;
 
@@ -98,6 +102,15 @@ public class ExamAttempt {
     }
 
     public static ExamAttempt start(Exam exam, UUID userId, int questionCount, Instant now) {
+        return start(exam, userId, questionCount, exam.getMaxRawScore(), now);
+    }
+
+    /**
+     * A full attempt scored out of {@code maxRawScore}, which is what the paper's questions actually carry. The paper's
+     * declared maximum is not always that - a band scale of 9 over 80 one-point questions, or 990 over questions that
+     * add up to 200 - and a percentage taken against the declared figure reads 888% or 20% for a perfect paper.
+     */
+    public static ExamAttempt start(Exam exam, UUID userId, int questionCount, BigDecimal maxRawScore, Instant now) {
         ExamAttempt attempt = new ExamAttempt();
         attempt.id = UUID.randomUUID();
         attempt.examId = exam.getId();
@@ -106,10 +119,11 @@ public class ExamAttempt {
         attempt.status = ExamAttemptStatus.IN_PROGRESS;
         attempt.startedAt = now;
         attempt.expiresAt = now.plusSeconds(exam.getDurationSeconds());
-        attempt.maxRawScore = exam.getMaxRawScore();
+        attempt.maxRawScore = maxRawScore;
         attempt.questionCount = questionCount;
         attempt.mode = ExamAttemptMode.FULL;
         attempt.timeLimitSeconds = exam.getDurationSeconds();
+        attempt.lastSeenAt = now;
         return attempt;
     }
 
@@ -139,6 +153,26 @@ public class ExamAttempt {
         return attempt;
     }
 
+    /** The browser is still on this sitting. */
+    public void touch(Instant now) {
+        if (status == ExamAttemptStatus.IN_PROGRESS && (lastSeenAt == null || now.isAfter(lastSeenAt))) {
+            lastSeenAt = now;
+        }
+    }
+
+    public Instant lastSeen() {
+        return lastSeenAt != null ? lastSeenAt : startedAt;
+    }
+
+    /**
+     * A full sitting nobody has been at for {@code grace}. A practice is never abandoned in this sense: it can be left
+     * and resumed, that being the difference between practising and sitting the test.
+     */
+    public boolean isAbandoned(Instant now, Duration grace) {
+        return mode == ExamAttemptMode.FULL && status == ExamAttemptStatus.IN_PROGRESS
+                && !now.isBefore(lastSeen().plus(grace));
+    }
+
     public boolean isPractice() {
         return mode == ExamAttemptMode.PRACTICE;
     }
@@ -159,8 +193,11 @@ public class ExamAttempt {
             throw new ConflictException("ATTEMPT_ALREADY_FINALIZED", "This exam attempt has already been finalized");
         }
         this.rawScore = rawScore;
+        // Never above a hundred: a paper whose declared maximum is below what its questions award would otherwise
+        // show a score beyond full marks.
         this.scorePercentage = maxRawScore.signum() == 0 ? BigDecimal.ZERO
-                : rawScore.multiply(BigDecimal.valueOf(100)).divide(maxRawScore, 2, java.math.RoundingMode.HALF_UP);
+                : rawScore.multiply(BigDecimal.valueOf(100)).divide(maxRawScore, 2, java.math.RoundingMode.HALF_UP)
+                        .min(BigDecimal.valueOf(100));
         this.correctAnswerCount = correctAnswerCount;
         this.submittedAt = now;
         this.scoredAt = now;

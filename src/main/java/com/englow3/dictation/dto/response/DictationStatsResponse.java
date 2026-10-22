@@ -23,8 +23,8 @@ public record DictationStatsResponse(int periodDays, long lessonsCompleted, int 
                                 word.accuracyPercent()))
                         .toList(),
                 result.difficultSentences().stream()
-                        .map(sentence -> new DifficultSentenceResponse(sentence.sentenceId(), sentence.text(),
-                                sentence.topic(), sentence.accuracyPercent(), sentence.attemptCount()))
+                        .map(sentence -> new DifficultSentenceResponse(sentence.sentenceId(), sentence.lessonId(),
+                                sentence.text(), sentence.topic(), sentence.accuracyPercent(), sentence.attemptCount()))
                         .toList(),
                 result.history().stream()
                         .map(session -> new SessionSummaryResponse(session.day(), session.lessonId(),
@@ -39,8 +39,8 @@ public record DictationStatsResponse(int periodDays, long lessonsCompleted, int 
     public record MissedWordResponse(String word, long missedCount, long correctCount, int accuracyPercent) {
     }
 
-    public record DifficultSentenceResponse(UUID sentenceId, String text, String topic, int accuracyPercent,
-            long attemptCount) {
+    public record DifficultSentenceResponse(UUID sentenceId, UUID lessonId, String text, String topic,
+            int accuracyPercent, long attemptCount) {
     }
 
     public record SessionSummaryResponse(LocalDate day, UUID lessonId, String lessonTitle, long sentenceCount,

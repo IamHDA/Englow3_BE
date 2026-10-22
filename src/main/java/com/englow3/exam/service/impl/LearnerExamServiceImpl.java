@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,9 +23,11 @@ import com.englow3.exam.entity.ExamType;
 import com.englow3.exam.entity.TargetLevel;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.ExamRepository;
+import com.englow3.exam.helper.ExamCatalogueSort;
 import com.englow3.exam.query.ExamOutlineQuery;
 import com.englow3.exam.service.LearnerExamService;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.page.StablePage;
 import com.englow3.user.api.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -41,15 +44,23 @@ public class LearnerExamServiceImpl implements LearnerExamService {
 
     @Transactional(readOnly = true)
     public Page<LearnerExamListItemResult> search(ExamType examType, CertificateType certificateType,
-            CertificateVariant certificateVariant, TargetLevel targetLevel, String title, Pageable pageable) {
-        Page<Exam> page = examRepo.searchCatalogue(ExamStatus.PUBLISHED, examType, certificateType, certificateVariant,
-                targetLevel, title, pageable);
+            CertificateVariant certificateVariant, TargetLevel targetLevel, String title, ExamCatalogueSort sortBy,
+            Pageable pageable) {
+        UUID userId = userDirectory.requireCurrentUserId();
+        // The order is the catalogue's own choice, not a free column name from the query string.
+        ExamCatalogueSort sort = sortBy == null ? ExamCatalogueSort.NEWEST : sortBy;
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        Page<Exam> page = sort.isPerLearner()
+                ? examRepo.searchCatalogueByBestScore(ExamStatus.PUBLISHED, examType, certificateType,
+                        certificateVariant, targetLevel, title, userId, unsorted)
+                : examRepo.searchCatalogue(ExamStatus.PUBLISHED, examType, certificateType, certificateVariant,
+                        targetLevel, title,
+                        StablePage.of(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort())));
         List<UUID> examIds = page.getContent().stream().map(Exam::getId).toList();
         Map<UUID, Long> counts = examIds.isEmpty() ? Map.of()
                 : examRepo.countQuestionsForExams(examIds).stream()
                         .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
 
-        UUID userId = userDirectory.requireCurrentUserId();
         Map<UUID, BigDecimal> bestScores = examIds.isEmpty() ? Map.of()
                 : attemptRepo.findBestScoreByExam(userId, examIds).stream()
                         .collect(Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));

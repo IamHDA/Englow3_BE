@@ -38,4 +38,17 @@ class ExamSectionScaleIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(exams.findSectionOrderNosOffTheirScale(exam)).isEmpty();
     }
+
+    /** What a full attempt is scored out of: the questions' own points, whatever the paper declares. */
+    @Test
+    void addsUpWhatTheQuestionsAreWorth() {
+        ExamFixture fixture = new ExamFixture(jdbc);
+        UUID author = new LearnerFixture(jdbc).learner();
+        UUID exam = fixture.publishedExam("Worth", author);
+        UUID set = fixture.questionSet(fixture.part(fixture.section(exam, 1, "READING"), 1, "Part 5"), 1);
+        fixture.question(set, 1, "First");
+        fixture.question(set, 2, "Second");
+
+        assertThat(exams.sumQuestionScores(exam)).isEqualByComparingTo("2");
+    }
 }

@@ -6,17 +6,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.englow3.shared.persistence.BasePersistedEntity;
 import lombok.Getter;
 
 @Entity
 @Table(name = "quiz_questions")
 @Getter
-public class QuizQuestion {
-
-    @Id
-    private UUID id;
+public class QuizQuestion extends BasePersistedEntity {
 
     @Column(name = "quiz_id", nullable = false, updatable = false)
     private UUID quizId;

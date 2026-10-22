@@ -35,6 +35,13 @@ spring:
     properties:
       hibernate:
         default_schema: englow3
+        # Rows saved together go to the database together. Without it a paper of 200 answers is 400 separate INSERTs,
+        # each a network round trip - the difference between a second and half a minute on a database that is not
+        # next door. order_inserts groups them by table so the batches stay full.
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   flyway:
     enabled: true

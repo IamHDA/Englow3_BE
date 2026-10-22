@@ -191,8 +191,10 @@ class ExamPracticeIntegrationTest extends PostgresIntegrationTest {
                 List.of(new SubmittedAnswer(firstQuestion, List.of(firstRight)))));
 
         assertThat(progress.activityTotals(learner, before).examAttempts()).isEqualTo(1);
-        // A full sitting is scored out of the paper's own maximum (200 in the fixture), not the sum of its questions.
-        assertThat(catalogue.detail(examId).bestScorePercentage()).isEqualByComparingTo("0.50");
+        // A full sitting is scored out of what the paper's questions carry (four points in the fixture), not out of the
+        // maximum the paper declares (200 here): on real papers the two have disagreed, and a perfect sitting read as
+        // 20% or as 888%.
+        assertThat(catalogue.detail(examId).bestScorePercentage()).isEqualByComparingTo("25.00");
     }
 
     @Test

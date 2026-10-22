@@ -32,8 +32,6 @@ import com.englow3.shared.page.PageResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import com.englow3.exam.helper.ExamCatalogueSort;
-import com.englow3.shared.page.StablePage;
-import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -53,12 +51,9 @@ public class ExamController {
             @RequestParam(required = false) CertificateVariant certificateVariant,
             @RequestParam(required = false) TargetLevel targetLevel, @RequestParam(required = false) String title,
             @RequestParam(required = false) ExamCatalogueSort sortBy, @PageableDefault(size = 20) Pageable pageable) {
-        // The order is the catalogue's own choice (sortBy), not a free column name from the query string.
-        Pageable ordered = StablePage.of(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
-                (sortBy == null ? ExamCatalogueSort.NEWEST : sortBy).toSort()));
-        return ResponseEntity.ok(PageResponse.from(
-                learnerExamService.search(examType, certificateType, certificateVariant, targetLevel, title, ordered)
-                        .map(LearnerExamResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(learnerExamService
+                .search(examType, certificateType, certificateVariant, targetLevel, title, sortBy, pageable)
+                .map(LearnerExamResponse::from)));
     }
 
     /**

@@ -47,6 +47,16 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
             """)
     List<UUID> findExamIdsWithLiveAttempt(@Param("userId") UUID userId, @Param("examIds") Collection<UUID> examIds);
 
+    /** Full sittings nobody has been at since {@code cutoff}, the longest-abandoned first. */
+    @Query("""
+            select a from ExamAttempt a
+             where a.mode = com.englow3.exam.entity.ExamAttemptMode.FULL
+               and a.status = com.englow3.exam.entity.ExamAttemptStatus.IN_PROGRESS
+               and coalesce(a.lastSeenAt, a.startedAt) < :cutoff
+             order by coalesce(a.lastSeenAt, a.startedAt)
+            """)
+    List<ExamAttempt> findAbandoned(@Param("cutoff") java.time.Instant cutoff, Pageable pageable);
+
     /** The learner's own attempt history, newest first. */
     Page<ExamAttempt> findByUserIdOrderByStartedAtDesc(UUID userId, Pageable pageable);
 

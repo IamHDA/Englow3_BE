@@ -90,8 +90,8 @@ public class DictationServiceImpl implements DictationService {
     }
 
     /**
-     * The practice payload. Audio and hints only - {@link DictationSentenceResult} has no field for the transcript, so
-     * there is nothing here to forget to strip.
+     * The practice payload: audio, transcript and hints. The transcript goes down with the lesson so each answer is
+     * marked in the browser at once; {@link #submit} still scores again from the stored transcript and records that.
      */
     @Transactional(readOnly = true)
     public DictationLessonDetailResult lessonDetail(UUID lessonId) {
@@ -104,6 +104,7 @@ public class DictationServiceImpl implements DictationService {
                 DictationLessonSummaryResult.of(lesson, sentences.size(), completedCount(userId, sentences),
                         totalDuration(sentences), lastPractisedFor(userId, List.of(lessonId)).get(lessonId)),
                 sentences.stream().map(sentence -> new DictationSentenceResult(sentence.getId(), sentence.getOrderNo(),
+                        sentence.getText(), sentence.getTranslationVi(),
                         presignedUrls.resolve(learningBucket, sentence.getAudioObjectKey(), mediaUrlTtl),
                         sentence.getAudioDurationSeconds(), sentence.getHintWordCount(), sentence.getHintFirstLetters(),
                         sentence.getHintRevealWord(), sentence.getHintPartialTranscript(), sentence.getAudioStartMs(),

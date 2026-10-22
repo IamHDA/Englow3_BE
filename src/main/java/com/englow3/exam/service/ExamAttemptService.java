@@ -23,6 +23,12 @@ public interface ExamAttemptService {
 
     void finalizeExpired(UUID id);
 
+    /** The browser is still on this full sitting. False when the sitting is no longer open. */
+    boolean heartbeat(UUID attemptId);
+
+    /** Ends a full sitting nobody has been at for the grace period, scoring what was saved. */
+    void finalizeAbandoned(UUID id);
+
     Page<ExamAttemptResult> attemptHistory(Pageable pageable);
 
     ExamAttemptResult start(UUID examId);
