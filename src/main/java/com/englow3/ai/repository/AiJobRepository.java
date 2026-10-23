@@ -70,7 +70,10 @@ public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
 
     long countByQueueScopeAndStatus(String queueScope, AiJobStatus status);
 
-    /** Every job this queue scope has created since the instant, whoever asked: the spend the platform-wide ceiling limits. */
+    /**
+     * Every job this queue scope has created since the instant, whoever asked: the spend the platform-wide ceiling
+     * limits.
+     */
     long countByQueueScopeAndCreatedAtGreaterThanEqual(String queueScope, Instant from);
 
     long countByQueueScopeAndStatusAndCompletedAtGreaterThanEqual(String queueScope, AiJobStatus status, Instant since);

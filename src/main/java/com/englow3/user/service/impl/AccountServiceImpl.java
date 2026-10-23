@@ -86,13 +86,14 @@ public class AccountServiceImpl implements AccountService {
     }
 
     /**
-     * Table and condition are literals written in this class, never request data, so assembling the statement from
-     * them is not an injection point; only the user id travels as a bound parameter.
+     * Table and condition are literals written in this class, never request data, so assembling the statement from them
+     * is not an injection point; only the user id travels as a bound parameter.
      */
     private JsonNode rows(String table, String condition, UUID userId) {
-        String text = jdbc.sql("select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text from (select * from "
-                + table + " where " + condition + " limit " + MAX_ROWS_PER_KIND + ") t").param("u", userId)
-                .query(String.class).single();
+        String text = jdbc
+                .sql("select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text from (select * from " + table
+                        + " where " + condition + " limit " + MAX_ROWS_PER_KIND + ") t")
+                .param("u", userId).query(String.class).single();
         try {
             return json.readTree(text);
         } catch (JsonProcessingException e) {
@@ -138,19 +139,25 @@ public class AccountServiceImpl implements AccountService {
 
         // Foreign keys without a cascade, children before parents. Everything else hangs off users with ON DELETE
         // CASCADE and goes with the last statement.
-        delete("delete from assessment_reviews where attempt_id in (select id from assessment_attempts where user_id = :u)", id);
+        delete("delete from assessment_reviews where attempt_id in (select id from assessment_attempts where user_id = :u)",
+                id);
         delete("delete from assessment_attempts where user_id = :u", id);
         delete("""
                 delete from attempt_answer_options where attempt_answer_id in
                   (select a.id from attempt_answers a join exam_attempts e on e.id = a.exam_attempt_id where e.user_id = :u)
-                """, id);
+                """,
+                id);
         delete("""
                 delete from attempt_answer_criterion_scores where attempt_answer_id in
                   (select a.id from attempt_answers a join exam_attempts e on e.id = a.exam_attempt_id where e.user_id = :u)
-                """, id);
-        delete("delete from attempt_answers where exam_attempt_id in (select id from exam_attempts where user_id = :u)", id);
-        delete("delete from attempt_section_results where exam_attempt_id in (select id from exam_attempts where user_id = :u)", id);
-        delete("delete from exam_attempt_drafts where attempt_id in (select id from exam_attempts where user_id = :u)", id);
+                """,
+                id);
+        delete("delete from attempt_answers where exam_attempt_id in (select id from exam_attempts where user_id = :u)",
+                id);
+        delete("delete from attempt_section_results where exam_attempt_id in (select id from exam_attempts where user_id = :u)",
+                id);
+        delete("delete from exam_attempt_drafts where attempt_id in (select id from exam_attempts where user_id = :u)",
+                id);
         delete("delete from exam_attempts where user_id = :u", id);
         delete("delete from ai_jobs where requested_by_user_id = :u", id);
         delete("delete from user_learning_purposes where user_id = :u", id);
@@ -180,14 +187,14 @@ public class AccountServiceImpl implements AccountService {
     }
 
     private User requireUser() {
-        return userRepo.findByAuthProviderId(currentUser.authProviderId()).orElseThrow(
-                () -> new NotFoundException("USER_NOT_FOUND", "No user is linked to this sign-in"));
+        return userRepo.findByAuthProviderId(currentUser.authProviderId())
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No user is linked to this sign-in"));
     }
 
     /**
      * Files go after the database commit. Before it, a failed commit would leave rows pointing at files that were
-     * already deleted; after it, the worst case is an orphan file, which a lifecycle rule can sweep and no learner
-     * ever sees.
+     * already deleted; after it, the worst case is an orphan file, which a lifecycle rule can sweep and no learner ever
+     * sees.
      */
     private void afterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

@@ -69,8 +69,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
             throw new BadRequestException("SUBSCRIPTION_PERIOD_INVALID", "billingPeriod must be MONTHLY or YEARLY");
         }
         if (days < 1 || days > MAX_GRANT_DAYS) {
-            throw new BadRequestException("SUBSCRIPTION_DAYS_INVALID",
-                    "days must be between 1 and " + MAX_GRANT_DAYS);
+            throw new BadRequestException("SUBSCRIPTION_DAYS_INVALID", "days must be between 1 and " + MAX_GRANT_DAYS);
         }
         UUID target = requireByEmail(email);
         jdbc.sql("""
@@ -99,8 +98,8 @@ class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     private UUID requireByEmail(String email) {
-        Optional<UUID> id = jdbc.sql("select id from users where lower(email) = lower(:e)").param("e", email == null
-                ? "" : email.trim()).query(UUID.class).optional();
+        Optional<UUID> id = jdbc.sql("select id from users where lower(email) = lower(:e)")
+                .param("e", email == null ? "" : email.trim()).query(UUID.class).optional();
         return id.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "No account has that email address"));
     }
 }

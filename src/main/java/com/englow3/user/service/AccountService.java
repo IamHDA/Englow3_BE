@@ -18,8 +18,9 @@ public interface AccountService {
     /**
      * Removes the signed-in learner and everything they produced, then their sign-in.
      *
-     * @param confirmEmail the account's own email, typed by the learner. Not authentication - the token already did
-     *                     that - but a deliberate step, so a stray click or a script cannot erase an account.
+     * @param confirmEmail
+     *            the account's own email, typed by the learner. Not authentication - the token already did that - but a
+     *            deliberate step, so a stray click or a script cannot erase an account.
      */
     void erase(String confirmEmail);
 }

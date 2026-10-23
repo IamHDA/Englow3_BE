@@ -45,8 +45,8 @@ class SubscriptionServiceIntegrationTest extends PostgresIntegrationTest {
                 .update();
         userId = jdbc.sql("select id from users where auth_provider_id = :a").param("a", authId).query(UUID.class)
                 .single();
-        Jwt token = Jwt.withTokenValue("test").header("alg", "none").subject(authId.toString())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
+        Jwt token = Jwt.withTokenValue("test").header("alg", "none").subject(authId.toString()).issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600)).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new JwtAuthenticationToken(token, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     }
@@ -83,8 +83,8 @@ class SubscriptionServiceIntegrationTest extends PostgresIntegrationTest {
         subscriptions.grantPaid(email, "MONTHLY", 30);
         subscriptions.grantPaid(email, "MONTHLY", 30);
 
-        assertThat(Duration.between(Instant.now(), subscriptions.mine().currentPeriodEnd()).toDays())
-                .isBetween(59L, 60L);
+        assertThat(Duration.between(Instant.now(), subscriptions.mine().currentPeriodEnd()).toDays()).isBetween(59L,
+                60L);
     }
 
     @Test

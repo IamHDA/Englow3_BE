@@ -47,8 +47,7 @@ class UserRateLimiterTest {
             limiter.check(user, "export", 3, WINDOW);
         }
 
-        assertThatThrownBy(() -> limiter.check(user, "export", 3, WINDOW))
-                .isInstanceOf(TooManyRequestsException.class);
+        assertThatThrownBy(() -> limiter.check(user, "export", 3, WINDOW)).isInstanceOf(TooManyRequestsException.class);
     }
 
     @Test

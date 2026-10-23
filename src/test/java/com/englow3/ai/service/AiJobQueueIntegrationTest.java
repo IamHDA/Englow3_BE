@@ -124,8 +124,8 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
-     * Each learner can be inside their own allowance while the platform is not: many accounts add up. Once the
-     * platform has spent its day, nobody gets another request, including a learner who has asked for nothing yet.
+     * Each learner can be inside their own allowance while the platform is not: many accounts add up. Once the platform
+     * has spent its day, nobody gets another request, including a learner who has asked for nothing yet.
      */
     @Test
     void thePlatformCeilingStopsEveryoneOnceTheDayIsSpent() {

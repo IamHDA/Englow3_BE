@@ -50,7 +50,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         // The pricing page's data: public by design, and it names no one
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/plans").permitAll().requestMatchers("/actuator/startup", "/actuator/metrics", "/actuator/metrics/**")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/plans").permitAll()
+                        .requestMatchers("/actuator/startup", "/actuator/metrics", "/actuator/metrics/**")
                         .hasRole("ADMIN")
                         // A second gate behind each admin controller's @PreAuthorize: a controller added under
                         // /api/admin without one is closed to learners rather than open to every signed-in user.

@@ -33,8 +33,8 @@ import com.englow3.support.PostgresIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * Erasing an account against the real schema. The foreign keys are the point: some cascade, some restrict, and a
- * delete that is correct for one table fails on another - which a mocked repository cannot show.
+ * Erasing an account against the real schema. The foreign keys are the point: some cascade, some restrict, and a delete
+ * that is correct for one table fails on another - which a mocked repository cannot show.
  */
 class AccountServiceIntegrationTest extends PostgresIntegrationTest {
 
@@ -81,8 +81,8 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void signIn(UUID subject) {
-        Jwt token = Jwt.withTokenValue("test").header("alg", "none").subject(subject.toString())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
+        Jwt token = Jwt.withTokenValue("test").header("alg", "none").subject(subject.toString()).issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600)).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new JwtAuthenticationToken(token, List.of(new SimpleGrantedAuthority("ROLE_LEARNER"))));
     }
