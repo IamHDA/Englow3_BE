@@ -84,7 +84,7 @@ app:
   calendar:
     zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.104.183.3:4000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 
   storage:
     # One bucket per domain: the module that owns a file names its own bucket, so shared/storage never has to pick a
@@ -109,6 +109,14 @@ app:
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
 
+  # What a paid plan changes. The free plan's AI allowance is app.ai.daily-request-limit below. Prices are placeholders
+  # shown on the pricing page and are not charged by anything yet: no payment provider is connected.
+  plans:
+    pro:
+      ai-daily-limit: ${PLAN_PRO_AI_DAILY_LIMIT:300}
+      price-vnd-monthly: ${PLAN_PRO_PRICE_MONTHLY:99000}
+      price-vnd-yearly: ${PLAN_PRO_PRICE_YEARLY:990000}
+
   ai:
     enabled: ${AI_ENABLED:false}
     provider: ${AI_PROVIDER:ai-service}
@@ -119,6 +127,8 @@ app:
     read-timeout: ${AI_READ_TIMEOUT:55s}
     speech-read-timeout: ${AI_SPEECH_READ_TIMEOUT:70s}
     daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    # Spend cap for the whole platform per day (0 = off). Set it to what the provider plan can bear.
+    platform-daily-request-limit: ${AI_PLATFORM_DAILY_REQUEST_LIMIT:0}
     queue-scope: ${AI_QUEUE_SCOPE:local}
     max-outstanding-jobs: ${AI_MAX_OUTSTANDING_JOBS:200}
     worker:
@@ -144,6 +154,24 @@ server:
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+
+# Error reporting. An empty DSN disables it entirely, which is the local and test default. Personal data stays out of
+# events: user ids and emails are not attached, and request bodies are never sent.
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:${AI_QUEUE_SCOPE:local}}
+  release: ${RELEASE_SHA:unknown}
+  send-default-pii: false
+  max-request-body-size: none
+  traces-sample-rate: 0.0
+  # After the @ExceptionHandler resolvers: an exception the application answered on purpose (a 404, a validation
+  # failure, a domain refusal) is the system working and must not be reported. Genuine 500s reach Sentry through the
+  # error-level log line GlobalExceptionHandler writes for them.
+  exception-resolver-order: 2147483647
+  logging:
+    minimum-event-level: error
+    # Log lines are not attached to events: they can carry emails and ids.
+    minimum-breadcrumb-level: error
 
 management:
   info:

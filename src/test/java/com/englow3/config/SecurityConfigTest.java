@@ -60,6 +60,15 @@ class SecurityConfigTest {
             mockMvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
             mockMvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
         }
+
+        /**
+         * The pricing page is public marketing; it is the one /api route a visitor may read. This slice has no handler
+         * for it, so "let through" shows as 404 where "turned away" would be 401.
+         */
+        @Test
+        void letsAVisitorReachThePlanCatalogue() throws Exception {
+            mockMvc.perform(get("/api/plans")).andExpect(status().isNotFound());
+        }
     }
 
     @Nested
@@ -68,6 +77,25 @@ class SecurityConfigTest {
         @Test
         void keepsApplicationEndpointsAuthenticated() throws Exception {
             mockMvc.perform(get("/api/private-test")).andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void keepsAccountAndSubscriptionEndpointsAuthenticated() throws Exception {
+            mockMvc.perform(get("/api/user/me/export")).andExpect(status().isUnauthorized());
+            mockMvc.perform(get("/api/user/me/subscription")).andExpect(status().isUnauthorized());
+            mockMvc.perform(
+                    org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/user/me/erase"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        /** Granting a plan is an administrator's act; staff and learners are turned away at the filter. */
+        @Test
+        void keepsPlanGrantsOutOfReachOfLearners() throws Exception {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                    .put("/api/admin/subscriptions")
+                    .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                            .user("test").roles("LEARNER")))
+                    .andExpect(status().isForbidden());
         }
     }
 }

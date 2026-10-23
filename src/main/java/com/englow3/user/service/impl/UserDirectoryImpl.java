@@ -61,6 +61,11 @@ public class UserDirectoryImpl implements UserDirectory {
                 .collect(Collectors.toMap(user -> user.getId(), user -> user.getDisplayName()));
     }
 
+    @Override
+    public void forget(UUID authProviderId) {
+        userIds.remove(authProviderId);
+    }
+
     /**
      * A valid token whose subject matches no row means the Supabase sync trigger did not fire - a real defect, and one
      * worth surfacing rather than papering over, so it is a 404 with a code that says what is missing. That answer is

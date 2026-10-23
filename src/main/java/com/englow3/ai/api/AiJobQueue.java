@@ -44,6 +44,9 @@ public interface AiJobQueue {
 
     int dailyRequestLimit();
 
+    /** The same ceiling for one learner - higher while a paid plan is in force. */
+    int dailyRequestLimit(UUID userId);
+
     void enqueueSpeechAssessment(UUID attemptId, String inputPayload, String idempotencyKey, String promptVersion,
             UUID requestedByUserId);
 

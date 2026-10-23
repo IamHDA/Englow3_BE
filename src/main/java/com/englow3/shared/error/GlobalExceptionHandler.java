@@ -40,6 +40,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case ConflictException ignored -> HttpStatus.CONFLICT;
             case BadRequestException ignored -> HttpStatus.BAD_REQUEST;
             case ForbiddenException ignored -> HttpStatus.FORBIDDEN;
+            case TooManyRequestsException ignored -> HttpStatus.TOO_MANY_REQUESTS;
         };
         return ResponseEntity.status(status).body(error(ex.getCode(), ex.getMessage()));
     }

@@ -5,7 +5,7 @@ package com.englow3.shared.error;
  * layer's job, in GlobalExceptionHandler.
  */
 public abstract sealed class DomainException extends RuntimeException
-        permits NotFoundException, ConflictException, BadRequestException, ForbiddenException {
+        permits NotFoundException, ConflictException, BadRequestException, ForbiddenException, TooManyRequestsException {
 
     private final String code;
 

@@ -166,7 +166,7 @@ public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
     private void requireQuotaRemaining(UUID userId) {
         if (!aiJobQueue.hasDailyAllowance(userId)) {
             throw new ConflictException("SPEAKING_DAILY_LIMIT_REACHED",
-                    "You have reached today's limit of %d AI requests".formatted(aiJobQueue.dailyRequestLimit()));
+                    "You have reached today's limit of %d AI requests".formatted(aiJobQueue.dailyRequestLimit(userId)));
         }
     }
 

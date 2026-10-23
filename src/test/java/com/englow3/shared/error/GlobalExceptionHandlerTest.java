@@ -34,6 +34,15 @@ class GlobalExceptionHandlerTest {
         }
 
         @Test
+        void mapsTooManyRequestsTo429() {
+            ResponseEntity<ApiErrorResponse> response = handler
+                    .onDomainException(new TooManyRequestsException("RATE_LIMITED", "Slow down"));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+            assertThat(response.getBody().code()).isEqualTo("RATE_LIMITED");
+        }
+
+        @Test
         void mapsOptimisticLockingFailureTo409() {
             ResponseEntity<ApiErrorResponse> response = handler
                     .onConcurrentUpdate(new OptimisticLockingFailureException("stale"));

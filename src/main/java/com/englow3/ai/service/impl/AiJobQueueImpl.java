@@ -24,6 +24,7 @@ import com.englow3.ai.service.AiJobWorkerQueue;
 import com.englow3.ai.service.AiJobQueued;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.time.StudyCalendar;
+import com.englow3.subscription.api.PlanEntitlements;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +45,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     private final StudyCalendar calendar;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final PlanEntitlements plans;
 
     @Value("${app.ai.queue-scope:local}")
     private String queueScope = "testing";
@@ -80,7 +82,7 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Transactional(readOnly = true)
     public Usage usage(UUID userId) {
         long used = jobRepo.countRequestedSince(userId, calendar.startOfToday());
-        return new Usage(dailyRequestLimit, (int) Math.min(Integer.MAX_VALUE, used),
+        return new Usage(dailyRequestLimit(userId), (int) Math.min(Integer.MAX_VALUE, used),
                 calendar.today().plusDays(1).atStartOfDay(calendar.zone()).toInstant());
     }
 
@@ -167,6 +169,10 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     @Value("${app.ai.daily-request-limit:100}")
     private int dailyRequestLimit;
 
+    /** Requests the whole platform may cause in a day, across every learner. Zero means no platform ceiling. */
+    @Value("${app.ai.platform-daily-request-limit:0}")
+    private int platformDailyRequestLimit;
+
     /** Three attempts covers a provider blip without leaving a learner waiting through four backoffs. */
     private static final short MAX_RETRY_COUNT = 3;
 
@@ -179,12 +185,37 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
      */
     @Transactional(readOnly = true)
     public boolean hasDailyAllowance(UUID userId) {
-        return jobRepo.countRequestedSince(userId, calendar.startOfToday()) < dailyRequestLimit;
+        return !platformCeilingReached()
+                && jobRepo.countRequestedSince(userId, calendar.startOfToday()) < dailyRequestLimit(userId);
     }
 
-    /** The ceiling, so a refusal can say what it was. */
+    /**
+     * Whether the platform as a whole has spent its day. A per-learner limit bounds one person; this bounds the bill -
+     * many accounts each inside their own allowance can still add up to more than the provider plan covers. Zero turns
+     * it off.
+     */
+    private boolean platformCeilingReached() {
+        if (platformDailyRequestLimit <= 0) {
+            return false;
+        }
+        long spent = jobRepo.countByQueueScopeAndCreatedAtGreaterThanEqual(queueScope, calendar.startOfToday());
+        if (spent >= platformDailyRequestLimit) {
+            log.warn("Platform AI ceiling reached for scope {}: {} of {} requests today", queueScope, spent,
+                    platformDailyRequestLimit);
+            return true;
+        }
+        return false;
+    }
+
+    /** The ceiling on the free plan, so a refusal that has no learner in hand can still say what it was. */
     public int dailyRequestLimit() {
         return dailyRequestLimit;
+    }
+
+    /** The ceiling for this learner: the paid plan's while it is in force, the free plan's otherwise. */
+    public int dailyRequestLimit(UUID userId) {
+        return plans.hasPaidPlan(userId) ? Math.max(dailyRequestLimit, plans.paidAiDailyRequestLimit())
+                : dailyRequestLimit;
     }
 
     /**

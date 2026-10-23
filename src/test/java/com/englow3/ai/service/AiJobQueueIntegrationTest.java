@@ -117,6 +117,75 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
         assertThat(queue.hasDailyAllowance(learner)).isTrue();
     }
 
+    private long spentToday() {
+        // This run's own queue scope, as the ceiling counts it: other runs and other scopes share the database.
+        return jdbc.sql("select count(*) from ai_jobs where queue_scope = :scope")
+                .param("scope", ReflectionTestUtils.getField(target, "queueScope")).query(Long.class).single();
+    }
+
+    /**
+     * Each learner can be inside their own allowance while the platform is not: many accounts add up. Once the
+     * platform has spent its day, nobody gets another request, including a learner who has asked for nothing yet.
+     */
+    @Test
+    void thePlatformCeilingStopsEveryoneOnceTheDayIsSpent() {
+        UUID other = new LearnerFixture(jdbc).learner();
+        int original = (int) ReflectionTestUtils.getField(target, "platformDailyRequestLimit");
+        try {
+            ReflectionTestUtils.setField(target, "platformDailyRequestLimit", (int) spentToday() + 2);
+            assertThat(queue.hasDailyAllowance(other)).isTrue();
+
+            speak(learner);
+            speak(learner);
+
+            assertThat(queue.hasDailyAllowance(other)).isFalse();
+            assertThat(queue.hasDailyAllowance(learner)).isFalse();
+        } finally {
+            ReflectionTestUtils.setField(target, "platformDailyRequestLimit", original);
+        }
+    }
+
+    @Test
+    void noPlatformCeilingMeansOnlyThePerLearnerLimitApplies() {
+        speak(learner);
+
+        assertThat(queue.hasDailyAllowance(learner)).isTrue();
+    }
+
+    private void putOnPaidPlan(UUID userId, String periodEnd) {
+        jdbc.sql("""
+                insert into user_subscriptions (user_id, plan, billing_period, current_period_end)
+                values (:userId, 'PRO', 'MONTHLY', cast(:end as timestamptz))
+                """).param("userId", userId).param("end", periodEnd).update();
+    }
+
+    /** What the paid plan is for: the same three requests that stop a free learner leave a paying one room. */
+    @Test
+    void aPaidPlanRaisesTheDailyCeiling() {
+        speak(learner);
+        speak(learner);
+        ask(learner);
+        assertThat(queue.hasDailyAllowance(learner)).isFalse();
+
+        putOnPaidPlan(learner, "2999-01-01T00:00:00Z");
+
+        assertThat(queue.hasDailyAllowance(learner)).isTrue();
+        assertThat(queue.dailyRequestLimit(learner)).isGreaterThan(LIMIT);
+        assertThat(queue.dailyRequestLimit(UUID.randomUUID())).isEqualTo(LIMIT);
+    }
+
+    /** Nobody has to clear an expired subscription: past its end it simply stops counting. */
+    @Test
+    void anExpiredPaidPlanGrantsNothing() {
+        speak(learner);
+        speak(learner);
+        ask(learner);
+        putOnPaidPlan(learner, "2000-01-01T00:00:00Z");
+
+        assertThat(queue.hasDailyAllowance(learner)).isFalse();
+        assertThat(queue.dailyRequestLimit(learner)).isEqualTo(LIMIT);
+    }
+
     /** Recorded on the row, so the budget reads what was actually stored rather than what a caller claimed. */
     @Test
     void recordsWhoAskedOnTheJob() {
