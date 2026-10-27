@@ -99,10 +99,12 @@ class AiJobWorkerTest {
     @Test
     void slowSpeakingDoesNotBlockTutorAndDoesNotPreclaimMoreWork() throws Exception {
         AiJob speaking = job(AiJobType.SPEECH_ASSESSMENT), tutor = job(AiJobType.TUTOR_REPLY);
+        // Each job once, as the real queue hands it out: a finished job wakes the worker to claim again, and a stub
+        // that kept returning the same job ran it twice more whenever that wake-up beat close() on a loaded machine.
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
-                .thenReturn(List.of(tutor));
+                .thenReturn(List.of(tutor), List.of());
         when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT")), any()))
-                .thenReturn(List.of(speaking));
+                .thenReturn(List.of(speaking), List.of());
         CountDownLatch entered = new CountDownLatch(2), release = new CountDownLatch(1);
         Runnable block = () -> {
             entered.countDown();
