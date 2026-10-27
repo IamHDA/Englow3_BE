@@ -29,6 +29,7 @@ import com.englow3.assessment.service.AssessmentService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +49,11 @@ public class AssessmentServiceImpl implements AssessmentService {
     private final ObjectStorageClient storage;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
+    private final UserRateLimiter rateLimiter;
+
+    /** Far more attempts than anyone starts by hand in ten minutes; few enough that a script cannot fill the bucket. */
+    static final int MAX_STARTS_PER_WINDOW = 30;
+    static final Duration START_WINDOW = Duration.ofMinutes(10);
     @Value("${app.ai.enabled:false}")
     private boolean aiEnabled;
     @Value("${app.assessment.automatic-writing:false}")
@@ -82,6 +88,9 @@ public class AssessmentServiceImpl implements AssessmentService {
                 return prior.get();
             }
             AssessmentTask task = publishedTask(taskId);
+            // Counted only for a new attempt, so a client repeating its own request is never refused. A speaking start
+            // signs a URL for up to 10 MB in the bucket, and an upload no submission claims is never removed.
+            rateLimiter.check(user, "assessment-start", MAX_STARTS_PER_WINDOW, START_WINDOW);
             UUID id = UUID.randomUUID();
             String key = null;
             if (task.getSkill() == AssessmentSkill.SPEAKING) {
@@ -125,10 +134,16 @@ public class AssessmentServiceImpl implements AssessmentService {
         String sealedKey = candidate.getSkill() == AssessmentSkill.SPEAKING
                 ? "productive-sealed/" + user + "/" + id + "/" + UUID.randomUUID() + ".wav"
                 : null;
+        // Taken now: sealing rewrites the attempt's key, and this is the upload that is removed once it is sealed.
+        String uploadKey = candidate.getAudioObjectKey();
         if (sealedKey != null) {
-            checkAudio(candidate);
             try {
-                storage.copy(bucket, candidate.getAudioObjectKey(), sealedKey);
+                checkAudio(candidate);
+            } catch (RuntimeException failure) {
+                return result(submittedMeanwhile(id, user).orElseThrow(() -> failure), false);
+            }
+            try {
+                storage.copy(bucket, uploadKey, sealedKey);
                 var metadata = storage.metadata(bucket, sealedKey);
                 if (metadata.contentLength() != candidate.getAudioContentLength()
                         || !"audio/wav".equals(metadata.contentType())) {
@@ -136,7 +151,7 @@ public class AssessmentServiceImpl implements AssessmentService {
                 }
             } catch (RuntimeException failure) {
                 removeUnusedRecording(sealedKey);
-                throw failure;
+                return result(submittedMeanwhile(id, user).orElseThrow(() -> failure), false);
             }
         }
         AssessmentAttempt a;
@@ -169,8 +184,22 @@ public class AssessmentServiceImpl implements AssessmentService {
         }
         if (sealedKey != null && !sealedKey.equals(a.getAudioObjectKey())) {
             removeUnusedRecording(sealedKey);
+        } else if (sealedKey != null) {
+            // This request sealed the recording, so the upload it was copied from is a second copy of the learner's
+            // voice that nothing reads any more. Left in place, every spoken submission kept one for good.
+            removeUnusedRecording(uploadKey);
         }
         return result(a, false);
+    }
+
+    /**
+     * The attempt as a concurrent request left it, if that request submitted it first. Such a request has already moved
+     * the upload under its seal and removed it, so this one finds no recording to copy - and the answer it should give
+     * is the submission that happened, not an error.
+     */
+    private Optional<AssessmentAttempt> submittedMeanwhile(UUID id, UUID user) {
+        AssessmentAttempt current = transactionTemplate.execute(tx -> owned(id, user, false));
+        return current.getStatus() == AssessmentAttemptStatus.DRAFT ? Optional.empty() : Optional.of(current);
     }
 
     private void removeUnusedRecording(String key) {

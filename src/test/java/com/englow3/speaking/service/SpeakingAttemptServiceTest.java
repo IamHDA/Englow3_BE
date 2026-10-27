@@ -12,8 +12,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,9 +27,12 @@ import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.error.TooManyRequestsException;
+import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.speaking.entity.SpeakingAttempt;
+import com.englow3.speaking.entity.SpeakingAttemptStatus;
 import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
@@ -51,7 +56,8 @@ class SpeakingAttemptServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final SpeakingAttemptService service = new SpeakingAttemptServiceImpl(promptRepo, attemptRepo, wordRepo,
-            aiJobQueue, userDirectory, objectStorage, presignedUrls, new ObjectMapper());
+            aiJobQueue, userDirectory, objectStorage, presignedUrls, new ObjectMapper(),
+            new UserRateLimiter(Clock.systemUTC()), Clock.systemUTC());
 
     private final UUID userId = UUID.randomUUID();
     private SpeakingPrompt prompt;
@@ -127,6 +133,56 @@ class SpeakingAttemptServiceTest {
                 .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("SPEAKING_DAILY_LIMIT_REACHED");
 
         verify(aiJobQueue, never()).enqueueSpeechAssessment(any(), anyString(), anyString(), anyString(), any());
+    }
+
+    /** No upload URL for a recording that could not be assessed today: the learner would record for nothing. */
+    @Test
+    void handsOutNoUploadOnceTodaysAssessmentsAreSpent() {
+        when(aiJobQueue.hasDailyAllowance(userId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.startAttempt(prompt.getId(), "audio/wav", 480_000))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("SPEAKING_DAILY_LIMIT_REACHED");
+
+        verify(attemptRepo, never()).save(any());
+        verify(objectStorage, never()).presignPut(anyString(), anyString(), anyString(), anyLong(), any());
+    }
+
+    @Test
+    void boundsHowManyUploadsOneLearnerCanOpenInAShortTime() {
+        for (int i = 0; i < 30; i++) {
+            service.startAttempt(prompt.getId(), "audio/wav", 480_000);
+        }
+
+        assertThatThrownBy(() -> service.startAttempt(prompt.getId(), "audio/wav", 480_000))
+                .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    void sweepsAnAttemptWhoseRecordingNeverArrivedAndTheFileItMayHaveLeft() {
+        SpeakingAttempt abandoned = SpeakingAttempt.awaitingUpload(userId, prompt.getId(), "speaking/u/gone.wav",
+                "audio/wav");
+        when(attemptRepo.findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                eq(SpeakingAttemptStatus.AWAITING_UPLOAD), any())).thenReturn(List.of(abandoned));
+        when(attemptRepo.deleteIfAwaitingUpload(abandoned.getId())).thenReturn(1);
+
+        assertThat(service.removeAbandonedUploads()).isEqualTo(1);
+
+        verify(objectStorage).delete("speaking", "speaking/u/gone.wav");
+    }
+
+    /** Submitted between the sweep's read and its delete: the row stays, and so does its recording. */
+    @Test
+    void leavesAnAttemptThatWasSubmittedWhileTheSweepRan() {
+        SpeakingAttempt late = SpeakingAttempt.awaitingUpload(userId, prompt.getId(), "speaking/u/late.wav",
+                "audio/wav");
+        when(attemptRepo.findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                eq(SpeakingAttemptStatus.AWAITING_UPLOAD), any())).thenReturn(List.of(late));
+        when(attemptRepo.deleteIfAwaitingUpload(late.getId())).thenReturn(0);
+
+        assertThat(service.removeAbandonedUploads()).isZero();
+
+        verify(objectStorage, never()).delete(anyString(), anyString());
     }
 
     @Test

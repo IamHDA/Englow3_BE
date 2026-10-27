@@ -14,4 +14,7 @@ public interface SpeakingAttemptService {
     SpeakingAttemptResult attemptResult(UUID attemptId);
 
     List<SpeakingAttemptResult> attemptHistory(UUID promptId);
+
+    /** Removes attempts whose recording never arrived, and whatever was uploaded for them. Returns how many. */
+    int removeAbandonedUploads();
 }

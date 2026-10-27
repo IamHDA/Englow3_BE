@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,6 +26,17 @@ public interface SpeakingAttemptRepository extends JpaRepository<SpeakingAttempt
     Optional<SpeakingAttempt> findByIdAndUserId(UUID id, UUID userId);
 
     List<SpeakingAttempt> findByUserIdAndSpeakingPromptIdOrderByCreatedAtDesc(UUID userId, UUID speakingPromptId);
+
+    List<SpeakingAttempt> findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(SpeakingAttemptStatus status,
+            Instant before);
+
+    /**
+     * Deletes the attempt only while it is still waiting for its recording, so a submission that landed between the
+     * sweep's read and this delete keeps its row. Returns whether it was deleted.
+     */
+    @Modifying
+    @Query("delete from SpeakingAttempt a where a.id = :id and a.status = SpeakingAttemptStatus.AWAITING_UPLOAD")
+    int deleteIfAwaitingUpload(@Param("id") UUID id);
 
     /** Best pronunciation score per prompt, for a page of prompts, in one query. */
     @Query("""

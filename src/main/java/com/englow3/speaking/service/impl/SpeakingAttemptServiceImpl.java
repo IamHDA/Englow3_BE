@@ -1,5 +1,6 @@
 package com.englow3.speaking.service.impl;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -13,11 +14,13 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import com.englow3.ai.api.AiJobQueue;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.speaking.dto.result.SpeakingAttemptResult;
 import com.englow3.speaking.dto.result.SpeakingUploadTicket;
 import com.englow3.speaking.entity.SpeakingAttempt;
+import com.englow3.speaking.entity.SpeakingAttemptStatus;
 import com.englow3.speaking.entity.SpeakingAttemptWord;
 import com.englow3.speaking.entity.SpeakingPrompt;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
@@ -32,14 +35,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /** Recording upload, assessment queueing, and result lifecycle. */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
 
     static final String ATTEMPT_TARGET_TYPE = "SPEAKING_ATTEMPT";
     static final String ASSESSMENT_VERSION = "speech-assessment-v1";
+
+    /** Far more takes than anyone records by hand in ten minutes; few enough that a script cannot fill the bucket. */
+    static final int MAX_STARTS_PER_WINDOW = 30;
+    static final Duration START_WINDOW = Duration.ofMinutes(10);
+
+    /** Long past the fifteen minutes an upload URL lasts, so nothing still in progress is ever swept. */
+    static final Duration ABANDONED_UPLOAD_AGE = Duration.ofHours(24);
 
     private final SpeakingPromptRepository promptRepo;
     private final SpeakingAttemptRepository attemptRepo;
@@ -49,6 +61,8 @@ public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
     private final ObjectStorageClient objectStorage;
     private final PresignedUrlResolver presignedUrls;
     private final ObjectMapper objectMapper;
+    private final UserRateLimiter rateLimiter;
+    private final Clock clock;
 
     @Value("${app.storage.speaking-bucket}")
     private String speakingBucket;
@@ -69,6 +83,11 @@ public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
 
         UUID userId = userDirectory.requireCurrentUserId();
         requirePublishedPrompt(promptId);
+        // Asked again at submission, but first here, as the tutor does: a learner out of requests would otherwise
+        // record and upload only to be told the recording cannot be assessed today.
+        requireQuotaRemaining(userId);
+        // Every start signs a URL for up to 10 MB in the bucket, and nothing removes an upload no submission claims.
+        rateLimiter.check(userId, "speaking-start", MAX_STARTS_PER_WINDOW, START_WINDOW);
 
         UUID attemptId = UUID.randomUUID();
         String objectKey = SpeakingAudioKeys.audioKey(userId, attemptId, contentType);
@@ -115,6 +134,31 @@ public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
         SpeakingPrompt prompt = requirePublishedPrompt(promptId);
         return attemptRepo.findByUserIdAndSpeakingPromptIdOrderByCreatedAtDesc(userId, promptId).stream()
                 .map(attempt -> result(attempt, prompt, List.of())).toList();
+    }
+
+    /**
+     * An attempt still waiting for its recording a day after it was started will never get one: the upload URL lasted
+     * fifteen minutes, and the screen submits as soon as the upload finishes. Each such attempt held a row and, if the
+     * upload did happen, ten megabytes nobody would ever read.
+     */
+    @Override
+    @Transactional
+    public int removeAbandonedUploads() {
+        int removed = 0;
+        for (SpeakingAttempt attempt : attemptRepo.findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                SpeakingAttemptStatus.AWAITING_UPLOAD, clock.instant().minus(ABANDONED_UPLOAD_AGE))) {
+            if (attemptRepo.deleteIfAwaitingUpload(attempt.getId()) == 0) {
+                continue;
+            }
+            removed++;
+            try {
+                objectStorage.delete(speakingBucket, attempt.getAudioObjectKey());
+            } catch (RuntimeException failure) {
+                // The row is what anyone reads; a file left behind is a stray in the bucket, not a broken attempt.
+                log.warn("Could not remove the upload of abandoned speaking attempt {}", attempt.getId(), failure);
+            }
+        }
+        return removed;
     }
 
     private SpeakingAttemptResult result(SpeakingAttempt attempt, SpeakingPrompt prompt,

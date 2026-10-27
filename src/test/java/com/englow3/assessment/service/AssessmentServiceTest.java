@@ -29,9 +29,12 @@ import com.englow3.assessment.service.impl.AssessmentServiceImpl;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @ExtendWith(MockitoExtension.class)
 class AssessmentServiceTest {
@@ -56,7 +59,7 @@ class AssessmentServiceTest {
     @BeforeEach
     void setup() {
         service = new AssessmentServiceImpl(tasks, results, attempts, users, queue, new ObjectMapper(), storage, tx,
-                Clock.systemUTC());
+                Clock.systemUTC(), new UserRateLimiter(Clock.systemUTC()));
         when(users.requireCurrentUserId()).thenReturn(user);
         when(tx.execute(any())).thenAnswer(
                 i -> ((TransactionCallback<?>) i.getArgument(0)).doInTransaction(mock(TransactionStatus.class)));
@@ -132,6 +135,26 @@ class AssessmentServiceTest {
         assertEquals(AssessmentAttemptStatus.NEEDS_REVIEW, attempt.getStatus());
         service.submit(id);
         verify(storage, times(1)).copy(any(), eq("original.wav"), eq(sealed));
+        // The sealed copy is what is graded and kept; the upload it came from is not left behind.
+        verify(storage, times(1)).delete(any(), eq("original.wav"));
+        verify(storage, never()).delete(any(), eq(sealed));
+        verifyNoInteractions(queue);
+    }
+
+    /** A second submit racing the first finds the upload already sealed and removed: it reports that submission. */
+    @Test
+    void aRacingSecondSubmitReportsTheFirstInsteadOfAMissingRecording() {
+        attempt = AssessmentAttempt.draft(id, user, UUID.randomUUID(), UUID.randomUUID(), AssessmentSkill.SPEAKING,
+                "{}", "original.wav", "audio/wav", 100L);
+        AssessmentAttempt sealedByTheFirst = AssessmentAttempt.draft(id, user, attempt.getTaskId(),
+                attempt.getClientKey(), AssessmentSkill.SPEAKING, "{}", "original.wav", "audio/wav", 100L);
+        sealedByTheFirst.submit(false, java.time.Instant.now());
+        when(attempts.findById(id)).thenReturn(Optional.of(attempt), Optional.of(sealedByTheFirst));
+        when(storage.metadata(any(), eq("original.wav")))
+                .thenThrow(S3Exception.builder().statusCode(404).message("gone").build());
+
+        assertDoesNotThrow(() -> service.submit(id));
+        verify(storage, never()).copy(any(), any(), any());
         verifyNoInteractions(queue);
     }
 

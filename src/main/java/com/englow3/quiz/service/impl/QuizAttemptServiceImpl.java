@@ -2,6 +2,7 @@ package com.englow3.quiz.service.impl;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -55,6 +56,13 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class QuizAttemptServiceImpl implements QuizAttemptService {
+
+    /**
+     * How long after the deadline a submission is still taken. The paper sends itself when the clock runs out; a quiz
+     * keeps no draft on the server, so a request that arrived a moment late used to lose every answer in it. Long
+     * enough for a slow connection, too short to be worth anything as extra time - the paper locks at the deadline.
+     */
+    static final Duration SUBMIT_GRACE = Duration.ofSeconds(30);
 
     private final QuizRepository quizRepo;
     private final QuizQuestionRepository questionRepo;
@@ -121,9 +129,12 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
             throw new ConflictException("QUIZ_ATTEMPT_ALREADY_FINALIZED",
                     "This quiz attempt has already been finalized");
         }
-        if (!now.isBefore(attempt.getExpiresAt())) {
+        if (!now.isBefore(attempt.getExpiresAt().plus(SUBMIT_GRACE))) {
             throw new ConflictException("QUIZ_ATTEMPT_EXPIRED", "This quiz attempt has expired");
         }
+        // A paper sent within the grace is dated to the deadline: the extra seconds were the network's, not the
+        // learner's, and must not show up as time spent beyond the limit.
+        Instant submittedAt = now.isAfter(attempt.getExpiresAt()) ? attempt.getExpiresAt() : now;
 
         Quiz quiz = requirePublished(attempt.getQuizId());
         List<QuizQuestion> questions = questionRepo.findByQuizIdOrderByOrderNo(quiz.getId());
@@ -157,7 +168,7 @@ public class QuizAttemptServiceImpl implements QuizAttemptService {
         }
 
         attemptAnswerRepo.saveAll(storedAnswers);
-        attempt.score(score, correctCount, quiz.getPassingScorePercent(), now);
+        attempt.score(score, correctCount, quiz.getPassingScorePercent(), submittedAt);
         return QuizAttemptResult.scored(attempt, quiz.getTitle(), reviews);
     }
 

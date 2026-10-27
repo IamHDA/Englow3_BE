@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -39,6 +41,7 @@ import com.englow3.quiz.repository.QuizQuestionRepository;
 import com.englow3.quiz.repository.QuizQuestionTokenRepository;
 import com.englow3.quiz.repository.QuizRepository;
 import com.englow3.quiz.service.impl.QuizAttemptServiceImpl;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
 
@@ -218,6 +221,34 @@ class QuizAttemptServiceTest {
 
             assertThat(result.correctAnswerCount()).isZero();
             assertThat(result.reviews()).singleElement().satisfies(review -> assertThat(review.correct()).isFalse());
+        }
+
+        /** The paper sends itself at the deadline; the request arriving a moment later must not lose every answer. */
+        @Test
+        void takesThePaperTheClockSentJustAfterTheDeadlineAndDatesItToTheDeadline() {
+            QuizAttempt attempt = attemptStartedSecondsAgo(600 + 10);
+
+            QuizAttemptResult result = service.submit(new SubmitQuizAttemptCommand(attempt.getId(),
+                    List.of(new SubmittedAnswer(choice.getId(), right.getId().toString()))));
+
+            assertThat(result.score()).isEqualByComparingTo("2");
+            assertThat(attempt.getSubmittedAt()).isEqualTo(attempt.getExpiresAt());
+        }
+
+        @Test
+        void refusesAPaperSentLongAfterTheDeadline() {
+            QuizAttempt attempt = attemptStartedSecondsAgo(600 + 120);
+
+            assertThatThrownBy(() -> service.submit(new SubmitQuizAttemptCommand(attempt.getId(), List.of())))
+                    .isInstanceOf(ConflictException.class).hasFieldOrPropertyWithValue("code", "QUIZ_ATTEMPT_EXPIRED");
+            verify(attemptAnswerRepo, never()).saveAll(any());
+        }
+
+        private QuizAttempt attemptStartedSecondsAgo(long seconds) {
+            QuizAttempt attempt = QuizAttempt.start(quiz, userId, 1, new BigDecimal("2"),
+                    CLOCK.instant().minusSeconds(seconds));
+            when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+            return attempt;
         }
 
         /** The review shows the option the learner picked, not the uuid they sent. */
