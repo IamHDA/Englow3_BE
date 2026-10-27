@@ -160,6 +160,10 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
         UUID author = users.requireCurrentUserId();
         AssessmentAttempt a = transactionTemplate.execute(tx -> {
             AssessmentAttempt attempt = reviewable(id, author);
+            // Staff can also sit tasks, including their own; marking that work would be awarding themselves a grade.
+            if (attempt.getUserId().equals(author)) {
+                throw new ForbiddenException("REVIEW_OWN_SUBMISSION", "A reviewer cannot grade their own submission");
+            }
             if (version != null && version != attempt.getVersion()) {
                 throw new ConflictException("GRADE_CHANGED",
                         "Another reviewer changed this submission. Reload before publishing");

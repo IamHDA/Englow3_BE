@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,13 +58,23 @@ class UserServiceTest {
         when(userRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    /** An image whose first bytes are those of the format it declares. */
     private MultipartFile mockImage(String contentType) {
+        byte[] header = switch (contentType) {
+            case "image/png" -> new byte[] { (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13 };
+            case "image/jpeg" -> new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16 };
+            default -> new byte[] { 1, 2, 3 };
+        };
+        return mockImage(contentType, header);
+    }
+
+    private MultipartFile mockImage(String contentType, byte[] content) {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getContentType()).thenReturn(contentType);
         when(file.getSize()).thenReturn(1024L);
         try {
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[] { 1, 2, 3 }));
+            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(content));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -157,6 +168,17 @@ class UserServiceTest {
                     .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                     .isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+        }
+
+        /** The avatar bucket is public: a page or script labelled image/png would be published as one. */
+        @Test
+        void refusesAFileThatIsNotTheImageItClaimsToBe() {
+            MultipartFile page = mockImage("image/png", "<html><script>".getBytes(StandardCharsets.US_ASCII));
+
+            assertThatThrownBy(() -> service.changeAvatar(page)).isInstanceOf(BadRequestException.class)
+                    .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_CONTENT_MISMATCH");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+            verify(user, never()).changeAvatar(anyString());
         }
 
         @Test

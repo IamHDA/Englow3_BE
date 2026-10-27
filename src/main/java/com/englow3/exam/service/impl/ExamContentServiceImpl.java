@@ -1,5 +1,6 @@
 package com.englow3.exam.service.impl;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -37,6 +38,8 @@ import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.exam.service.ExamContentService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.storage.AudioFileHeader;
+import com.englow3.shared.storage.ImageFileHeader;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.shared.storage.PresignedUrlResolver;
 
@@ -91,10 +94,19 @@ public class ExamContentServiceImpl implements ExamContentService {
             throw new BadRequestException("MEDIA_TYPE_NOT_SUPPORTED",
                     "Only MP3, WAV, JPEG and PNG media are accepted, got %s".formatted(contentType));
         }
-        String subfolder = contentType.startsWith("audio/") ? "audios" : "images";
+        boolean audio = contentType.startsWith("audio/");
+        String subfolder = audio ? "audios" : "images";
         String objectKey = "%s/%s/%s.%s".formatted(examId, subfolder, UUID.randomUUID(), extension);
         try {
-            objectStorage.upload(examBucket, objectKey, file.getInputStream(), file.getSize(), contentType);
+            // The declared type is the browser's word; the dictation and flashcard uploads already check the bytes.
+            var content = new BufferedInputStream(file.getInputStream());
+            content.mark(ImageFileHeader.LENGTH);
+            byte[] header = content.readNBytes(ImageFileHeader.LENGTH);
+            content.reset();
+            if (audio ? !AudioFileHeader.matches(header, contentType) : !ImageFileHeader.matches(header, contentType)) {
+                throw new BadRequestException("MEDIA_CONTENT_MISMATCH", "The file does not match its declared format");
+            }
+            objectStorage.upload(examBucket, objectKey, content, file.getSize(), contentType);
         } catch (IOException e) {
             throw new BadRequestException("MEDIA_UNREADABLE", "The uploaded media could not be read");
         }

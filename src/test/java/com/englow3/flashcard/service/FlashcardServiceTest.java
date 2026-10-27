@@ -22,9 +22,12 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
 import com.englow3.flashcard.entity.Flashcard;
+import com.englow3.flashcard.entity.FlashcardReview;
 import com.englow3.flashcard.entity.FlashcardReviewLog;
+import com.englow3.flashcard.entity.FlashcardReviewStatus;
 import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.ReviewRating;
+import com.englow3.flashcard.helper.FlashcardSrs;
 import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardReviewLogRepository;
 import com.englow3.flashcard.repository.FlashcardReviewRepository;
@@ -85,6 +88,40 @@ class FlashcardServiceTest {
 
         assertThat(result.flashcardId()).isEqualTo(card.getId());
         verify(reviewLogRepo).save(any());
+    }
+
+    /** Going through the same session again a minute later is practice; it must not climb the intervals. */
+    @Test
+    void aCardAnsweredBeforeItIsDueKeepsItsSchedule() {
+        setIsPublished(true);
+        FlashcardReview review = reviewedOnceWithGood();
+        Instant due = review.getDueAt();
+
+        service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.EASY, 5));
+
+        assertThat(review.getRepetitions()).isEqualTo((short) 1);
+        assertThat(review.getDueAt()).isEqualTo(due);
+        assertThat(review.getStatus()).isEqualTo(FlashcardReviewStatus.LEARNING);
+        verify(reviewLogRepo).save(any());
+    }
+
+    @Test
+    void aCardForgottenBeforeItIsDueIsStillSentBackToLearning() {
+        setIsPublished(true);
+        FlashcardReview review = reviewedOnceWithGood();
+
+        service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.AGAIN, 5));
+
+        assertThat(review.getRepetitions()).isZero();
+        assertThat(review.getDueAt()).isEqualTo(CLOCK.instant().plus(Duration.ofMinutes(10)));
+    }
+
+    private FlashcardReview reviewedOnceWithGood() {
+        FlashcardReview review = FlashcardReview.unseen(userId, card.getId(), CLOCK.instant());
+        review.applySchedule(ReviewRating.GOOD, FlashcardSrs.schedule(review, ReviewRating.GOOD, CLOCK.instant()),
+                CLOCK.instant());
+        when(reviewRepo.findByUserIdAndFlashcardId(userId, card.getId())).thenReturn(Optional.of(review));
+        return review;
     }
 
     @Test

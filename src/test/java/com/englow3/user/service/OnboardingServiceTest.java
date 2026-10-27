@@ -251,6 +251,31 @@ class OnboardingServiceTest {
         }
 
         @Test
+        void refusesATargetNoHigherThanTheScoreAlreadyHeld() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.declareCurrentLevel(CertificateLevel.B1);
+
+            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(CertificateType.TOEIC,
+                    new BigDecimal("800"), new BigDecimal("800"), LocalDate.now().plusMonths(6))))
+                            .isInstanceOf(BadRequestException.class)
+                            .extracting(e -> ((BadRequestException) e).getCode())
+                            .isEqualTo("TARGET_SCORE_NOT_ABOVE_CURRENT");
+            assertThat(profile.getTargetScore()).isNull();
+        }
+
+        /** A declared level is not a measured one: the tutor is told which it is, and must not be told wrong. */
+        @Test
+        void aDeclaredLevelNoLongerClaimsTheEarlierPlacement() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
+            profile.recordPlacement(CertificateLevel.B1, UUID.randomUUID());
+
+            service.setCurrentLevel(new SetCurrentLevelCommand(CertificateLevel.C1));
+
+            assertThat(profile.getCurrentLevel()).isEqualTo(CertificateLevel.C1);
+            assertThat(profile.getPlacementAttemptId()).isNull();
+        }
+
+        @Test
         void acceptsHalfBandsForIeltsAndStepsOfFiveForToeic() {
             assertThat(CertificateType.IELTS.isValidScore(new BigDecimal("6.5"))).isTrue();
             assertThat(CertificateType.IELTS.isValidScore(new BigDecimal("6.3"))).isFalse();

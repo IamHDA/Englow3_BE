@@ -153,8 +153,11 @@ public class FlashcardServiceImpl implements FlashcardService {
         FlashcardReview review = reviewRepo.findByUserIdAndFlashcardId(userId, card.getId())
                 .orElseGet(() -> reviewRepo.save(FlashcardReview.unseen(userId, card.getId(), now)));
 
-        review.applySchedule(command.rating(), FlashcardSrs.schedule(review, command.rating(), now), now);
+        if (review.schedulesAnswer(command.rating(), now)) {
+            review.applySchedule(command.rating(), FlashcardSrs.schedule(review, command.rating(), now), now);
+        }
 
+        // Logged either way: practising a card ahead of time is still time spent studying it.
         reviewLogRepo.save(FlashcardReviewLog.of(userId, card.getId(), card.getFlashcardSetId(), command.rating(),
                 Math.max(0, command.timeSpentSeconds()), now));
 

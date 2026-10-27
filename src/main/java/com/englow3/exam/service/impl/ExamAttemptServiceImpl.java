@@ -270,6 +270,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (!clock.instant().isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "This exam attempt has expired");
         }
+        requireNotAbandoned(attempt, clock.instant());
         var paper = attempt.isPractice() ? paperQuery.load(attempt.getExamId(), attempt.getPartIds())
                 : paperQuery.load(attempt.getExamId());
         return toResult(paper.orElseThrow(() -> examNotFound(attempt.getExamId())));
@@ -288,6 +289,11 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         }
         if (!now.isBefore(attempt.getExpiresAt())) {
             return scoreAttempt(attempt, storedAnswers(attempt.getId()), attempt.getExpiresAt());
+        }
+        if (attempt.isAbandoned(now, fullAttemptGrace)) {
+            // The sitting ended when the learner left it, as heartbeat and start already treat it; the deadline worker
+            // has simply not reached it yet. Answers sent from a screen that came back afterwards do not count.
+            return scoreAttempt(attempt, storedAnswers(attempt.getId()), attempt.lastSeen());
         }
         return scoreAttempt(attempt, command.answers(), now);
     }
@@ -370,6 +376,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS || !now.isBefore(attempt.getExpiresAt())) {
             throw new ConflictException("ATTEMPT_EXPIRED", "Answers can only be saved before the deadline");
         }
+        // Before touch(): a save would otherwise revive a sitting that already ended, which heartbeat refuses to do.
+        requireNotAbandoned(attempt, now);
         Map<UUID, GradingQuestion> questions = gradingFor(attempt).stream()
                 .collect(Collectors.toMap(GradingQuestion::id, Function.identity()));
         validateSubmission(c.answers(), questions);
@@ -529,6 +537,16 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                     correctIds, answer != null && answer.isCorrect(),
                     answer == null ? BigDecimal.ZERO : answer.getAwardedRawScore(), question.explanation(), options);
         }).toList();
+    }
+
+    /**
+     * A full sitting left for longer than the grace is over even before the deadline worker finalizes it. Refused with
+     * the expiry code on purpose: to the screen both mean the sitting has ended and its result is what comes next.
+     */
+    private void requireNotAbandoned(ExamAttempt attempt, Instant now) {
+        if (attempt.isAbandoned(now, fullAttemptGrace)) {
+            throw new ConflictException("ATTEMPT_EXPIRED", "This sitting ended when it was left");
+        }
     }
 
     private Exam requirePublishedExam(UUID examId) {

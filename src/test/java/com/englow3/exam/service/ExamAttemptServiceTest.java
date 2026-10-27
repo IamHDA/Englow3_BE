@@ -402,6 +402,55 @@ class ExamAttemptServiceTest {
         assertThat(attempt.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
     }
 
+    /** A save must not revive a sitting that already ended: it would put off the worker that is about to end it. */
+    @Test
+    void aSaveFromAScreenThatCameBackAfterTheGraceIsRefused() {
+        Exam exam = publishedExam();
+        Instant left = CLOCK.instant().minusSeconds(900);
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, left);
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+
+        assertThatThrownBy(() -> service.saveDraft(new SaveExamDraftCommand(attempt.getId(), 0, List.of())))
+                .isInstanceOf(ConflictException.class).extracting(e -> ((ConflictException) e).getCode())
+                .isEqualTo("ATTEMPT_EXPIRED");
+
+        verify(draftRepo, never()).saveAndFlush(any());
+        assertThat(attempt.lastSeen()).isEqualTo(left);
+    }
+
+    @Test
+    void aSubmitAfterTheGraceScoresWhatWasSavedBeforeLeaving() throws Exception {
+        Exam exam = publishedExam();
+        Instant left = CLOCK.instant().minusSeconds(900);
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, left);
+        UUID questionId = UUID.randomUUID(), correct = UUID.randomUUID(), wrong = UUID.randomUUID();
+        var question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
+                List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
+        var draft = ExamAttemptDraft.empty(attempt.getId(), left);
+        draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(List.of(new SubmittedAnswer(questionId, List.of(correct)))), left);
+        when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(question));
+
+        var result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(wrong)))));
+
+        assertThat(result.rawScore()).isEqualByComparingTo("1");
+        assertThat(result.submittedAt()).isEqualTo(left);
+    }
+
+    @Test
+    void thePaperOfASittingLeftPastTheGraceIsNotHandedOutAgain() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(900));
+        when(attemptRepo.findById(attempt.getId())).thenReturn(Optional.of(attempt));
+
+        assertThatThrownBy(() -> service.paperForAttempt(attempt.getId())).isInstanceOf(ConflictException.class)
+                .extracting(e -> ((ConflictException) e).getCode()).isEqualTo("ATTEMPT_EXPIRED");
+    }
+
     @Test
     void theWorkerEndsASittingNobodyHasBeenAtAndLeavesAPresentOneAlone() {
         Exam exam = publishedExam();

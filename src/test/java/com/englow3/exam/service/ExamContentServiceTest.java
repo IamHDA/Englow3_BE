@@ -60,13 +60,24 @@ class ExamContentServiceTest {
         Exam exam = AdminExamServiceTest.draft();
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
         UUID examId = exam.getId();
-        MockMultipartFile file = new MockMultipartFile("file", "clip.mp3", "audio/mpeg", "audio-bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "clip.mp3", "audio/mpeg", "ID3audio-bytes".getBytes());
 
         ExamMediaResult result = service.uploadMedia(examId, file);
 
         assertThat(result.objectKey()).startsWith(examId + "/audios/").endsWith(".mp3");
         verify(objectStorage).upload(eq(EXAM_BUCKET), eq(result.objectKey()), any(), eq(file.getSize()),
                 eq("audio/mpeg"));
+    }
+
+    @Test
+    void refusesMediaWhoseBytesAreNotTheDeclaredFormat() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "not-a-picture".getBytes());
+
+        assertThatThrownBy(() -> service.uploadMedia(exam.getId(), file)).isInstanceOf(BadRequestException.class)
+                .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("MEDIA_CONTENT_MISMATCH");
+        verifyNoInteractions(objectStorage);
     }
 
     /** A file for a paper that is not there, or can no longer change, would be an orphan in the bucket. */

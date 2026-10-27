@@ -56,8 +56,13 @@ public class LearnerProfile extends BasePersistedEntity {
         return profile;
     }
 
+    /**
+     * A level the learner chose. Any placement on record no longer describes it, so the link goes: kept, it would
+     * present a declared C1 as "measured by the placement test" to everything that asks how the level was set.
+     */
     public void declareCurrentLevel(CertificateLevel level) {
         this.currentLevel = level;
+        this.placementAttemptId = null;
     }
 
     /**

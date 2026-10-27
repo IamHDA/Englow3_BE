@@ -114,6 +114,13 @@ public class OnboardingServiceImpl implements OnboardingService {
 
         requireScoreOnScale(command.certificateType(), command.currentScore(), "CURRENT_SCORE_OUT_OF_RANGE");
         requireScoreOnScale(command.certificateType(), command.targetScore(), "TARGET_SCORE_OUT_OF_RANGE");
+        // A target at or below the score already held is no goal, and every plan built on the gap would read it as one
+        // already reached.
+        if (command.currentScore() != null && command.targetScore() != null
+                && command.targetScore().compareTo(command.currentScore()) <= 0) {
+            throw new BadRequestException("TARGET_SCORE_NOT_ABOVE_CURRENT",
+                    "The target score must be higher than the current score");
+        }
 
         profile.setGoal(command.certificateType(), command.currentScore(), command.targetScore(), command.targetDate());
         user.moveTo(OnboardingStep.TARGET_SKILLS);

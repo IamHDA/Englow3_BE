@@ -125,6 +125,32 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
         verify(storage).delete(anyString(), eq("me.png"));
     }
 
+    /** Submitting seals a copy of the recording; the upload it was copied from is the learner's voice too. */
+    @Test
+    void removesBothTheSealedRecordingAndTheUploadItWasCopiedFrom() {
+        UUID task = UUID.randomUUID(), attempt = UUID.randomUUID();
+        jdbc.sql("""
+                insert into assessment_tasks (id, skill, title, task_type, instructions, time_limit_seconds, status,
+                                              created_by_user_id)
+                values (:id, 'SPEAKING', 'Erase test', 'PART_2', 'Speak.', 120, 'PUBLISHED', :author)
+                """).param("id", task).param("author", new LearnerFixture(jdbc).learner()).update();
+        jdbc.sql("""
+                insert into assessment_attempts (id, user_id, task_id, client_key, skill, task_snapshot,
+                                                 audio_object_key, audio_content_type, audio_content_length, status)
+                values (:id, :u, :task, gen_random_uuid(), 'SPEAKING', '{}', :sealed, 'audio/wav', 100, 'NEEDS_REVIEW')
+                """).param("id", attempt).param("u", userId).param("task", task)
+                .param("sealed", "productive-sealed/%s/%s/copy.wav".formatted(userId, attempt)).update();
+        try {
+            account.erase(email);
+
+            verify(storage).delete(anyString(), eq("productive-sealed/%s/%s/copy.wav".formatted(userId, attempt)));
+            verify(storage).delete(anyString(), eq("productive/%s/%s.wav".formatted(userId, attempt)));
+        } finally {
+            jdbc.sql("delete from assessment_attempts where id = :id").param("id", attempt).update();
+            jdbc.sql("delete from assessment_tasks where id = :id").param("id", task).update();
+        }
+    }
+
     @Test
     void leavesOtherPeopleAndSharedContentAlone() {
         UUID other = new LearnerFixture(jdbc).learner();

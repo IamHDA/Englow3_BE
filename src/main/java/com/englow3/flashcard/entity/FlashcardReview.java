@@ -85,6 +85,16 @@ public class FlashcardReview {
     }
 
     /**
+     * Whether an answer given now moves the schedule. A card answered before it is due is being practised, not
+     * reviewed: letting a success count would let a learner who goes through the same session again a minute later
+     * climb the 1-day and 6-day intervals in seconds and call a word mastered that was never left to be forgotten. A
+     * failure counts whenever it happens - forgetting a card is news whether or not it was due.
+     */
+    public boolean schedulesAnswer(ReviewRating rating, Instant now) {
+        return rating.isFailure() || !now.isBefore(dueAt);
+    }
+
+    /**
      * Applies one answer. A lapse is counted only for a card that had been learned - failing a card that was still
      * being learned is ordinary progress, not a relapse, and counting it would make the difficulty statistics lie.
      */

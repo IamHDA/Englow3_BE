@@ -126,9 +126,13 @@ public class AccountServiceImpl implements AccountService {
                     "An AI job for this account is still running. Try again in a few minutes");
         }
 
-        // Read before deleting, or the keys are gone with the rows that hold them.
+        // Read before deleting, or the keys are gone with the rows that hold them. A submitted spoken assessment keeps
+        // only the sealed copy's key; the upload it was copied from is still in the bucket under the key the start
+        // gave it, which no row records any more - so it is named here the way AssessmentServiceImpl names it.
         List<String> speakingKeys = jdbc.sql("""
                 select audio_object_key from assessment_attempts where user_id = :u and audio_object_key is not null
+                union select 'productive/' || user_id || '/' || id || '.wav' from assessment_attempts
+                      where user_id = :u and skill = 'SPEAKING'
                 union select audio_object_key from speaking_attempts where user_id = :u and audio_object_key is not null
                 union select a.audio_object_key from attempt_answers a join exam_attempts e on e.id = a.exam_attempt_id
                       where e.user_id = :u and a.audio_object_key is not null

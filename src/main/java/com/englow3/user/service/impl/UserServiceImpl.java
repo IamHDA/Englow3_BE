@@ -1,5 +1,6 @@
 package com.englow3.user.service.impl;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
+import com.englow3.shared.storage.ImageFileHeader;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.dto.command.UpdateUserBasicInfoCommand;
 import com.englow3.user.dto.result.UserInformationResult;
@@ -118,8 +120,15 @@ public class UserServiceImpl implements UserService {
 
         String objectKey = "users/%s/%s/%s.%s".formatted(userId, kind, UUID.randomUUID(), extension);
         try {
-            objectStorageClient.upload(avatarBucket, objectKey, image.getInputStream(), image.getSize(),
-                    image.getContentType());
+            // The bucket is public: what is stored here is served to anyone, under the type it was stored with.
+            var content = new BufferedInputStream(image.getInputStream());
+            content.mark(ImageFileHeader.LENGTH);
+            byte[] header = content.readNBytes(ImageFileHeader.LENGTH);
+            content.reset();
+            if (!ImageFileHeader.matches(header, image.getContentType())) {
+                throw new BadRequestException("IMAGE_CONTENT_MISMATCH", "The file is not the image it claims to be");
+            }
+            objectStorageClient.upload(avatarBucket, objectKey, content, image.getSize(), image.getContentType());
         } catch (IOException e) {
             throw new BadRequestException("IMAGE_UNREADABLE", "The uploaded image could not be read");
         }
