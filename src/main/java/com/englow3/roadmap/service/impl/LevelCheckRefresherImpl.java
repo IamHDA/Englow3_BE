@@ -17,6 +17,7 @@ import com.englow3.roadmap.entity.LevelCheckPurpose;
 import com.englow3.roadmap.entity.LevelCheckStatus;
 import com.englow3.roadmap.helper.LevelCombiner;
 import com.englow3.roadmap.query.LevelBandQuery;
+import com.englow3.roadmap.query.LevelCheckWeightQuery;
 import com.englow3.roadmap.service.LevelCheckRefresher;
 import com.englow3.roadmap.service.RoadmapProgression;
 import com.englow3.user.api.LearnerGoalReader;
@@ -35,6 +36,7 @@ public class LevelCheckRefresherImpl implements LevelCheckRefresher {
     private final ScoredExamAttemptReader sittings;
     private final SpeakingLevelReader speaking;
     private final LevelBandQuery bands;
+    private final LevelCheckWeightQuery weightQuery;
     private final LearnerGoalReader goalReader;
     private final PlacementRecorder placementRecorder;
     private final RoadmapProgression progression;
@@ -76,8 +78,11 @@ public class LevelCheckRefresherImpl implements LevelCheckRefresher {
         if (!check.hasWrittenParts()) {
             return new Outcome(speakingFailed, null);
         }
-        LevelCombiner.Weights weights = LevelCombiner
-                .forPurposes(goalReader.read(userId).map(LearnerGoalReader.Goal::purposeCodes).orElse(List.of()));
+        // The weights in force now; the check keeps them beside its result, so a later change rewrites nothing.
+        LevelCombiner.Weights weights = weightQuery
+                .weightsFor(goalReader.read(userId).map(LearnerGoalReader.Goal::purposeCodes).orElse(List.of()),
+                        clock.instant())
+                .orElse(LevelCombiner.FALLBACK);
         if (!check.isReadyToComplete()) {
             CefrLevel provisional = LevelCombiner
                     .combine(check.getVocabLevel(), check.getListeningLevel(), null, weights).level();

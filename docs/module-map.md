@@ -124,7 +124,7 @@ of how the plan changed.
 
 - **Tables:** `learning_roadmaps`, `roadmap_stages`, `roadmap_items`,
   `roadmap_milestones`, `level_checks`, `roadmap_adjustments`,
-  `level_check_conversions`. Only this module writes them.
+  `level_check_conversions`, `level_check_weights`. Only this module writes them.
 - **Entry points:** `GET/POST/DELETE /api/roadmap`,
   `POST /api/roadmap/milestones/{id}/sittings`, and `/api/roadmap/level-checks`
   (start, latest, read, attach the exam sitting or spoken answer, skip speaking).
@@ -143,7 +143,10 @@ of how the plan changed.
   grammar, plus LISTENING) and a `LEVEL_CHECK` speaking task. Section shares map to
   bands through `level_check_conversions`; speaking through
   `assessment.api.SpeakingLevelReader`. The parts combine as a weighted mean,
-  rounded down; without a spoken part the written weights make the whole. The result is recorded on the
+  rounded down; without a spoken part the written weights make the whole.
+  Weights come from `level_check_weights` (highest-priority row among the
+  learner's purposes, else DEFAULT, as in force at the time); tune them by inserting
+  rows with a later `effective_from`. Each completed check keeps the weights it used. The result is recorded on the
   learner profile through `user.api.PlacementRecorder`.
 - **Cross-module read:** `ContentCatalogQuery` reads published
   `flashcard_sets`, `dictation_lessons`, `quizzes`, `speaking_prompts`,

@@ -1,7 +1,5 @@
 package com.englow3.roadmap.helper;
 
-import java.util.List;
-
 import com.englow3.roadmap.entity.CefrLevel;
 
 /**
@@ -27,19 +25,11 @@ public final class LevelCombiner {
     public record Result(CefrLevel level, String appliedWeights) {
     }
 
-    static final Weights SPEAKING_FIRST = new Weights(35, 30, 35);
-    static final Weights DEFAULT = new Weights(40, 30, 30);
-
     /**
-     * Weights by learning purpose. Speaking counts for more for those learning to talk to people (conversation,
-     * travel); otherwise vocabulary and grammar lead.
+     * The weights used only if the configured table has no row that applies - the same values its DEFAULT row is seeded
+     * with. Configured weights live in {@code level_check_weights}.
      */
-    public static Weights forPurposes(List<String> purposeCodes) {
-        if (purposeCodes != null && (purposeCodes.contains("COMMUNICATION") || purposeCodes.contains("TRAVEL"))) {
-            return SPEAKING_FIRST;
-        }
-        return DEFAULT;
-    }
+    public static final Weights FALLBACK = new Weights(40, 30, 30);
 
     /**
      * @param speaking
