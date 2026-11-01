@@ -44,6 +44,7 @@ public class Quiz {
 
     @Column(name = "target_level")
     private String targetLevel;
+    private String certificateType;
 
     @Column(name = "time_limit_seconds", nullable = false)
     private int timeLimitSeconds;
@@ -173,6 +174,7 @@ public class Quiz {
         this.description = source.description();
         this.category = source.category();
         this.targetLevel = source.targetLevel();
+        this.certificateType = source.certificateType();
         this.timeLimitSeconds = source.timeLimitSeconds();
         this.passingScorePercent = source.passingScorePercent();
         authoringUpdatedAt = now;
@@ -199,5 +201,10 @@ public class Quiz {
             throw new ConflictException("QUIZ_ALREADY_ARCHIVED", "This quiz is already archived");
         }
         this.status = QuizStatus.ARCHIVED;
+    }
+
+    /** IELTS or TOEIC preparation, or null for general practice suited to every learner. */
+    public void prepareFor(String certificateType) {
+        this.certificateType = certificateType;
     }
 }

@@ -48,6 +48,7 @@ public class ContentCatalogQuery {
                                                 where x.dictation_lesson_id = d.id)))
                    from dictation_lessons d
                   where d.status = 'PUBLISHED' and (d.target_level is null or d.target_level between :from and :to)
+                    and (d.certificate_type is null or d.certificate_type = :certificate)
                   order by d.target_level is null, d.target_level, d.published_at desc nulls last
                   limit :perKind)
                 union all
@@ -55,6 +56,7 @@ public class ContentCatalogQuery {
                         least(60, greatest(5, coalesce(q.time_limit_seconds / 60, 15)))
                    from quizzes q
                   where q.status = 'PUBLISHED' and (q.target_level is null or q.target_level between :from and :to)
+                    and (q.certificate_type is null or q.certificate_type = :certificate)
                   order by q.target_level is null, q.target_level, q.published_at desc nulls last
                   limit :perKind)
                 union all

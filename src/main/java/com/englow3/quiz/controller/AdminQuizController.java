@@ -69,7 +69,8 @@ class AdminQuizController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(QuizSummaryResponse.from(adminQuizService.create(new CreateQuizCommand(request.slug(),
                         request.title(), request.description(), QuizCategory.valueOf(request.category()),
-                        request.targetLevel(), request.timeLimitSeconds(), request.passingScorePercent()))));
+                        request.targetLevel(), request.timeLimitSeconds(), request.passingScorePercent(),
+                        request.certificateType()))));
     }
 
     @PostMapping("/{id}/questions")
@@ -152,7 +153,7 @@ class AdminQuizController {
         var m = r.metadata();
         return new SaveAuthoringCommand(id, r.version(),
                 new CreateQuizCommand(m.slug(), m.title(), m.description(), QuizCategory.valueOf(m.category()),
-                        m.targetLevel(), m.timeLimitSeconds(), m.passingScorePercent()),
+                        m.targetLevel(), m.timeLimitSeconds(), m.passingScorePercent(), m.certificateType()),
                 r.content().questions().stream()
                         .map(q -> new AddQuizQuestionsCommand.NewQuestion(q.questionType(), q.title(), q.prompt(),
                                 q.points(), q.explanation(), q.beforeText(), q.afterText(), q.originalSentence(),

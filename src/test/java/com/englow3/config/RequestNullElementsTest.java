@@ -85,8 +85,18 @@ class RequestNullElementsTest {
         assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Minimal Pairs", "B1",
                 "Hello there.", null, null, null, null))).isNotEmpty();
         assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
-                "Grammar", "B1", 600, (short) 60))).isNotEmpty();
+                "Grammar", "B1", 600, (short) 60, null))).isNotEmpty();
         assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
-                "GRAMMAR", "B1", 600, (short) 60))).isEmpty();
+                "GRAMMAR", "B1", 600, (short) 60, null))).isEmpty();
+    }
+
+    @Test
+    void refusesACertificateOtherThanIeltsOrToeic() {
+        assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
+                "GRAMMAR", "B1", 600, (short) 60, "TOEFL"))).isNotEmpty();
+        assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
+                "GRAMMAR", "B1", 600, (short) 60, "IELTS"))).isEmpty();
+        assertThat(VALIDATOR.validate(new com.englow3.dictation.dto.request.CreateDictationLessonRequest("slug",
+                "Title", "Travel", "B1", "SAT"))).isNotEmpty();
     }
 }

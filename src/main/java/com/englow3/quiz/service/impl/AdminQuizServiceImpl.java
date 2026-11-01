@@ -48,6 +48,7 @@ public class AdminQuizServiceImpl implements AdminQuizService {
         Quiz quiz = quizRepo.save(Quiz.draft(command.slug(), command.title(), command.description(), command.category(),
                 command.targetLevel(), command.timeLimitSeconds(), command.passingScorePercent(),
                 userDirectory.requireCurrentUserId()));
+        quiz.prepareFor(command.certificateType());
         return summaryOf(quiz);
     }
 
@@ -114,7 +115,8 @@ public class AdminQuizServiceImpl implements AdminQuizService {
         var item = requireQuiz(id);
         return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReview().getReviewNote(),
                 new CreateQuizCommand(item.getSlug(), item.getTitle(), item.getDescription(), item.getCategory(),
-                        item.getTargetLevel(), item.getTimeLimitSeconds(), item.getPassingScorePercent()),
+                        item.getTargetLevel(), item.getTimeLimitSeconds(), item.getPassingScorePercent(),
+                        item.getCertificateType()),
                 questionAuthoring.authoringQuestions(id));
     }
 

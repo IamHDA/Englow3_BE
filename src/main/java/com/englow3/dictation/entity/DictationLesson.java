@@ -41,6 +41,7 @@ public class DictationLesson {
 
     @Column(name = "target_level")
     private String targetLevel;
+    private String certificateType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -170,6 +171,7 @@ public class DictationLesson {
         this.title = source.title();
         this.topic = source.topic();
         this.targetLevel = source.targetLevel();
+        this.certificateType = source.certificateType();
         authoringUpdatedAt = now;
     }
 
@@ -194,5 +196,10 @@ public class DictationLesson {
             throw new ConflictException("DICTATION_LESSON_ALREADY_ARCHIVED", "This lesson is already archived");
         }
         this.status = DictationLessonStatus.ARCHIVED;
+    }
+
+    /** IELTS or TOEIC preparation, or null for general practice suited to every learner. */
+    public void prepareFor(String certificateType) {
+        this.certificateType = certificateType;
     }
 }

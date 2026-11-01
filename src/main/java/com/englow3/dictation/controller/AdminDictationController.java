@@ -93,7 +93,7 @@ class AdminDictationController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(DictationLessonResponse
                         .from(adminDictationService.create(new CreateDictationLessonCommand(request.slug(),
-                                request.title(), request.topic(), request.targetLevel()))));
+                                request.title(), request.topic(), request.targetLevel(), request.certificateType()))));
     }
 
     @PostMapping("/lessons/{id}/sentences")
@@ -167,7 +167,7 @@ class AdminDictationController {
     private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
         return new SaveAuthoringCommand(id, r.version(),
-                new CreateDictationLessonCommand(m.slug(), m.title(), m.topic(), m.targetLevel()),
+                new CreateDictationLessonCommand(m.slug(), m.title(), m.topic(), m.targetLevel(), m.certificateType()),
                 r.sentences().stream()
                         .map(c -> new SaveAuthoringCommand.Sentence(c.text(), c.translationVi(), c.audioObjectKey(),
                                 c.audioDurationSeconds(), c.hintFirstLetters(), c.hintRevealWord(),

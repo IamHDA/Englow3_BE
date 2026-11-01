@@ -65,6 +65,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
 
         DictationLesson lesson = lessonRepo.save(DictationLesson.draft(command.slug(), command.title(), command.topic(),
                 command.targetLevel(), userDirectory.requireCurrentUserId()));
+        lesson.prepareFor(command.certificateType());
         return summaryOf(lesson);
     }
 
@@ -221,7 +222,7 @@ public class AdminDictationServiceImpl implements AdminDictationService {
         var item = requireLesson(id);
         return new AuthoringResult(id, item.getVersion(), item.getStatus().name(), item.getReview().getReviewNote(),
                 new CreateDictationLessonCommand(item.getSlug(), item.getTitle(), item.getTopic(),
-                        item.getTargetLevel()),
+                        item.getTargetLevel(), item.getCertificateType()),
                 sentenceRepo.findByDictationLessonIdOrderByOrderNo(id).stream()
                         .map(c -> new SaveAuthoringCommand.Sentence(c.getText(), c.getTranslationVi(),
                                 c.getAudioObjectKey(), c.getAudioDurationSeconds(), c.getHintFirstLetters(),

@@ -100,6 +100,19 @@ class QuizAuthoringIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void keepsTheCertificateAQuizPreparesFor() {
+        var m = metadata("IELTS grammar");
+        var ielts = new CreateQuizCommand(m.slug(), m.title(), m.description(), m.category(), m.targetLevel(),
+                m.timeLimitSeconds(), m.passingScorePercent(), "IELTS");
+        var created = service.saveAuthoring(new SaveAuthoringCommand(null, null, ielts, questions()));
+        quiz = created.id();
+        assertThat(created.metadata().certificateType()).isEqualTo("IELTS");
+
+        var general = service.saveAuthoring(new SaveAuthoringCommand(quiz, created.version(), m, questions()));
+        assertThat(general.metadata().certificateType()).as("cleared back to general practice").isNull();
+    }
+
+    @Test
     void invalidReplacementRollsBackBothMetadataAndDeletedQuestions() {
         var created = service.saveAuthoring(new SaveAuthoringCommand(null, null, metadata("Original"), questions()));
         quiz = created.id();
