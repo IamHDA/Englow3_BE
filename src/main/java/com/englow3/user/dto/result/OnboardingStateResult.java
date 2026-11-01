@@ -14,11 +14,12 @@ import com.englow3.user.entity.User;
 
 public record OnboardingStateResult(OnboardingStep step, Set<Integer> learningPurposeIds, boolean certificateLearner,
         CertificateType targetCertificateType, CertificateLevel currentLevel, BigDecimal targetScore,
-        LocalDate targetDate, Set<TargetSkill> targetSkills) {
+        LocalDate targetDate, Set<TargetSkill> targetSkills, CertificateLevel targetLevel, Integer dailyStudyMinutes) {
 
     public static OnboardingStateResult of(User user, LearnerProfile profile, boolean certificateLearner) {
         return new OnboardingStateResult(user.getOnboardingStep(), new TreeSet<>(user.getLearningPurposeIds()),
                 certificateLearner, profile.getTargetCertificateType(), profile.getCurrentLevel(),
-                profile.getTargetScore(), profile.getTargetDate(), new TreeSet<>(user.getTargetSkills()));
+                profile.getTargetScore(), profile.getTargetDate(), new TreeSet<>(user.getTargetSkills()),
+                profile.getTargetLevel(), profile.getDailyStudyMinutes());
     }
 }

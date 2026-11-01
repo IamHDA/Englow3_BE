@@ -19,7 +19,7 @@ public class LearnerContextReaderImpl implements LearnerContextReader {
         return profileRepo.findByUserId(userDirectory.requireCurrentUserId())
                 .map(profile -> new LearningContext(
                         profile.getCurrentLevel() == null ? null : profile.getCurrentLevel().name(),
-                        profile.getPlacementAttemptId() != null,
+                        profile.getPlacementAttemptId() != null || profile.getLevelCheckId() != null,
                         profile.getTargetCertificateType() == null ? null : profile.getTargetCertificateType().name(),
                         profile.getTargetScore()));
     }

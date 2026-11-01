@@ -67,9 +67,9 @@ class OnboardingController {
 
     @PutMapping("/learning-goal")
     ResponseEntity<OnboardingStateResponse> setLearningGoal(@Valid @RequestBody SetLearningGoalRequest request) {
-        return ResponseEntity.ok(OnboardingStateResponse
-                .from(onboardingService.setLearningGoal(new SetLearningGoalCommand(request.certificateType(),
-                        request.currentScore(), request.targetScore(), request.targetDate()))));
+        return ResponseEntity.ok(OnboardingStateResponse.from(onboardingService.setLearningGoal(
+                new SetLearningGoalCommand(request.certificateType(), request.currentScore(), request.targetScore(),
+                        request.targetDate(), request.targetLevel(), request.dailyStudyMinutes()))));
     }
 
     @PutMapping("/target-skills")

@@ -14,11 +14,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record OnboardingStateResponse(OnboardingStep step, Set<Integer> learningPurposeIds, boolean certificateLearner,
         @Schema(nullable = true) CertificateType targetCertificateType,
         @Schema(nullable = true) CertificateLevel currentLevel, @Schema(nullable = true) BigDecimal targetScore,
-        @Schema(nullable = true) LocalDate targetDate, Set<TargetSkill> targetSkills) {
+        @Schema(nullable = true) LocalDate targetDate, Set<TargetSkill> targetSkills,
+        @Schema(nullable = true) CertificateLevel targetLevel, @Schema(nullable = true) Integer dailyStudyMinutes) {
 
     public static OnboardingStateResponse from(OnboardingStateResult result) {
         return new OnboardingStateResponse(result.step(), result.learningPurposeIds(), result.certificateLearner(),
                 result.targetCertificateType(), result.currentLevel(), result.targetScore(), result.targetDate(),
-                result.targetSkills());
+                result.targetSkills(), result.targetLevel(), result.dailyStudyMinutes());
     }
 }

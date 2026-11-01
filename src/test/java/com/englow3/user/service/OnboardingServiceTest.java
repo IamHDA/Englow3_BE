@@ -223,6 +223,30 @@ class OnboardingServiceTest {
             assertThat(profile.getTargetScore()).isEqualByComparingTo("800");
         }
 
+        @Test
+        void refusesALevelTargetFromACertificateLearner() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.declareCurrentLevel(CertificateLevel.B1);
+
+            assertThatThrownBy(() -> service.setLearningGoal(
+                    new SetLearningGoalCommand(CertificateType.IELTS, null, null, null, CertificateLevel.C1, 30)))
+                            .isInstanceOf(BadRequestException.class)
+                            .extracting(e -> ((BadRequestException) e).getCode())
+                            .isEqualTo("TARGET_LEVEL_NOT_APPLICABLE");
+        }
+
+        @Test
+        void keepsALevelTargetAndStudyTimeFromAnyoneElse() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of());
+            profile.declareCurrentLevel(CertificateLevel.A2);
+
+            service.setLearningGoal(
+                    new SetLearningGoalCommand(CertificateType.IELTS, null, null, null, CertificateLevel.B1, 45));
+
+            assertThat(profile.getTargetLevel()).isEqualTo(CertificateLevel.B1);
+            assertThat(profile.getDailyStudyMinutes()).isEqualTo(45);
+        }
+
         /** Without a purpose the flow cannot know whether a certificate step belonged in between. */
         @Test
         void refusesTheLevelStepBeforeAPurposeIsChosen() {

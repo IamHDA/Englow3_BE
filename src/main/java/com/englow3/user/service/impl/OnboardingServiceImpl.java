@@ -122,7 +122,12 @@ public class OnboardingServiceImpl implements OnboardingService {
                     "The target score must be higher than the current score");
         }
 
-        profile.setGoal(command.certificateType(), command.currentScore(), command.targetScore(), command.targetDate());
+        if (command.targetLevel() != null && isCertificateLearner(user)) {
+            throw new BadRequestException("TARGET_LEVEL_NOT_APPLICABLE",
+                    "A certificate learner aims at a score, not at a level");
+        }
+        profile.setGoal(command.certificateType(), command.currentScore(), command.targetScore(), command.targetDate(),
+                command.targetLevel(), command.dailyStudyMinutes());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
 
         return state(user, profile);
