@@ -184,7 +184,9 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(afterFail.adjusting()).isTrue();
         assertThat(afterFail.pendingReason()).hasToString("MILESTONE_FAILED");
 
-        RoadmapResult afterPass = roadmapService.recordMockSitting(milestone, mockSitting(mock, "6.0"));
+        mockSitting(mock, "6.0");
+        // Sat on the usual exam screens: the next look at the roadmap counts it.
+        RoadmapResult afterPass = roadmapService.current().orElseThrow();
         assertThat(afterPass.adjusting()).as("a pass makes the replan moot").isFalse();
         assertThat(afterPass.stages()).extracting(stage -> stage.status().name()).containsExactly("PASSED", "CURRENT");
         assertThat(afterPass.adjustments()).extracting(adjustment -> adjustment.reason().name())

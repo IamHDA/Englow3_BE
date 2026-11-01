@@ -21,6 +21,8 @@ import com.englow3.roadmap.dto.result.RoadmapResult;
 import com.englow3.roadmap.entity.AdjustmentReason;
 import com.englow3.roadmap.entity.CefrLevel;
 import com.englow3.roadmap.entity.LearningRoadmap;
+import com.englow3.roadmap.entity.MilestoneKind;
+import com.englow3.roadmap.entity.MilestoneStatus;
 import com.englow3.roadmap.entity.RoadmapContentKind;
 import com.englow3.roadmap.entity.RoadmapGoalType;
 import com.englow3.roadmap.entity.RoadmapItem;
@@ -80,6 +82,10 @@ public class RoadmapServiceImpl implements RoadmapService {
             return Optional.empty();
         }
         LearningRoadmap roadmap = found.get();
+        Optional<MilestoneContext> sat = mockSittingToRecord(roadmap);
+        if (sat.isPresent()) {
+            roadmap = sat.get().roadmap();
+        }
         if (isFarBehind(roadmap)) {
             LearningRoadmap locked = roadmapRepo.findByIdForUpdate(roadmap.getId()).orElseThrow();
             if (isFarBehind(locked)) {
@@ -163,6 +169,41 @@ public class RoadmapServiceImpl implements RoadmapService {
                 sitting.convertedScore(), clock.instant());
         progression.settle(context);
         return assemble(context.roadmap());
+    }
+
+    /**
+     * The learner sits the current stage's mock paper on the usual exam screens. The newest scored full sitting since
+     * the stage began, if not already counted, is taken as the milestone's result here, on the next look at the roadmap
+     * - the exam module never needs to know a roadmap is waiting.
+     *
+     * @return the milestone, locked and settled, when a sitting was recorded
+     */
+    private Optional<MilestoneContext> mockSittingToRecord(LearningRoadmap roadmap) {
+        if (roadmap.getStatus() != RoadmapStatus.ACTIVE) {
+            return Optional.empty();
+        }
+        Optional<RoadmapStage> current = stageRepo.findFirstByRoadmapIdAndStatus(roadmap.getId(),
+                RoadmapStageStatus.CURRENT);
+        Optional<RoadmapMilestone> milestone = current.flatMap(stage -> milestoneRepo.findByStageId(stage.getId()))
+                .filter(found -> found.getKind() == MilestoneKind.CERTIFICATE_MOCK)
+                .filter(found -> found.getStatus() != MilestoneStatus.PASSED);
+        if (milestone.isEmpty()) {
+            return Optional.empty();
+        }
+        var sitting = sittings.latestFullSitting(milestone.get().getExamId(), roadmap.getUserId(),
+                current.get().getCreatedAt());
+        if (sitting.isEmpty() || sitting.get().attemptId().equals(milestone.get().getResultExamAttemptId())
+                || sitting.get().convertedScore() == null) {
+            return Optional.empty();
+        }
+        MilestoneContext context = progression.locate(roadmap.getUserId(), milestone.get().getId());
+        if (sitting.get().attemptId().equals(context.milestone().getResultExamAttemptId())) {
+            return Optional.empty();
+        }
+        context.milestone().recordMockSitting(sitting.get().attemptId(), sitting.get().examId(), sitting.get().scored(),
+                sitting.get().full(), sitting.get().convertedScore(), clock.instant());
+        progression.settle(context);
+        return Optional.of(context);
     }
 
     /**
