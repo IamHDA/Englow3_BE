@@ -214,9 +214,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     }
 
     private PracticePlan planPractice(Exam exam, StartExamAttemptCommand command) {
-        if (exam.getExamType() == ExamType.PLACEMENT) {
+        if (exam.getExamType() == ExamType.PLACEMENT || exam.getExamType() == ExamType.LEVEL_CHECK) {
             throw new BadRequestException("PRACTICE_NOT_AVAILABLE",
-                    "A placement test can only be taken in full - it decides the learner's level");
+                    "A placement or level test can only be taken in full - it decides the learner's level");
         }
         if (command.partIds() == null || command.partIds().isEmpty()) {
             throw new BadRequestException("PRACTICE_PARTS_REQUIRED", "Choose at least one part to practise");

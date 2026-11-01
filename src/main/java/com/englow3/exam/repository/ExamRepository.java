@@ -44,6 +44,7 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             select e from Exam e
             where (:status is null or e.status = :status)
               and (:examType is null or e.examType = :examType)
+              and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
               and (:certificateType is null or e.certificateType = :certificateType)
               and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
               and (:targetLevel is null or e.targetLevel = :targetLevel)
@@ -63,6 +64,7 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             select e from Exam e
             where (:status is null or e.status = :status)
               and (:examType is null or e.examType = :examType)
+              and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
               and (:certificateType is null or e.certificateType = :certificateType)
               and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
               and (:targetLevel is null or e.targetLevel = :targetLevel)
