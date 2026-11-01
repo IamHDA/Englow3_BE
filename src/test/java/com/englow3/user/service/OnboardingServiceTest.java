@@ -293,10 +293,23 @@ class OnboardingServiceTest {
             when(user.getLearningPurposeIds()).thenReturn(Set.of(COMMUNICATION_PURPOSE_ID));
             profile.recordPlacement(CertificateLevel.B1, UUID.randomUUID());
 
-            service.setCurrentLevel(new SetCurrentLevelCommand(CertificateLevel.C1));
+            var state = service.setCurrentLevel(new SetCurrentLevelCommand(CertificateLevel.C1));
 
             assertThat(profile.getCurrentLevel()).isEqualTo(CertificateLevel.C1);
             assertThat(profile.getPlacementAttemptId()).isNull();
+            assertThat(state.placementAttemptId()).isNull();
+        }
+
+        /** The home screen stops offering the placement test once the state says one was taken. */
+        @Test
+        void theStateNamesThePlacementTheLevelCameFrom() {
+            UUID attemptId = UUID.randomUUID();
+            profile.recordPlacement(CertificateLevel.B1, attemptId);
+
+            var state = service.currentState();
+
+            assertThat(state.currentLevel()).isEqualTo(CertificateLevel.B1);
+            assertThat(state.placementAttemptId()).isEqualTo(attemptId);
         }
 
         @Test

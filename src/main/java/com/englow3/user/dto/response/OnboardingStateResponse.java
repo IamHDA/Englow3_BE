@@ -3,6 +3,7 @@ package com.englow3.user.dto.response;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
+import java.util.UUID;
 
 import com.englow3.user.entity.CertificateLevel;
 import com.englow3.user.entity.CertificateType;
@@ -15,11 +16,12 @@ public record OnboardingStateResponse(OnboardingStep step, Set<Integer> learning
         @Schema(nullable = true) CertificateType targetCertificateType,
         @Schema(nullable = true) CertificateLevel currentLevel, @Schema(nullable = true) BigDecimal targetScore,
         @Schema(nullable = true) LocalDate targetDate, Set<TargetSkill> targetSkills,
-        @Schema(nullable = true) CertificateLevel targetLevel, @Schema(nullable = true) Integer dailyStudyMinutes) {
+        @Schema(nullable = true) CertificateLevel targetLevel, @Schema(nullable = true) Integer dailyStudyMinutes,
+        @Schema(nullable = true) UUID placementAttemptId) {
 
     public static OnboardingStateResponse from(OnboardingStateResult result) {
         return new OnboardingStateResponse(result.step(), result.learningPurposeIds(), result.certificateLearner(),
                 result.targetCertificateType(), result.currentLevel(), result.targetScore(), result.targetDate(),
-                result.targetSkills(), result.targetLevel(), result.dailyStudyMinutes());
+                result.targetSkills(), result.targetLevel(), result.dailyStudyMinutes(), result.placementAttemptId());
     }
 }
