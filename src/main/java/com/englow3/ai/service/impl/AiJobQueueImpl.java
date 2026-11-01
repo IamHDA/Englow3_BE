@@ -301,6 +301,18 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
                 requestedByUserId);
     }
 
+    @Override
+    @Transactional
+    public void enqueueTranslationAssessment(UUID attemptId, String inputPayload, String idempotencyKey,
+            String promptVersion, UUID requestedByUserId) {
+        lockBudget(requestedByUserId);
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isEmpty() && !hasDailyAllowance(requestedByUserId)) {
+            throw new ConflictException("TRANSLATION_DAILY_LIMIT_REACHED", "Today's AI allowance has been reached");
+        }
+        enqueue(AiJobType.TRANSLATION_ASSESSMENT, "TRANSLATION_ATTEMPT", attemptId, inputPayload, idempotencyKey,
+                promptVersion, requestedByUserId);
+    }
+
     /**
      * Takes up to {@code limit} jobs and marks them RUNNING, in one short transaction. The provider is called after
      * this commits, never inside it: a database connection held for the length of a network round trip is how a pool

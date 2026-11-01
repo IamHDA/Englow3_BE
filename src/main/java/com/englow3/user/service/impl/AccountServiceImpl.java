@@ -77,6 +77,7 @@ public class AccountServiceImpl implements AccountService {
         out.put("speakingAttempts", rows("speaking_attempts", "user_id = :u", userId));
         out.put("dictationAttempts", rows("dictation_attempts", "user_id = :u", userId));
         out.put("quizAttempts", rows("quiz_attempts", "user_id = :u", userId));
+        out.put("translationAttempts", rows("translation_attempts", "user_id = :u", userId));
         out.put("flashcardReviews", rows("flashcard_reviews", "user_id = :u", userId));
         out.put("flashcardReviewLogs", rows("flashcard_review_logs", "user_id = :u", userId));
         out.put("tutorConversations", rows("tutor_conversations", "user_id = :u", userId));
