@@ -1,5 +1,7 @@
 package com.englow3.quiz.service;
 
+import com.englow3.quiz.entity.QuizCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -56,7 +58,7 @@ class QuizAuthoringIntegrationTest extends PostgresIntegrationTest {
     }
 
     CreateQuizCommand metadata(String title) {
-        return new CreateQuizCommand("ux-" + author, title, "Description", "Grammar", "B1", 600, (short) 60);
+        return new CreateQuizCommand("ux-" + author, title, "Description", QuizCategory.GRAMMAR, "B1", 600, (short) 60);
     }
 
     List<NewQuestion> questions() {

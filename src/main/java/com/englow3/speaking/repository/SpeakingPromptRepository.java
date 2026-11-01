@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.speaking.entity.SpeakingPrompt;
+import com.englow3.speaking.entity.SpeakingPromptCategory;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 
 public interface SpeakingPromptRepository extends JpaRepository<SpeakingPrompt, UUID> {
@@ -24,7 +25,7 @@ public interface SpeakingPromptRepository extends JpaRepository<SpeakingPrompt, 
               and (:title is null or lower(p.title) like lower(concat('%', cast(:title as String), '%')))
             """)
     Page<SpeakingPrompt> searchByStatus(@Param("status") SpeakingPromptStatus status,
-            @Param("category") String category, @Param("title") String title, Pageable pageable);
+            @Param("category") SpeakingPromptCategory category, @Param("title") String title, Pageable pageable);
 
     /**
      * The authoring list, which unlike the catalogue must show every status - an administrator with no way to see a

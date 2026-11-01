@@ -1,5 +1,7 @@
 package com.englow3.speaking.entity;
 
+import com.englow3.speaking.entity.SpeakingPromptCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -24,8 +26,8 @@ class SpeakingPromptTest {
     private static final UUID REVIEWER_ID = UUID.randomUUID();
 
     private static SpeakingPrompt draft() {
-        return SpeakingPrompt.draft("seat-sit", "Seat vs sit", "Minimal Pairs", "A2", "Please sit on this seat.", null,
-                null, "/iː/ vs /ɪ/", "[]", AUTHOR_ID);
+        return SpeakingPrompt.draft("seat-sit", "Seat vs sit", SpeakingPromptCategory.SOUNDS, "A2",
+                "Please sit on this seat.", null, null, "/iː/ vs /ɪ/", "[]", AUTHOR_ID);
     }
 
     private static SpeakingPrompt pending() {
@@ -40,8 +42,8 @@ class SpeakingPromptTest {
         /** The sentence to be said is the whole prompt - there is no draft worth keeping without one. */
         @Test
         void refusesAPromptWithNothingToSay() {
-            assertThatThrownBy(() -> SpeakingPrompt.draft("empty", "Empty", "Minimal Pairs", "A2", "   ", null, null,
-                    null, "[]", AUTHOR_ID)).isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> SpeakingPrompt.draft("empty", "Empty", SpeakingPromptCategory.SOUNDS, "A2", "   ",
+                    null, null, null, "[]", AUTHOR_ID)).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("SPEAKING_PROMPT_NO_REFERENCE_TEXT");
         }
@@ -49,8 +51,8 @@ class SpeakingPromptTest {
         /** Stored stripped, because it is read aloud and compared word for word against what comes back. */
         @Test
         void keepsTheReferenceTextWithoutItsSurroundingSpace() {
-            SpeakingPrompt prompt = SpeakingPrompt.draft("s", "S", "Minimal Pairs", "A2", "  Please sit.  ", null, null,
-                    null, "[]", AUTHOR_ID);
+            SpeakingPrompt prompt = SpeakingPrompt.draft("s", "S", SpeakingPromptCategory.SOUNDS, "A2",
+                    "  Please sit.  ", null, null, null, "[]", AUTHOR_ID);
 
             assertThat(prompt.getReferenceText()).isEqualTo("Please sit.");
         }
@@ -60,8 +62,8 @@ class SpeakingPromptTest {
          */
         @Test
         void standsInAnEmptyTipListRatherThanNothingAtAll() {
-            SpeakingPrompt prompt = SpeakingPrompt.draft("s", "S", "Minimal Pairs", "A2", "Please sit.", null, null,
-                    null, null, AUTHOR_ID);
+            SpeakingPrompt prompt = SpeakingPrompt.draft("s", "S", SpeakingPromptCategory.SOUNDS, "A2", "Please sit.",
+                    null, null, null, null, AUTHOR_ID);
 
             assertThat(prompt.getTips()).isEqualTo("[]");
         }

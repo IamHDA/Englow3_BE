@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.quiz.entity.Quiz;
+import com.englow3.quiz.entity.QuizCategory;
 import com.englow3.quiz.entity.QuizStatus;
 
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
@@ -22,7 +23,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
               and (:category is null or q.category = :category)
               and (:title is null or lower(q.title) like lower(concat('%', cast(:title as String), '%')))
             """)
-    Page<Quiz> searchByStatus(@Param("status") QuizStatus status, @Param("category") String category,
+    Page<Quiz> searchByStatus(@Param("status") QuizStatus status, @Param("category") QuizCategory category,
             @Param("title") String title, Pageable pageable);
 
     /**

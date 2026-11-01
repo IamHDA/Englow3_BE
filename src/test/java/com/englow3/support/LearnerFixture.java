@@ -103,7 +103,7 @@ public final class LearnerFixture {
         jdbc.sql("""
                 insert into quizzes (id, slug, title, description, category, time_limit_seconds,
                                      passing_score_percent, status, created_by_user_id)
-                values (:id, :slug, :title, '', 'grammar', 600, 70, 'PUBLISHED', :authorId)
+                values (:id, :slug, :title, '', 'GRAMMAR', 600, 70, 'PUBLISHED', :authorId)
                 """).param("id", id).param("slug", "quiz-" + id).param("title", title).param("authorId", authorId)
                 .update();
 

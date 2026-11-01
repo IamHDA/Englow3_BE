@@ -1,5 +1,7 @@
 package com.englow3.support;
 
+import com.englow3.speaking.entity.SpeakingPromptCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
@@ -90,7 +92,7 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
         UUID author = new LearnerFixture(jdbc).learner();
 
         SpeakingPrompt prompt = promptRepo.saveAndFlush(SpeakingPrompt.draft("seat-" + UUID.randomUUID(), "Seat vs sit",
-                "Minimal Pairs", "A2", "Please sit on this seat.", null, null, "/iː/ vs /ɪ/",
+                SpeakingPromptCategory.SOUNDS, "A2", "Please sit on this seat.", null, null, "/iː/ vs /ɪ/",
                 "[\"Smile for /iː/\",\"Relax for /ɪ/\"]", author));
 
         assertThat(promptRepo.findById(prompt.getId())).get().extracting(SpeakingPrompt::getTips).asString()
@@ -102,7 +104,7 @@ class JsonColumnsIntegrationTest extends PostgresIntegrationTest {
     void storesAnAssessmentsPhonemes() {
         UUID learner = new LearnerFixture(jdbc).learner();
         SpeakingPrompt prompt = promptRepo.saveAndFlush(SpeakingPrompt.draft("sit-" + UUID.randomUUID(), "Sit",
-                "Minimal Pairs", "A2", "Please sit.", null, null, null, "[]", learner));
+                SpeakingPromptCategory.SOUNDS, "A2", "Please sit.", null, null, null, "[]", learner));
         SpeakingAttempt attempt = attemptRepo
                 .saveAndFlush(SpeakingAttempt.awaitingUpload(learner, prompt.getId(), "speaking/a.wav", "audio/wav"));
 

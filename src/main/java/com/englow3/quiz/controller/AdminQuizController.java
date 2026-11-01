@@ -29,6 +29,7 @@ import com.englow3.quiz.dto.request.SaveAuthoringRequest;
 import com.englow3.quiz.dto.response.AuthoringResponse;
 import com.englow3.quiz.dto.response.ContentReviewResponse;
 import com.englow3.quiz.dto.response.QuizSummaryResponse;
+import com.englow3.quiz.entity.QuizCategory;
 import com.englow3.quiz.entity.QuizStatus;
 import com.englow3.quiz.service.AdminQuizService;
 import com.englow3.quiz.service.QuizQuestionAuthoringService;
@@ -67,8 +68,8 @@ class AdminQuizController {
     ResponseEntity<QuizSummaryResponse> create(@Valid @RequestBody CreateQuizRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(QuizSummaryResponse.from(adminQuizService.create(new CreateQuizCommand(request.slug(),
-                        request.title(), request.description(), request.category(), request.targetLevel(),
-                        request.timeLimitSeconds(), request.passingScorePercent()))));
+                        request.title(), request.description(), QuizCategory.valueOf(request.category()),
+                        request.targetLevel(), request.timeLimitSeconds(), request.passingScorePercent()))));
     }
 
     @PostMapping("/{id}/questions")
@@ -150,21 +151,23 @@ class AdminQuizController {
     private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
         return new SaveAuthoringCommand(id, r.version(),
-                new CreateQuizCommand(m.slug(), m.title(), m.description(), m.category(), m.targetLevel(),
-                        m.timeLimitSeconds(), m.passingScorePercent()),
-                r.content().questions().stream().map(q -> new AddQuizQuestionsCommand.NewQuestion(q.questionType(),
-                        q.title(), q.prompt(), q.points(), q.explanation(), q.beforeText(), q.afterText(),
-                        q.originalSentence(), q.rewriteKeyword(),
-                        q.options() == null ? null
-                                : q.options().stream()
-                                        .map(o -> new AddQuizQuestionsCommand.NewOption(o.label(), o.content(),
-                                                o.correct()))
-                                        .toList(),
-                        q.acceptedAnswers(), q.wordBank(), q.correctWords(), q.scrambledWords(), q.correctOrder(),
-                        q.pairs() == null ? null
-                                : q.pairs().stream()
-                                        .map(p -> new AddQuizQuestionsCommand.NewPair(p.leftText(), p.rightText()))
-                                        .toList()))
+                new CreateQuizCommand(m.slug(), m.title(), m.description(), QuizCategory.valueOf(m.category()),
+                        m.targetLevel(), m.timeLimitSeconds(), m.passingScorePercent()),
+                r.content().questions().stream()
+                        .map(q -> new AddQuizQuestionsCommand.NewQuestion(q.questionType(), q.title(), q.prompt(),
+                                q.points(), q.explanation(), q.beforeText(), q.afterText(), q.originalSentence(),
+                                q.rewriteKeyword(),
+                                q.options() == null ? null
+                                        : q.options().stream()
+                                                .map(o -> new AddQuizQuestionsCommand.NewOption(o.label(), o.content(),
+                                                        o.correct()))
+                                                .toList(),
+                                q.acceptedAnswers(), q.wordBank(), q.correctWords(), q.scrambledWords(),
+                                q.correctOrder(),
+                                q.pairs() == null ? null
+                                        : q.pairs().stream().map(
+                                                p -> new AddQuizQuestionsCommand.NewPair(p.leftText(), p.rightText()))
+                                                .toList()))
                         .toList());
     }
 }

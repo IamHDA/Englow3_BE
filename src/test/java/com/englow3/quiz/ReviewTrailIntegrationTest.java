@@ -34,7 +34,7 @@ class ReviewTrailIntegrationTest extends PostgresIntegrationTest {
         jdbc.sql("""
                 insert into quizzes (id, slug, title, description, category, time_limit_seconds,
                                      passing_score_percent, status, created_by_user_id)
-                values (:id, :slug, 'Never reviewed', '', 'grammar', 600, 70, 'DRAFT', :authorId)
+                values (:id, :slug, 'Never reviewed', '', 'GRAMMAR', 600, 70, 'DRAFT', :authorId)
                 """).param("id", quizId).param("slug", "quiz-" + quizId).param("authorId", authorId).update();
 
         transactions.executeWithoutResult(status -> {

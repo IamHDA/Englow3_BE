@@ -74,9 +74,19 @@ class RequestNullElementsTest {
     /** Every other kind of content already insisted on a CEFR band; a speaking prompt took any two characters. */
     @Test
     void refusesASpeakingPromptLevelThatIsNotACefrBand() {
-        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Sounds", "ZZ", "Hello there.",
+        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "SOUNDS", "ZZ", "Hello there.",
                 null, null, null, null))).isNotEmpty();
-        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Sounds", "B1", "Hello there.",
+        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "SOUNDS", "B1", "Hello there.",
                 null, null, null, null))).isEmpty();
+    }
+
+    @Test
+    void refusesACategoryOutsideTheFixedList() {
+        assertThat(VALIDATOR.validate(new CreateSpeakingPromptRequest("slug", "Title", "Minimal Pairs", "B1",
+                "Hello there.", null, null, null, null))).isNotEmpty();
+        assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
+                "Grammar", "B1", 600, (short) 60))).isNotEmpty();
+        assertThat(VALIDATOR.validate(new com.englow3.quiz.dto.request.CreateQuizRequest("slug", "Title", null,
+                "GRAMMAR", "B1", 600, (short) 60))).isEmpty();
     }
 }

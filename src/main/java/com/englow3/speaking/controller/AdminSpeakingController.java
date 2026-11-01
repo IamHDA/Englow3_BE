@@ -24,6 +24,7 @@ import com.englow3.speaking.dto.request.RejectSpeakingPromptRequest;
 import com.englow3.speaking.dto.request.SaveAuthoringRequest;
 import com.englow3.speaking.dto.response.AuthoringResponse;
 import com.englow3.speaking.dto.response.SpeakingPromptReviewResponse;
+import com.englow3.speaking.entity.SpeakingPromptCategory;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.service.AdminSpeakingService;
 
@@ -47,8 +48,8 @@ class AdminSpeakingController {
     @ApiResponse(responseCode = "201", description = "Speaking prompt created")
     ResponseEntity<SpeakingPromptReviewResponse> create(@Valid @RequestBody CreateSpeakingPromptRequest request) {
         CreateSpeakingPromptCommand command = new CreateSpeakingPromptCommand(request.slug(), request.title(),
-                request.category(), request.targetLevel(), request.referenceText(), request.ipaTranscript(),
-                request.translationVi(), request.phonemeTarget(), request.tips());
+                SpeakingPromptCategory.valueOf(request.category()), request.targetLevel(), request.referenceText(),
+                request.ipaTranscript(), request.translationVi(), request.phonemeTarget(), request.tips());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(SpeakingPromptReviewResponse.from(adminSpeakingService.create(command)));
@@ -121,7 +122,8 @@ class AdminSpeakingController {
     private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
         var m = r.metadata();
         return new SaveAuthoringCommand(id, r.version(),
-                new CreateSpeakingPromptCommand(m.slug(), m.title(), m.category(), m.targetLevel(), m.referenceText(),
-                        m.ipaTranscript(), m.translationVi(), m.phonemeTarget(), m.tips()));
+                new CreateSpeakingPromptCommand(m.slug(), m.title(), SpeakingPromptCategory.valueOf(m.category()),
+                        m.targetLevel(), m.referenceText(), m.ipaTranscript(), m.translationVi(), m.phonemeTarget(),
+                        m.tips()));
     }
 }

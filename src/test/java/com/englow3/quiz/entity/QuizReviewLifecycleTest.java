@@ -1,5 +1,7 @@
 package com.englow3.quiz.entity;
 
+import com.englow3.quiz.entity.QuizCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -64,7 +66,7 @@ class QuizReviewLifecycleTest {
     }
 
     private static Quiz draftQuiz() {
-        return Quiz.draft("tenses", "Tenses", "", "grammar", "B1", 600, (short) 70, AUTHOR_ID);
+        return Quiz.draft("tenses", "Tenses", "", QuizCategory.GRAMMAR, "B1", 600, (short) 70, AUTHOR_ID);
     }
 
     private static Quiz pendingQuiz() {

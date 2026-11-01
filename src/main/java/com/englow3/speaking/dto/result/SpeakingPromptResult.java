@@ -17,8 +17,9 @@ public record SpeakingPromptResult(UUID id, String slug, String title, String ca
         BigDecimal bestScorePercent) {
 
     public static SpeakingPromptResult of(SpeakingPrompt prompt, BigDecimal bestScorePercent) {
-        return new SpeakingPromptResult(prompt.getId(), prompt.getSlug(), prompt.getTitle(), prompt.getCategory(),
-                prompt.getTargetLevel(), prompt.getReferenceText(), prompt.getIpaTranscript(),
-                prompt.getTranslationVi(), prompt.getPhonemeTarget(), prompt.getTips(), bestScorePercent);
+        return new SpeakingPromptResult(prompt.getId(), prompt.getSlug(), prompt.getTitle(),
+                prompt.getCategory().name(), prompt.getTargetLevel(), prompt.getReferenceText(),
+                prompt.getIpaTranscript(), prompt.getTranslationVi(), prompt.getPhonemeTarget(), prompt.getTips(),
+                bestScorePercent);
     }
 }

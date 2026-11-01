@@ -18,9 +18,9 @@ public record SpeakingPromptReviewResult(UUID id, String slug, String title, Str
         Instant submittedForReviewAt, UUID reviewedByUserId, Instant reviewedAt, String reviewNote) {
 
     public static SpeakingPromptReviewResult of(SpeakingPrompt prompt) {
-        return new SpeakingPromptReviewResult(prompt.getId(), prompt.getSlug(), prompt.getTitle(), prompt.getCategory(),
-                prompt.getTargetLevel(), prompt.getReferenceText(), prompt.getStatus(), prompt.getCreatedAt(),
-                prompt.getPublishedAt(), prompt.getSubmittedForReviewAt(), prompt.getReviewedByUserId(),
-                prompt.getReviewedAt(), prompt.getReviewNote());
+        return new SpeakingPromptReviewResult(prompt.getId(), prompt.getSlug(), prompt.getTitle(),
+                prompt.getCategory().name(), prompt.getTargetLevel(), prompt.getReferenceText(), prompt.getStatus(),
+                prompt.getCreatedAt(), prompt.getPublishedAt(), prompt.getSubmittedForReviewAt(),
+                prompt.getReviewedByUserId(), prompt.getReviewedAt(), prompt.getReviewNote());
     }
 }

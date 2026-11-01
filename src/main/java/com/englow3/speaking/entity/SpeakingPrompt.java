@@ -44,8 +44,9 @@ public class SpeakingPrompt {
     @Column(nullable = false)
     private String title;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String category;
+    private SpeakingPromptCategory category;
 
     @Column(name = "target_level")
     private String targetLevel;
@@ -99,7 +100,7 @@ public class SpeakingPrompt {
     protected SpeakingPrompt() {
     }
 
-    public static SpeakingPrompt draft(String slug, String title, String category, String targetLevel,
+    public static SpeakingPrompt draft(String slug, String title, SpeakingPromptCategory category, String targetLevel,
             String referenceText, String ipaTranscript, String translationVi, String phonemeTarget, String tipsJson,
             UUID createdByUserId) {
         requireReferenceText(referenceText);

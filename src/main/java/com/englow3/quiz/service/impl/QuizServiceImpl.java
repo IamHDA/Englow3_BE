@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.quiz.dto.result.QuizSummaryResult;
 import com.englow3.quiz.entity.Quiz;
+import com.englow3.quiz.entity.QuizCategory;
 import com.englow3.quiz.entity.QuizStatus;
 import com.englow3.quiz.repository.QuizQuestionRepository;
 import com.englow3.quiz.repository.QuizRepository;
@@ -23,7 +24,12 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional(readOnly = true)
     public Page<QuizSummaryResult> searchPublished(String category, String title, Pageable pageable) {
-        Page<Quiz> page = quizRepo.searchByStatus(QuizStatus.PUBLISHED, category, title, pageable);
+        // A category that does not exist matches nothing, as it did when categories were free text.
+        if (category != null && QuizCategory.parse(category).isEmpty()) {
+            return Page.empty(pageable);
+        }
+        Page<Quiz> page = quizRepo.searchByStatus(QuizStatus.PUBLISHED, QuizCategory.parse(category).orElse(null),
+                title, pageable);
         return page.map(quiz -> QuizSummaryResult.of(quiz, questionRepo.countByQuizId(quiz.getId()), null, 0));
     }
 }

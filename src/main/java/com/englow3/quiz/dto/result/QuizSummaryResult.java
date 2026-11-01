@@ -12,7 +12,7 @@ public record QuizSummaryResult(UUID id, String slug, String title, String descr
 
     public static QuizSummaryResult of(Quiz quiz, long questionCount, BigDecimal bestScorePercent, int attemptCount) {
         return new QuizSummaryResult(quiz.getId(), quiz.getSlug(), quiz.getTitle(), quiz.getDescription(),
-                quiz.getCategory(), quiz.getTargetLevel(), quiz.getTimeLimitSeconds(), quiz.getPassingScorePercent(),
-                questionCount, bestScorePercent, attemptCount);
+                quiz.getCategory().name(), quiz.getTargetLevel(), quiz.getTimeLimitSeconds(),
+                quiz.getPassingScorePercent(), questionCount, bestScorePercent, attemptCount);
     }
 }

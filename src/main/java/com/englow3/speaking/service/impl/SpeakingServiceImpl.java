@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.speaking.dto.result.SpeakingPromptResult;
 import com.englow3.speaking.entity.SpeakingPrompt;
+import com.englow3.speaking.entity.SpeakingPromptCategory;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.repository.SpeakingAttemptRepository;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
@@ -33,8 +34,12 @@ public class SpeakingServiceImpl implements SpeakingService {
     @Transactional(readOnly = true)
     public Page<SpeakingPromptResult> searchPublished(String category, String title, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
-        Page<SpeakingPrompt> page = promptRepo.searchByStatus(SpeakingPromptStatus.PUBLISHED, category, title,
-                pageable);
+        // A category that does not exist matches nothing, as it did when categories were free text.
+        if (category != null && SpeakingPromptCategory.parse(category).isEmpty()) {
+            return Page.empty(pageable);
+        }
+        Page<SpeakingPrompt> page = promptRepo.searchByStatus(SpeakingPromptStatus.PUBLISHED,
+                SpeakingPromptCategory.parse(category).orElse(null), title, pageable);
         Map<UUID, BigDecimal> bestScores = attemptRepo.bestScores(userId,
                 page.getContent().stream().map(SpeakingPrompt::getId).toList());
         return page.map(prompt -> SpeakingPromptResult.of(prompt, bestScores.get(prompt.getId())));

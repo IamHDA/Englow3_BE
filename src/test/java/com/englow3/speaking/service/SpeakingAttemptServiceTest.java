@@ -1,5 +1,7 @@
 package com.englow3.speaking.service;
 
+import com.englow3.speaking.entity.SpeakingPromptCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,8 +71,8 @@ class SpeakingAttemptServiceTest {
         ReflectionTestUtils.setField(service, "playbackUrlTtl", Duration.ofHours(3));
         ReflectionTestUtils.setField(service, "locale", "en-US");
 
-        prompt = SpeakingPrompt.draft("seat-sit", "Seat vs sit", "Minimal Pairs", "A2", "Please sit on this seat.",
-                null, null, "/iː/ vs /ɪ/", "[]", UUID.randomUUID());
+        prompt = SpeakingPrompt.draft("seat-sit", "Seat vs sit", SpeakingPromptCategory.SOUNDS, "A2",
+                "Please sit on this seat.", null, null, "/iː/ vs /ɪ/", "[]", UUID.randomUUID());
         prompt.publish(Instant.now());
 
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
@@ -233,8 +235,8 @@ class SpeakingAttemptServiceTest {
 
     @Test
     void refusesAnAttemptAtAnUnpublishedPrompt() {
-        SpeakingPrompt draft = SpeakingPrompt.draft("draft", "Draft", "Minimal Pairs", "A2", "Say this.", null, null,
-                null, "[]", UUID.randomUUID());
+        SpeakingPrompt draft = SpeakingPrompt.draft("draft", "Draft", SpeakingPromptCategory.SOUNDS, "A2", "Say this.",
+                null, null, null, "[]", UUID.randomUUID());
         when(promptRepo.findById(draft.getId())).thenReturn(Optional.of(draft));
 
         assertThatThrownBy(() -> service.startAttempt(draft.getId(), "audio/wav", 1000))

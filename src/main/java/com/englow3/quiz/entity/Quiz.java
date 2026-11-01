@@ -38,8 +38,9 @@ public class Quiz {
     @Column(nullable = false)
     private String description;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String category;
+    private QuizCategory category;
 
     @Column(name = "target_level")
     private String targetLevel;
@@ -81,7 +82,7 @@ public class Quiz {
     protected Quiz() {
     }
 
-    public static Quiz draft(String slug, String title, String description, String category, String targetLevel,
+    public static Quiz draft(String slug, String title, String description, QuizCategory category, String targetLevel,
             int timeLimitSeconds, short passingScorePercent, UUID createdByUserId) {
         Quiz quiz = new Quiz();
         quiz.id = UUID.randomUUID();

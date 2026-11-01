@@ -1,5 +1,7 @@
 package com.englow3.quiz.service;
 
+import com.englow3.quiz.entity.QuizCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,7 +50,7 @@ class QuizQuestionAuthoringServiceTest {
 
     @BeforeEach
     void setUp() {
-        quiz = Quiz.draft("present-perfect", "Present perfect", "", "Grammar", "B1", 600, (short) 60,
+        quiz = Quiz.draft("present-perfect", "Present perfect", "", QuizCategory.GRAMMAR, "B1", 600, (short) 60,
                 UUID.randomUUID());
         when(quizRepo.findById(quiz.getId())).thenReturn(Optional.of(quiz));
         when(questionRepo.countByQuizId(quiz.getId())).thenReturn(0L);

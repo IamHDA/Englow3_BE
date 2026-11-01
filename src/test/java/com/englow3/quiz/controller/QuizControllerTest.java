@@ -1,5 +1,7 @@
 package com.englow3.quiz.controller;
 
+import com.englow3.quiz.entity.QuizCategory;
+
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,7 +55,7 @@ class QuizControllerTest {
 
     @Test
     void handsTheLoserOfADoubleStartTheAttemptThatWon() throws Exception {
-        Quiz quiz = Quiz.draft("tenses", "Tenses", "", "Grammar", "B1", 600, (short) 60, UUID.randomUUID());
+        Quiz quiz = Quiz.draft("tenses", "Tenses", "", QuizCategory.GRAMMAR, "B1", 600, (short) 60, UUID.randomUUID());
         quiz.publish(1, 1, Instant.now());
         QuizAttempt winner = QuizAttempt.start(quiz, UUID.randomUUID(), 1, BigDecimal.ONE, Instant.now());
         when(quizAttemptService.start(quiz.getId()))
