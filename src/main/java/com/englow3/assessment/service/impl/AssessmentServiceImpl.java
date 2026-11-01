@@ -19,6 +19,7 @@ import com.englow3.assessment.dto.result.AssessmentUploadResult;
 import com.englow3.assessment.entity.AssessmentAttempt;
 import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTaskPurpose;
 import com.englow3.assessment.entity.AssessmentTask;
 import com.englow3.assessment.entity.AssessmentTaskStatus;
 import com.englow3.assessment.helper.AssessmentResultMapper;
@@ -68,8 +69,9 @@ public class AssessmentServiceImpl implements AssessmentService {
     }
 
     public Page<AssessmentTaskResult> catalog(AssessmentSkill skill, Pageable page) {
-        return transactionTemplate.execute(tx -> taskRepo.search(skill, AssessmentTaskStatus.PUBLISHED, null, page)
-                .map(t -> AssessmentTaskResult.from(t, false)));
+        return transactionTemplate.execute(
+                tx -> taskRepo.search(skill, AssessmentTaskStatus.PUBLISHED, null, AssessmentTaskPurpose.PRACTICE, page)
+                        .map(t -> AssessmentTaskResult.from(t, false)));
     }
 
     public AssessmentTaskResult task(UUID id) {

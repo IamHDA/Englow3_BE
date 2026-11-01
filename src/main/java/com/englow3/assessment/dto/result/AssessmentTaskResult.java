@@ -3,21 +3,23 @@ package com.englow3.assessment.dto.result;
 import java.util.UUID;
 
 import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTaskPurpose;
 import com.englow3.assessment.entity.AssessmentTask;
 import com.englow3.assessment.entity.AssessmentTaskStatus;
 
 public record AssessmentTaskResult(UUID id, AssessmentSkill skill, String title, String taskType, String instructions,
         String rubricNotes, String sampleAnswer, int minimumWords, int timeLimitSeconds, AssessmentTaskStatus status,
-        String reviewNote, long version) {
+        String reviewNote, long version, String targetLevel, AssessmentTaskPurpose purpose, String certificateType) {
     public static AssessmentTaskResult from(AssessmentTask task, boolean authoring) {
         return new AssessmentTaskResult(task.getId(), task.getSkill(), task.getTitle(), task.getTaskType(),
                 task.getInstructions(), authoring ? task.getRubricNotes() : null,
                 authoring ? task.getSampleAnswer() : null, task.getMinimumWords(), task.getTimeLimitSeconds(),
-                task.getStatus(), authoring ? task.getReviewNote() : null, task.getVersion());
+                task.getStatus(), authoring ? task.getReviewNote() : null, task.getVersion(), task.getTargetLevel(),
+                task.getPurpose(), task.getCertificateType());
     }
 
     public AssessmentTaskResult hideSolution() {
         return new AssessmentTaskResult(id, skill, title, taskType, instructions, null, null, minimumWords,
-                timeLimitSeconds, status, null, version);
+                timeLimitSeconds, status, null, version, targetLevel, purpose, certificateType);
     }
 }

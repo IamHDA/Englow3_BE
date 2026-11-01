@@ -14,7 +14,7 @@ import com.englow3.shared.error.ConflictException;
 class AssessmentLifecycleTest {
     private AssessmentTask task() {
         return AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Opinion", "TASK_2",
-                "Discuss this topic", "Rubric", "Sample", 250, 2400), UUID.randomUUID());
+                "Discuss this topic", "Rubric", "Sample", 250, 2400, null, null, null), UUID.randomUUID());
     }
 
     private AssessmentAttempt attempt() {
@@ -33,7 +33,7 @@ class AssessmentLifecycleTest {
         t.submit();
         t.reject(UUID.randomUUID(), "Explain the data");
         t.edit(new AssessmentTaskCommand(AssessmentSkill.WRITING, "New title", "TASK_1", "Data description", "", "",
-                150, 1200));
+                150, 1200, null, null, null));
         t.submit();
         t.approve(UUID.randomUUID(), Instant.now());
         assertEquals(AssessmentTaskStatus.PUBLISHED, t.getStatus());
@@ -45,15 +45,52 @@ class AssessmentLifecycleTest {
         var t = task();
         t.submit();
         t.approve(UUID.randomUUID(), Instant.now());
-        assertThrows(ConflictException.class, () -> t.edit(
-                new AssessmentTaskCommand(AssessmentSkill.WRITING, "Changed", "TASK_2", "Changed", "", "", 250, 2400)));
+        assertThrows(ConflictException.class, () -> t.edit(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Changed",
+                "TASK_2", "Changed", "", "", 250, 2400, null, null, null)));
+    }
+
+    @Test
+    void aTaskIsPracticeUnlessToldOtherwise() {
+        assertEquals(AssessmentTaskPurpose.PRACTICE, task().getPurpose());
+    }
+
+    @Test
+    void keepsTheLevelPurposeAndCertificateItWasGiven() {
+        var t = AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.SPEAKING, "Talk about travel", "PART_2",
+                "Describe a trip", "", "", 0, 120, "B1", AssessmentTaskPurpose.LEVEL_CHECK, "IELTS"),
+                UUID.randomUUID());
+        assertEquals("B1", t.getTargetLevel());
+        assertEquals(AssessmentTaskPurpose.LEVEL_CHECK, t.getPurpose());
+        assertEquals("IELTS", t.getCertificateType());
+    }
+
+    @Test
+    void aLevelCheckTaskMustBeSpeaking() {
+        assertThrows(BadRequestException.class,
+                () -> AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Title", "TASK_2",
+                        "Instructions", "", "", 0, 120, null, AssessmentTaskPurpose.LEVEL_CHECK, null),
+                        UUID.randomUUID()));
+    }
+
+    @Test
+    void refusesALevelThatIsNotACefrBand() {
+        assertThrows(BadRequestException.class,
+                () -> AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Title", "TASK_2",
+                        "Instructions", "", "", 0, 120, "B3", null, null), UUID.randomUUID()));
+    }
+
+    @Test
+    void refusesACertificateOtherThanIeltsOrToeic() {
+        assertThrows(BadRequestException.class,
+                () -> AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Title", "TASK_2",
+                        "Instructions", "", "", 0, 120, null, null, "TOEFL"), UUID.randomUUID()));
     }
 
     @Test
     void refusesInvalidSkillTaskType() {
-        assertThrows(BadRequestException.class, () -> AssessmentTask.draft(
-                new AssessmentTaskCommand(AssessmentSkill.WRITING, "Title", "PART_2", "Instructions", "", "", 0, 120),
-                UUID.randomUUID()));
+        assertThrows(BadRequestException.class,
+                () -> AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Title", "PART_2",
+                        "Instructions", "", "", 0, 120, null, null, null), UUID.randomUUID()));
     }
 
     @Test

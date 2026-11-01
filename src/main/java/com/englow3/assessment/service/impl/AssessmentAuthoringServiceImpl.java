@@ -63,7 +63,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     public Page<AssessmentTaskResult> tasks(AssessmentSkill skill, AssessmentTaskStatus status, Pageable page) {
         UUID author = currentUser.hasRole("ADMIN") ? null : users.requireCurrentUserId();
         return transactionTemplate.execute(
-                tx -> taskRepo.search(skill, status, author, page).map(t -> AssessmentTaskResult.from(t, true)));
+                tx -> taskRepo.search(skill, status, author, null, page).map(t -> AssessmentTaskResult.from(t, true)));
     }
 
     public AssessmentTaskResult create(AssessmentTaskCommand c) {

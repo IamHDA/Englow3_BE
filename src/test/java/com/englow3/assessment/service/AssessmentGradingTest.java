@@ -53,7 +53,7 @@ class AssessmentGradingTest {
     void aReviewerCannotGradeTheirOwnSubmission() {
         UUID staff = UUID.randomUUID();
         AssessmentTask task = AssessmentTask.draft(new AssessmentTaskCommand(AssessmentSkill.WRITING, "Opinion",
-                "TASK_2", "Discuss.", "Use examples.", "Sample", 250, 2400), staff);
+                "TASK_2", "Discuss.", "Use examples.", "Sample", 250, 2400, null, null, null), staff);
         AssessmentAttempt attempt = AssessmentAttempt.draft(UUID.randomUUID(), staff, task.getId(), UUID.randomUUID(),
                 AssessmentSkill.WRITING, "{}", null, null, null);
         attempt.submit(false, Instant.now());

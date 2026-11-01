@@ -11,15 +11,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTaskPurpose;
 import com.englow3.assessment.entity.AssessmentTask;
 import com.englow3.assessment.entity.AssessmentTaskStatus;
 
 import jakarta.persistence.LockModeType;
 
 public interface AssessmentTaskRepository extends JpaRepository<AssessmentTask, UUID> {
-    @Query("select t from AssessmentTask t where (:skill is null or t.skill=:skill) and (:status is null or t.status=:status) and (:author is null or t.createdByUserId=:author)")
+    @Query("select t from AssessmentTask t where (:skill is null or t.skill=:skill) and (:status is null or t.status=:status) and (:author is null or t.createdByUserId=:author) and (:purpose is null or t.purpose=:purpose)")
     Page<AssessmentTask> search(@Param("skill") AssessmentSkill skill, @Param("status") AssessmentTaskStatus status,
-            @Param("author") UUID author, Pageable pageable);
+            @Param("author") UUID author, @Param("purpose") AssessmentTaskPurpose purpose, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from AssessmentTask t where t.id=:id")

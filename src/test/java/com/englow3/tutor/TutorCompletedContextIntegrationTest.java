@@ -53,7 +53,7 @@ class TutorCompletedContextIntegrationTest extends PostgresIntegrationTest {
         ReflectionTestUtils.setField(tutor, "enabled", true);
         var task = tasks.saveAndFlush(AssessmentTask.draft(new AssessmentTaskCommand(skill, "Synthetic context",
                 skill == AssessmentSkill.WRITING ? "TASK_2" : "PART_2", "Explain a favourite activity.",
-                "Private rubric", "HIDDEN_SAMPLE", 1, 60), user));
+                "Private rubric", "HIDDEN_SAMPLE", 1, 60, null, null, null), user));
         var mapper = new ObjectMapper();
         String snapshot = mapper
                 .writeValueAsString(com.englow3.assessment.dto.result.AssessmentTaskResult.from(task, true));

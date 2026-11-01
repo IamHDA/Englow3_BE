@@ -84,7 +84,7 @@ class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
         signIn(staff, "STAFF");
         var created = authoring.create(new AssessmentTaskCommand(skill, "Opinion task",
                 skill == AssessmentSkill.WRITING ? "TASK_2" : "PART_2", "Discuss the advantages and disadvantages.",
-                "Use specific examples.", "Sample answer", 250, 2400));
+                "Use specific examples.", "Sample answer", 250, 2400, null, null, null));
         task = created.id();
         authoring.transition(task, "submit", null);
         assertThatThrownBy(() -> authoring.transition(task, "approve", null)).isInstanceOf(ForbiddenException.class);

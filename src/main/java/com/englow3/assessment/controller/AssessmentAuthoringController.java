@@ -136,6 +136,7 @@ public class AssessmentAuthoringController {
 
     private AssessmentTaskCommand command(AssessmentTaskRequest r) {
         return new AssessmentTaskCommand(r.skill(), r.title(), r.taskType(), r.instructions(), r.rubricNotes(),
-                r.sampleAnswer(), r.minimumWords(), r.timeLimitSeconds());
+                r.sampleAnswer(), r.minimumWords(), r.timeLimitSeconds(), r.targetLevel(), r.purpose(),
+                r.certificateType());
     }
 }

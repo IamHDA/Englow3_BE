@@ -35,6 +35,12 @@ public class AssessmentTask {
     private String sampleAnswer;
     private int minimumWords;
     private int timeLimitSeconds;
+    /** CEFR band the task is pitched at; null for a task meant for any level. */
+    private String targetLevel;
+    @Enumerated(EnumType.STRING)
+    private AssessmentTaskPurpose purpose;
+    /** IELTS or TOEIC when the task follows that exam's format; null for general English. */
+    private String certificateType;
     @Enumerated(EnumType.STRING)
     private AssessmentTaskStatus status;
     private UUID createdByUserId;
@@ -47,6 +53,9 @@ public class AssessmentTask {
     @org.hibernate.annotations.CreationTimestamp
     @Column(updatable = false)
     private Instant createdAt;
+
+    private static final Set<String> CEFR_LEVELS = Set.of("A1", "A2", "B1", "B2", "C1", "C2");
+    private static final Set<String> CERTIFICATES = Set.of("IELTS", "TOEIC");
 
     protected AssessmentTask() {
     }
@@ -84,6 +93,18 @@ public class AssessmentTask {
                 || c.timeLimitSeconds() > 3600) {
             throw new BadRequestException("TASK_LIMIT_INVALID", "Task limits are invalid");
         }
+        if (c.targetLevel() != null && !CEFR_LEVELS.contains(c.targetLevel())) {
+            throw new BadRequestException("TASK_LEVEL_INVALID", "Target level must be a CEFR band");
+        }
+        if (c.certificateType() != null && !CERTIFICATES.contains(c.certificateType())) {
+            throw new BadRequestException("TASK_CERTIFICATE_INVALID", "Certificate must be IELTS or TOEIC");
+        }
+        AssessmentTaskPurpose nextPurpose = c.purpose() == null ? AssessmentTaskPurpose.PRACTICE : c.purpose();
+        // A level check measures speaking: it is the spoken part of the roadmap's level test, whose other parts are an
+        // exam the exam module grades.
+        if (nextPurpose == AssessmentTaskPurpose.LEVEL_CHECK && c.skill() != AssessmentSkill.SPEAKING) {
+            throw new BadRequestException("TASK_PURPOSE_SKILL", "A level-check task must be a speaking task");
+        }
         skill = c.skill();
         title = c.title().strip();
         taskType = c.taskType();
@@ -92,6 +113,9 @@ public class AssessmentTask {
         sampleAnswer = c.sampleAnswer() == null ? "" : c.sampleAnswer().strip();
         minimumWords = c.minimumWords();
         timeLimitSeconds = c.timeLimitSeconds();
+        targetLevel = c.targetLevel();
+        purpose = nextPurpose;
+        certificateType = c.certificateType();
     }
 
     public void submit() {
