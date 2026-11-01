@@ -70,7 +70,7 @@ public class AiJobWorker implements AutoCloseable {
     @Scheduled(fixedDelayString = "${app.ai.worker.fixed-delay:2s}")
     public void drain() {
         dispatch(tutorBusy, List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION"));
-        dispatch(gradingBusy, List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT"));
+        dispatch(gradingBusy, List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION"));
     }
 
     /** No database or provider I/O on the submitting request's after-commit callback. */

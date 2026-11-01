@@ -14,5 +14,8 @@ public enum AiJobType {
     TUTOR_REPLY,
 
     /** Transcribe a private, bounded Tutor recording. No pronunciation score is produced. */
-    TUTOR_TRANSCRIPTION
+    TUTOR_TRANSCRIPTION,
+
+    /** Propose a learning roadmap, or its remaining stages after an adjustment. Target is the learning roadmap. */
+    ROADMAP_GENERATION
 }

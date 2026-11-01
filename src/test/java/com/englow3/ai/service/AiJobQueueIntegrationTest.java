@@ -1,6 +1,7 @@
 package com.englow3.ai.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -16,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.api.AiJobQueue;
 import com.englow3.ai.entity.AiJob;
+import com.englow3.shared.error.ConflictException;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 
@@ -103,6 +105,41 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
         }
 
         assertThat(queue.hasDailyAllowance(learner)).isTrue();
+    }
+
+    private void plan(UUID userId) {
+        UUID roadmap = UUID.randomUUID();
+        queue.enqueueRoadmapGeneration(roadmap, "{}", "roadmap:" + roadmap, "v1", userId);
+    }
+
+    /** The system plans on the learner's behalf; a learner who spent the day's questions still gets their roadmap. */
+    @Test
+    void roadmapGenerationIsOutsideTheLearnersAllowance() {
+        for (int i = 0; i < LIMIT; i++) {
+            plan(learner);
+        }
+        assertThat(queue.hasDailyAllowance(learner)).isTrue();
+
+        speak(learner);
+        speak(learner);
+        ask(learner);
+        assertThat(queue.hasDailyAllowance(learner)).isFalse();
+
+        plan(learner);
+    }
+
+    /** Bounded on its own, so a client stuck in a loop cannot spend the provider budget on rebuilding plans. */
+    @Test
+    void roadmapGenerationHasItsOwnDailyLimit() {
+        for (int i = 0; i < 5; i++) {
+            plan(learner);
+        }
+
+        assertThatThrownBy(() -> plan(learner)).isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "ROADMAP_DAILY_LIMIT");
+        UUID roadmap = UUID.randomUUID();
+        UUID other = new LearnerFixture(jdbc).learner();
+        queue.enqueueRoadmapGeneration(roadmap, "{}", "roadmap:" + roadmap, "v1", other);
     }
 
     /** The budget is per day, the learners' day like every other daily figure here. Yesterday's spending is spent. */

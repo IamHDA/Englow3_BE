@@ -52,4 +52,11 @@ public interface AiJobQueue {
 
     void enqueueTutorReply(UUID messageId, String inputPayload, String idempotencyKey, String promptVersion,
             UUID requestedByUserId);
+
+    /**
+     * Asks for a learning roadmap to be generated or adjusted. Outside the learner's daily allowance - the system asks
+     * on their behalf - but bounded on its own, so a client stuck in a loop cannot spend the provider budget.
+     */
+    void enqueueRoadmapGeneration(UUID roadmapId, String inputPayload, String idempotencyKey, String promptVersion,
+            UUID requestedByUserId);
 }

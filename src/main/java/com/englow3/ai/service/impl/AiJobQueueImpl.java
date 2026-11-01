@@ -250,6 +250,22 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
         });
     }
 
+    /** Generations and adjustments one learner may cause in a day. */
+    static final int ROADMAP_DAILY_LIMIT = 5;
+
+    @Override
+    @Transactional
+    public void enqueueRoadmapGeneration(UUID roadmapId, String inputPayload, String idempotencyKey,
+            String promptVersion, UUID requestedByUserId) {
+        lockBudget(requestedByUserId);
+        if (jobRepo.findByIdempotencyKey(idempotencyKey).isEmpty() && jobRepo
+                .countRoadmapGenerationsSince(requestedByUserId, calendar.startOfToday()) >= ROADMAP_DAILY_LIMIT) {
+            throw new ConflictException("ROADMAP_DAILY_LIMIT", "The roadmap has been rebuilt too often today");
+        }
+        enqueue(AiJobType.ROADMAP_GENERATION, "LEARNING_ROADMAP", roadmapId, inputPayload, idempotencyKey,
+                promptVersion, requestedByUserId);
+    }
+
     @Override
     @Transactional
     public void enqueueSpeechAssessment(UUID attemptId, String inputPayload, String idempotencyKey,

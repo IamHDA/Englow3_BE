@@ -150,6 +150,22 @@ public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
      * job again, not a new request - and neither is a second submit of the same work, which idempotency collapses into
      * the first job.
      */
-    @Query("select count(j) from AiJob j where j.requestedByUserId = :userId and j.createdAt >= :from")
+    @Query("""
+            select count(j) from AiJob j
+             where j.requestedByUserId = :userId and j.createdAt >= :from
+               and j.jobType <> com.englow3.ai.entity.AiJobType.ROADMAP_GENERATION
+            """)
     long countRequestedSince(@Param("userId") UUID userId, @Param("from") Instant from);
+
+    /**
+     * Roadmap generations a learner has caused since {@code from}. Counted apart from the learner's allowance: the
+     * system asks for a roadmap on the learner's behalf (after onboarding, after a milestone), and a learner who used
+     * the day's tutor questions must still get their plan adjusted.
+     */
+    @Query("""
+            select count(j) from AiJob j
+             where j.requestedByUserId = :userId and j.createdAt >= :from
+               and j.jobType = com.englow3.ai.entity.AiJobType.ROADMAP_GENERATION
+            """)
+    long countRoadmapGenerationsSince(@Param("userId") UUID userId, @Param("from") Instant from);
 }
