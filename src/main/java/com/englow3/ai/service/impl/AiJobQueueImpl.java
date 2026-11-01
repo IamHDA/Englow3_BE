@@ -254,6 +254,12 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
     static final int ROADMAP_DAILY_LIMIT = 5;
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean hasRoadmapAllowance(UUID userId) {
+        return jobRepo.countRoadmapGenerationsSince(userId, calendar.startOfToday()) < ROADMAP_DAILY_LIMIT;
+    }
+
+    @Override
     @Transactional
     public void enqueueRoadmapGeneration(UUID roadmapId, String inputPayload, String idempotencyKey,
             String promptVersion, UUID requestedByUserId) {

@@ -20,6 +20,8 @@ public interface SpeakingLevelReader {
     Optional<SpeakingLevel> read(UUID attemptId, UUID ownerId);
 
     /**
+     * @param taskId
+     *            the task the answer was to, so a caller can tell an answer to the task it asked for from any other
      * @param overall
      *            mean of the four criteria on the 0-9 scale, in half bands; null until graded
      * @param level
@@ -27,7 +29,7 @@ public interface SpeakingLevelReader {
      * @param failed
      *            grading will not happen without the learner retrying or asking for a human review
      */
-    record SpeakingLevel(UUID attemptId, boolean completed, boolean failed, BigDecimal overall, String level,
-            Instant gradedAt) {
+    record SpeakingLevel(UUID attemptId, UUID taskId, boolean completed, boolean failed, BigDecimal overall,
+            String level, Instant gradedAt) {
     }
 }

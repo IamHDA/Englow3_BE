@@ -19,7 +19,10 @@ skills, and onboarding.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam
   attempt UUID. It is not a JPA relationship to the exam module.
 - **Public API:** `user.api.UserDirectory` and `user.api.PlacementRecorder` are the
-  contracts for cross-module identity lookup and placement recording. User entities,
+  contracts for cross-module identity lookup and placement recording.
+  `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
+  level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
+  daily study minutes and purposes as plain values. User entities,
   repositories, and service implementations remain internal.
 - **Files:** profile images use the shared storage client, while object-key meaning
   remains owned by this module.
@@ -44,6 +47,10 @@ answers, and section results.
 - **Modes:** one active attempt per learner, paper and mode. FULL and PRACTICE
   may remain open independently; replacing one never finalizes the other.
   Active-attempt previews are read-only and do not start or reset a clock.
+- **Level checks:** `exam_type = LEVEL_CHECK` papers are full-sitting only and
+  stay out of the learner catalogue. `exam.api.ScoredExamAttemptReader` reports a
+  learner's sitting as per-section points for the roadmap's milestones and level
+  checks, without exposing exam entities.
 - **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the
@@ -105,6 +112,44 @@ module's table as a JPA entity.
   computed on every read. There is no points ledger or persisted daily path to
   drift out of step with activity.
 
+## `roadmap`
+
+Owns each learner's plan towards their goal: stages, the content scheduled in each,
+the milestone that closes each stage, the three-part level check, and the history
+of how the plan changed.
+
+- **Tables:** `learning_roadmaps`, `roadmap_stages`, `roadmap_items`,
+  `roadmap_milestones`, `level_checks`, `roadmap_adjustments`,
+  `level_check_conversions`. Only this module writes them.
+- **Entry points:** `GET/POST/DELETE /api/roadmap`,
+  `POST /api/roadmap/milestones/{id}/sittings`, and `/api/roadmap/level-checks`
+  (start, latest, read, attach the exam sitting or spoken answer, skip speaking).
+- **Generation:** `ROADMAP_GENERATION` jobs on the `ai` queue, outside the
+  learner's daily allowance but limited to five a day each. The payload carries the
+  goal and the candidate content; `RoadmapGenerationHandler` asks the LLM and
+  `helper.RoadmapPlanValidator` refuses any plan that schedules content not offered,
+  skips a level, misses the goal, runs past the target date or asks for more minutes
+  a week than the learner has. A refused plan is retried; the last failure marks a
+  first plan `FAILED` and leaves an adjusted plan as it was. A token on the roadmap
+  fences out results of requests that were replaced.
+- **Adjustment:** a failed milestone, falling a week behind a stage's planned end,
+  or a changed goal of the same kind replaces the stages not yet passed. Passed
+  stages are never replaced. A different goal supersedes the plan.
+- **Level check:** a `LEVEL_CHECK` exam paper (READING section for vocabulary and
+  grammar, plus LISTENING) and a `LEVEL_CHECK` speaking task. Section shares map to
+  bands through `level_check_conversions`; speaking through
+  `assessment.api.SpeakingLevelReader`. The parts combine as a weighted mean,
+  rounded down; without a spoken part the written weights make the whole. Grades are
+  read on every look rather than pushed by events. The result is recorded on the
+  learner profile through `user.api.PlacementRecorder`.
+- **Cross-module read:** `ContentCatalogQuery` reads published
+  `flashcard_sets`, `dictation_lessons`, `quizzes`, `speaking_prompts`,
+  `assessment_tasks` and `exams`; `ItemProgressQuery` reads `flashcards`,
+  `flashcard_reviews`, `dictation_sentences`, `dictation_attempts`,
+  `quiz_attempts`, `speaking_attempts` and `assessment_attempts`. Both are
+  documented read-only joins; no roadmap code writes those tables.
+- **Derived, not stored:** item progress is computed from activity on every read.
+
 ## `ai`
 
 Owns the durable job queue that every provider call goes through. It owns no
@@ -112,6 +157,8 @@ business vocabulary of its own: it knows a job has a type, a target and a payloa
 and nothing about what any of those mean.
 
 - **Tables:** `ai_jobs`.
+- **Allowance:** every job counts against the requesting learner's daily allowance
+  except `ROADMAP_GENERATION`, which has its own per-learner daily limit.
 - **Entry points:** none. Other modules enqueue; nothing outside the worker reads.
 - **Public API:** `ai.api.AiJobQueue` exposes enqueue/quota capabilities and
   `ai.api.AiJobHandler` is the handler contract. `AiJob`, `AiJobType`, and
@@ -157,7 +204,12 @@ Owns rubric-based productive practice for free Writing and Speaking responses.
 Pronunciation read-aloud tasks remain in `speaking`; they measure a different
 exercise and retain their existing percentage scores.
 
-- **Tables:** `assessment_tasks`, `assessment_attempts`, `assessment_reviews`.
+- **Tables:** `assessment_tasks`, `assessment_attempts`, `assessment_reviews`,
+  `speaking_level_conversions`.
+- **Level checks:** a `LEVEL_CHECK` task (Speaking only) is the spoken part of the
+  roadmap's level check and stays out of the learner catalogue.
+  `assessment.api.SpeakingLevelReader` turns a graded answer's four-criterion mean
+  into a CEFR band using the conversion in force when it was graded.
 - **Roles:** staff author and grade their own tasks; administrators approve,
   reject or archive tasks and may correct a completed grade. Learners only read
   published tasks and their own drafts, submissions and reports.

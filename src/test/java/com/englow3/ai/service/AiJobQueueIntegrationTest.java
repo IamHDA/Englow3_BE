@@ -132,8 +132,10 @@ class AiJobQueueIntegrationTest extends PostgresIntegrationTest {
     @Test
     void roadmapGenerationHasItsOwnDailyLimit() {
         for (int i = 0; i < 5; i++) {
+            assertThat(queue.hasRoadmapAllowance(learner)).isTrue();
             plan(learner);
         }
+        assertThat(queue.hasRoadmapAllowance(learner)).isFalse();
 
         assertThatThrownBy(() -> plan(learner)).isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("code", "ROADMAP_DAILY_LIMIT");

@@ -37,12 +37,12 @@ public class SpeakingLevelReaderImpl implements SpeakingLevelReader {
 
     private SpeakingLevel levelOf(AssessmentAttempt attempt) {
         if (attempt.getStatus() != AssessmentAttemptStatus.COMPLETED) {
-            return new SpeakingLevel(attempt.getId(), false, attempt.getStatus() == AssessmentAttemptStatus.FAILED,
-                    null, null, null);
+            return new SpeakingLevel(attempt.getId(), attempt.getTaskId(), false,
+                    attempt.getStatus() == AssessmentAttemptStatus.FAILED, null, null, null);
         }
         BigDecimal overall = overall(attempt.getReport());
         Instant gradedAt = attempt.getAssessedAt();
-        return new SpeakingLevel(attempt.getId(), true, false, overall,
+        return new SpeakingLevel(attempt.getId(), attempt.getTaskId(), true, false, overall,
                 overall == null ? null : levelFor(overall, gradedAt == null ? Instant.now() : gradedAt), gradedAt);
     }
 

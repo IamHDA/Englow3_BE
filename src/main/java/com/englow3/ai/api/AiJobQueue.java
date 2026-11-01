@@ -59,4 +59,10 @@ public interface AiJobQueue {
      */
     void enqueueRoadmapGeneration(UUID roadmapId, String inputPayload, String idempotencyKey, String promptVersion,
             UUID requestedByUserId);
+
+    /**
+     * Whether another roadmap generation would be accepted today. Lets the roadmap skip an automatic adjustment rather
+     * than fail the request that noticed it was due.
+     */
+    boolean hasRoadmapAllowance(UUID userId);
 }

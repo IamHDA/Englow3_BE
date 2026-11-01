@@ -40,6 +40,7 @@ class SpeakingLevelReaderIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(level.completed()).isFalse();
         assertThat(level.level()).isNull();
+        assertThat(level.taskId()).isNotNull();
     }
 
     @Test

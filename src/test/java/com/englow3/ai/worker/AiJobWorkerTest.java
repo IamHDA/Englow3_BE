@@ -29,8 +29,8 @@ class AiJobWorkerTest {
         AiJob job = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any())).thenReturn(List.of(job),
                 List.of());
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of());
         CountDownLatch started = new CountDownLatch(1);
         try (var worker = worker(List.of(handler("TUTOR_REPLY", started::countDown)))) {
             worker.queued(new com.englow3.ai.service.AiJobQueued());
@@ -44,8 +44,8 @@ class AiJobWorkerTest {
         AiJob first = job(AiJobType.TUTOR_REPLY), second = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
                 .thenReturn(List.of(first), List.of(second), List.of());
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of());
         CountDownLatch completed = new CountDownLatch(2);
         try (var worker = worker(List.of(handler("TUTOR_REPLY", completed::countDown)))) {
             worker.drain();
@@ -60,8 +60,8 @@ class AiJobWorkerTest {
         AiJob claimed = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
                 .thenReturn(List.of(claimed));
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of());
         var readiness = mock(com.englow3.ai.client.AiServiceReadiness.class);
         var handler = mock(AiJobHandler.class);
         when(handler.handles()).thenReturn("TUTOR_REPLY");
@@ -103,8 +103,8 @@ class AiJobWorkerTest {
         // that kept returning the same job ran it twice more whenever that wake-up beat close() on a loaded machine.
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
                 .thenReturn(List.of(tutor), List.of());
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of(speaking), List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of(speaking), List.of());
         CountDownLatch entered = new CountDownLatch(2), release = new CountDownLatch(1);
         Runnable block = () -> {
             entered.countDown();
@@ -130,8 +130,8 @@ class AiJobWorkerTest {
         AiJob job = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
                 .thenReturn(List.of(job));
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of());
         when(queue.record(eq(job.getId()), any(), any(), any())).thenReturn(true);
         AiJobHandler handler = mock(AiJobHandler.class);
         when(handler.handles()).thenReturn("TUTOR_REPLY");
@@ -162,8 +162,8 @@ class AiJobWorkerTest {
         AiJob job = job(AiJobType.TUTOR_REPLY);
         when(queue.claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any()))
                 .thenReturn(List.of(job));
-        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")), any()))
-                .thenReturn(List.of());
+        when(queue.claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION")),
+                any())).thenReturn(List.of());
         try (var worker = new AiJobWorker(queue, List.of(handler("TUTOR_REPLY", () -> {
         })), Duration.ofMinutes(3), Duration.ZERO)) {
             worker.drain();
