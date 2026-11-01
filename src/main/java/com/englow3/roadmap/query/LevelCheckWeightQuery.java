@@ -41,4 +41,26 @@ public class LevelCheckWeightQuery {
                 .query((rs, row) -> new Weights(rs.getInt("vocabulary"), rs.getInt("listening"), rs.getInt("speaking")))
                 .optional();
     }
+
+    /** A learning purpose as the user module names it: a declared read-only read of {@code learning_purposes}. */
+    public record PurposeName(String code, String displayName) {
+    }
+
+    public List<PurposeName> learningPurposes() {
+        return jdbc.sql("select purpose_code, display_name from learning_purposes order by id")
+                .query((rs, row) -> new PurposeName(rs.getString("purpose_code"), rs.getString("display_name"))).list();
+    }
+
+    /** The id of the row in force at {@code at} for each purpose that has one. */
+    public java.util.Map<String, java.util.UUID> rowsInForce(Instant at) {
+        java.util.Map<String, java.util.UUID> rows = new java.util.HashMap<>();
+        jdbc.sql("""
+                select w.purpose_code, w.id from level_check_weights w
+                 where w.effective_from = (select max(effective_from) from level_check_weights
+                                            where purpose_code = w.purpose_code and effective_from <= :at)
+                """).param("at", SqlTime.at(at))
+                .query((rs, row) -> rows.put(rs.getString("purpose_code"), rs.getObject("id", java.util.UUID.class)))
+                .list();
+        return rows;
+    }
 }

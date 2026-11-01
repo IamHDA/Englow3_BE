@@ -146,7 +146,10 @@ of how the plan changed.
   rounded down; without a spoken part the written weights make the whole.
   Weights come from `level_check_weights` (highest-priority row among the
   learner's purposes, else DEFAULT, as in force at the time); tune them by inserting
-  rows with a later `effective_from`. Each completed check keeps the weights it used. The result is recorded on the
+  rows with a later `effective_from` - from the admin screen
+  (`GET/PUT /api/admin/roadmap/level-check-weights`, ADMIN only) or SQL. Each completed
+  check keeps the weights it used. The screen lists purposes through a declared
+  read-only read of `learning_purposes`. The result is recorded on the
   learner profile through `user.api.PlacementRecorder`.
 - **Cross-module read:** `ContentCatalogQuery` reads published
   `flashcard_sets`, `dictation_lessons`, `quizzes`, `speaking_prompts`,
