@@ -7,6 +7,7 @@ import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.Gender;
 import com.englow3.user.entity.OnboardingStep;
 import com.englow3.user.entity.Role;
+import com.englow3.user.helper.AvatarPreset;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record UserInformationResponse(UUID id, String email, String fullName, String displayName,
@@ -14,9 +15,11 @@ public record UserInformationResponse(UUID id, String email, String fullName, St
         @Schema(nullable = true) String avatarUrl, @Schema(nullable = true) String bannerUrl,
         OnboardingStep onboardingStep, Role role) {
 
-    public static UserInformationResponse from(UserInformationResult result, String publicBaseUrl) {
+    public static UserInformationResponse from(UserInformationResult result, String publicBaseUrl,
+            String presetBaseUrl) {
         return new UserInformationResponse(result.id(), result.email(), result.fullName(), result.displayName(),
-                result.gender(), result.birthDate(), publicUrl(publicBaseUrl, result.avatarObjectKey()),
+                result.gender(), result.birthDate(),
+                AvatarPreset.urlForStoredKey(result.avatarObjectKey(), presetBaseUrl, publicBaseUrl),
                 publicUrl(publicBaseUrl, result.bannerObjectKey()), result.onboardingStep(), result.role());
     }
 

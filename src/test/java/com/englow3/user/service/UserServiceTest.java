@@ -108,23 +108,30 @@ class UserServiceTest {
         }
 
         @Test
-        void storesAnAvatarUnderAServerGeneratedKeyInTheDefaultBucket() {
-            service.changeAvatar(mockImage("image/png"));
+        void wearsAPresetPictureWithoutUploadingAnything() {
+            service.choosePresetAvatar("fox");
 
-            ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
-            verify(objectStorageClient).upload(eq(BUCKET), key.capture(), any(), anyLong(), eq("image/png"));
-            assertThat(key.getValue()).startsWith("users/" + userId + "/avatar/").endsWith(".png");
-            verify(user).changeAvatar(key.getValue());
+            verify(user).changeAvatar("preset:fox");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
         }
 
-        /** Every change used to leave the old picture in the bucket for good. */
+        /** A picture uploaded before presets existed is a file in the bucket; switching away removes it. */
         @Test
-        void deletesThePictureItReplaces() {
+        void deletesAnUploadedPictureItReplaces() {
             when(user.getAvatarObjectKey()).thenReturn("users/old/avatar/previous.png");
 
-            service.changeAvatar(mockImage("image/png"));
+            service.choosePresetAvatar("owl");
 
             verify(objectStorageClient).delete(BUCKET, "users/old/avatar/previous.png");
+        }
+
+        @Test
+        void leavesTheBucketAloneWhenSwitchingBetweenPresets() {
+            when(user.getAvatarObjectKey()).thenReturn("preset:fox");
+
+            service.choosePresetAvatar("owl");
+
+            verify(objectStorageClient, never()).delete(anyString(), anyString());
         }
 
         /** The change has happened by then; a stray file is no reason to report it as failed. */
@@ -134,9 +141,9 @@ class UserServiceTest {
             org.mockito.Mockito.doThrow(new RuntimeException("store down")).when(objectStorageClient)
                     .delete(anyString(), anyString());
 
-            service.changeAvatar(mockImage("image/png"));
+            service.choosePresetAvatar("cat");
 
-            verify(user).changeAvatar(anyString());
+            verify(user).changeAvatar("preset:cat");
         }
 
         @Test
@@ -162,23 +169,32 @@ class UserServiceTest {
                     .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("USER_NOT_FOUND");
         }
 
+        /** Nothing a user sends becomes their face: only an id from the list is accepted. */
+        @Test
+        void refusesAPresetThatDoesNotExist() {
+            assertThatThrownBy(() -> service.choosePresetAvatar("../../etc/passwd"))
+                    .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                    .isEqualTo("AVATAR_PRESET_UNKNOWN");
+            verify(user, never()).changeAvatar(anyString());
+        }
+
         @Test
         void refusesAContentTypeThatIsNotAnAllowedImage() {
-            assertThatThrownBy(() -> service.changeAvatar(mockImage("image/svg+xml")))
+            assertThatThrownBy(() -> service.changeBanner(mockImage("image/svg+xml")))
                     .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                     .isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
         }
 
-        /** The avatar bucket is public: a page or script labelled image/png would be published as one. */
+        /** The bucket is public: a page or script labelled image/png would be published as one. */
         @Test
         void refusesAFileThatIsNotTheImageItClaimsToBe() {
             MultipartFile page = mockImage("image/png", "<html><script>".getBytes(StandardCharsets.US_ASCII));
 
-            assertThatThrownBy(() -> service.changeAvatar(page)).isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.changeBanner(page)).isInstanceOf(BadRequestException.class)
                     .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_CONTENT_MISMATCH");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
-            verify(user, never()).changeAvatar(anyString());
+            verify(user, never()).changeBanner(anyString());
         }
 
         @Test
@@ -186,7 +202,7 @@ class UserServiceTest {
             MultipartFile huge = mockImage("image/png");
             when(huge.getSize()).thenReturn(6L * 1024 * 1024);
 
-            assertThatThrownBy(() -> service.changeAvatar(huge)).isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.changeBanner(huge)).isInstanceOf(BadRequestException.class)
                     .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_TOO_LARGE");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
         }
@@ -196,7 +212,7 @@ class UserServiceTest {
             MultipartFile empty = mock(MultipartFile.class);
             when(empty.isEmpty()).thenReturn(true);
 
-            assertThatThrownBy(() -> service.changeAvatar(empty)).isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.changeBanner(empty)).isInstanceOf(BadRequestException.class)
                     .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_REQUIRED");
         }
 
