@@ -79,7 +79,7 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         profile("A2", null, null, "B1");
 
         RoadmapResult requested = roadmapService.create();
-        assertThat(requested.status()).isEqualTo("GENERATING");
+        assertThat(requested.status()).hasToString("GENERATING");
         assertThat(roadmapService.create().id()).as("asking again for the same goal is the same plan")
                 .isEqualTo(requested.id());
 
@@ -93,11 +93,11 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         runJob(requested.id());
 
         RoadmapResult active = roadmapService.current().orElseThrow();
-        assertThat(active.status()).isEqualTo("ACTIVE");
+        assertThat(active.status()).hasToString("ACTIVE");
         RoadmapResult.Stage stage = active.stages().getFirst();
-        assertThat(stage.status()).isEqualTo("CURRENT");
+        assertThat(stage.status()).hasToString("CURRENT");
         assertThat(stage.items()).singleElement().satisfies(item -> assertThat(item.done()).isFalse());
-        assertThat(stage.milestone().kind()).isEqualTo("LEVEL_CHECK");
+        assertThat(stage.milestone().kind()).hasToString("LEVEL_CHECK");
         assertThat(stage.milestone().ready()).isFalse();
 
         var todayBefore = todayReader.today(learner).orElseThrow();
@@ -123,17 +123,17 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         // Sat on the usual exam screens: the check finds the sitting itself the next time it is looked at.
         var done = levelCheckService.get(check.id());
         assertThat(done.examAttemptId()).isEqualTo(sitting);
-        assertThat(done.status()).isEqualTo("COMPLETED");
-        assertThat(done.vocabLevel()).isEqualTo("C2");
-        assertThat(done.listeningLevel()).isEqualTo("B1");
-        assertThat(done.resultLevel()).isEqualTo("B2");
+        assertThat(done.status()).hasToString("COMPLETED");
+        assertThat(done.vocabLevel()).hasToString("C2");
+        assertThat(done.listeningLevel()).hasToString("B1");
+        assertThat(done.resultLevel()).hasToString("B2");
 
         RoadmapResult finished = roadmapService.current().orElseThrow();
-        assertThat(finished.status()).isEqualTo("COMPLETED");
+        assertThat(finished.status()).hasToString("COMPLETED");
         assertThat(todayReader.today(learner)).as("a finished roadmap leaves the daily path to its own rules")
                 .isEmpty();
-        assertThat(finished.stages().getFirst().status()).isEqualTo("PASSED");
-        assertThat(finished.stages().getFirst().milestone().resultLevel()).isEqualTo("B2");
+        assertThat(finished.stages().getFirst().status()).hasToString("PASSED");
+        assertThat(finished.stages().getFirst().milestone().resultLevel()).hasToString("B2");
         assertThat(jdbc.sql("select current_level from learner_profiles where user_id = :id").param("id", learner)
                 .query(String.class).single()).isEqualTo("B2");
     }
@@ -153,8 +153,9 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(outcome.retryable()).isTrue();
         assertThat(outcome.errorCode()).isEqualTo("ROADMAP_PLAN_INVALID");
         handler.onGaveUp(requested.id(), outcome.errorCode());
-        assertThat(roadmapService.current().orElseThrow().status()).isEqualTo("FAILED");
-        assertThat(roadmapService.create().status()).as("a failed plan can be asked for again").isEqualTo("GENERATING");
+        assertThat(roadmapService.current().orElseThrow().status()).hasToString("FAILED");
+        assertThat(roadmapService.create().status()).as("a failed plan can be asked for again")
+                .hasToString("GENERATING");
     }
 
     @Test
@@ -179,14 +180,15 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         UUID milestone = roadmapService.current().orElseThrow().stages().getFirst().milestone().id();
 
         RoadmapResult afterFail = roadmapService.recordMockSitting(milestone, mockSitting(mock, "5.0"));
-        assertThat(afterFail.stages().getFirst().milestone().status()).isEqualTo("FAILED");
+        assertThat(afterFail.stages().getFirst().milestone().status()).hasToString("FAILED");
         assertThat(afterFail.adjusting()).isTrue();
-        assertThat(afterFail.pendingReason()).isEqualTo("MILESTONE_FAILED");
+        assertThat(afterFail.pendingReason()).hasToString("MILESTONE_FAILED");
 
         RoadmapResult afterPass = roadmapService.recordMockSitting(milestone, mockSitting(mock, "6.0"));
         assertThat(afterPass.adjusting()).as("a pass makes the replan moot").isFalse();
-        assertThat(afterPass.stages()).extracting(RoadmapResult.Stage::status).containsExactly("PASSED", "CURRENT");
-        assertThat(afterPass.adjustments()).extracting(RoadmapResult.Adjustment::reason).contains("MILESTONE_PASSED");
+        assertThat(afterPass.stages()).extracting(stage -> stage.status().name()).containsExactly("PASSED", "CURRENT");
+        assertThat(afterPass.adjustments()).extracting(adjustment -> adjustment.reason().name())
+                .contains("MILESTONE_PASSED");
         assertThatThrownBy(() -> roadmapService.recordMockSitting(milestone, mockSitting(mock, "7.0")))
                 .hasFieldOrPropertyWithValue("code", "MILESTONE_NOT_CURRENT");
     }
@@ -207,7 +209,7 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(jdbc.sql("select status from learning_roadmaps where id = :id").param("id", first.id())
                 .query(String.class).single()).isEqualTo("SUPERSEDED");
         roadmapService.abandon();
-        assertThat(roadmapService.current().orElseThrow().status()).isEqualTo("ABANDONED");
+        assertThat(roadmapService.current().orElseThrow().status()).hasToString("ABANDONED");
     }
 
     private void profile(String current, String certificate, BigDecimal targetScore, String targetLevel) {

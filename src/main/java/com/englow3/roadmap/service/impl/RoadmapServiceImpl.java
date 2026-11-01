@@ -25,6 +25,7 @@ import com.englow3.roadmap.entity.RoadmapContentKind;
 import com.englow3.roadmap.entity.RoadmapGoalType;
 import com.englow3.roadmap.entity.RoadmapItem;
 import com.englow3.roadmap.entity.RoadmapMilestone;
+import com.englow3.roadmap.entity.RoadmapSchedule;
 import com.englow3.roadmap.entity.RoadmapStage;
 import com.englow3.roadmap.entity.RoadmapStageStatus;
 import com.englow3.roadmap.entity.RoadmapStatus;
@@ -212,29 +213,28 @@ public class RoadmapServiceImpl implements RoadmapService {
         Map<UUID, Integer> done = itemProgress.percentDone(roadmap.getUserId(), byKind);
 
         LocalDate today = calendar.today();
-        String schedule = stages.stream().filter(stage -> stage.getStatus() == RoadmapStageStatus.CURRENT)
-                .anyMatch(stage -> stage.getPlannedEnd().isBefore(today)) ? "BEHIND" : "ON_TRACK";
+        RoadmapSchedule schedule = stages.stream().filter(stage -> stage.getStatus() == RoadmapStageStatus.CURRENT)
+                .anyMatch(stage -> stage.getPlannedEnd().isBefore(today)) ? RoadmapSchedule.BEHIND
+                        : RoadmapSchedule.ON_TRACK;
         List<RoadmapResult.Stage> stageResults = stages.stream().map(stage -> stage(stage,
                 itemsByStage.getOrDefault(stage.getId(), List.of()), milestones.get(stage.getId()), done)).toList();
         List<RoadmapResult.Adjustment> adjustments = adjustmentRepo
                 .findTop10ByRoadmapIdOrderByCreatedAtDesc(roadmap.getId()).stream()
-                .map(adjustment -> new RoadmapResult.Adjustment(adjustment.getReason().name(),
-                        adjustment.getCreatedAt()))
+                .map(adjustment -> new RoadmapResult.Adjustment(adjustment.getReason(), adjustment.getCreatedAt()))
                 .toList();
-        return new RoadmapResult(roadmap.getId(), roadmap.getStatus().name(), roadmap.getGoalType().name(),
-                roadmap.getTargetCertificate(), roadmap.getTargetScore(), name(roadmap.getTargetLevel()),
-                roadmap.getTargetDate(), name(roadmap.getStartLevel()), roadmap.getStartScore(),
-                roadmap.getDailyMinutes(), roadmap.isAdjusting(), name(roadmap.getPendingReason()),
-                roadmap.getFailureCode(), schedule, roadmap.getCreatedAt(), roadmap.getCompletedAt(), stageResults,
-                adjustments);
+        return new RoadmapResult(roadmap.getId(), roadmap.getStatus(), roadmap.getGoalType(),
+                roadmap.getTargetCertificate(), roadmap.getTargetScore(), roadmap.getTargetLevel(),
+                roadmap.getTargetDate(), roadmap.getStartLevel(), roadmap.getStartScore(), roadmap.getDailyMinutes(),
+                roadmap.isAdjusting(), roadmap.getPendingReason(), roadmap.getFailureCode(), schedule,
+                roadmap.getCreatedAt(), roadmap.getCompletedAt(), stageResults, adjustments);
     }
 
     private static RoadmapResult.Stage stage(RoadmapStage stage, List<RoadmapItem> items, RoadmapMilestone milestone,
             Map<UUID, Integer> done) {
         List<RoadmapResult.Item> itemResults = items.stream().map(item -> {
             int percent = done.getOrDefault(item.getContentId(), 0);
-            return new RoadmapResult.Item(item.getId(), item.getContentKind().name(), item.getContentId(),
-                    item.getTitle(), item.getSkill(), item.isRequired(), item.getTargetPercent(), item.getPlannedWeek(),
+            return new RoadmapResult.Item(item.getId(), item.getContentKind(), item.getContentId(), item.getTitle(),
+                    item.getSkill(), item.isRequired(), item.getTargetPercent(), item.getPlannedWeek(),
                     item.getEstimatedMinutes(), percent, percent >= item.getTargetPercent());
         }).toList();
         List<RoadmapResult.Item> required = itemResults.stream().filter(RoadmapResult.Item::required).toList();
@@ -244,18 +244,14 @@ public class RoadmapServiceImpl implements RoadmapService {
                         .orElse(0);
         boolean ready = required.stream().allMatch(RoadmapResult.Item::done);
         RoadmapResult.Milestone milestoneResult = milestone == null ? null
-                : new RoadmapResult.Milestone(milestone.getId(), milestone.getKind().name(), milestone.getExamId(),
-                        milestone.getRequiredScore(), name(milestone.getRequiredLevel()), milestone.getStatus().name(),
-                        milestone.getResultScore(), name(milestone.getResultLevel()), milestone.getAttemptCount(),
+                : new RoadmapResult.Milestone(milestone.getId(), milestone.getKind(), milestone.getExamId(),
+                        milestone.getRequiredScore(), milestone.getRequiredLevel(), milestone.getStatus(),
+                        milestone.getResultScore(), milestone.getResultLevel(), milestone.getAttemptCount(),
                         milestone.getAchievedAt(), ready);
         List<String> skills = stage.getFocusSkills().isBlank() ? List.of()
                 : Arrays.asList(stage.getFocusSkills().split(","));
         return new RoadmapResult.Stage(stage.getId(), stage.getOrderNo(), stage.getTitle(), stage.getSummary(),
-                stage.getFromLevel().name(), stage.getToLevel().name(), skills, stage.getPlannedStart(),
-                stage.getPlannedEnd(), stage.getStatus().name(), percentDone, itemResults, milestoneResult);
-    }
-
-    private static String name(Enum<?> value) {
-        return value == null ? null : value.name();
+                stage.getFromLevel(), stage.getToLevel(), skills, stage.getPlannedStart(), stage.getPlannedEnd(),
+                stage.getStatus(), percentDone, itemResults, milestoneResult);
     }
 }

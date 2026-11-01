@@ -218,14 +218,10 @@ public class LevelCheckServiceImpl implements LevelCheckService {
     }
 
     private static LevelCheckResult view(LevelCheck check, boolean speakingFailed, CefrLevel provisional) {
-        return new LevelCheckResult(check.getId(), check.getPurpose().name(), check.getStatus().name(),
-                check.getMilestoneId(), check.getExamId(), check.getSpeakingTaskId(), check.getExamAttemptId(),
-                check.getSpeakingAttemptId(), check.isSpeakingSkipped(), speakingFailed, name(check.getVocabLevel()),
-                name(check.getListeningLevel()), name(check.getSpeakingLevel()), name(check.getResultLevel()),
-                name(provisional), check.getCreatedAt(), check.getCompletedAt());
-    }
-
-    private static String name(Enum<?> value) {
-        return value == null ? null : value.name();
+        return new LevelCheckResult(check.getId(), check.getPurpose(), check.getStatus(), check.getMilestoneId(),
+                check.getExamId(), check.getSpeakingTaskId(), check.getExamAttemptId(), check.getSpeakingAttemptId(),
+                check.isSpeakingSkipped(), speakingFailed, check.getVocabLevel(), check.getListeningLevel(),
+                check.getSpeakingLevel(), check.getResultLevel(), provisional, check.getCreatedAt(),
+                check.getCompletedAt());
     }
 }

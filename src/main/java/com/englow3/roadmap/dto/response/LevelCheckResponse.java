@@ -4,11 +4,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.roadmap.dto.result.LevelCheckResult;
+import com.englow3.roadmap.entity.CefrLevel;
+import com.englow3.roadmap.entity.LevelCheckPurpose;
+import com.englow3.roadmap.entity.LevelCheckStatus;
 
-public record LevelCheckResponse(UUID id, String purpose, String status, UUID milestoneId, UUID examId,
-        UUID speakingTaskId, UUID examAttemptId, UUID speakingAttemptId, boolean speakingSkipped,
-        boolean speakingFailed, String vocabLevel, String listeningLevel, String speakingLevel, String resultLevel,
-        String provisionalLevel, Instant createdAt, Instant completedAt) {
+public record LevelCheckResponse(UUID id, LevelCheckPurpose purpose, LevelCheckStatus status, UUID milestoneId,
+        UUID examId, UUID speakingTaskId, UUID examAttemptId, UUID speakingAttemptId, boolean speakingSkipped,
+        boolean speakingFailed, CefrLevel vocabLevel, CefrLevel listeningLevel, CefrLevel speakingLevel,
+        CefrLevel resultLevel, CefrLevel provisionalLevel, Instant createdAt, Instant completedAt) {
 
     public static LevelCheckResponse from(LevelCheckResult r) {
         return new LevelCheckResponse(r.id(), r.purpose(), r.status(), r.milestoneId(), r.examId(), r.speakingTaskId(),
