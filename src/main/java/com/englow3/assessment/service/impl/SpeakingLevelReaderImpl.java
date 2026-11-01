@@ -35,6 +35,15 @@ public class SpeakingLevelReaderImpl implements SpeakingLevelReader {
                 .map(this::levelOf);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<SpeakingLevel> latestAnswer(UUID taskId, UUID ownerId, Instant since) {
+        return attemptRepo
+                .findFirstByUserIdAndTaskIdAndSkillAndStatusNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(ownerId,
+                        taskId, AssessmentSkill.SPEAKING, AssessmentAttemptStatus.DRAFT, since)
+                .map(this::levelOf);
+    }
+
     private SpeakingLevel levelOf(AssessmentAttempt attempt) {
         if (attempt.getStatus() != AssessmentAttemptStatus.COMPLETED) {
             return new SpeakingLevel(attempt.getId(), attempt.getTaskId(), false,

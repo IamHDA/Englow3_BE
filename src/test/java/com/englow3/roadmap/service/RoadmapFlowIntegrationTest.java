@@ -119,7 +119,10 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         // No microphone: the written parts make the whole result.
         assertThat(levelCheckService.skipSpeaking(check.id()).speakingSkipped()).isTrue();
         // Reading 2/2 is C2 and listening 1/2 is B1: (6x40 + 3x30) / 70 = 4.7, rounded down to B2.
-        var done = levelCheckService.attachExamAttempt(check.id(), sitting(paper, 2, 1));
+        UUID sitting = sitting(paper, 2, 1);
+        // Sat on the usual exam screens: the check finds the sitting itself the next time it is looked at.
+        var done = levelCheckService.get(check.id());
+        assertThat(done.examAttemptId()).isEqualTo(sitting);
         assertThat(done.status()).isEqualTo("COMPLETED");
         assertThat(done.vocabLevel()).isEqualTo("C2");
         assertThat(done.listeningLevel()).isEqualTo("B1");

@@ -159,6 +159,16 @@ public class LevelCheckServiceImpl implements LevelCheckService {
             return view(check, false, null);
         }
         UUID userId = check.getUserId();
+        // The learner sits the paper and answers the task on their usual screens; the sitting and the answer made
+        // since this check began are this check's, unless the learner named others explicitly.
+        if (check.getExamAttemptId() == null) {
+            sittings.latestFullSitting(check.getExamId(), userId, check.getCreatedAt())
+                    .ifPresent(sitting -> check.attachExamAttempt(sitting.attemptId()));
+        }
+        if (check.getSpeakingAttemptId() == null && check.getSpeakingTaskId() != null && !check.isSpeakingSkipped()) {
+            speaking.latestAnswer(check.getSpeakingTaskId(), userId, check.getCreatedAt())
+                    .ifPresent(answer -> check.attachSpeakingAttempt(answer.attemptId()));
+        }
         if (check.getExamAttemptId() != null && !check.hasWrittenParts()) {
             sittings.read(check.getExamAttemptId(), userId).filter(sitting -> sitting.scored() && sitting.full())
                     .ifPresent(sitting -> check.recordWrittenParts(band(sitting, VOCABULARY_SECTION),

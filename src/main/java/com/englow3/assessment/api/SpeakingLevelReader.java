@@ -20,6 +20,12 @@ public interface SpeakingLevelReader {
     Optional<SpeakingLevel> read(UUID attemptId, UUID ownerId);
 
     /**
+     * The learner's most recent submitted answer to {@code taskId} created at or after {@code since}, graded or not -
+     * how the roadmap finds the spoken answer to a level check without the assessment screens having to report it.
+     */
+    Optional<SpeakingLevel> latestAnswer(UUID taskId, UUID ownerId, java.time.Instant since);
+
+    /**
      * @param taskId
      *            the task the answer was to, so a caller can tell an answer to the task it asked for from any other
      * @param overall

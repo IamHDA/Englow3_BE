@@ -16,6 +16,12 @@ public interface ScoredExamAttemptReader {
     Optional<Sitting> read(UUID attemptId, UUID ownerId);
 
     /**
+     * The learner's most recent scored full sitting of {@code examId} started at or after {@code since} - how the
+     * roadmap finds the sitting a learner made of a level-check paper without the exam screens having to report it.
+     */
+    Optional<Sitting> latestFullSitting(UUID examId, UUID ownerId, Instant since);
+
+    /**
      * @param examType
      *            PLACEMENT, MOCK or LEVEL_CHECK
      * @param scored

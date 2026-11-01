@@ -1,6 +1,7 @@
 package com.englow3.exam.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +32,15 @@ public class ScoredExamAttemptReaderImpl implements ScoredExamAttemptReader {
     public Optional<Sitting> read(UUID attemptId, UUID ownerId) {
         return attemptRepo.findById(attemptId).filter(attempt -> attempt.getUserId().equals(ownerId))
                 .flatMap(attempt -> examRepo.findById(attempt.getExamId()).map(exam -> sitting(attempt, exam)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Sitting> latestFullSitting(UUID examId, UUID ownerId, Instant since) {
+        return attemptRepo
+                .findFirstByUserIdAndExamIdAndModeAndStatusAndStartedAtGreaterThanEqualOrderByStartedAtDesc(ownerId,
+                        examId, ExamAttemptMode.FULL, ExamAttemptStatus.SCORED, since)
+                .flatMap(attempt -> examRepo.findById(examId).map(exam -> sitting(attempt, exam)));
     }
 
     private Sitting sitting(ExamAttempt attempt, Exam exam) {

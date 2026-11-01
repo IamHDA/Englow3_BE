@@ -13,10 +13,15 @@ import org.springframework.data.repository.query.Param;
 import com.englow3.assessment.entity.AssessmentAttempt;
 import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentSkill;
 
 import jakarta.persistence.LockModeType;
 
 public interface AssessmentAttemptRepository extends JpaRepository<AssessmentAttempt, UUID> {
+
+    Optional<AssessmentAttempt> findFirstByUserIdAndTaskIdAndSkillAndStatusNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+            UUID userId, UUID taskId, AssessmentSkill skill, AssessmentAttemptStatus status, java.time.Instant since);
+
     @Query("select a from AssessmentAttempt a left join AssessmentResultRead r on r.attemptId=a.id where a.userId=:user and a.status=com.englow3.assessment.entity.AssessmentAttemptStatus.COMPLETED and (r.attemptId is null or r.resultVersion<>a.version) order by a.assessedAt desc,a.id")
     Page<AssessmentAttempt> unreadResults(@Param("user") UUID user, Pageable pageable);
 

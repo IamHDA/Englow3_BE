@@ -22,6 +22,9 @@ import jakarta.persistence.LockModeType;
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
     List<ExamAttempt> findTop50ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(ExamAttemptStatus status, Instant now);
 
+    Optional<ExamAttempt> findFirstByUserIdAndExamIdAndModeAndStatusAndStartedAtGreaterThanEqualOrderByStartedAtDesc(
+            UUID userId, UUID examId, ExamAttemptMode mode, ExamAttemptStatus status, Instant since);
+
     Optional<ExamAttempt> findFirstByUserIdAndExamIdAndModeAndStatusOrderByStartedAtDesc(UUID userId, UUID examId,
             ExamAttemptMode mode, ExamAttemptStatus status);
 
