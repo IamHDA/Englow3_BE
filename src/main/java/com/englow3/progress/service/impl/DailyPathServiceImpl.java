@@ -23,6 +23,7 @@ import com.englow3.progress.helper.ExperiencePoints;
 import com.englow3.progress.helper.StudyStreak;
 import com.englow3.progress.query.DailyPathQuery;
 import com.englow3.progress.service.DailyPathService;
+import com.englow3.roadmap.api.RoadmapTodayReader;
 import com.englow3.shared.persistence.ParallelReads;
 import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.api.UserDirectory;
@@ -48,6 +49,7 @@ public class DailyPathServiceImpl implements DailyPathService {
     private static final int STREAK_LOOKBACK_DAYS = 365;
 
     private final DailyPathQuery pathQuery;
+    private final RoadmapTodayReader roadmapToday;
     private final DictationCompletionPolicy dictationCompletionPolicy;
     private final UserDirectory userDirectory;
     private final ParallelReads reads;
@@ -78,6 +80,7 @@ public class DailyPathServiceImpl implements DailyPathService {
         var unpassedQuizzes = reads.fork(() -> pathQuery.unpassedQuizzes(userId, TASKS_PER_KIND));
         var productiveTasks = reads.fork(() -> pathQuery.productiveTasks(userId, startOfToday, TASKS_PER_KIND * 2));
         var questCounts = reads.fork(() -> pathQuery.questCounts(userId, startOfToday, now));
+        var roadmapPlan = reads.fork(() -> roadmapToday.today(userId));
 
         List<LocalDate> studyDays = studyDaysRead.get();
         DailyPathQuery.ActivityTotals totals = totalsRead.get();
@@ -86,16 +89,25 @@ public class DailyPathServiceImpl implements DailyPathService {
                         totals.quizAttempts(), totals.examAttempts(), totals.productiveAttempts()));
         ExperiencePoints.Level level = ExperiencePoints.levelFor(totalXp);
 
+        var plan = roadmapPlan.get();
         return new DailyPathResult(StudyStreak.count(studyDays, today), level.totalXp(), level.level(),
-                level.xpIntoLevel(), level.levelCostXp(), nodes(setsToday.get(), lessonsToday.get(), quizzesToday.get(),
-                        dueSets.get(), unfinishedLessons.get(), unpassedQuizzes.get(), productiveTasks.get()),
-                quests(questCounts.get(), studyDays, today));
+                level.xpIntoLevel(), level.levelCostXp(),
+                nodes(setsToday.get(), lessonsToday.get(), quizzesToday.get(), dueSets.get(), unfinishedLessons.get(),
+                        unpassedQuizzes.get(), productiveTasks.get(), plan.orElse(null)),
+                quests(questCounts.get(), studyDays, today),
+                plan.map(RoadmapTodayReader.TodayPlan::stageTitle).orElse(null));
     }
 
+    /**
+     * With an active roadmap, the outstanding work is: cards due (spaced repetition keeps its deadline), then the
+     * current stage's content in the roadmap's order, then the stage's milestone once its required content is done.
+     * Without one, the general rules pick the work.
+     */
     private static List<DailyPlan.Node> nodes(List<DailyPathQuery.StudiedSet> setsToday,
             List<DailyPathQuery.PractisedLesson> lessonsToday, List<DailyPathQuery.AttemptedQuiz> quizzesToday,
             List<DailyPathQuery.DueSet> dueSets, List<DailyPathQuery.PendingLesson> unfinishedLessons,
-            List<DailyPathQuery.PendingQuiz> unpassedQuizzes, List<DailyPathQuery.ProductiveTask> productiveTasks) {
+            List<DailyPathQuery.PendingQuiz> unpassedQuizzes, List<DailyPathQuery.ProductiveTask> productiveTasks,
+            RoadmapTodayReader.TodayPlan roadmap) {
         Map<UUID, Long> cardsPerSetToday = setsToday.stream().collect(
                 Collectors.toMap(DailyPathQuery.StudiedSet::setId, DailyPathQuery.StudiedSet::cardCount, Long::sum));
         Map<UUID, Long> sentencesPerLessonToday = lessonsToday.stream().collect(Collectors.toMap(
@@ -117,6 +129,19 @@ public class DailyPathServiceImpl implements DailyPathService {
         List<DailyPlan.Candidate> candidates = new ArrayList<>();
         dueSets.forEach(set -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.FLASHCARD_REVIEW, set.setId(),
                 set.name(), set.dueCount(), cardsPerSetToday.getOrDefault(set.setId(), 0L), set.completionPercent())));
+        if (roadmap != null) {
+            productiveTasks.stream().filter(DailyPathQuery.ProductiveTask::submittedToday).forEach(task -> finished
+                    .add(new DailyPlan.Finished(productiveKind(task.skill()), task.id(), task.title(), 1, null)));
+            for (RoadmapTodayReader.TodayItem item : roadmap.items()) {
+                candidates.add(new DailyPlan.Candidate(kindOf(item), item.contentId(), item.title(), 1, 0,
+                        item.percentDone() == 0 ? null : item.percentDone()));
+            }
+            if (roadmap.milestone() != null) {
+                candidates.add(new DailyPlan.Candidate(DailyTaskKind.MILESTONE, roadmap.milestone().milestoneId(),
+                        "Bài kiểm tra cuối giai đoạn: " + roadmap.stageTitle(), 1, 0, null));
+            }
+            return DailyPlan.buildInPlanOrder(finished, candidates);
+        }
         unfinishedLessons.forEach(lesson -> candidates.add(new DailyPlan.Candidate(DailyTaskKind.DICTATION,
                 lesson.lessonId(), lesson.title(), lesson.remainingSentences(),
                 sentencesPerLessonToday.getOrDefault(lesson.lessonId(), 0L), lesson.completionPercent())));
@@ -124,7 +149,7 @@ public class DailyPathServiceImpl implements DailyPathService {
                 quiz.title(), quiz.questionCount(), 0, quiz.bestScorePercent())));
 
         productiveTasks.forEach(task -> {
-            var kind = task.skill().equals("WRITING") ? DailyTaskKind.WRITING : DailyTaskKind.SPEAKING;
+            var kind = productiveKind(task.skill());
             if (task.submittedToday()) {
                 finished.add(new DailyPlan.Finished(kind, task.id(), task.title(), 1, null));
             } else if (task.unsubmitted()) {
@@ -132,6 +157,20 @@ public class DailyPathServiceImpl implements DailyPathService {
             }
         });
         return DailyPlan.build(finished, candidates);
+    }
+
+    private static DailyTaskKind productiveKind(String skill) {
+        return "WRITING".equals(skill) ? DailyTaskKind.WRITING : DailyTaskKind.SPEAKING;
+    }
+
+    private static DailyTaskKind kindOf(RoadmapTodayReader.TodayItem item) {
+        return switch (item.kind()) {
+            case "FLASHCARD_SET" -> DailyTaskKind.FLASHCARD_REVIEW;
+            case "DICTATION_LESSON" -> DailyTaskKind.DICTATION;
+            case "QUIZ" -> DailyTaskKind.QUIZ;
+            case "SPEAKING_PROMPT" -> DailyTaskKind.PRONUNCIATION;
+            default -> productiveKind(item.skill());
+        };
     }
 
     private static List<DailyQuests.Quest> quests(DailyPathQuery.QuestCounts counts, List<LocalDate> studyDays,

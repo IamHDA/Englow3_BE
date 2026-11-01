@@ -40,7 +40,7 @@ public final class RoadmapPlan {
             List<MockPaper> mockPapers) {
     }
 
-    public record ProposedItem(RoadmapContentKind kind, UUID contentId, String title, boolean required,
+    public record ProposedItem(RoadmapContentKind kind, UUID contentId, String title, String skill, boolean required,
             int targetPercent, int plannedWeek, int estimatedMinutes) {
     }
 

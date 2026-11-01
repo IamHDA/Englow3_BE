@@ -12,5 +12,11 @@ public enum DailyTaskKind {
     /** A published quiz the learner has not passed yet. */
     QUIZ,
 
-    WRITING, SPEAKING
+    WRITING, SPEAKING,
+
+    /** A pronunciation prompt scheduled by the learner's roadmap. */
+    PRONUNCIATION,
+
+    /** The test closing the current roadmap stage; the target is the milestone. */
+    MILESTONE
 }

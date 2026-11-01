@@ -25,6 +25,7 @@ public class RoadmapItem extends BasePersistedEntity {
     private RoadmapContentKind contentKind;
     private UUID contentId;
     private String title;
+    private String skill;
     private boolean required;
     private int targetPercent;
     private int plannedWeek;
@@ -34,7 +35,7 @@ public class RoadmapItem extends BasePersistedEntity {
     }
 
     public static RoadmapItem of(UUID id, UUID stageId, int orderNo, RoadmapContentKind kind, UUID contentId,
-            String title, boolean required, int targetPercent, int plannedWeek, int estimatedMinutes) {
+            String title, String skill, boolean required, int targetPercent, int plannedWeek, int estimatedMinutes) {
         RoadmapItem item = new RoadmapItem();
         item.id = id;
         item.stageId = stageId;
@@ -42,6 +43,7 @@ public class RoadmapItem extends BasePersistedEntity {
         item.contentKind = kind;
         item.contentId = contentId;
         item.title = title.length() > 200 ? title.substring(0, 200) : title;
+        item.skill = skill;
         item.required = required;
         item.targetPercent = targetPercent;
         item.plannedWeek = plannedWeek;

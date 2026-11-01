@@ -108,6 +108,10 @@ module's table as a JPA entity.
   flashcard, quiz, dictation and assessment tables. Both are documented read-only joins; no
   `progress` code writes those tables.
 - **Productive practice:** a valid first submission on each attempt counts once for study activity and the existing practice-attempt XP rate. Regrading, retrying a grader and reading a report do not add another submission. Drafts count for neither XP nor streak.
+- **Roadmap:** with an active roadmap, the outstanding work is cards due, then the
+  current stage's unfinished content due by this week of the stage (from
+  `roadmap.api.RoadmapTodayReader`), then the stage's milestone once its required
+  content is done. Without one, the general rules above choose the work.
 - **Derived, not stored:** plans, experience, levels, streaks, and quests are
   computed on every read. There is no points ledger or persisted daily path to
   drift out of step with activity.

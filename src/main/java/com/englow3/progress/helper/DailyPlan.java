@@ -51,7 +51,8 @@ public final class DailyPlan {
      * late is a card the schedule has lost - while a quiz or a dictation lesson is equally useful whenever it is done.
      */
     private static final List<DailyTaskKind> KIND_ORDER = List.of(DailyTaskKind.FLASHCARD_REVIEW,
-            DailyTaskKind.DICTATION, DailyTaskKind.QUIZ, DailyTaskKind.WRITING, DailyTaskKind.SPEAKING);
+            DailyTaskKind.DICTATION, DailyTaskKind.QUIZ, DailyTaskKind.WRITING, DailyTaskKind.SPEAKING,
+            DailyTaskKind.PRONUNCIATION, DailyTaskKind.MILESTONE);
 
     /**
      * @param finished
@@ -62,6 +63,21 @@ public final class DailyPlan {
     public static List<Node> build(List<Finished> finished, List<Candidate> candidates) {
         List<Candidate> ordered = new ArrayList<>(candidates);
         ordered.sort(Comparator.comparingInt(candidate -> KIND_ORDER.indexOf(candidate.kind())));
+        return nodes(finished, ordered);
+    }
+
+    /**
+     * As {@link #build}, keeping the candidates in the order given: the learner's roadmap has already decided what
+     * comes first, and sorting by kind would undo it. A target listed twice keeps its first place.
+     */
+    public static List<Node> buildInPlanOrder(List<Finished> finished, List<Candidate> candidates) {
+        Set<String> seen = new HashSet<>();
+        List<Candidate> ordered = candidates.stream()
+                .filter(candidate -> seen.add(key(candidate.kind(), candidate.targetId()))).toList();
+        return nodes(finished, ordered);
+    }
+
+    private static List<Node> nodes(List<Finished> finished, List<Candidate> ordered) {
 
         Set<String> outstanding = new HashSet<>();
         for (Candidate candidate : ordered) {
@@ -102,6 +118,9 @@ public final class DailyPlan {
             case DICTATION -> unitsRemaining * ExperiencePoints.DICTATION_SENTENCE_XP;
             // Per attempt, not per question: a long quiz is one submission.
             case QUIZ, WRITING, SPEAKING -> ExperiencePoints.QUIZ_ATTEMPT_XP;
+            // Pronunciation practice earns nothing on the counter today, so the node promises nothing.
+            case PRONUNCIATION -> 0;
+            case MILESTONE -> ExperiencePoints.EXAM_ATTEMPT_XP;
         };
     }
 

@@ -45,6 +45,22 @@ class DailyPlanTest {
                 DailyTaskKind.DICTATION, DailyTaskKind.QUIZ);
     }
 
+    /** The learner's roadmap decided the order; the plan keeps it, and lists a target once even if offered twice. */
+    @Test
+    void keepsTheRoadmapsOrderAndListsEachTargetOnce() {
+        UUID milestone = UUID.randomUUID();
+        List<Node> nodes = DailyPlan.buildInPlanOrder(List.of(),
+                List.of(new Candidate(DailyTaskKind.FLASHCARD_REVIEW, SET, "Core 500", 12, 0, 40),
+                        new Candidate(DailyTaskKind.QUIZ, QUIZ, "Tenses", 1, 0, null),
+                        new Candidate(DailyTaskKind.DICTATION, LESSON, "Airport", 1, 0, 20),
+                        new Candidate(DailyTaskKind.FLASHCARD_REVIEW, SET, "Core 500", 1, 0, 40),
+                        new Candidate(DailyTaskKind.MILESTONE, milestone, "Kiểm tra", 1, 0, null)));
+
+        assertThat(nodes).extracting(Node::kind).containsExactly(DailyTaskKind.FLASHCARD_REVIEW, DailyTaskKind.QUIZ,
+                DailyTaskKind.DICTATION, DailyTaskKind.MILESTONE);
+        assertThat(nodes.getLast().xpReward()).isEqualTo(ExperiencePoints.EXAM_ATTEMPT_XP);
+    }
+
     @Test
     void listsWorkFinishedTodayAsCompletedBeforeWhatIsLeft() {
         List<Node> nodes = DailyPlan.build(List.of(new Finished(DailyTaskKind.DICTATION, LESSON, "Airport", 6, 88)),

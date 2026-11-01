@@ -10,7 +10,7 @@ import com.englow3.progress.entity.DailyTaskStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record DailyPathResponse(int streakDays, long totalXp, int level, long xpIntoLevel, long levelCostXp,
-        List<DailyTaskResponse> tasks, List<DailyQuestResponse> quests) {
+        List<DailyTaskResponse> tasks, List<DailyQuestResponse> quests, String roadmapStageTitle) {
 
     public static DailyPathResponse from(DailyPathResult result) {
         return new DailyPathResponse(result.streakDays(), result.totalXp(), result.level(), result.xpIntoLevel(),
@@ -21,7 +21,8 @@ public record DailyPathResponse(int streakDays, long totalXp, int level, long xp
                                 node.xpReward()))
                         .toList(),
                 result.quests().stream().map(quest -> new DailyQuestResponse(quest.kind(), quest.progress(),
-                        quest.target(), quest.completed())).toList());
+                        quest.target(), quest.completed())).toList(),
+                result.roadmapStageTitle());
     }
 
     /**

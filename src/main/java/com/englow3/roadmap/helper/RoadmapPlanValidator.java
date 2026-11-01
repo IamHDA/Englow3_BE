@@ -142,8 +142,8 @@ public final class RoadmapPlanValidator {
                 throw invalid("stage %d week %d needs %d minutes, more than %d available".formatted(position, week,
                         minutes, weeklyMinutes));
             }
-            items.add(new ProposedItem(kind, contentId, candidate.title(), item.path("required").asBoolean(true),
-                    target, week, candidate.estimatedMinutes()));
+            items.add(new ProposedItem(kind, contentId, candidate.title(), candidate.skill(),
+                    item.path("required").asBoolean(true), target, week, candidate.estimatedMinutes()));
         }
         return items;
     }

@@ -77,7 +77,7 @@ public class RoadmapPlanWriterImpl implements RoadmapPlanWriter {
             int itemNo = 0;
             for (ProposedItem item : proposed.items()) {
                 items.add(RoadmapItem.of(UUID.randomUUID(), stage.getId(), ++itemNo, item.kind(), item.contentId(),
-                        item.title(), item.required(), item.targetPercent(), item.plannedWeek(),
+                        item.title(), item.skill(), item.required(), item.targetPercent(), item.plannedWeek(),
                         item.estimatedMinutes()));
             }
             milestones.add(proposed.milestone().examId() != null

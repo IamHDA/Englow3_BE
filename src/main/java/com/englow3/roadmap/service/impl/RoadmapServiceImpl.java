@@ -234,7 +234,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         List<RoadmapResult.Item> itemResults = items.stream().map(item -> {
             int percent = done.getOrDefault(item.getContentId(), 0);
             return new RoadmapResult.Item(item.getId(), item.getContentKind().name(), item.getContentId(),
-                    item.getTitle(), item.isRequired(), item.getTargetPercent(), item.getPlannedWeek(),
+                    item.getTitle(), item.getSkill(), item.isRequired(), item.getTargetPercent(), item.getPlannedWeek(),
                     item.getEstimatedMinutes(), percent, percent >= item.getTargetPercent());
         }).toList();
         List<RoadmapResult.Item> required = itemResults.stream().filter(RoadmapResult.Item::required).toList();

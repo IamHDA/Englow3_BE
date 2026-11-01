@@ -71,6 +71,8 @@ create table roadmap_items (
     content_id     uuid         not null,
     -- The title when the plan was made, so a plan still reads sensibly if the content is later renamed or archived.
     title          varchar(200) not null,
+    -- What the content trains (GRAMMAR, LISTENING, WRITING, ...), as the catalogue described it when planned.
+    skill          varchar(30),
     required       boolean      not null default true,
     target_percent integer      not null default 80 check (target_percent between 1 and 100),
     planned_week   integer      not null default 1 check (planned_week > 0),

@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.englow3.ai.client.LlmClient;
 import com.englow3.roadmap.dto.result.RoadmapResult;
+import com.englow3.roadmap.api.RoadmapTodayReader;
 import com.englow3.roadmap.entity.LevelCheckPurpose;
 import com.englow3.roadmap.worker.RoadmapGenerationHandler;
 import com.englow3.shared.time.StudyCalendar;
@@ -49,6 +50,8 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
     private ObjectMapper mapper;
     @Autowired
     private StudyCalendar calendar;
+    @Autowired
+    private RoadmapTodayReader todayReader;
 
     private final LlmClient llm = mock(LlmClient.class);
     private RoadmapGenerationHandler handler;
@@ -97,8 +100,15 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(stage.milestone().kind()).isEqualTo("LEVEL_CHECK");
         assertThat(stage.milestone().ready()).isFalse();
 
+        var todayBefore = todayReader.today(learner).orElseThrow();
+        assertThat(todayBefore.items()).extracting(RoadmapTodayReader.TodayItem::contentId).containsExactly(quiz);
+        assertThat(todayBefore.milestone()).as("not before the required work is done").isNull();
+
         fixture.quizAttempt(learner, quiz, 90, true, Instant.now());
         assertThat(roadmapService.current().orElseThrow().stages().getFirst().milestone().ready()).isTrue();
+        var todayAfter = todayReader.today(learner).orElseThrow();
+        assertThat(todayAfter.items()).isEmpty();
+        assertThat(todayAfter.milestone().milestoneId()).isEqualTo(stage.milestone().id());
 
         UUID paper = levelCheckPaper();
         var check = levelCheckService.start(LevelCheckPurpose.MILESTONE, stage.milestone().id());
@@ -117,6 +127,8 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
 
         RoadmapResult finished = roadmapService.current().orElseThrow();
         assertThat(finished.status()).isEqualTo("COMPLETED");
+        assertThat(todayReader.today(learner)).as("a finished roadmap leaves the daily path to its own rules")
+                .isEmpty();
         assertThat(finished.stages().getFirst().status()).isEqualTo("PASSED");
         assertThat(finished.stages().getFirst().milestone().resultLevel()).isEqualTo("B2");
         assertThat(jdbc.sql("select current_level from learner_profiles where user_id = :id").param("id", learner)

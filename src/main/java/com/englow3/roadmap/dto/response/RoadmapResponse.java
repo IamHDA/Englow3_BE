@@ -31,9 +31,9 @@ public record RoadmapResponse(UUID id, String status, String goalType, String ta
             return new StageResponse(s.id(), s.orderNo(), s.title(), s.summary(), s.fromLevel(), s.toLevel(),
                     s.focusSkills(), s.plannedStart(), s.plannedEnd(), s.status(), s.percentDone(),
                     s.items().stream()
-                            .map(i -> new ItemResponse(i.id(), i.kind(), i.contentId(), i.title(), i.required(),
-                                    i.targetPercent(), i.plannedWeek(), i.estimatedMinutes(), i.percentDone(),
-                                    i.done()))
+                            .map(i -> new ItemResponse(i.id(), i.kind(), i.contentId(), i.title(), i.skill(),
+                                    i.required(), i.targetPercent(), i.plannedWeek(), i.estimatedMinutes(),
+                                    i.percentDone(), i.done()))
                             .toList(),
                     m == null ? null
                             : new MilestoneResponse(m.id(), m.kind(), m.examId(), m.requiredScore(), m.requiredLevel(),
@@ -46,8 +46,8 @@ public record RoadmapResponse(UUID id, String status, String goalType, String ta
      * @param contentId
      *            the set, lesson, quiz, prompt or task to open - the client links it by kind
      */
-    public record ItemResponse(UUID id, String kind, UUID contentId, String title, boolean required, int targetPercent,
-            int plannedWeek, int estimatedMinutes, int percentDone, boolean done) {
+    public record ItemResponse(UUID id, String kind, UUID contentId, String title, String skill, boolean required,
+            int targetPercent, int plannedWeek, int estimatedMinutes, int percentDone, boolean done) {
     }
 
     /**

@@ -13,7 +13,10 @@ import com.englow3.progress.helper.DailyQuests;
  *            consecutive days with any practice, counted across every feature
  * @param totalXp
  *            derived from all recorded activity, never stored
+ * @param roadmapStageTitle
+ *            the roadmap stage today's work comes from; null when the learner has no active roadmap and the work is
+ *            chosen by the general rules
  */
 public record DailyPathResult(int streakDays, long totalXp, int level, long xpIntoLevel, long levelCostXp,
-        List<DailyPlan.Node> nodes, List<DailyQuests.Quest> quests) {
+        List<DailyPlan.Node> nodes, List<DailyQuests.Quest> quests, String roadmapStageTitle) {
 }

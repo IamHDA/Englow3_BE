@@ -29,8 +29,8 @@ public record RoadmapResult(UUID id, String status, String goalType, String targ
             List<Item> items, Milestone milestone) {
     }
 
-    public record Item(UUID id, String kind, UUID contentId, String title, boolean required, int targetPercent,
-            int plannedWeek, int estimatedMinutes, int percentDone, boolean done) {
+    public record Item(UUID id, String kind, UUID contentId, String title, String skill, boolean required,
+            int targetPercent, int plannedWeek, int estimatedMinutes, int percentDone, boolean done) {
     }
 
     /**
