@@ -1,5 +1,7 @@
 package com.englow3.assessment.service.impl;
 
+import org.springframework.context.ApplicationEventPublisher;
+import com.englow3.assessment.api.AssessmentAnswerGraded;
 import java.time.Clock;
 import java.util.UUID;
 
@@ -21,11 +23,17 @@ public class AssessmentResultWriterImpl implements AssessmentResultWriter {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final AiJobQueue queue;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public void complete(UUID id, int revision, String report, String transcript) {
-        attemptRepo.lockById(id).ifPresent(a -> a.finishAi(revision,
-                AssessmentRubric.validate(mapper, a.getSkill(), report), transcript, clock.instant()));
+        attemptRepo.lockById(id).ifPresent(a -> {
+            if (a.finishAi(revision, AssessmentRubric.validate(mapper, a.getSkill(), report), transcript,
+                    clock.instant())) {
+                events.publishEvent(
+                        new AssessmentAnswerGraded(a.getId(), a.getUserId(), a.getTaskId(), a.getSkill().name()));
+            }
+        });
     }
 
     @Transactional

@@ -17,11 +17,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.exam.api.ExamSittingScored;
 import com.englow3.exam.dto.command.SaveExamDraftCommand;
 import com.englow3.exam.dto.command.StartExamAttemptCommand;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand.SubmittedAnswer;
@@ -83,6 +85,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
     private final ExamOutlineQuery outlineQuery;
     private final Duration fullAttemptGrace;
+    private final ApplicationEventPublisher events;
 
     /** The longest clock a learner can set on a practice. */
     static final int MAX_PRACTICE_MINUTES = 300;
@@ -94,7 +97,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl, ExamAttemptDraftRepository draftRepo,
             com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery,
-            @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace) {
+            @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace, ApplicationEventPublisher events) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
         this.answerRepo = answerRepo;
@@ -111,6 +114,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.mapper = mapper;
         this.outlineQuery = outlineQuery;
         this.fullAttemptGrace = fullAttemptGrace;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -330,6 +334,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         answerRepo.saveAll(storedAnswers);
         answerOptionRepo.saveAll(storedOptions);
         attempt.score(rawScore, correctCount, now);
+        events.publishEvent(new ExamSittingScored(attempt.getId(), attempt.getUserId(), attempt.getExamId(),
+                !attempt.isPractice()));
 
         Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
         // A practice never sets a level: it is a chosen slice of the paper, on a clock the learner picked.

@@ -94,6 +94,8 @@ public abstract class PostgresIntegrationTest {
         registry.add("app.ai.enabled", () -> "false");
         registry.add("app.tutor.maintenance-enabled", () -> "false");
         registry.add("app.ai.queue-scope", () -> TEST_QUEUE_SCOPE);
+        // The sweep would touch rows other tests are in the middle of asserting on.
+        registry.add("app.roadmap.sweep.enabled", () -> "false");
 
         // The only two settings with no default. They are deliberately required in production - an application that
         // silently starts with no token issuer would accept nothing and say nothing about why - so the context needs

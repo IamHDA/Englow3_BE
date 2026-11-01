@@ -35,6 +35,21 @@ public interface LevelCheckRepository extends JpaRepository<LevelCheck, UUID> {
 
     Optional<LevelCheck> findFirstByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    /** The learner's unfinished checks on this paper - the ones a new sitting of it may belong to. */
+    List<LevelCheck> findByUserIdAndExamIdAndStatusNot(UUID userId, UUID examId, LevelCheckStatus status);
+
+    /** The learner's unfinished checks asking for this spoken task. */
+    List<LevelCheck> findByUserIdAndSpeakingTaskIdAndStatusNot(UUID userId, UUID taskId, LevelCheckStatus status);
+
+    /** Unfinished checks started since {@code since}, oldest first, for the periodic sweep. */
+    @Query("""
+            select c.id from LevelCheck c
+             where c.status <> com.englow3.roadmap.entity.LevelCheckStatus.COMPLETED and c.createdAt >= :since
+             order by c.createdAt
+            """)
+    List<UUID> findUnfinishedSince(@Param("since") java.time.Instant since,
+            org.springframework.data.domain.Pageable page);
+
     /** Papers and tasks the learner has already met, so a retake gets fresh ones where there are any. */
     @Query("select c.examId from LevelCheck c where c.userId = :userId")
     List<UUID> usedExamIds(@Param("userId") UUID userId);

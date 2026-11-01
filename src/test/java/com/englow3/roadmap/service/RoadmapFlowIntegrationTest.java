@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.englow3.ai.client.LlmClient;
 import com.englow3.roadmap.dto.result.RoadmapResult;
+import com.englow3.exam.api.ExamSittingScored;
 import com.englow3.roadmap.api.RoadmapTodayReader;
 import com.englow3.roadmap.entity.LevelCheckPurpose;
 import com.englow3.roadmap.worker.RoadmapGenerationHandler;
@@ -52,6 +53,10 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
     private StudyCalendar calendar;
     @Autowired
     private RoadmapTodayReader todayReader;
+    @Autowired
+    private RoadmapResultSync sync;
+    @Autowired
+    private org.springframework.context.ApplicationEventPublisher events;
 
     private final LlmClient llm = mock(LlmClient.class);
     private RoadmapGenerationHandler handler;
@@ -120,7 +125,12 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(levelCheckService.skipSpeaking(check.id()).speakingSkipped()).isTrue();
         // Reading 2/2 is C2 and listening 1/2 is B1: (6x40 + 3x30) / 70 = 4.7, rounded down to B2.
         UUID sitting = sitting(paper, 2, 1);
-        // Sat on the usual exam screens: the check finds the sitting itself the next time it is looked at.
+        // The exam module announces the score; the check completes and the stage closes with nobody on the page.
+        events.publishEvent(new ExamSittingScored(sitting, learner, paper, true));
+        assertThat(jdbc.sql("select status from level_checks where id = :id").param("id", check.id())
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("select status from learning_roadmaps where id = :id").param("id", requested.id())
+                .query(String.class).single()).isEqualTo("COMPLETED");
         var done = levelCheckService.get(check.id());
         assertThat(done.examAttemptId()).isEqualTo(sitting);
         assertThat(done.status()).hasToString("COMPLETED");
@@ -184,10 +194,18 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(afterFail.adjusting()).isTrue();
         assertThat(afterFail.pendingReason()).hasToString("MILESTONE_FAILED");
 
-        mockSitting(mock, "6.0");
-        // Sat on the usual exam screens: the next look at the roadmap counts it.
+        UUID passing = mockSitting(mock, "6.0");
+        // Practising a few parts of the paper is no milestone.
+        events.publishEvent(new ExamSittingScored(passing, learner, mock, false));
+        assertThat(stageStatuses(requested.id())).containsExactly("CURRENT", "LOCKED");
+        // The sweep finds the full sitting even if its announcement was lost.
+        sync.refreshRoadmap(requested.id());
+        assertThat(stageStatuses(requested.id())).containsExactly("PASSED", "CURRENT");
         RoadmapResult afterPass = roadmapService.current().orElseThrow();
         assertThat(afterPass.adjusting()).as("a pass makes the replan moot").isFalse();
+        assertThat(afterPass.stages().get(1).milestone().status())
+                .as("the sitting that closed stage 1 does not count again for stage 2's mock on the same paper")
+                .hasToString("PENDING");
         assertThat(afterPass.stages()).extracting(stage -> stage.status().name()).containsExactly("PASSED", "CURRENT");
         assertThat(afterPass.adjustments()).extracting(adjustment -> adjustment.reason().name())
                 .contains("MILESTONE_PASSED");
@@ -222,6 +240,11 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
                 """).param("id", UUID.randomUUID()).param("user", learner).param("current", current)
                 .param("certificate", certificate).param("score", targetScore).param("level", targetLevel)
                 .param("date", calendar.today().plusMonths(8)).update();
+    }
+
+    private java.util.List<String> stageStatuses(UUID roadmapId) {
+        return jdbc.sql("select status from roadmap_stages where roadmap_id = :id and status <> 'REPLACED' "
+                + "order by order_no").param("id", roadmapId).query(String.class).list();
     }
 
     private void purpose(String code) {

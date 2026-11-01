@@ -73,7 +73,7 @@ class ExamAttemptServiceTest {
     private final ExamAttemptService service = new ExamAttemptServiceImpl(examRepo, attemptRepo, answerRepo,
             answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder, presignedUrls, CLOCK, "exams",
             Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery,
-            Duration.ofMinutes(2));
+            Duration.ofMinutes(2), mock(org.springframework.context.ApplicationEventPublisher.class));
 
     private final UUID userId = UUID.randomUUID();
 

@@ -21,8 +21,6 @@ import com.englow3.roadmap.dto.result.RoadmapResult;
 import com.englow3.roadmap.entity.AdjustmentReason;
 import com.englow3.roadmap.entity.CefrLevel;
 import com.englow3.roadmap.entity.LearningRoadmap;
-import com.englow3.roadmap.entity.MilestoneKind;
-import com.englow3.roadmap.entity.MilestoneStatus;
 import com.englow3.roadmap.entity.RoadmapContentKind;
 import com.englow3.roadmap.entity.RoadmapGoalType;
 import com.englow3.roadmap.entity.RoadmapItem;
@@ -55,9 +53,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RoadmapServiceImpl implements RoadmapService {
 
-    /** How far past a stage's planned end the plan is rebuilt around where the learner really is. */
-    static final int BEHIND_SCHEDULE_DAYS = 7;
-
     private final LearningRoadmapRepository roadmapRepo;
     private final RoadmapStageRepository stageRepo;
     private final RoadmapItemRepository itemRepo;
@@ -81,19 +76,9 @@ public class RoadmapServiceImpl implements RoadmapService {
         if (found.isEmpty()) {
             return Optional.empty();
         }
-        LearningRoadmap roadmap = found.get();
-        Optional<MilestoneContext> sat = mockSittingToRecord(roadmap);
-        if (sat.isPresent()) {
-            roadmap = sat.get().roadmap();
-        }
-        if (isFarBehind(roadmap)) {
-            LearningRoadmap locked = roadmapRepo.findByIdForUpdate(roadmap.getId()).orElseThrow();
-            if (isFarBehind(locked)) {
-                planner.tryRequestAdjustment(locked, AdjustmentReason.BEHIND_SCHEDULE);
-            }
-            roadmap = locked;
-        }
-        return Optional.of(assemble(roadmap));
+        // Results normally arrive by event or the periodic sweep; catching up here as well means a learner never
+        // sees a page older than what the database already knows.
+        return Optional.of(assemble(progression.catchUp(found.get())));
     }
 
     @Override
@@ -161,7 +146,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         var sitting = sittings.read(examAttemptId, userId)
                 .orElseThrow(() -> new NotFoundException("EXAM_ATTEMPT_NOT_FOUND",
                         "No sitting %s of yours".formatted(examAttemptId)));
-        if (sitting.scoredAt() != null && sitting.scoredAt().isBefore(context.stage().getCreatedAt())) {
+        if (sitting.scoredAt() != null && sitting.scoredAt().isBefore(progression.openedAt(context.stage()))) {
             throw new BadRequestException("MILESTONE_SITTING_TOO_OLD",
                     "Only a sitting taken since this stage began counts");
         }
@@ -169,58 +154,6 @@ public class RoadmapServiceImpl implements RoadmapService {
                 sitting.convertedScore(), clock.instant());
         progression.settle(context);
         return assemble(context.roadmap());
-    }
-
-    /**
-     * The learner sits the current stage's mock paper on the usual exam screens. The newest scored full sitting since
-     * the stage began, if not already counted, is taken as the milestone's result here, on the next look at the roadmap
-     * - the exam module never needs to know a roadmap is waiting.
-     *
-     * @return the milestone, locked and settled, when a sitting was recorded
-     */
-    private Optional<MilestoneContext> mockSittingToRecord(LearningRoadmap roadmap) {
-        if (roadmap.getStatus() != RoadmapStatus.ACTIVE) {
-            return Optional.empty();
-        }
-        Optional<RoadmapStage> current = stageRepo.findFirstByRoadmapIdAndStatus(roadmap.getId(),
-                RoadmapStageStatus.CURRENT);
-        Optional<RoadmapMilestone> milestone = current.flatMap(stage -> milestoneRepo.findByStageId(stage.getId()))
-                .filter(found -> found.getKind() == MilestoneKind.CERTIFICATE_MOCK)
-                .filter(found -> found.getStatus() != MilestoneStatus.PASSED);
-        if (milestone.isEmpty()) {
-            return Optional.empty();
-        }
-        var sitting = sittings.latestFullSitting(milestone.get().getExamId(), roadmap.getUserId(),
-                current.get().getCreatedAt());
-        if (sitting.isEmpty() || sitting.get().attemptId().equals(milestone.get().getResultExamAttemptId())
-                || sitting.get().convertedScore() == null) {
-            return Optional.empty();
-        }
-        MilestoneContext context = progression.locate(roadmap.getUserId(), milestone.get().getId());
-        if (sitting.get().attemptId().equals(context.milestone().getResultExamAttemptId())) {
-            return Optional.empty();
-        }
-        context.milestone().recordMockSitting(sitting.get().attemptId(), sitting.get().examId(), sitting.get().scored(),
-                sitting.get().full(), sitting.get().convertedScore(), clock.instant());
-        progression.settle(context);
-        return Optional.of(context);
-    }
-
-    /**
-     * The current stage ran a week past its planned end, nothing is being replanned, and no automatic replan failed
-     * today already - otherwise every visit would spend another of the day's attempts on the same failure.
-     */
-    private boolean isFarBehind(LearningRoadmap roadmap) {
-        if (roadmap.getStatus() != RoadmapStatus.ACTIVE || roadmap.isAdjusting()) {
-            return false;
-        }
-        if (roadmap.getFailureCode() != null && roadmap.getUpdatedAt() != null
-                && !calendar.dayOf(roadmap.getUpdatedAt()).isBefore(calendar.today())) {
-            return false;
-        }
-        LocalDate today = calendar.today();
-        return stageRepo.findFirstByRoadmapIdAndStatus(roadmap.getId(), RoadmapStageStatus.CURRENT)
-                .map(stage -> stage.getPlannedEnd().plusDays(BEHIND_SCHEDULE_DAYS).isBefore(today)).orElse(false);
     }
 
     private static boolean sameKind(LearningRoadmap roadmap, Goal goal) {

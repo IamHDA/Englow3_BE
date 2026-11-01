@@ -143,8 +143,7 @@ of how the plan changed.
   grammar, plus LISTENING) and a `LEVEL_CHECK` speaking task. Section shares map to
   bands through `level_check_conversions`; speaking through
   `assessment.api.SpeakingLevelReader`. The parts combine as a weighted mean,
-  rounded down; without a spoken part the written weights make the whole. Grades are
-  read on every look rather than pushed by events. The result is recorded on the
+  rounded down; without a spoken part the written weights make the whole. The result is recorded on the
   learner profile through `user.api.PlacementRecorder`.
 - **Cross-module read:** `ContentCatalogQuery` reads published
   `flashcard_sets`, `dictation_lessons`, `quizzes`, `speaking_prompts`,
@@ -152,6 +151,13 @@ of how the plan changed.
   `flashcard_reviews`, `dictation_sentences`, `dictation_attempts`,
   `quiz_attempts`, `speaking_attempts` and `assessment_attempts`. Both are
   documented read-only joins; no roadmap code writes those tables.
+- **Results without a page view:** `exam` publishes `exam.api.ExamSittingScored`
+  and `assessment` publishes `assessment.api.AssessmentAnswerGraded` inside the
+  grading transaction. `RoadmapResultListener` hears them after commit and moves
+  level checks and mock milestones on at once. `RoadmapResultSweeper` (every 10
+  minutes, `app.roadmap.sweep.*`) re-checks unfinished level checks and active
+  roadmaps, catching lost announcements and roadmaps a week behind. Reading the
+  roadmap or a level check catches up too. Neither publisher depends on `roadmap`.
 - **Derived, not stored:** item progress is computed from activity on every read.
 
 ## `ai`

@@ -7,7 +7,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.englow3.roadmap.entity.AdjustmentReason;
+import com.englow3.exam.api.ScoredExamAttemptReader;
 import com.englow3.roadmap.entity.LearningRoadmap;
+import com.englow3.roadmap.entity.MilestoneKind;
 import com.englow3.roadmap.entity.MilestoneStatus;
 import com.englow3.roadmap.entity.RoadmapAdjustment;
 import com.englow3.roadmap.entity.RoadmapMilestone;
@@ -22,6 +24,7 @@ import com.englow3.roadmap.service.RoadmapPlanner;
 import com.englow3.roadmap.service.RoadmapProgression;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.shared.time.StudyCalendar;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,12 +33,17 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RoadmapProgressionImpl implements RoadmapProgression {
 
+    /** How far past a stage's planned end the plan is rebuilt around where the learner really is. */
+    static final int BEHIND_SCHEDULE_DAYS = 7;
+
     private final LearningRoadmapRepository roadmapRepo;
     private final RoadmapStageRepository stageRepo;
     private final RoadmapMilestoneRepository milestoneRepo;
     private final RoadmapAdjustmentRepository adjustmentRepo;
     private final RoadmapPlanner planner;
+    private final ScoredExamAttemptReader sittings;
     private final Clock clock;
+    private final StudyCalendar calendar;
 
     @Override
     public MilestoneContext locate(UUID userId, UUID milestoneId) {
@@ -61,6 +69,77 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
         } catch (NotFoundException | ConflictException movedOn) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public LearningRoadmap catchUp(LearningRoadmap roadmap) {
+        LearningRoadmap current = recordLatestMockSitting(roadmap).map(MilestoneContext::roadmap).orElse(roadmap);
+        if (isFarBehind(current)) {
+            LearningRoadmap locked = roadmapRepo.findByIdForUpdate(current.getId()).orElseThrow();
+            if (isFarBehind(locked)) {
+                planner.tryRequestAdjustment(locked, AdjustmentReason.BEHIND_SCHEDULE);
+            }
+            current = locked;
+        }
+        return current;
+    }
+
+    /**
+     * The current stage ran a week past its planned end, nothing is being replanned, and no automatic replan failed
+     * today already - otherwise every check would spend another of the day's attempts on the same failure.
+     */
+    private boolean isFarBehind(LearningRoadmap roadmap) {
+        if (roadmap.getStatus() != RoadmapStatus.ACTIVE || roadmap.isAdjusting()) {
+            return false;
+        }
+        if (roadmap.getFailureCode() != null && roadmap.getUpdatedAt() != null
+                && !calendar.dayOf(roadmap.getUpdatedAt()).isBefore(calendar.today())) {
+            return false;
+        }
+        java.time.LocalDate today = calendar.today();
+        return stageRepo.findFirstByRoadmapIdAndStatus(roadmap.getId(), RoadmapStageStatus.CURRENT)
+                .map(stage -> stage.getPlannedEnd().plusDays(BEHIND_SCHEDULE_DAYS).isBefore(today)).orElse(false);
+    }
+
+    @Override
+    public Optional<MilestoneContext> recordLatestMockSitting(LearningRoadmap roadmap) {
+        if (roadmap.getStatus() != RoadmapStatus.ACTIVE) {
+            return Optional.empty();
+        }
+        Optional<RoadmapStage> current = stageRepo.findFirstByRoadmapIdAndStatus(roadmap.getId(),
+                RoadmapStageStatus.CURRENT);
+        Optional<RoadmapMilestone> milestone = current.flatMap(stage -> milestoneRepo.findByStageId(stage.getId()))
+                .filter(found -> found.getKind() == MilestoneKind.CERTIFICATE_MOCK)
+                .filter(found -> found.getStatus() != MilestoneStatus.PASSED);
+        if (milestone.isEmpty()) {
+            return Optional.empty();
+        }
+        var sitting = sittings.latestFullSitting(milestone.get().getExamId(), roadmap.getUserId(),
+                openedAt(current.get()));
+        if (sitting.isEmpty() || sitting.get().attemptId().equals(milestone.get().getResultExamAttemptId())
+                || sitting.get().convertedScore() == null) {
+            return Optional.empty();
+        }
+        MilestoneContext context = locate(roadmap.getUserId(), milestone.get().getId());
+        if (sitting.get().attemptId().equals(context.milestone().getResultExamAttemptId())) {
+            return Optional.empty();
+        }
+        context.milestone().recordMockSitting(sitting.get().attemptId(), sitting.get().examId(), sitting.get().scored(),
+                sitting.get().full(), sitting.get().convertedScore(), clock.instant());
+        settle(context);
+        return Optional.of(context);
+    }
+
+    @Override
+    public java.time.Instant openedAt(RoadmapStage stage) {
+        java.time.Instant opened = stage.getCreatedAt();
+        Optional<java.time.Instant> previousPass = stageRepo
+                .findByRoadmapIdOrderByOrderNoAscCreatedAtAsc(stage.getRoadmapId()).stream()
+                .filter(other -> other.getStatus() == RoadmapStageStatus.PASSED)
+                .filter(other -> other.getOrderNo() < stage.getOrderNo()).reduce((first, second) -> second)
+                .flatMap(previous -> milestoneRepo.findByStageId(previous.getId()))
+                .map(RoadmapMilestone::getAchievedAt);
+        return previousPass.filter(passed -> passed.isAfter(opened)).orElse(opened);
     }
 
     @Override

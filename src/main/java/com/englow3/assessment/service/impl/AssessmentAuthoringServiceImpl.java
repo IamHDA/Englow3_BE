@@ -1,5 +1,7 @@
 package com.englow3.assessment.service.impl;
 
+import org.springframework.context.ApplicationEventPublisher;
+import com.englow3.assessment.api.AssessmentAnswerGraded;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher events;
 
     public AssessmentWorkloadResult workload() {
         return workloadQuery.counts(currentUser.hasRole("ADMIN") ? null : users.requireCurrentUserId());
@@ -178,6 +181,8 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
             attempt.finishHuman(normalized, transcript == null ? attempt.getRecognizedText() : transcript,
                     clock.instant(), currentUser.hasRole("ADMIN"));
             reviewRepo.save(AssessmentReview.of(id, author, previous, normalized, note.strip()));
+            events.publishEvent(new AssessmentAnswerGraded(attempt.getId(), attempt.getUserId(), attempt.getTaskId(),
+                    attempt.getSkill().name()));
             return attemptRepo.saveAndFlush(attempt);
         });
         return resultMapper.from(a, true);

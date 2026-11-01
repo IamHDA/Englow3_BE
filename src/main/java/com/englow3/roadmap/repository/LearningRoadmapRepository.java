@@ -31,6 +31,14 @@ public interface LearningRoadmapRepository extends JpaRepository<LearningRoadmap
     Optional<LearningRoadmap> findFirstByUserIdAndStatusInOrderByCreatedAtDesc(UUID userId,
             List<RoadmapStatus> statuses);
 
+    /** Active roadmaps, oldest first, for the periodic sweep. */
+    @Query("""
+            select r.id from LearningRoadmap r
+             where r.status = com.englow3.roadmap.entity.RoadmapStatus.ACTIVE
+             order by r.createdAt
+            """)
+    List<UUID> findActiveIds(org.springframework.data.domain.Pageable page);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from LearningRoadmap r where r.id = :id")
     Optional<LearningRoadmap> findByIdForUpdate(@Param("id") UUID id);
