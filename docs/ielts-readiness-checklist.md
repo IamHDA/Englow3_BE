@@ -26,8 +26,8 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
     module `assessment`.
 - [x] **D-IELTS-3. Câu "Choose TWO/THREE letters".** Đã chốt: một câu N điểm, mỗi lựa
   chọn đúng được 1 điểm. Hệ thống hiện chấm kiểu tất cả hoặc không
-  (`ExamAttemptServiceImpl.java:321`). Còn phải đếm số câu `MULTIPLE_CHOICE` đang có
-  trong DB thật. Xem
+  (`ExamAttemptServiceImpl.java:321`). DB thật chưa có câu `MULTIPLE_CHOICE` nào, nên đổi
+  thẳng cách chấm của loại này. Xem
   [decisions.md](decisions.md#d-ielts-3--choose-twothree-letters-là-một-câu-nhiều-điểm).
 - [x] **D-IELTS-4. Quy tắc chấm câu điền từ.** Đã chốt: code chỉ bỏ phân biệt hoa thường
   và khoảng trắng thừa; mọi biến thể khác người viết đề liệt kê thành nhiều đáp án. Xem

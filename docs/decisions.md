@@ -188,10 +188,13 @@ ngược lại đều phải tính là đúng. Gộp thành một câu thì quy 
   được điều này.
 - Số câu của lượt thi (`question_count`) sẽ ít hơn 40, dù tổng điểm vẫn là 40.
 
-**Còn phải kiểm tra:** DB thật có câu `MULTIPLE_CHOICE` nào chưa:
-`select count(*) from questions where question_type = 'MULTIPLE_CHOICE'`. Các câu đó đang
-được chấm kiểu tất cả hoặc không. Nếu có, đổi cách chấm chung sẽ làm điểm của chúng thay
-đổi, nên phải tạo một loại câu mới thay vì sửa `MULTIPLE_CHOICE`.
+**Đã kiểm tra (2026-11-05):** DB thật chưa có câu `MULTIPLE_CHOICE` nào. Query dùng để
+kiểm tra (các bảng nằm trong schema `englow3`, không phải `public`):
+`select question_type, count(*) from englow3.questions group by question_type`.
+
+Vì vậy đổi thẳng cách chấm của `MULTIPLE_CHOICE` sang điểm từng phần, không cần loại câu
+mới. Chạy lại query này ngay trước khi triển khai thay đổi cách chấm: nếu lúc đó đã có
+câu `MULTIPLE_CHOICE`, điểm của các câu đó sẽ đổi theo.
 
 **Đổi ý thì:** muốn tách câu về sau thì phải viết lại dữ liệu của các câu đã có.
 
