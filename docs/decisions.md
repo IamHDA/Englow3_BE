@@ -175,6 +175,26 @@ Writing Task 1 khác. Làm Academic trước thì GT về sau chỉ phải thêm
 
 **Đổi ý thì:** không mất gì; GT chỉ là phần thêm vào.
 
+### D-IELTS-3 — "Choose TWO/THREE letters" là một câu nhiều điểm
+
+**Chốt:** một câu `MULTIPLE_CHOICE` có N đáp án đúng thì được N điểm. Mỗi lựa chọn đúng
+được 1 điểm, không tính thứ tự. FE cho chọn tối đa N; BE từ chối bài nộp chọn nhiều hơn N.
+
+**Lý do:** nếu tách thành N câu thì phải chấm theo cặp, vì "câu 21 = B, câu 22 = D" và
+ngược lại đều phải tính là đúng. Gộp thành một câu thì quy tắc nằm gọn trong một entity.
+
+**Hệ quả:**
+- Khi hiển thị, câu này chiếm N số ("21–22"), nên cách đánh số câu (D-IELTS-5) phải tính
+  được điều này.
+- Số câu của lượt thi (`question_count`) sẽ ít hơn 40, dù tổng điểm vẫn là 40.
+
+**Còn phải kiểm tra:** DB thật có câu `MULTIPLE_CHOICE` nào chưa:
+`select count(*) from questions where question_type = 'MULTIPLE_CHOICE'`. Các câu đó đang
+được chấm kiểu tất cả hoặc không. Nếu có, đổi cách chấm chung sẽ làm điểm của chúng thay
+đổi, nên phải tạo một loại câu mới thay vì sửa `MULTIPLE_CHOICE`.
+
+**Đổi ý thì:** muốn tách câu về sau thì phải viết lại dữ liệu của các câu đã có.
+
 ### D-IELTS-4 — Chấm câu điền từ: code chỉ chuẩn hoá tối thiểu, biến thể nằm ở dữ liệu
 
 **Chốt:** code chỉ chuẩn hoá hai thứ:
@@ -212,6 +232,28 @@ kê vẫn đúng, chỉ thành thừa.
   trang không được phát lại từ đầu, mà phải chạy tiếp từ mốc ứng với thời gian đã trôi.
 
 **Đổi ý thì:** chỉ đổi phía FE, dữ liệu không ảnh hưởng.
+
+### D-IELTS-9 — AI chấm Writing Task 1 bằng số liệu dạng text
+
+**Chốt:**
+- Số liệu của biểu đồ ghi dạng text trong `assessment_tasks.rubric_notes`. AI chấm nhận
+  trường này qua bản snapshot của task (`AssessmentServiceImpl.java:108`).
+- Ảnh biểu đồ được vẽ bằng code từ chính bộ số liệu đó (ví dụ matplotlib trong
+  pipeline), để ảnh học viên thấy và số liệu AI đọc luôn khớp nhau.
+- Bản đồ và sơ đồ quy trình không có số liệu thì mô tả bằng lời trong `rubric_notes`.
+
+**Lý do:** `ai_service/app/providers/llm.py` chỉ gửi text cho Groq. Muốn gửi ảnh thì
+phải sửa ai_service và đổi sang một model đọc được ảnh. Chấm theo text cũng cho kết quả
+ổn định hơn.
+
+**Hệ quả:**
+- Vẫn cần thêm cột ảnh vào `assessment_tasks` để học viên xem được biểu đồ.
+- Học viên đọc được `rubric_notes` sau khi bài đã chấm xong (`hideSolution` chỉ áp dụng
+  khi bài chưa `COMPLETED`). Số liệu thì không sao, vì nó vốn hiện trên biểu đồ. Nhưng
+  không ghi vào đây điều gì không muốn học viên thấy.
+
+**Đổi ý thì:** chuyển sang gửi ảnh thì số liệu đã ghi vẫn dùng được làm thông tin bổ sung
+cho AI.
 
 ---
 

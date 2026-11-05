@@ -24,11 +24,11 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   - Đề mock chỉ gồm Listening và Reading. Writing và Speaking bị từ chối trong đề mock
     (`ExamContentServiceImpl.java:189`, `ExamReviewServiceImpl.java:76`), nên đi qua
     module `assessment`.
-- [ ] **D-IELTS-3. Câu "Choose TWO/THREE letters".** IELTS cho 1 điểm mỗi chữ cái đúng
-  và không tính thứ tự. Hệ thống hiện chấm kiểu tất cả hoặc không
-  (`ExamAttemptServiceImpl.java:321`: `selectedIds.equals(correctIds)`). Chọn một:
-  - (a) tách thành 2–3 câu dùng chung một bộ lựa chọn;
-  - (b) một câu 2–3 điểm, chấm điểm từng phần.
+- [x] **D-IELTS-3. Câu "Choose TWO/THREE letters".** Đã chốt: một câu N điểm, mỗi lựa
+  chọn đúng được 1 điểm. Hệ thống hiện chấm kiểu tất cả hoặc không
+  (`ExamAttemptServiceImpl.java:321`). Còn phải đếm số câu `MULTIPLE_CHOICE` đang có
+  trong DB thật. Xem
+  [decisions.md](decisions.md#d-ielts-3--choose-twothree-letters-là-một-câu-nhiều-điểm).
 - [x] **D-IELTS-4. Quy tắc chấm câu điền từ.** Đã chốt: code chỉ bỏ phân biệt hoa thường
   và khoảng trắng thừa; mọi biến thể khác người viết đề liệt kê thành nhiều đáp án. Xem
   [decisions.md](decisions.md#d-ielts-4--chấm-câu-điền-từ-code-chỉ-chuẩn-hoá-tối-thiểu-biến-thể-nằm-ở-dữ-liệu).
@@ -37,6 +37,10 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   ô nhập vào đâu. Đang bàn: đánh dấu theo thứ tự câu trong nhóm (`{{1}}`, `{{2}}`…,
   khớp `questions.order_no`), chứ không theo số câu hiển thị. Số câu hiển thị do FE tự
   tính (`QuestionCard`: `questionIndex + 1`), không lưu ở đâu cả.
+  - Đang bàn thêm: lưu số câu vào DB, hay để BE tính rồi trả qua API. FE hiện đánh số
+    liên tục qua mọi section (`ExamSittingView`, `flatMap` cả đề). Cách này đúng với
+    TOEIC (1–200) nhưng sai với IELTS: Reading sẽ hiện câu 41–80 thay vì 1–40. Câu nhiều
+    điểm (D-IELTS-3) cũng phải chiếm nhiều số.
 - [ ] **D-IELTS-6. Điểm tổng của đề mock L+R.** IELTS thật lấy trung bình 4 kỹ năng rồi
   làm tròn: phần lẻ .25 lên .5, phần lẻ .75 lên số nguyên kế tiếp. Đề mock chỉ có 2 kỹ
   năng. Chọn một:
@@ -44,6 +48,7 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   - chỉ lưu band từng kỹ năng.
 
   Roadmap so `ExamAttempt.convertedScore` với `requiredScore` (thang 0–9, bước 0,5).
+  - Đang bàn thêm: làm đề full test 4 kỹ năng, để có band tổng đúng như thi thật.
 - [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
   cuối bài; chế độ PRACTICE tua thoải mái. Xem
   [decisions.md](decisions.md#d-ielts-7--listening-full-phát-một-lần-practice-tua-thoải-mái).
@@ -51,8 +56,9 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   - Part 1 và Part 3 có nhiều câu hỏi. Chọn: mỗi câu là một task, hay cả part ghi chung
     một bản (`assessment_attempts` chỉ có một `audio_object_key`).
   - Part 2 có 1 phút chuẩn bị. Có cần đồng hồ đếm riêng cho phần này không?
-- [ ] **D-IELTS-9. AI chấm Writing Task 1 Academic.** AI cần đọc được biểu đồ. Chọn: gửi
-  ảnh cho model đa phương thức, hay lưu số liệu biểu đồ dạng text/JSON kèm task.
+- [x] **D-IELTS-9. AI chấm Writing Task 1 Academic.** Đã chốt: số liệu biểu đồ ghi dạng
+  text trong `rubric_notes`, ảnh vẽ bằng code từ chính số liệu đó. Xem
+  [decisions.md](decisions.md#d-ielts-9--ai-chấm-writing-task-1-bằng-số-liệu-dạng-text).
 
 ---
 
@@ -223,6 +229,8 @@ chưa map. Những việc còn phải làm ở DB:
   - Part 1 và Part 3 là hội thoại; Part 2 và Part 4 là độc thoại.
   - Mỗi part một file, gắn vào `section_parts.audio_object_key`.
 - [ ] **Ảnh** cho câu gắn nhãn bản đồ/sơ đồ: gắn vào `question_sets.image_object_key`.
+- [ ] **Biểu đồ Writing Task 1:** vẽ bằng code từ bộ số liệu ghi trong `rubric_notes`
+  (D-IELTS-9).
 
 ---
 
