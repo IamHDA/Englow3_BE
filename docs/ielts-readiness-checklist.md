@@ -36,14 +36,12 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   tự câu trong nhóm. Số câu hiển thị không lưu DB, mà BE tính rồi trả qua API. FE hiện
   đánh số liên tục qua cả đề, nên Reading IELTS đang ra câu 41–80; phải sửa cùng lúc. Xem
   [decisions.md](decisions.md#d-ielts-5--ô-trống-đánh-dấu-theo-thứ-tự-trong-nhóm-số-câu-do-be-tính).
-- [ ] **D-IELTS-6. Điểm tổng của đề mock L+R.** IELTS thật lấy trung bình 4 kỹ năng rồi
-  làm tròn: phần lẻ .25 lên .5, phần lẻ .75 lên số nguyên kế tiếp. Đề mock chỉ có 2 kỹ
-  năng. Chọn một:
-  - lấy trung bình L và R theo cùng quy tắc;
-  - chỉ lưu band từng kỹ năng.
-
-  Roadmap so `ExamAttempt.convertedScore` với `requiredScore` (thang 0–9, bước 0,5).
-  - Đang bàn thêm: làm đề full test 4 kỹ năng, để có band tổng đúng như thi thật.
+- [x] **D-IELTS-6. Band tổng.** Đã chốt: band tổng chỉ có từ full test 4 kỹ năng; band
+  tạm là band thấp hơn của L và R. Còn chờ xác nhận cách tính band Writing và Speaking.
+  Xem [decisions.md](decisions.md#d-ielts-6--band-tổng-chỉ-có-từ-full-test-4-kỹ-năng).
+- [x] **D-IELTS-10. Full test.** Đã chốt: full test là test đầu vào của người học IELTS,
+  đặt ở module `exam`, chỉ người học chứng chỉ được làm. Còn 4 điểm để ngỏ. Xem
+  [decisions.md](decisions.md#d-ielts-10--full-test-là-test-đầu-vào-của-người-học-ielts-đặt-ở-module-exam).
 - [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
   cuối bài; chế độ PRACTICE tua thoải mái. Xem
   [decisions.md](decisions.md#d-ielts-7--listening-full-phát-một-lần-practice-tua-thoải-mái).
@@ -78,6 +76,11 @@ chưa map. Những việc còn phải làm ở DB:
   - Thêm `image_object_key varchar(500)`.
   - Thêm `certificate_variant` nếu cần tách Academic với GT. Task 1 bên GT là viết thư,
     không có ảnh.
+- [ ] **Full test (D-IELTS-10):** thêm 2 bảng trong `exam`, gồm định nghĩa full test và
+  lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
+  có một lượt đang mở cho mỗi full test.
+- [ ] **Roadmap:** `roadmap_milestones` phải trỏ được tới full test và lượt full test.
+  Hiện bảng chỉ có `exam_id` và `result_exam_attempt_id`.
 
 **Những thứ không cần đổi DB:**
 
@@ -170,7 +173,25 @@ chưa map. Những việc còn phải làm ở DB:
   - map cột ảnh cho Task 1 Academic (sau migration ở mục 1);
   - xử lý D-IELTS-9 trong `AssessmentRubric`.
 
-### 2.7 Tài liệu
+### 2.7 Full test (D-IELTS-10, module `exam`)
+
+- [ ] Entity lượt full test giữ các luật sau, mỗi luật có entity test riêng:
+  - chỉ gắn được lượt làm bài đúng task và của đúng học viên;
+  - có band tạm khi đã có band L và R;
+  - chỉ có band tổng khi đủ 4 kỹ năng.
+- [ ] Chỉ người học chứng chỉ được bắt đầu full test. Kiểm tra qua
+  `user.api.LearnerGoalReader`.
+- [ ] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
+  giữ khoá, vì hai bài có thể được chấm cùng lúc. Sự kiện không bền, nên việc đọc lượt
+  full test và một job định kỳ phải tự bắt kịp, giống level check.
+- [ ] `assessment.api`: thêm reader trả band của một bài Writing.
+- [ ] `user.api.PlacementRecorder`: thêm hàm ghi band IELTS vào
+  `learner_profiles.current_score`, kèm CEFR lấy từ `score_conversions.cefr_level`. Ghi
+  band tạm trước, band chính thức sau, không bắt làm lại onboarding.
+- [ ] `exam.api`: phát sự kiện khi một lượt full test có band chính thức. Roadmap nghe
+  sự kiện này để tính mốc thi thử IELTS.
+
+### 2.8 Tài liệu
 
 - [ ] Cập nhật [module-map.md](module-map.md) khi các bảng trên bắt đầu có entity.
 - [ ] Ghi các quyết định D-IELTS-* vào [decisions.md](decisions.md).
@@ -197,6 +218,9 @@ chưa map. Những việc còn phải làm ở DB:
   - **Không nạp đề IELTS vào môi trường mà editor chưa hỗ trợ loại câu mới.** Nếu admin
     mở đề rồi lưu lại, thao tác sẽ lỗi khoá ngoại hoặc làm mất đáp án.
 - [ ] Writing Task 1: hiển thị ảnh biểu đồ.
+- [ ] Màn full test: bắt đầu, tiến độ 4 kỹ năng, band tạm và band chính thức.
+- [ ] Onboarding của người học IELTS: làm full test ở bước trình độ, rồi đi tiếp với
+  band tạm.
 
 ---
 
@@ -240,6 +264,8 @@ chưa map. Những việc còn phải làm ở DB:
 - [ ] Học viên làm bài ở cả chế độ FULL và PRACTICE, lưu nháp rồi nộp. Kiểm tra: điểm
   thô, band từng kỹ năng, band tổng, màn kết quả, ngữ cảnh tutor.
 - [ ] Roadmap: milestone `CERTIFICATE_MOCK` phải ghi nhận được lần thi.
+- [ ] Full test: một học viên IELTS mới đăng ký làm trọn full test từ onboarding. Band
+  tạm hiện ngay sau phần L+R, và band chính thức thay vào khi Writing/Speaking chấm xong.
 - [ ] Chạy các lệnh kiểm tra trong `CONTRIBUTING.md` mục *Verification*:
   - `mvn formatter:validate`
   - `mvn --batch-mode clean verify`

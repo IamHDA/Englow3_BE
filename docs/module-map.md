@@ -55,6 +55,34 @@ answers, and section results.
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the
   shared storage client performs the I/O.
+- **IELTS full test (planned, not built):** groups one full Listening + Reading
+  sitting of a `MOCK` paper with Writing Task 1, Writing Task 2 and Speaking Parts
+  1-3 from `assessment` into one sitting with an overall band.
+  - **Who sits it:** it is the IELTS learner's placement test, and can also be taken
+    from the catalogue without a roadmap. Only certificate learners may start one
+    (`user.api.LearnerGoalReader`).
+  - **Tables:** exam will own two new tables, the full-test definition and the
+    learner's full-test sitting. Only exam writes them.
+  - **Rules:** the sitting entity holds them. Only an attempt at the right task by the
+    same learner can be attached. The provisional band is the lower of Listening and
+    Reading. The overall band is the IELTS mean of four skills (a .25 or .75 remainder
+    rounds up) and exists only once every skill is graded.
+  - **Reads and events:** Writing/Speaking bands are read through an `assessment.api`
+    reader, and the sitting hears `assessment.api.AssessmentAnswerGraded`. Those
+    events are not durable, so reads and a scheduled sweep catch up, as the roadmap
+    does for level checks.
+  - **Concurrency:** updates take the sitting's lock and version, because two answers
+    can be graded at once.
+  - **Results out:** both bands reach the learner profile through
+    `user.api.PlacementRecorder`. A new `exam.api` event announces a final band to the
+    roadmap, whose IELTS mock milestones will point at a full test (a roadmap schema
+    change).
+  - **Why:** the full test must exist without a roadmap, and exam already owns mock
+    papers and sittings. The grouping has no rules beyond combining bands, so a module
+    of its own would only add wiring. `assessment` does not depend on `exam`, so the
+    new dependency makes no cycle.
+  - **Revisit if:** the full test gains rules of its own (retake policy, pricing, an
+    authoring workflow of its own), or `assessment` ever needs to read exam data.
 
 ## `flashcard`
 

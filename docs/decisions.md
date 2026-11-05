@@ -249,6 +249,35 @@ kê vẫn đúng, chỉ thành thừa.
 **Đổi ý thì:** nếu sau này cần đặt số câu tuỳ ý thì mới thêm cột; các dấu `{{n}}` không
 phải đổi.
 
+### D-IELTS-6 — Band tổng chỉ có từ full test 4 kỹ năng
+
+**Chốt:**
+- Band tổng IELTS chỉ có từ một lượt full test (D-IELTS-10). Cách tính theo IELTS:
+  trung bình 4 kỹ năng; phần lẻ .25 làm tròn lên .5, phần lẻ .75 làm tròn lên số nguyên
+  kế tiếp.
+- **Band tạm:** khi đã có band Listening và Reading, band tạm là band thấp hơn trong
+  hai band đó. Ghi rõ "chỉ dựa trên Listening và Reading". Khi đủ 4 kỹ năng thì band
+  chính thức thay vào.
+- Đề L+R làm riêng, ngoài full test, chỉ để luyện tập: hiện band từng kỹ năng, không
+  ra band tổng.
+- Mốc thi thử trên roadmap chỉ tính band chính thức của full test.
+
+**Lý do:**
+- Đề L+R thiếu hai kỹ năng thường kéo band tổng xuống, nên trung bình L+R dễ làm học
+  viên tưởng mình đã đạt.
+- `NEEDS_REVIEW` nghĩa là AI chưa chấm, nên chưa có điểm nào (`AssessmentAttempt.submit`,
+  `requestReview`). Vì vậy band tạm chỉ có thể lấy từ L và R, hai phần chấm ngay khi
+  nộp.
+- Lấy band thấp hơn, vì thà đánh giá thấp còn hơn để học viên tưởng mình đã đạt.
+
+**Còn chờ xác nhận:**
+- Band Writing: Task 2 tính gấp đôi Task 1, theo cách IELTS công bố.
+- Band Speaking: trung bình 3 part (D-IELTS-8).
+- Cả hai làm tròn về nửa band gần nhất.
+
+**Đổi ý thì:** chỉ đổi phép tính, không đổi dữ liệu. Các lượt đã có điểm nên giữ band
+đã tính lúc đó.
+
 ### D-IELTS-7 — Listening: FULL phát một lần, PRACTICE tua thoải mái
 
 **Chốt:**
@@ -311,6 +340,49 @@ phải sửa ai_service và đổi sang một model đọc được ảnh. Chấ
 
 **Đổi ý thì:** chuyển sang gửi ảnh thì số liệu đã ghi vẫn dùng được làm thông tin bổ sung
 cho AI.
+
+### D-IELTS-10 — Full test là test đầu vào của người học IELTS, đặt ở module `exam`
+
+**Chốt:**
+- Một full test gồm một đề L+R, Writing Task 1, Writing Task 2 và Speaking Part 1, 2,
+  3. Mỗi phần vẫn do module của nó chấm. Lượt full test chỉ nối các lượt làm bài lại
+  và tính band (D-IELTS-6).
+- Full test là **test đầu vào** của người học IELTS, thay cho đề `PLACEMENT` dùng chung
+  hiện nay. Học viên đi tiếp onboarding với band tạm. Khi có band chính thức, trình độ
+  được cập nhật mà không phải làm lại onboarding.
+- Học viên không có roadmap cũng tự chọn làm được trong thư viện đề.
+- **Chỉ người học chứng chỉ** được làm full test. Người không học chứng chỉ vẫn dùng
+  level check của roadmap.
+- Phần gom thuộc module `exam`; xem mục `exam` trong [module-map.md](module-map.md).
+
+**Lý do:**
+- Full test phải tồn tại cả khi không có roadmap, nên không đặt ở `roadmap`.
+- `exam` đã sở hữu đề mock và lượt thi.
+- Phần gom không có luật nào ngoài việc cộng band, nên tạo module riêng là thừa.
+- Level check của roadmap đã gom `exam` với `assessment` theo đúng kiểu này.
+
+**Hệ quả:**
+- DB: thêm 2 bảng trong `exam` (định nghĩa full test và lượt full test).
+  `roadmap_milestones` phải trỏ được tới full test.
+- `user.api.PlacementRecorder` cần thêm một hàm ghi band IELTS. DB không phải đổi:
+  `learner_profiles.current_score` đã có, và CEFR lấy từ `score_conversions.cefr_level`.
+- `assessment.api` cần thêm một reader cho band Writing. `SpeakingLevelReader` hiện chỉ
+  có cho Speaking.
+- Chấm tự động Writing/Speaking **mặc định tắt** (`ASSESSMENT_AUTOMATIC_WRITING=false`,
+  `ASSESSMENT_AUTOMATIC_SPEAKING=false`). Nếu môi trường thật cũng tắt, mọi band chính
+  thức đều phải chờ staff chấm.
+
+**Còn để ngỏ:**
+- Owner nói phần Writing/Speaking "sẽ dễ hơn". Chưa rõ nghĩa là ít bài và ngắn hơn
+  (không ảnh hưởng độ tin cậy), hay đề dễ hơn (band kém tin cậy).
+- Học viên được làm Writing/Speaking sau phần L+R trong bao lâu.
+- Người học TOEIC có được làm full test IELTS không. Test đầu vào TOEIC vẫn là đề
+  `PLACEMENT`.
+- Full test được tạo và duyệt thế nào: theo quy trình duyệt như đề, hay chỉ cần mọi
+  phần của nó đã xuất bản.
+
+**Đổi ý thì:** chuyển phần gom sang module khác thì phải chuyển 2 bảng và các listener.
+Các lượt làm bài trong `exam` và `assessment` không ảnh hưởng.
 
 ---
 
