@@ -32,15 +32,10 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
 - [x] **D-IELTS-4. Quy tắc chấm câu điền từ.** Đã chốt: code chỉ bỏ phân biệt hoa thường
   và khoảng trắng thừa; mọi biến thể khác người viết đề liệt kê thành nhiều đáp án. Xem
   [decisions.md](decisions.md#d-ielts-4--chấm-câu-điền-từ-code-chỉ-chuẩn-hoá-tối-thiểu-biến-thể-nằm-ở-dữ-liệu).
-- [ ] **D-IELTS-5. Cách đặt ô trống trong đoạn văn hoặc bảng** (dạng form, note, table,
-  flow-chart completion). Chốt một ký hiệu trong `question_sets.content` để FE biết đặt
-  ô nhập vào đâu. Đang bàn: đánh dấu theo thứ tự câu trong nhóm (`{{1}}`, `{{2}}`…,
-  khớp `questions.order_no`), chứ không theo số câu hiển thị. Số câu hiển thị do FE tự
-  tính (`QuestionCard`: `questionIndex + 1`), không lưu ở đâu cả.
-  - Đang bàn thêm: lưu số câu vào DB, hay để BE tính rồi trả qua API. FE hiện đánh số
-    liên tục qua mọi section (`ExamSittingView`, `flatMap` cả đề). Cách này đúng với
-    TOEIC (1–200) nhưng sai với IELTS: Reading sẽ hiện câu 41–80 thay vì 1–40. Câu nhiều
-    điểm (D-IELTS-3) cũng phải chiếm nhiều số.
+- [x] **D-IELTS-5. Ô trống và số câu.** Đã chốt: ô trống được đánh dấu `{{n}}` theo thứ
+  tự câu trong nhóm. Số câu hiển thị không lưu DB, mà BE tính rồi trả qua API. FE hiện
+  đánh số liên tục qua cả đề, nên Reading IELTS đang ra câu 41–80; phải sửa cùng lúc. Xem
+  [decisions.md](decisions.md#d-ielts-5--ô-trống-đánh-dấu-theo-thứ-tự-trong-nhóm-số-câu-do-be-tính).
 - [ ] **D-IELTS-6. Điểm tổng của đề mock L+R.** IELTS thật lấy trung bình 4 kỹ năng rồi
   làm tròn: phần lẻ .25 lên .5, phần lẻ .75 lên số nguyên kế tiếp. Đề mock chỉ có 2 kỹ
   năng. Chọn một:
@@ -52,10 +47,9 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
 - [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
   cuối bài; chế độ PRACTICE tua thoải mái. Xem
   [decisions.md](decisions.md#d-ielts-7--listening-full-phát-một-lần-practice-tua-thoải-mái).
-- [ ] **D-IELTS-8. Speaking.**
-  - Part 1 và Part 3 có nhiều câu hỏi. Chọn: mỗi câu là một task, hay cả part ghi chung
-    một bản (`assessment_attempts` chỉ có một `audio_object_key`).
-  - Part 2 có 1 phút chuẩn bị. Có cần đồng hồ đếm riêng cho phần này không?
+- [x] **D-IELTS-8. Speaking.** Đã chốt: mỗi part một lần ghi; Part 1 và Part 3 không quá
+  5 phút; FE đếm 60 giây chuẩn bị cho Part 2. Không phải đổi DB. Xem
+  [decisions.md](decisions.md#d-ielts-8--speaking-mỗi-part-một-lần-ghi).
 - [x] **D-IELTS-9. AI chấm Writing Task 1 Academic.** Đã chốt: số liệu biểu đồ ghi dạng
   text trong `rubric_notes`, ảnh vẽ bằng code từ chính số liệu đó. Xem
   [decisions.md](decisions.md#d-ielts-9--ai-chấm-writing-task-1-bằng-số-liệu-dạng-text).
@@ -84,7 +78,6 @@ chưa map. Những việc còn phải làm ở DB:
   - Thêm `image_object_key varchar(500)`.
   - Thêm `certificate_variant` nếu cần tách Academic với GT. Task 1 bên GT là viết thư,
     không có ảnh.
-- [ ] (Tuỳ D-IELTS-8) Thêm cột thời gian chuẩn bị cho Speaking Part 2.
 
 **Những thứ không cần đổi DB:**
 
@@ -158,6 +151,8 @@ chưa map. Những việc còn phải làm ở DB:
 - [ ] `SubmitExamAttemptRequest` và `SaveExamDraftRequest` chỉ có `selectedOptionIds`.
   Thêm câu trả lời dạng chữ, và cho `validateSubmission` kiểm tra kiểu câu trả lời khớp
   với loại câu.
+- [ ] Tính số câu hiển thị ở một chỗ (D-IELTS-5), rồi trả nó trong đề cho học viên,
+  màn kết quả và ngữ cảnh tutor.
 - [ ] Đề trả cho học viên (`LearnerExamPaperProjection`, `LearnerExamPaperQuery`):
   - trả bộ lựa chọn chung cho câu matching;
   - **không bao giờ** trả accepted answers;
@@ -193,6 +188,8 @@ chưa map. Những việc còn phải làm ở DB:
   - ô trống nằm ngay trong đoạn văn hoặc bảng, theo quy ước D-IELTS-5.
 - [ ] `ExamSittingView`, `hooks/useExamAutosave.ts` và `graphql/exam-attempt.graphql`:
   gửi và lưu nháp câu trả lời dạng chữ.
+- [ ] Bỏ việc tự đếm số câu trong `ExamSittingView` và `QuestionCard`; dùng `numberFrom`
+  và `numberTo` từ API (D-IELTS-5).
 - [ ] `ExamResultView`: hiện đáp án dạng chữ.
 - [ ] `features/content/components/blocks/ExamTreeEditor.tsx` và
   `features/content/api/authoringValidation.ts`: admin phải **soạn và duyệt** được loại

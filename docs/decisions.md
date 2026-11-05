@@ -218,6 +218,37 @@ trong giới hạn số từ của câu.
 **Đổi ý thì:** nếu sau này code tự hiểu được số hay biến thể chính tả, các dòng đã liệt
 kê vẫn đúng, chỉ thành thừa.
 
+### D-IELTS-5 — Ô trống đánh dấu theo thứ tự trong nhóm; số câu do BE tính
+
+**Chốt:**
+- Ô trống trong `question_sets.content` được đánh dấu bằng `{{n}}`, với n là
+  `questions.order_no` của câu trong nhóm đó (`{{1}}`, `{{2}}`…). FE thay mỗi dấu bằng ô
+  nhập của câu tương ứng.
+- Số câu hiển thị không lưu vào DB. BE tính ở một chỗ rồi trả qua API (`numberFrom`,
+  `numberTo`); FE thôi tự đếm.
+- Quy tắc tính:
+  - IELTS đánh lại từ 1 ở mỗi section; TOEIC đánh liên tục cả đề.
+  - Câu N điểm (D-IELTS-3) chiếm N số.
+  - Số được tính trên cả đề, nên một lượt PRACTICE vẫn giữ số câu của đề đầy đủ.
+
+**Lý do:**
+- Chèn thêm câu ở đầu đề thì không phải sửa dấu ở các nhóm phía sau.
+- Mỗi lần lưu, nội dung đề bị xoá rồi ghi lại (`ExamContentServiceImpl.deleteContent`),
+  nên số câu lưu sẵn cũng sẽ bị tính lại mỗi lần. Lưu vào DB chỉ thêm nguy cơ lệch, thêm
+  một migration, và phải điền số cho mọi đề TOEIC đang có.
+- BE dùng lại được cùng con số cho thông báo lỗi và cho tutor ("câu 14").
+
+**Hệ quả:**
+- FE hiện đánh số liên tục qua cả đề (`ExamSittingView`, `flatMap`), nên Reading IELTS
+  đang hiện câu 41–80. Phải sửa cùng lúc.
+- Lỗi `EXAM_HAS_INCOMPLETE_QUESTION` nên báo theo số câu hiển thị, thay vì `order_no`
+  trong nhóm.
+- Validator của pipeline phải kiểm tra: mỗi dấu `{{n}}` ứng với đúng một câu điền từ
+  trong nhóm, và không câu nào có hai dấu.
+
+**Đổi ý thì:** nếu sau này cần đặt số câu tuỳ ý thì mới thêm cột; các dấu `{{n}}` không
+phải đổi.
+
 ### D-IELTS-7 — Listening: FULL phát một lần, PRACTICE tua thoải mái
 
 **Chốt:**
@@ -232,6 +263,32 @@ kê vẫn đúng, chỉ thành thừa.
   trang không được phát lại từ đầu, mà phải chạy tiếp từ mốc ứng với thời gian đã trôi.
 
 **Đổi ý thì:** chỉ đổi phía FE, dữ liệu không ảnh hưởng.
+
+### D-IELTS-8 — Speaking: mỗi part một lần ghi
+
+**Chốt:**
+- Part 1, 2 và 3 là ba task riêng (`PART_1`, `PART_2`, `PART_3`). Mỗi part có một bản ghi
+  và một kết quả chấm.
+- Part 1 và Part 3: bấm ghi một lần, các câu hỏi hiện lần lượt trong lúc ghi. FE dừng ghi
+  khi đủ 5 phút.
+- Part 2: FE đếm 60 giây chuẩn bị (không ghi âm), sau đó ghi tối đa 2 phút.
+
+**Lý do:**
+- Trong từng part, cách làm này gần với thi thật, mà vẫn nằm trong giới hạn hiện có:
+  file WAV tối đa 10 MB (`AssessmentServiceImpl.java:100`) và tối đa 5 phút
+  (`ai_service/app/providers/speech.py`).
+- Tiêu chí Speaking của IELTS không chấm theo từng câu hỏi, nên một bản ghi cho cả part
+  vẫn đủ để AI chấm.
+- Lỗi mạng chỉ làm mất một part, không mất cả bài.
+- Không phải đổi DB.
+
+**Hệ quả:**
+- Câu hỏi của Part 1 và Part 3 nằm trong `instructions` của task. Cần quy ước cách ghi
+  danh sách câu hỏi trong đó, để FE tách ra và hiện lần lượt.
+- Band Speaking của một bài full test được gộp từ 3 part; cách gộp chốt cùng D-IELTS-6.
+
+**Đổi ý thì:** muốn ghi cả bài trong một lần thì phải nâng giới hạn audio và thêm một
+loại task. Các task đã viết vẫn dùng được làm từng part.
 
 ### D-IELTS-9 — AI chấm Writing Task 1 bằng số liệu dạng text
 
