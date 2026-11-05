@@ -142,6 +142,79 @@ an toàn **trước** lần chạy đầu tiên.
 
 ---
 
+## Đề IELTS
+
+Chốt ngày **2026-11-05**. Danh sách đầy đủ, kể cả các quyết định còn đang bàn
+(D-IELTS-3, 5, 6, 8, 9), nằm ở [ielts-readiness-checklist.md](ielts-readiness-checklist.md).
+
+### D-IELTS-1 — Tự viết đề, không cào
+
+**Chốt:** mọi đề IELTS là nội dung gốc, do người hoặc agent viết qua `data_pipeline`.
+Đề mẫu của British Council, IDP, ielts.org và Cambridge chỉ dùng để tham khảo format
+và độ khó. Không chép, không cào, kể cả từ các site đề bên thứ ba.
+
+**Lý do:** đề mẫu chính thức chỉ cho dùng cá nhân, phi thương mại. Muốn đăng lại hay
+sửa thì phải có giấy phép bằng văn bản. Các site bên thứ ba thường đăng lại đề trong
+sách Cambridge, nên không có quyền cấp phép cho ai. Đây cũng là kết luận đã có với
+TOEIC trong [source_data_status.md](../data_pipeline/reports/source_data_status.md).
+
+**Đổi ý thì:** muốn dùng đề có bản quyền thì phải có hợp đồng với Cambridge trước khi
+nạp. Các đề tự viết vẫn giữ được.
+
+### D-IELTS-2 — Làm Academic trước
+
+**Chốt:** đợt đầu gồm Listening, Reading Academic, Writing Task 1 Academic (tả biểu đồ),
+Writing Task 2 và Speaking. Làm sau: Reading General Training và Writing Task 1 GT
+(viết thư).
+
+**Lý do:** Listening, Writing Task 2 và Speaking giống nhau ở cả hai loại; chỉ Reading và
+Writing Task 1 khác. Làm Academic trước thì GT về sau chỉ phải thêm hai phần khác biệt.
+
+**Hệ quả:** đề mock đợt đầu có `certificate_variant = ACADEMIC`. `score_conversions`
+đợt đầu chỉ cần bảng Listening và bảng Reading `ACADEMIC`.
+
+**Đổi ý thì:** không mất gì; GT chỉ là phần thêm vào.
+
+### D-IELTS-4 — Chấm câu điền từ: code chỉ chuẩn hoá tối thiểu, biến thể nằm ở dữ liệu
+
+**Chốt:** code chỉ chuẩn hoá hai thứ:
+- không phân biệt hoa thường;
+- bỏ khoảng trắng thừa ở đầu, ở cuối và giữa các từ.
+
+Mọi biến thể khác do người viết đề liệt kê, mỗi biến thể một dòng trong
+`question_accepted_answers`:
+- cách viết Anh-Anh và Anh-Mỹ: `colour`, `color`;
+- số viết bằng chữ và bằng số: `3`, `three`;
+- có và không có từ tuỳ chọn: `museum`, `the museum`.
+
+Sai chính tả thì tính là sai. Không đáp án nào được vượt giới hạn số từ của câu.
+
+**Lý do:** kết quả chấm đoán trước được. Khi chấm sai một đáp án, sửa dữ liệu của câu
+đó chứ không phải sửa code rồi chấm lại mọi đề.
+
+**Hệ quả:** validator của pipeline phải kiểm tra mọi đáp án được chấp nhận đều nằm
+trong giới hạn số từ của câu.
+
+**Đổi ý thì:** nếu sau này code tự hiểu được số hay biến thể chính tả, các dòng đã liệt
+kê vẫn đúng, chỉ thành thừa.
+
+### D-IELTS-7 — Listening: FULL phát một lần, PRACTICE tua thoải mái
+
+**Chốt:**
+- Chế độ FULL: audio phát một lần, không tua, không dừng. Cuối bài có 2 phút kiểm tra
+  đáp án, như bản thi trên máy tính.
+- Chế độ PRACTICE: tua và dừng thoải mái.
+
+**Hệ quả:**
+- Thời gian của section Listening ở chế độ FULL bằng tổng thời lượng audio cộng 120
+  giây.
+- Chỉ FE chặn được việc phát lại; BE không biết audio đã phát bao nhiêu lần. Tải lại
+  trang không được phát lại từ đầu, mà phải chạy tiếp từ mốc ứng với thời gian đã trôi.
+
+**Đổi ý thì:** chỉ đổi phía FE, dữ liệu không ảnh hưởng.
+
+---
+
 ## Còn treo — chưa quyết được vì phụ thuộc môi trường
 
 | # | Việc | Chặn |

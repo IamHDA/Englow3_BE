@@ -1,6 +1,6 @@
 # Việc cần làm trước khi tạo dữ liệu đề IELTS
 
-**Cập nhật:** 2026-11-01 · **Đọc từ nhánh:** `testing` (`58308b3`)
+**Cập nhật:** 2026-11-05 · **Đọc từ nhánh:** `testing` (`58308b3`)
 
 Dữ liệu IELTS nhập vào trước khi xong các mục dưới đây sẽ không lưu được, không chấm
 được, hoặc phải sinh lại. Thứ tự làm:
@@ -17,13 +17,10 @@ Dữ liệu IELTS nhập vào trước khi xong các mục dưới đây sẽ kh
 
 Ghi từng quyết định vào [decisions.md](decisions.md).
 
-- [ ] **D-IELTS-1. Nguồn nội dung.** Chọn một trong ba: tự viết đề gốc, biên tập lại từ
-  nguồn mở (tài liệu chính phủ Mỹ là public domain; Wikipedia là CC BY-SA, kéo theo
-  nghĩa vụ share-alike), hoặc mua giấy phép từ Cambridge.
-  - **Không cào** British Council, IDP, ielts.org hay các site đề bên thứ ba. Đề mẫu
-    chính thức chỉ cho dùng cá nhân, phi thương mại. Chỉ được dùng chúng làm mẫu
-    format, không chép nội dung.
-- [ ] **D-IELTS-2. Phạm vi.** Academic, General Training, hay cả hai.
+- [x] **D-IELTS-1. Nguồn nội dung.** Đã chốt: tự viết đề gốc, không cào. Xem
+  [decisions.md](decisions.md#d-ielts-1--tự-viết-đề-không-cào).
+- [x] **D-IELTS-2. Phạm vi.** Đã chốt: làm Academic trước. Xem
+  [decisions.md](decisions.md#d-ielts-2--làm-academic-trước).
   - Đề mock chỉ gồm Listening và Reading. Writing và Speaking bị từ chối trong đề mock
     (`ExamContentServiceImpl.java:189`, `ExamReviewServiceImpl.java:76`), nên đi qua
     module `assessment`.
@@ -32,19 +29,14 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   (`ExamAttemptServiceImpl.java:321`: `selectedIds.equals(correctIds)`). Chọn một:
   - (a) tách thành 2–3 câu dùng chung một bộ lựa chọn;
   - (b) một câu 2–3 điểm, chấm điểm từng phần.
-- [ ] **D-IELTS-4. Quy tắc chấm câu điền từ.** Người viết đề phải biết cần nhập những
-  biến thể đáp án nào, nên quy tắc phải chốt trước. Đề xuất:
-  - Không phân biệt hoa thường. Bỏ khoảng trắng thừa.
-  - Chính tả phải đúng.
-  - Cả cách viết Anh-Anh lẫn Anh-Mỹ đều được chấp nhận, bằng cách liệt kê nhiều dòng
-    trong `question_accepted_answers`.
-  - Quyết định số viết bằng chữ hay bằng số.
-  - Quyết định cách xử lý từ tuỳ chọn trong ngoặc, ví dụ `(the) museum`.
-  - Vượt giới hạn số từ thì tính là sai.
+- [x] **D-IELTS-4. Quy tắc chấm câu điền từ.** Đã chốt: code chỉ bỏ phân biệt hoa thường
+  và khoảng trắng thừa; mọi biến thể khác người viết đề liệt kê thành nhiều đáp án. Xem
+  [decisions.md](decisions.md#d-ielts-4--chấm-câu-điền-từ-code-chỉ-chuẩn-hoá-tối-thiểu-biến-thể-nằm-ở-dữ-liệu).
 - [ ] **D-IELTS-5. Cách đặt ô trống trong đoạn văn hoặc bảng** (dạng form, note, table,
-  flow-chart completion). Chốt một quy ước placeholder trong `question_sets.content`,
-  ví dụ `{{14}}` theo số thứ tự câu. Mọi đề sẽ viết theo quy ước này, và FE render
-  theo nó.
+  flow-chart completion). Chốt một ký hiệu trong `question_sets.content` để FE biết đặt
+  ô nhập vào đâu. Đang bàn: đánh dấu theo thứ tự câu trong nhóm (`{{1}}`, `{{2}}`…,
+  khớp `questions.order_no`), chứ không theo số câu hiển thị. Số câu hiển thị do FE tự
+  tính (`QuestionCard`: `questionIndex + 1`), không lưu ở đâu cả.
 - [ ] **D-IELTS-6. Điểm tổng của đề mock L+R.** IELTS thật lấy trung bình 4 kỹ năng rồi
   làm tròn: phần lẻ .25 lên .5, phần lẻ .75 lên số nguyên kế tiếp. Đề mock chỉ có 2 kỹ
   năng. Chọn một:
@@ -52,8 +44,9 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   - chỉ lưu band từng kỹ năng.
 
   Roadmap so `ExamAttempt.convertedScore` với `requiredScore` (thang 0–9, bước 0,5).
-- [ ] **D-IELTS-7. Listening ở chế độ FULL.** Audio chỉ phát một lần hay cho tua lại?
-  Có cho thời gian kiểm tra cuối bài không (bản thi trên máy tính có 2 phút)?
+- [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
+  cuối bài; chế độ PRACTICE tua thoải mái. Xem
+  [decisions.md](decisions.md#d-ielts-7--listening-full-phát-một-lần-practice-tua-thoải-mái).
 - [ ] **D-IELTS-8. Speaking.**
   - Part 1 và Part 3 có nhiều câu hỏi. Chọn: mỗi câu là một task, hay cả part ghi chung
     một bản (`assessment_attempts` chỉ có một `audio_object_key`).
@@ -206,8 +199,8 @@ chưa map. Những việc còn phải làm ở DB:
 
 ## 4. Data pipeline
 
-- [ ] Lấy nguồn theo D-IELTS-1. Ghi công cho mọi nguồn mở, theo mẫu
-  `seeds/ATTRIBUTION.md`.
+- [ ] Viết đề gốc theo D-IELTS-1. Đề mẫu chính thức chỉ dùng để đối chiếu format, không
+  đưa vào thư mục nguồn của pipeline.
 - [ ] **Schema.** Trong `schemas/exam.py`, `part_number` 1–7 và quy tắc 3/4 lựa chọn là
   của TOEIC. Cần một schema IELTS riêng:
   - Listening 4 part, Reading 3 section, 40 câu mỗi kỹ năng;
