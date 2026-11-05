@@ -5,8 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record UserBootstrapResponse(UserInformationResponse user,
         @Schema(nullable = true) OnboardingStateResponse onboardingState) {
-    public static UserBootstrapResponse from(UserBootstrapResult result, String publicBaseUrl) {
-        return new UserBootstrapResponse(UserInformationResponse.from(result.user(), publicBaseUrl),
+    public static UserBootstrapResponse from(UserBootstrapResult result, String publicBaseUrl, String presetBaseUrl) {
+        return new UserBootstrapResponse(UserInformationResponse.from(result.user(), publicBaseUrl, presetBaseUrl),
                 result.onboardingState() == null ? null : OnboardingStateResponse.from(result.onboardingState()));
     }
 }

@@ -10,7 +10,8 @@ public interface UserService {
 
     UserInformationResult updateBasicInfo(UpdateUserBasicInfoCommand command);
 
-    UserInformationResult changeAvatar(MultipartFile image);
+    /** Wears one of the preset pictures; refused with AVATAR_PRESET_UNKNOWN for an id that names none. */
+    UserInformationResult choosePresetAvatar(String presetId);
 
     UserInformationResult changeBanner(MultipartFile image);
 }

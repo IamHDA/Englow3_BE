@@ -13,15 +13,18 @@ import com.englow3.user.service.UserBootstrapService;
 class UserBootstrapController {
     private final UserBootstrapService bootstrapService;
     private final String publicBaseUrl;
+    private final String presetBaseUrl;
 
     UserBootstrapController(UserBootstrapService bootstrapService,
-            @Value("${app.storage.public-base-url}") String publicBaseUrl) {
+            @Value("${app.storage.public-base-url}") String publicBaseUrl,
+            @Value("${app.avatar.preset-base-url}") String presetBaseUrl) {
         this.bootstrapService = bootstrapService;
         this.publicBaseUrl = publicBaseUrl;
+        this.presetBaseUrl = presetBaseUrl;
     }
 
     @GetMapping
     ResponseEntity<UserBootstrapResponse> current() {
-        return ResponseEntity.ok(UserBootstrapResponse.from(bootstrapService.current(), publicBaseUrl));
+        return ResponseEntity.ok(UserBootstrapResponse.from(bootstrapService.current(), publicBaseUrl, presetBaseUrl));
     }
 }

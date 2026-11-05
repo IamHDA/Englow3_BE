@@ -199,6 +199,24 @@ and nothing about what any of those mean.
   them from inside a handler's run covered one of those four and left the other
   three waiting forever.
 
+## `translation`
+
+Owns Vietnamese-to-English translation practice: sets of sentences to translate,
+and each learner's graded attempts.
+
+- **Tables:** `translation_sets`, `translation_items`, `translation_attempts`.
+- **Entry points:** the learner library, practice and attempt history under
+  `/api/translation`, plus the admin authoring API under `/api/admin/translation`.
+- **Review workflow:** the same shape as the other authored content, through its
+  own status enum. Sentences are replaced wholesale on save, which is safe because
+  only a never-published set is editable.
+- **Grading:** a `TRANSLATION_ASSESSMENT` job through `ai`, counted against the
+  shared daily allowance. `TranslationRubric` validates the model's four part
+  scores and computes the total and verdict itself. The reference translation is
+  returned only once the attempt is no longer waiting.
+- **Account data:** `AccountServiceImpl` includes `translation_attempts` in the
+  personal export (declared read-only); attempts cascade with the user row.
+
 ## `speaking`
 
 Owns pronunciation practice: what there is to say, the recording of someone saying

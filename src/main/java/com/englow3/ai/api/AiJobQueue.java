@@ -65,4 +65,7 @@ public interface AiJobQueue {
      * than fail the request that noticed it was due.
      */
     boolean hasRoadmapAllowance(UUID userId);
+
+    void enqueueTranslationAssessment(UUID attemptId, String inputPayload, String idempotencyKey, String promptVersion,
+            UUID requestedByUserId);
 }

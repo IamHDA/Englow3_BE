@@ -137,6 +137,14 @@ Injected repositories use a `Repo` suffix, for example
 
 - Flyway is the only schema authority; Hibernate `ddl-auto` stays `validate`.
 - Never edit a migration that has already run. Add a new versioned migration.
+- Never start the application against a shared database (testing, dev, production)
+  while a migration exists only on your machine. Flyway records it there, and the
+  next deploy of code without that exact file stops at validation: "checksum
+  mismatch" when someone else used the version number, "applied migration not
+  resolved locally" when they did not. Push the migration first, or run against a
+  local or throwaway database.
+- Pick the next version number from the latest `testing`, not from your branch
+  alone, and rebase before pushing if someone took it in the meantime.
 - Keep demo and bulk seed data out of versioned schema migrations.
 - Add database constraints for rules that must never be violated.
 - Index lookup and foreign-key-like columns where query patterns require it.

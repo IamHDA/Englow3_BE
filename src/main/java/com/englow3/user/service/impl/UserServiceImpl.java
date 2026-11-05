@@ -20,6 +20,7 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.dto.command.UpdateUserBasicInfoCommand;
 import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.User;
+import com.englow3.user.helper.AvatarPreset;
 import com.englow3.user.repository.UserRepository;
 import com.englow3.user.service.UserService;
 
@@ -62,26 +63,26 @@ public class UserServiceImpl implements UserService {
         return UserInformationResult.of(user);
     }
 
-    public UserInformationResult changeAvatar(MultipartFile image) {
-        return storeImage(image, "avatar");
+    /** Not one transaction, like the banner: the old file is deleted from storage, which no transaction covers. */
+    public UserInformationResult choosePresetAvatar(String presetId) {
+        String key = AvatarPreset.storedKey(presetId);
+        User user = requireCurrentUser();
+        String replaced = user.getAvatarObjectKey();
+        user.changeAvatar(key);
+
+        UserInformationResult result = UserInformationResult.of(userRepo.save(user));
+        // A picture uploaded before presets existed is a file in the bucket; a preset is not.
+        if (!AvatarPreset.isPreset(replaced)) {
+            deleteQuietly(replaced);
+        }
+        return result;
     }
 
     public UserInformationResult changeBanner(MultipartFile image) {
-        return storeImage(image, "banner");
-    }
-
-    private UserInformationResult storeImage(MultipartFile image, String kind) {
         User user = requireCurrentUser();
-        String objectKey = upload(image, user.getId(), kind);
-
-        String replaced;
-        if ("avatar".equals(kind)) {
-            replaced = user.getAvatarObjectKey();
-            user.changeAvatar(objectKey);
-        } else {
-            replaced = user.getBannerObjectKey();
-            user.changeBanner(objectKey);
-        }
+        String objectKey = upload(image, user.getId(), "banner");
+        String replaced = user.getBannerObjectKey();
+        user.changeBanner(objectKey);
 
         UserInformationResult result = UserInformationResult.of(userRepo.save(user));
         deleteQuietly(replaced);

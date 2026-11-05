@@ -24,6 +24,7 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
 import com.englow3.user.entity.Role;
 import com.englow3.user.entity.User;
+import com.englow3.user.helper.AvatarPreset;
 import com.englow3.user.repository.UserRepository;
 import com.englow3.user.service.AccountService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -77,6 +78,7 @@ public class AccountServiceImpl implements AccountService {
         out.put("speakingAttempts", rows("speaking_attempts", "user_id = :u", userId));
         out.put("dictationAttempts", rows("dictation_attempts", "user_id = :u", userId));
         out.put("quizAttempts", rows("quiz_attempts", "user_id = :u", userId));
+        out.put("translationAttempts", rows("translation_attempts", "user_id = :u", userId));
         out.put("flashcardReviews", rows("flashcard_reviews", "user_id = :u", userId));
         out.put("flashcardReviewLogs", rows("flashcard_review_logs", "user_id = :u", userId));
         out.put("tutorConversations", rows("tutor_conversations", "user_id = :u", userId));
@@ -174,7 +176,8 @@ public class AccountServiceImpl implements AccountService {
         jdbc.sql("delete from auth.users where id = :a").param("a", user.getAuthProviderId()).update();
         directory.forget(user.getAuthProviderId());
 
-        String avatar = user.getAvatarObjectKey();
+        // A preset picture is a file of the web app, not of the bucket.
+        String avatar = AvatarPreset.isPreset(user.getAvatarObjectKey()) ? null : user.getAvatarObjectKey();
         String banner = user.getBannerObjectKey();
         afterCommit(() -> {
             for (String key : new String[] { avatar, banner }) {

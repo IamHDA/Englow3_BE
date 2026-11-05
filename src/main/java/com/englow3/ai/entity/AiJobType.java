@@ -17,5 +17,7 @@ public enum AiJobType {
     TUTOR_TRANSCRIPTION,
 
     /** Propose a learning roadmap, or its remaining stages after an adjustment. Target is the learning roadmap. */
-    ROADMAP_GENERATION
+    ROADMAP_GENERATION,
+    /** Grade a learner's English translation of a Vietnamese sentence. Target is a translation attempt. */
+    TRANSLATION_ASSESSMENT
 }
