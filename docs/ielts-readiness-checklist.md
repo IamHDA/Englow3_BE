@@ -40,8 +40,8 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   tạm là band thấp hơn của L và R; band từng kỹ năng tính như IELTS.
   Xem [decisions.md](decisions.md#d-ielts-6--band-tổng-chỉ-có-từ-full-test-4-kỹ-năng).
 - [x] **D-IELTS-10. Full test.** Đã chốt: full test là test đầu vào của người học IELTS,
-  đặt ở module `exam`, chỉ người học IELTS được làm, duyệt theo quy trình như đề. Còn để
-  ngỏ thời hạn làm Writing/Speaking sau phần L+R. Xem
+  đặt ở module `exam`, chỉ người học IELTS được làm, duyệt theo quy trình như đề, phải nộp
+  đủ các phần trong 7 ngày. Xem
   [decisions.md](decisions.md#d-ielts-10--full-test-là-test-đầu-vào-của-người-học-ielts-đặt-ở-module-exam).
 - [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
   cuối bài; chế độ PRACTICE tua thoải mái. Xem
@@ -79,7 +79,8 @@ chưa map. Những việc còn phải làm ở DB:
     không có ảnh.
 - [ ] **Full test (D-IELTS-10):** thêm 2 bảng trong `exam`, gồm định nghĩa full test và
   lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
-  có một lượt đang mở cho mỗi full test.
+  có một lượt đang mở cho mỗi full test. Lượt full test cũng phải lưu hạn nộp (lúc bắt
+  đầu cộng 7 ngày).
 - [ ] **Roadmap:** `roadmap_milestones` phải trỏ được tới full test và lượt full test.
   Hiện bảng chỉ có `exam_id` và `result_exam_attempt_id`.
 
@@ -179,14 +180,17 @@ chưa map. Những việc còn phải làm ở DB:
 - [ ] Entity lượt full test giữ các luật sau, mỗi luật có entity test riêng:
   - chỉ gắn được lượt làm bài đúng task và của đúng học viên;
   - có band tạm khi đã có band L và R;
-  - chỉ có band tổng khi đủ 4 kỹ năng.
+  - chỉ có band tổng khi đủ 4 kỹ năng;
+  - các phần phải nộp trong 7 ngày kể từ lúc bắt đầu; bài nộp trước hạn vẫn được tính
+    khi chấm xong sau hạn.
 - [ ] Chỉ người học có mục tiêu IELTS được bắt đầu full test. Kiểm tra qua
   `user.api.LearnerGoalReader`.
 - [ ] Tạo và duyệt full test theo cùng quy trình như đề. Luật trong entity: chỉ xuất bản
   được khi đề L+R và cả 5 task đều đã xuất bản và đúng loại IELTS.
 - [ ] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
   giữ khoá, vì hai bài có thể được chấm cùng lúc. Sự kiện không bền, nên việc đọc lượt
-  full test và một job định kỳ phải tự bắt kịp, giống level check.
+  full test và một job định kỳ phải tự bắt kịp, giống level check. Job này cũng đóng
+  các lượt đã quá hạn 7 ngày.
 - [ ] `assessment.api`: thêm reader trả band của một bài Writing.
 - [ ] `user.api.PlacementRecorder`: thêm hàm ghi band IELTS vào
   `learner_profiles.current_score`, kèm CEFR lấy từ `score_conversions.cefr_level`. Ghi
@@ -270,6 +274,8 @@ chưa map. Những việc còn phải làm ở DB:
 - [ ] Roadmap: milestone `CERTIFICATE_MOCK` phải ghi nhận được lần thi.
 - [ ] Full test: một học viên IELTS mới đăng ký làm trọn full test từ onboarding. Band
   tạm hiện ngay sau phần L+R, và band chính thức thay vào khi Writing/Speaking chấm xong.
+- [ ] Bỏ dở full test quá 7 ngày: lượt đóng lại, band tạm giữ nguyên, và học viên bắt đầu
+  được lượt mới.
 - [ ] Chạy các lệnh kiểm tra trong `CONTRIBUTING.md` mục *Verification*:
   - `mvn formatter:validate`
   - `mvn --batch-mode clean verify`

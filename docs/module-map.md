@@ -68,7 +68,10 @@ answers, and section results.
     Reading. The overall band is the IELTS mean of four skills (a .25 or .75 remainder
     rounds up) and exists only once every skill is graded. A full test goes through
     the same review workflow as a paper, and can be published only when its paper
-    and all five tasks are published and of the right IELTS kind.
+    and all five tasks are published and of the right IELTS kind. Every part must
+    be submitted within seven days of starting; an answer submitted in time still
+    counts when it is graded later. A sitting that runs out of time with parts
+    missing closes and keeps its provisional band.
   - **Reads and events:** Writing/Speaking bands are read through an `assessment.api`
     reader, and the sitting hears `assessment.api.AssessmentAnswerGraded`. Those
     events are not durable, so reads and a scheduled sweep catch up, as the roadmap

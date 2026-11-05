@@ -380,8 +380,15 @@ cho AI.
   `ASSESSMENT_AUTOMATIC_SPEAKING=false`). Nếu môi trường thật cũng tắt, mọi band chính
   thức đều phải chờ staff chấm.
 
-**Còn để ngỏ:** học viên được làm Writing/Speaking sau phần L+R trong bao lâu, và khi
-quá hạn thì lượt full test xử lý thế nào.
+**Thời hạn làm bài:**
+- Học viên được nghỉ giữa các phần, miễn là nộp đủ các phần trong **7 ngày** tính từ lúc
+  bắt đầu lượt full test. Mỗi phần vẫn có giờ làm riêng.
+- Hạn 7 ngày chỉ tính cho việc **nộp bài**. Bài nộp trước hạn vẫn được tính khi chấm xong
+  sau hạn, kể cả khi phải chờ staff chấm.
+- Quá hạn mà chưa nộp đủ thì lượt full test đóng lại. Band tạm đã ghi vào hồ sơ vẫn giữ
+  nguyên; muốn có band tổng thì làm một lượt full test mới.
+- Chọn 7 ngày vì IELTS thật cũng cho thi Speaking trong khoảng 7 ngày trước hoặc sau ba
+  kỹ năng kia.
 
 **Đổi ý thì:** chuyển phần gom sang module khác thì phải chuyển 2 bảng và các listener.
 Các lượt làm bài trong `exam` và `assessment` không ảnh hưởng.
