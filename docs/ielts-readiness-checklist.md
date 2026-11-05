@@ -37,10 +37,11 @@ Ghi từng quyết định vào [decisions.md](decisions.md).
   đánh số liên tục qua cả đề, nên Reading IELTS đang ra câu 41–80; phải sửa cùng lúc. Xem
   [decisions.md](decisions.md#d-ielts-5--ô-trống-đánh-dấu-theo-thứ-tự-trong-nhóm-số-câu-do-be-tính).
 - [x] **D-IELTS-6. Band tổng.** Đã chốt: band tổng chỉ có từ full test 4 kỹ năng; band
-  tạm là band thấp hơn của L và R. Còn chờ xác nhận cách tính band Writing và Speaking.
+  tạm là band thấp hơn của L và R; band từng kỹ năng tính như IELTS.
   Xem [decisions.md](decisions.md#d-ielts-6--band-tổng-chỉ-có-từ-full-test-4-kỹ-năng).
 - [x] **D-IELTS-10. Full test.** Đã chốt: full test là test đầu vào của người học IELTS,
-  đặt ở module `exam`, chỉ người học chứng chỉ được làm. Còn 4 điểm để ngỏ. Xem
+  đặt ở module `exam`, chỉ người học IELTS được làm, duyệt theo quy trình như đề. Còn để
+  ngỏ thời hạn làm Writing/Speaking sau phần L+R. Xem
   [decisions.md](decisions.md#d-ielts-10--full-test-là-test-đầu-vào-của-người-học-ielts-đặt-ở-module-exam).
 - [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
   cuối bài; chế độ PRACTICE tua thoải mái. Xem
@@ -179,8 +180,10 @@ chưa map. Những việc còn phải làm ở DB:
   - chỉ gắn được lượt làm bài đúng task và của đúng học viên;
   - có band tạm khi đã có band L và R;
   - chỉ có band tổng khi đủ 4 kỹ năng.
-- [ ] Chỉ người học chứng chỉ được bắt đầu full test. Kiểm tra qua
+- [ ] Chỉ người học có mục tiêu IELTS được bắt đầu full test. Kiểm tra qua
   `user.api.LearnerGoalReader`.
+- [ ] Tạo và duyệt full test theo cùng quy trình như đề. Luật trong entity: chỉ xuất bản
+  được khi đề L+R và cả 5 task đều đã xuất bản và đúng loại IELTS.
 - [ ] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
   giữ khoá, vì hai bài có thể được chấm cùng lúc. Sự kiện không bền, nên việc đọc lượt
   full test và một job định kỳ phải tự bắt kịp, giống level check.
@@ -219,6 +222,7 @@ chưa map. Những việc còn phải làm ở DB:
     mở đề rồi lưu lại, thao tác sẽ lỗi khoá ngoại hoặc làm mất đáp án.
 - [ ] Writing Task 1: hiển thị ảnh biểu đồ.
 - [ ] Màn full test: bắt đầu, tiến độ 4 kỹ năng, band tạm và band chính thức.
+- [ ] Màn admin tạo, gửi duyệt và duyệt full test.
 - [ ] Onboarding của người học IELTS: làm full test ở bước trình độ, rồi đi tiếp với
   band tạm.
 

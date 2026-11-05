@@ -59,14 +59,16 @@ answers, and section results.
   sitting of a `MOCK` paper with Writing Task 1, Writing Task 2 and Speaking Parts
   1-3 from `assessment` into one sitting with an overall band.
   - **Who sits it:** it is the IELTS learner's placement test, and can also be taken
-    from the catalogue without a roadmap. Only certificate learners may start one
-    (`user.api.LearnerGoalReader`).
+    from the catalogue without a roadmap. Only learners aiming at IELTS may start
+    one (`user.api.LearnerGoalReader`); TOEIC learners keep the placement paper.
   - **Tables:** exam will own two new tables, the full-test definition and the
     learner's full-test sitting. Only exam writes them.
   - **Rules:** the sitting entity holds them. Only an attempt at the right task by the
     same learner can be attached. The provisional band is the lower of Listening and
     Reading. The overall band is the IELTS mean of four skills (a .25 or .75 remainder
-    rounds up) and exists only once every skill is graded.
+    rounds up) and exists only once every skill is graded. A full test goes through
+    the same review workflow as a paper, and can be published only when its paper
+    and all five tasks are published and of the right IELTS kind.
   - **Reads and events:** Writing/Speaking bands are read through an `assessment.api`
     reader, and the sitting hears `assessment.api.AssessmentAnswerGraded`. Those
     events are not durable, so reads and a scheduled sweep catch up, as the roadmap
@@ -81,8 +83,8 @@ answers, and section results.
     papers and sittings. The grouping has no rules beyond combining bands, so a module
     of its own would only add wiring. `assessment` does not depend on `exam`, so the
     new dependency makes no cycle.
-  - **Revisit if:** the full test gains rules of its own (retake policy, pricing, an
-    authoring workflow of its own), or `assessment` ever needs to read exam data.
+  - **Revisit if:** the full test gains rules of its own (retake policy, pricing, a
+    review workflow unlike a paper's), or `assessment` ever needs to read exam data.
 
 ## `flashcard`
 

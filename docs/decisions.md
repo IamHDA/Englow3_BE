@@ -270,10 +270,12 @@ phải đổi.
   nộp.
 - Lấy band thấp hơn, vì thà đánh giá thấp còn hơn để học viên tưởng mình đã đạt.
 
-**Còn chờ xác nhận:**
-- Band Writing: Task 2 tính gấp đôi Task 1, theo cách IELTS công bố.
-- Band Speaking: trung bình 3 part (D-IELTS-8).
-- Cả hai làm tròn về nửa band gần nhất.
+**Band từng kỹ năng**, tính theo cách IELTS:
+- Writing: Task 2 tính gấp đôi Task 1, tức (Task 1 + 2 × Task 2) / 3.
+- Speaking: trung bình 3 part (D-IELTS-8). Thi thật thì giám khảo cho một band cho cả
+  bài; khi mỗi part được chấm riêng, trung bình 3 part là cách gần nhất với điều đó.
+- Mọi band đều làm tròn theo cùng quy tắc với band tổng: về nửa band gần nhất, phần lẻ
+  .25 và .75 làm tròn lên.
 
 **Đổi ý thì:** chỉ đổi phép tính, không đổi dữ liệu. Các lượt đã có điểm nên giữ band
 đã tính lúc đó.
@@ -351,8 +353,14 @@ cho AI.
   hiện nay. Học viên đi tiếp onboarding với band tạm. Khi có band chính thức, trình độ
   được cập nhật mà không phải làm lại onboarding.
 - Học viên không có roadmap cũng tự chọn làm được trong thư viện đề.
-- **Chỉ người học chứng chỉ** được làm full test. Người không học chứng chỉ vẫn dùng
-  level check của roadmap.
+- **Chỉ người học có mục tiêu IELTS** được làm full test.
+  - Người học TOEIC không làm full test IELTS; test đầu vào của họ vẫn là đề
+    `PLACEMENT`.
+  - Người không học chứng chỉ vẫn dùng level check của roadmap.
+  - Vì vậy full test luôn giữ đúng format và độ dài của bài thi IELTS.
+- Full test được tạo và duyệt theo **cùng quy trình duyệt như đề**: nháp, gửi duyệt,
+  duyệt hoặc từ chối, xuất bản. Full test chỉ xuất bản được khi đề L+R và cả 5 task đều
+  đã xuất bản và đúng loại IELTS. Đây là luật nằm trong entity.
 - Phần gom thuộc module `exam`; xem mục `exam` trong [module-map.md](module-map.md).
 
 **Lý do:**
@@ -372,14 +380,8 @@ cho AI.
   `ASSESSMENT_AUTOMATIC_SPEAKING=false`). Nếu môi trường thật cũng tắt, mọi band chính
   thức đều phải chờ staff chấm.
 
-**Còn để ngỏ:**
-- Owner nói phần Writing/Speaking "sẽ dễ hơn". Chưa rõ nghĩa là ít bài và ngắn hơn
-  (không ảnh hưởng độ tin cậy), hay đề dễ hơn (band kém tin cậy).
-- Học viên được làm Writing/Speaking sau phần L+R trong bao lâu.
-- Người học TOEIC có được làm full test IELTS không. Test đầu vào TOEIC vẫn là đề
-  `PLACEMENT`.
-- Full test được tạo và duyệt thế nào: theo quy trình duyệt như đề, hay chỉ cần mọi
-  phần của nó đã xuất bản.
+**Còn để ngỏ:** học viên được làm Writing/Speaking sau phần L+R trong bao lâu, và khi
+quá hạn thì lượt full test xử lý thế nào.
 
 **Đổi ý thì:** chuyển phần gom sang module khác thì phải chuyển 2 bảng và các listener.
 Các lượt làm bài trong `exam` và `assessment` không ảnh hưởng.
