@@ -29,8 +29,11 @@ public interface AssessmentBandReader {
      *            when the learner handed it in; what a deadline is measured against
      * @param band
      *            mean of the four criteria on the 0-9 scale, in half bands; null until graded
+     * @param status
+     *            the attempt's status by name: DRAFT, QUEUED, NEEDS_REVIEW, COMPLETED or FAILED
      */
-    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band) {
+    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band,
+            String status) {
     }
 
     /**

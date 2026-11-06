@@ -134,7 +134,7 @@ class FullTestSittingServiceTest {
         for (UUID taskId : test.taskIds()) {
             when(assessments.latestAnswer(taskId, userId, sitting.getStartedAt()))
                     .thenReturn(Optional.of(new AssessmentBandReader.Answer(UUID.randomUUID(), taskId,
-                            CLOCK.instant().minusSeconds(30), true, new BigDecimal("6.0"))));
+                            CLOCK.instant().minusSeconds(30), true, new BigDecimal("6.0"), "COMPLETED")));
         }
 
         var result = service.view(sitting.getId());
@@ -164,5 +164,23 @@ class FullTestSittingServiceTest {
 
         verify(placements).recordIeltsBand(eq(userId), eq(paper.getId()), eq("B2"), eq(new BigDecimal("6.0")));
         verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void saysWhichPartTheGraderGaveUpOn() {
+        FullTestSitting sitting = FullTestSitting.start(test.getId(), userId, CLOCK.instant().minusSeconds(3600));
+        when(sittingRepo.findByIdForUpdate(sitting.getId())).thenReturn(Optional.of(sitting));
+        UUID task2 = test.taskId(FullTest.Slot.WRITING_TASK_2);
+        UUID failed = UUID.randomUUID();
+        var answer = new AssessmentBandReader.Answer(failed, task2, CLOCK.instant().minusSeconds(30), false, null,
+                "FAILED");
+        when(assessments.latestAnswer(task2, userId, sitting.getStartedAt())).thenReturn(Optional.of(answer));
+        when(assessments.read(failed, userId)).thenReturn(Optional.of(answer));
+
+        var parts = service.view(sitting.getId()).parts();
+
+        assertThat(parts.get(FullTest.Slot.WRITING_TASK_2.ordinal()).grading())
+                .isEqualTo(com.englow3.exam.entity.FullTestPartGrading.FAILED);
+        assertThat(parts.get(FullTest.Slot.WRITING_TASK_1.ordinal()).grading()).isNull();
     }
 }

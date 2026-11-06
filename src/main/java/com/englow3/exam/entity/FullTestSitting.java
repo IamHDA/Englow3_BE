@@ -25,7 +25,8 @@ import lombok.Getter;
  * <p>
  * The rules: a part counts only if it was submitted within {@link #WINDOW} of starting - the deadline covers
  * submitting, so an answer graded later still counts; once a part is attached it is never swapped for another; the
- * provisional band is the lower of Listening and Reading; the overall band exists only when all four skills are graded.
+ * provisional band is the lower of Listening and Reading; the overall band exists only when all four skills are graded;
+ * a sitting still short of a grade {@link #GRADING_WINDOW} after its deadline expires.
  */
 @Entity
 @Table(name = "full_test_sittings")
@@ -34,6 +35,13 @@ public class FullTestSitting extends BasePersistedEntity {
 
     /** IELTS itself allows the Speaking test up to seven days either side of the other three. */
     public static final Duration WINDOW = Duration.ofDays(7);
+
+    /**
+     * How long grading may take once the submit window has closed. A grade that never comes - an answer the grader
+     * gave up on and nobody resent, a review nobody picked up - would otherwise hold the sitting open for good; past
+     * this the sitting expires and keeps its provisional band, so the learner can start again.
+     */
+    public static final Duration GRADING_WINDOW = Duration.ofDays(7);
 
     /** A Writing or Speaking answer the service found for a slot: when it was submitted, and its band once graded. */
     public record Part(UUID attemptId, Instant submittedAt, BigDecimal band) {
@@ -126,6 +134,11 @@ public class FullTestSitting extends BasePersistedEntity {
         return sitting;
     }
 
+    /** Grades landing after this no longer count: the sitting expires instead of waiting on. */
+    public Instant gradesDueAt() {
+        return deadlineAt.plus(GRADING_WINDOW);
+    }
+
     public boolean isSettled() {
         return status == FullTestSittingStatus.COMPLETED || status == FullTestSittingStatus.EXPIRED;
     }
@@ -185,7 +198,8 @@ public class FullTestSitting extends BasePersistedEntity {
         }
         if (now.isAfter(deadlineAt)) {
             boolean everythingIn = examAttemptId != null && java.util.Arrays.stream(parts).allMatch(Objects::nonNull);
-            status = everythingIn ? FullTestSittingStatus.AWAITING_GRADES : FullTestSittingStatus.EXPIRED;
+            status = everythingIn && !now.isAfter(gradesDueAt()) ? FullTestSittingStatus.AWAITING_GRADES
+                    : FullTestSittingStatus.EXPIRED;
         }
         return new Change(provisionalSet, false);
     }

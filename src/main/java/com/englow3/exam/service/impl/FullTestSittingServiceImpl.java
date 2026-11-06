@@ -23,6 +23,7 @@ import com.englow3.exam.entity.ExamAttemptMode;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.FullTest;
+import com.englow3.exam.entity.FullTestPartGrading;
 import com.englow3.exam.entity.FullTestSitting;
 import com.englow3.exam.entity.FullTestSittingStatus;
 import com.englow3.exam.entity.SectionType;
@@ -84,7 +85,7 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
             FullTestSitting sitting = lock(open.get().getId());
             settle(sitting, test);
             if (sitting.getStatus() == FullTestSittingStatus.IN_PROGRESS) {
-                return FullTestSittingResult.of(sitting, test);
+                return FullTestSittingResult.of(sitting, test, grading(sitting));
             }
             sittingRepo.flush();
         }
@@ -102,7 +103,7 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
                         "No full test sitting with id %s".formatted(sittingId)));
         FullTest test = fullTestRepo.findById(sitting.getFullTestId()).orElseThrow();
         settle(sitting, test);
-        return FullTestSittingResult.of(sitting, test);
+        return FullTestSittingResult.of(sitting, test, grading(sitting));
     }
 
     @Override
@@ -128,6 +129,17 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
             sittingRepo.findByIdForUpdate(candidate.getId()).ifPresent(
                     sitting -> settle(sitting, fullTestRepo.findById(sitting.getFullTestId()).orElseThrow()));
         }
+    }
+
+    /** How grading stands for each attached answer, so the screen can say which part to resend. */
+    private List<FullTestPartGrading> grading(FullTestSitting sitting) {
+        List<FullTestPartGrading> states = new ArrayList<>();
+        for (UUID attemptId : sitting.partAttemptIds()) {
+            states.add(attemptId == null ? null
+                    : assessments.read(attemptId, sitting.getUserId())
+                            .map(answer -> FullTestPartGrading.of(answer.status())).orElse(null));
+        }
+        return states;
     }
 
     private FullTestSitting lock(UUID id) {

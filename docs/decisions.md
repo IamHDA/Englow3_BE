@@ -396,6 +396,13 @@ cho AI.
   nguyên; muốn có band tổng thì làm một lượt full test mới.
 - Chọn 7 ngày vì IELTS thật cũng cho thi Speaking trong khoảng 7 ngày trước hoặc sau ba
   kỹ năng kia.
+- Chấm cũng có hạn: **7 ngày sau hạn nộp** (`FullTestSitting.GRADING_WINDOW`). Hết hạn mà
+  còn phần chưa có band thì lượt đóng (`EXPIRED`), giữ band tạm. Nếu không có hạn này,
+  một bài AI bỏ cuộc (`FAILED`) mà học viên không gửi lại, hoặc một bài chờ staff mà
+  không ai chấm, sẽ giữ lượt ở `AWAITING_GRADES` mãi.
+- Màn hình lượt thi hiện trạng thái chấm của từng phần (`FullTestPartGrading`: đang chấm,
+  chờ người chấm, lỗi, đã chấm), để học viên biết phần nào cần "Chấm lại" hoặc "Gửi
+  người chấm" trước hạn chấm. Trạng thái đọc từ `assessment` mỗi lần xem, không lưu.
 
 **Đổi ý thì:** chuyển phần gom sang module khác thì phải chuyển 2 bảng và các listener.
 Các lượt làm bài trong `exam` và `assessment` không ảnh hưởng.

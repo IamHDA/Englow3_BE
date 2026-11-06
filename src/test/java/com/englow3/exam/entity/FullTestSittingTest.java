@@ -149,4 +149,34 @@ class FullTestSittingTest {
         assertThat(change.provisionalSet()).isFalse();
         assertThat(sitting.getListeningBand()).isNull();
     }
+
+    @Test
+    void aSittingStillShortOfAGradeAWeekAfterItsDeadlineExpiresWithItsProvisionalBand() {
+        FullTestSitting sitting = started();
+        FullTestSitting.Part[] ungraded = { part(DURING, "6.0"), part(DURING, null), part(DURING, "6.0"),
+                part(DURING, "6.0"), part(DURING, "6.0") };
+        sitting.settle(progress("7.0", "6.5", ungraded), DURING);
+
+        Instant due = sitting.gradesDueAt();
+        assertThat(due).isEqualTo(sitting.getDeadlineAt().plus(FullTestSitting.GRADING_WINDOW));
+        sitting.settle(progress("7.0", "6.5", ungraded), due);
+        assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.AWAITING_GRADES);
+
+        sitting.settle(progress("7.0", "6.5", ungraded), due.plusSeconds(1));
+        assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.EXPIRED);
+        assertThat(sitting.getProvisionalBand()).isEqualByComparingTo("6.5");
+        assertThat(sitting.getOverallBand()).isNull();
+    }
+
+    @Test
+    void aGradeArrivingInTimeStillCompletesTheSittingOnTheLastDay() {
+        FullTestSitting sitting = started();
+        FullTestSitting.Part late = part(DURING, null);
+        FullTestSitting.Part[] waiting = { part(DURING, "6.0"), late, part(DURING, "6.0"), part(DURING, "6.0"),
+                part(DURING, "6.0") };
+        sitting.settle(progress("7.0", "6.5", waiting), AFTER);
+
+        waiting[1] = new FullTestSitting.Part(late.attemptId(), late.submittedAt(), b("6.0"));
+        assertThat(sitting.settle(progress("7.0", "6.5", waiting), sitting.gradesDueAt()).completed()).isTrue();
+    }
 }
