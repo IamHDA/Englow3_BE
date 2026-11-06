@@ -19,13 +19,13 @@ import com.englow3.exam.entity.FullTestSittingStatus;
  *            the lower of Listening and Reading, shown as an estimate until the overall band exists
  */
 public record FullTestSittingResult(UUID id, UUID fullTestId, String title, FullTestSittingStatus status,
-        Instant startedAt, Instant deadlineAt, Instant gradesDueAt, Instant completedAt, UUID examId, UUID examAttemptId,
-        java.util.List<PartResult> parts, BigDecimal listeningBand, BigDecimal readingBand, BigDecimal writingBand,
-        BigDecimal speakingBand, BigDecimal provisionalBand, BigDecimal overallBand) {
+        Instant startedAt, Instant deadlineAt, Instant gradesDueAt, Instant completedAt, UUID examId,
+        UUID examAttemptId, java.util.List<PartResult> parts, BigDecimal listeningBand, BigDecimal readingBand,
+        BigDecimal writingBand, BigDecimal speakingBand, BigDecimal provisionalBand, BigDecimal overallBand) {
 
     /**
-     * One Writing or Speaking slot: the task to answer, the answer attached, if any, and how its grading stands -
-     * null when nothing is attached or when the caller did not look (the list of sittings).
+     * One Writing or Speaking slot: the task to answer, the answer attached, if any, and how its grading stands - null
+     * when nothing is attached or when the caller did not look (the list of sittings).
      */
     public record PartResult(FullTest.Slot slot, UUID taskId, UUID attemptId, FullTestPartGrading grading) {
     }
@@ -48,9 +48,8 @@ public record FullTestSittingResult(UUID id, UUID fullTestId, String title, Full
         }
         return new FullTestSittingResult(sitting.getId(), test.getId(), test.getTitle(), sitting.getStatus(),
                 sitting.getStartedAt(), sitting.getDeadlineAt(), sitting.gradesDueAt(), sitting.getCompletedAt(),
-                test.getExamId(),
-                sitting.getExamAttemptId(), parts, sitting.getListeningBand(), sitting.getReadingBand(),
-                sitting.getWritingBand(), sitting.getSpeakingBand(), sitting.getProvisionalBand(),
-                sitting.getOverallBand());
+                test.getExamId(), sitting.getExamAttemptId(), parts, sitting.getListeningBand(),
+                sitting.getReadingBand(), sitting.getWritingBand(), sitting.getSpeakingBand(),
+                sitting.getProvisionalBand(), sitting.getOverallBand());
     }
 }

@@ -30,9 +30,10 @@ public record FullTestSittingResponse(UUID id, UUID fullTestId, String title, Fu
 
     public static FullTestSittingResponse from(FullTestSittingResult result) {
         return new FullTestSittingResponse(result.id(), result.fullTestId(), result.title(), result.status(),
-                result.startedAt(), result.deadlineAt(), result.gradesDueAt(), result.completedAt(), result.examId(), result.examAttemptId(),
-                result.parts().stream().map(part -> new PartResponse(part.slot(), part.taskId(), part.attemptId(),
-                        part.grading()))
+                result.startedAt(), result.deadlineAt(), result.gradesDueAt(), result.completedAt(), result.examId(),
+                result.examAttemptId(),
+                result.parts().stream()
+                        .map(part -> new PartResponse(part.slot(), part.taskId(), part.attemptId(), part.grading()))
                         .toList(),
                 result.listeningBand(), result.readingBand(), result.writingBand(), result.speakingBand(),
                 result.provisionalBand(), result.overallBand());

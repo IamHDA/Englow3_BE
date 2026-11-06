@@ -10,8 +10,7 @@ public enum FullTestPartGrading {
     /** Waiting for a person to grade it. */
     AWAITING_REVIEW,
     /** The automatic grader gave up; the learner can resend it or ask for a person. */
-    FAILED,
-    GRADED;
+    FAILED, GRADED;
 
     /** From the assessment module's attempt status; null for one with no answer yet (a draft). */
     public static FullTestPartGrading of(String attemptStatus) {

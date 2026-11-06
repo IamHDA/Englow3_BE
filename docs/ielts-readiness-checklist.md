@@ -162,9 +162,11 @@ chưa map. Những việc còn phải làm ở DB:
   dung đề. Mọi khoá ngoại đều là `on delete restrict`, nên phải xoá
   `question_matching_answers`, `question_accepted_answers` và `question_set_options`
   **trước** khi xoá câu hỏi và nhóm câu.
-- [ ] `QuestionBankServiceImpl`: khi copy nhóm câu từ ngân hàng, phải copy cả 3 bảng
+- [x] `QuestionBankServiceImpl`: khi copy nhóm câu từ ngân hàng, phải copy cả 3 bảng
   mới.
-  - Không cần: `QuestionBankServiceImpl` chỉ tìm kiếm và đọc, không copy nhóm câu vào đề.
+  - `QuestionBankServiceImpl` chỉ tìm kiếm; bản copy là thứ client gửi lên khi lưu đề. Vì
+    vậy kết quả tìm kiếm giờ trả đủ cái trả lời câu: đáp án điền từ, nhãn đáp án câu ghép
+    và cả danh sách chung của nhóm câu ghép, để bản copy không mất đáp án.
 
 ### 2.5 Làm bài, xem kết quả, tutor
 
@@ -227,34 +229,34 @@ chưa map. Những việc còn phải làm ở DB:
 
 ### 2.8 Tài liệu
 
-- [ ] Cập nhật [module-map.md](module-map.md) khi các bảng trên bắt đầu có entity.
-- [ ] Ghi các quyết định D-IELTS-* vào [decisions.md](decisions.md).
+- [x] Cập nhật [module-map.md](module-map.md) khi các bảng trên bắt đầu có entity.
+- [x] Ghi các quyết định D-IELTS-* vào [decisions.md](decisions.md).
 
 ---
 
 ## 3. BFF và FE (repo `Englow3_FE`, nhánh `testing`)
 
-- [ ] `apps/bff/src/modules/exam/exam.typeDefs.ts`: thêm field mới, rồi sinh lại
+- [x] `apps/bff/src/modules/exam/exam.typeDefs.ts`: thêm field mới, rồi sinh lại
   `apps/bff/src/generated/backend-openapi.ts` và `graphql.ts`.
-- [ ] `apps/web/src/features/exam/components/blocks/QuestionCard`: hiện chỉ render radio
+- [x] `apps/web/src/features/exam/components/blocks/QuestionCard`: hiện chỉ render radio
   và checkbox. Thêm:
   - ô nhập chữ;
   - dropdown cho câu matching;
   - ô trống nằm ngay trong đoạn văn hoặc bảng, theo quy ước D-IELTS-5.
-- [ ] `ExamSittingView`, `hooks/useExamAutosave.ts` và `graphql/exam-attempt.graphql`:
+- [x] `ExamSittingView`, `hooks/useExamAutosave.ts` và `graphql/exam-attempt.graphql`:
   gửi và lưu nháp câu trả lời dạng chữ.
-- [ ] Bỏ việc tự đếm số câu trong `ExamSittingView` và `QuestionCard`; dùng `numberFrom`
+- [x] Bỏ việc tự đếm số câu trong `ExamSittingView` và `QuestionCard`; dùng `numberFrom`
   và `numberTo` từ API (D-IELTS-5).
-- [ ] `ExamResultView`: hiện đáp án dạng chữ.
-- [ ] `features/content/components/blocks/ExamTreeEditor.tsx` và
+- [x] `ExamResultView`: hiện đáp án dạng chữ.
+- [x] `features/content/components/blocks/ExamTreeEditor.tsx` và
   `features/content/api/authoringValidation.ts`: admin phải **soạn và duyệt** được loại
   câu mới.
   - **Không nạp đề IELTS vào môi trường mà editor chưa hỗ trợ loại câu mới.** Nếu admin
     mở đề rồi lưu lại, thao tác sẽ lỗi khoá ngoại hoặc làm mất đáp án.
-- [ ] Writing Task 1: hiển thị ảnh biểu đồ.
-- [ ] Màn full test: bắt đầu, tiến độ 4 kỹ năng, band tạm và band chính thức.
-- [ ] Màn admin tạo, gửi duyệt và duyệt full test.
-- [ ] Onboarding của người học IELTS: làm full test ở bước trình độ, rồi đi tiếp với
+- [x] Writing Task 1: hiển thị ảnh biểu đồ.
+- [x] Màn full test: bắt đầu, tiến độ 4 kỹ năng, band tạm và band chính thức.
+- [x] Màn admin tạo, gửi duyệt và duyệt full test.
+- [x] Onboarding của người học IELTS: làm full test ở bước trình độ, rồi đi tiếp với
   band tạm.
 
 ---

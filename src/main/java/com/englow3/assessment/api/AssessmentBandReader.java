@@ -32,8 +32,7 @@ public interface AssessmentBandReader {
      * @param status
      *            the attempt's status by name: DRAFT, QUEUED, NEEDS_REVIEW, COMPLETED or FAILED
      */
-    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band,
-            String status) {
+    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band, String status) {
     }
 
     /**

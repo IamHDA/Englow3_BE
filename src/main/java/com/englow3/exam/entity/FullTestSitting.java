@@ -37,9 +37,9 @@ public class FullTestSitting extends BasePersistedEntity {
     public static final Duration WINDOW = Duration.ofDays(7);
 
     /**
-     * How long grading may take once the submit window has closed. A grade that never comes - an answer the grader
-     * gave up on and nobody resent, a review nobody picked up - would otherwise hold the sitting open for good; past
-     * this the sitting expires and keeps its provisional band, so the learner can start again.
+     * How long grading may take once the submit window has closed. A grade that never comes - an answer the grader gave
+     * up on and nobody resent, a review nobody picked up - would otherwise hold the sitting open for good; past this
+     * the sitting expires and keeps its provisional band, so the learner can start again.
      */
     public static final Duration GRADING_WINDOW = Duration.ofDays(7);
 
