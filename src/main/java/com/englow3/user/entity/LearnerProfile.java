@@ -95,6 +95,12 @@ public class LearnerProfile extends BasePersistedEntity {
         this.levelCheckId = null;
     }
 
+    /** A placement that also measured a certificate score - an IELTS band from the full test. */
+    public void recordPlacement(CertificateLevel level, UUID attemptId, BigDecimal score) {
+        recordPlacement(level, attemptId);
+        this.currentScore = score;
+    }
+
     /** A level measured by the roadmap's level check; the counterpart of {@link #recordPlacement}. */
     public void recordLevelCheck(CertificateLevel level, UUID levelCheckId) {
         this.currentLevel = level;

@@ -69,33 +69,33 @@ answers, and section results.
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the
   shared storage client performs the I/O.
-- **IELTS full test (planned, not built):** groups one full Listening + Reading
-  sitting of a `MOCK` paper with Writing Task 1, Writing Task 2 and Speaking Parts
-  1-3 from `assessment` into one sitting with an overall band.
-  - **Who sits it:** it is the IELTS learner's placement test, and can also be taken
-    from the catalogue without a roadmap. Only learners aiming at IELTS may start
-    one (`user.api.LearnerGoalReader`); TOEIC learners keep the placement paper.
-  - **Tables:** exam will own two new tables, the full-test definition and the
-    learner's full-test sitting. Only exam writes them.
-  - **Rules:** the sitting entity holds them. Only an attempt at the right task by the
-    same learner can be attached. The provisional band is the lower of Listening and
-    Reading. The overall band is the IELTS mean of four skills (a .25 or .75 remainder
-    rounds up) and exists only once every skill is graded. A full test goes through
-    the same review workflow as a paper, and can be published only when its paper
-    and all five tasks are published and of the right IELTS kind. Every part must
-    be submitted within seven days of starting; an answer submitted in time still
-    counts when it is graded later. A sitting that runs out of time with parts
-    missing closes and keeps its provisional band.
-  - **Reads and events:** Writing/Speaking bands are read through an `assessment.api`
-    reader, and the sitting hears `assessment.api.AssessmentAnswerGraded`. Those
-    events are not durable, so reads and a scheduled sweep catch up, as the roadmap
-    does for level checks.
-  - **Concurrency:** updates take the sitting's lock and version, because two answers
-    can be graded at once.
+- **IELTS full test:** groups one full Listening + Reading sitting of a `MOCK` paper
+  with Writing Task 1, Writing Task 2 and Speaking Parts 1-3 from `assessment` into
+  one sitting with an overall band.
+  - **Who sits it:** it is the IELTS learner's placement test, and is also in the
+    catalogue without a roadmap (`/api/full-tests`). Only learners aiming at IELTS may
+    start one (`user.api.LearnerGoalReader`); TOEIC learners keep the placement paper.
+  - **Tables:** `full_tests` and `full_test_sittings` (V082). Only exam writes them.
+    The five tasks are assessment's and are referenced by id only.
+  - **Rules:** `FullTest` follows a paper's review workflow and can be published only
+    when its paper is a published IELTS mock of its variant with Listening and Reading
+    and all five tasks are published IELTS tasks of the right slot. `FullTestSitting`
+    attaches the latest full scored sitting of the paper and the latest submitted
+    answer to each task started since the sitting, if submitted within seven days, and
+    never swaps one once attached. The provisional band is the lower of Listening and
+    Reading; Writing weights Task 2 twice, Speaking averages its parts, and the overall
+    band is the IELTS mean of four (`helper.IeltsBand`).
+  - **Reads and events:** Writing/Speaking bands and task facts come from
+    `assessment.api.AssessmentBandReader`. `worker.FullTestSittingListener` settles a
+    learner's open sittings after `ExamSittingScored` or `AssessmentAnswerGraded`
+    commits; those events are not durable, so reads and `FullTestSittingSweeper`
+    (every 10 minutes, `app.exam.full-test-sweep.*`) catch up and close sittings past
+    their deadline.
+  - **Concurrency:** a sitting is settled under a row lock with `@Version`; one open
+    sitting per learner and full test is a partial unique index.
   - **Results out:** both bands reach the learner profile through
-    `user.api.PlacementRecorder`. A new `exam.api` event announces a final band to the
-    roadmap, whose IELTS mock milestones will point at a full test (a roadmap schema
-    change).
+    `user.api.PlacementRecorder.recordIeltsBand`. `exam.api.FullTestCompleted` announces
+    a final band; the roadmap does not listen to it yet.
   - **Why:** the full test must exist without a roadmap, and exam already owns mock
     papers and sittings. The grouping has no rules beyond combining bands, so a module
     of its own would only add wiring. `assessment` does not depend on `exam`, so the
@@ -291,6 +291,9 @@ exercise and retain their existing percentage scores.
   roadmap's level check and stays out of the learner catalogue.
   `assessment.api.SpeakingLevelReader` turns a graded answer's four-criterion mean
   into a CEFR band using the conversion in force when it was graded.
+- **Full test:** `assessment.api.AssessmentBandReader` gives the exam module's IELTS
+  full test an answer's band (the four-criterion mean), when it was submitted, and a
+  task's skill, type, certificate and whether it is published. Plain values only.
 - **Roles:** staff author and grade their own tasks; administrators approve,
   reject or archive tasks and may correct a completed grade. Learners only read
   published tasks and their own drafts, submissions and reports.

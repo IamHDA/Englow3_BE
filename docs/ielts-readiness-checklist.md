@@ -77,7 +77,7 @@ chưa map. Những việc còn phải làm ở DB:
   - Thêm `image_object_key varchar(500)`.
   - Thêm `certificate_variant` nếu cần tách Academic với GT. Task 1 bên GT là viết thư,
     không có ảnh.
-- [ ] **Full test (D-IELTS-10):** thêm 2 bảng trong `exam`, gồm định nghĩa full test và
+- [x] **Full test (D-IELTS-10):** thêm 2 bảng (V082) trong `exam`, gồm định nghĩa full test và
   lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
   có một lượt đang mở cho mỗi full test. Lượt full test cũng phải lưu hạn nộp (lúc bắt
   đầu cộng 7 ngày).
@@ -190,26 +190,33 @@ chưa map. Những việc còn phải làm ở DB:
 
 ### 2.7 Full test (D-IELTS-10, module `exam`)
 
-- [ ] Entity lượt full test giữ các luật sau, mỗi luật có entity test riêng:
+- [x] Entity lượt full test giữ các luật sau, mỗi luật có entity test riêng:
   - chỉ gắn được lượt làm bài đúng task và của đúng học viên;
   - có band tạm khi đã có band L và R;
   - chỉ có band tổng khi đủ 4 kỹ năng;
   - các phần phải nộp trong 7 ngày kể từ lúc bắt đầu; bài nộp trước hạn vẫn được tính
     khi chấm xong sau hạn.
-- [ ] Chỉ người học có mục tiêu IELTS được bắt đầu full test. Kiểm tra qua
+  - Đã làm trong `FullTest` và `FullTestSitting`, kèm `FullTestTest` và
+    `FullTestSittingTest`. Một bài đã gắn vào lượt thì không bao giờ bị thay.
+- [x] Chỉ người học có mục tiêu IELTS được bắt đầu full test. Kiểm tra qua
   `user.api.LearnerGoalReader`.
-- [ ] Tạo và duyệt full test theo cùng quy trình như đề. Luật trong entity: chỉ xuất bản
+- [x] Tạo và duyệt full test theo cùng quy trình như đề. Luật trong entity: chỉ xuất bản
   được khi đề L+R và cả 5 task đều đã xuất bản và đúng loại IELTS.
-- [ ] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
+- [x] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
   giữ khoá, vì hai bài có thể được chấm cùng lúc. Sự kiện không bền, nên việc đọc lượt
   full test và một job định kỳ phải tự bắt kịp, giống level check. Job này cũng đóng
   các lượt đã quá hạn 7 ngày.
-- [ ] `assessment.api`: thêm reader trả band của một bài Writing.
-- [ ] `user.api.PlacementRecorder`: thêm hàm ghi band IELTS vào
+- [x] `assessment.api`: thêm reader trả band của một bài Writing.
+- [x] `user.api.PlacementRecorder`: thêm hàm ghi band IELTS vào
   `learner_profiles.current_score`, kèm CEFR lấy từ `score_conversions.cefr_level`. Ghi
   band tạm trước, band chính thức sau, không bắt làm lại onboarding.
+  - Đã làm (`recordIeltsBand`). CEFR lấy theo mốc Cambridge trong `helper.IeltsBand`,
+    không lấy từ `score_conversions.cefr_level`: cột đó gắn với điểm thô của một section,
+    còn ở đây là band tổng.
 - [ ] `exam.api`: phát sự kiện khi một lượt full test có band chính thức. Roadmap nghe
   sự kiện này để tính mốc thi thử IELTS.
+  - Đã phát `exam.api.FullTestCompleted`. Roadmap **chưa** nghe sự kiện này, nên mốc thi thử
+    IELTS vẫn chưa tính bằng full test (cần đổi `roadmap_milestones`).
 
 ### 2.8 Tài liệu
 

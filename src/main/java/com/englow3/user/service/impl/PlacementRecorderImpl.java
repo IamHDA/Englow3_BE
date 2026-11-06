@@ -87,6 +87,22 @@ public class PlacementRecorderImpl implements PlacementRecorder {
         }
     }
 
+    @Override
+    @Transactional
+    public void recordIeltsBand(UUID userId, UUID examAttemptId, String level, BigDecimal band) {
+        CertificateLevel measured = CertificateLevel.valueOf(level);
+        User user = userRepo.findById(userId).orElse(null);
+        if (user == null) {
+            return;
+        }
+        LearnerProfile profile = learnerProfileRepo.findByUserId(userId)
+                .orElseGet(() -> learnerProfileRepo.save(LearnerProfile.forUser(userId)));
+        profile.recordPlacement(measured, examAttemptId, band);
+        if (user.getOnboardingStep() == OnboardingStep.CURRENT_LEVEL) {
+            user.moveTo(OnboardingStep.LEARNING_GOAL);
+        }
+    }
+
     public static CertificateLevel levelFor(BigDecimal scorePercentage) {
         if (scorePercentage == null) {
             return LOWEST_LEVEL;
