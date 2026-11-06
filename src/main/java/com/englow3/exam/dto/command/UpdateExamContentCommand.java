@@ -47,12 +47,31 @@ public record UpdateExamContentCommand(UUID examId, List<SectionCommand> section
 
     public record QuestionCommand(QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<OptionCommand> options) {
+            UUID sourceQuestionId, List<OptionCommand> options, List<AcceptedAnswerCommand> acceptedAnswers) {
+
+        public QuestionCommand {
+            acceptedAnswers = acceptedAnswers == null ? List.of() : acceptedAnswers;
+        }
+
+        public QuestionCommand(QuestionType questionType, String content, DifficultyLevel difficultyLevel,
+                SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
+                UUID sourceQuestionId, List<OptionCommand> options) {
+            this(questionType, content, difficultyLevel, skillType, questionCategory, orderNo, maxRawScore, explanation,
+                    sourceQuestionId, options, List.of());
+        }
 
         public static QuestionCommand of(UpdateExamContentRequest.QuestionRequest r) {
             return new QuestionCommand(r.questionType(), r.content(), r.difficultyLevel(), r.skillType(),
                     r.questionCategory(), r.orderNo(), r.maxRawScore(), r.explanation(), r.sourceQuestionId(),
-                    r.options().stream().map(OptionCommand::of).toList());
+                    r.options().stream().map(OptionCommand::of).toList(),
+                    r.acceptedAnswers().stream().map(AcceptedAnswerCommand::of).toList());
+        }
+    }
+
+    public record AcceptedAnswerCommand(String text, boolean caseSensitive, int orderNo) {
+
+        public static AcceptedAnswerCommand of(UpdateExamContentRequest.AcceptedAnswerRequest r) {
+            return new AcceptedAnswerCommand(r.text(), r.caseSensitive(), r.orderNo());
         }
     }
 

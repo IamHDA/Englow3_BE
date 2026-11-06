@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionAcceptedAnswer;
 import com.englow3.exam.entity.QuestionOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
@@ -55,11 +56,20 @@ public class AdminExamPaperQuery {
                 "select o from QuestionOption o where o.questionId in :parentIds order by o.orderNo",
                 QuestionOption.class);
 
-        return Optional.of(assemble(exam, sections, parts, questionSets, questions, options));
+        List<QuestionAcceptedAnswer> accepted = childrenOf(idsOf(questions, Question::getId),
+                "select a from QuestionAcceptedAnswer a where a.questionId in :parentIds order by a.orderNo",
+                QuestionAcceptedAnswer.class);
+
+        return Optional.of(assemble(exam, sections, parts, questionSets, questions, options, accepted));
     }
 
     private AdminExamPaperProjection assemble(Exam exam, List<ExamSection> sections, List<SectionPart> parts,
-            List<QuestionSet> questionSets, List<Question> questions, List<QuestionOption> options) {
+            List<QuestionSet> questionSets, List<Question> questions, List<QuestionOption> options,
+            List<QuestionAcceptedAnswer> accepted) {
+        Map<UUID, List<AdminExamPaperProjection.AcceptedAnswer>> acceptedByQuestion = accepted.stream()
+                .collect(groupingBy(QuestionAcceptedAnswer::getQuestionId,
+                        mapping(a -> new AdminExamPaperProjection.AcceptedAnswer(a.getId(), a.getAnswerText(),
+                                a.isCaseSensitive(), a.getOrderNo()), toList())));
         Map<UUID, List<Option>> optionsByQuestion = options.stream()
                 .collect(groupingBy(QuestionOption::getQuestionId,
                         mapping(option -> new Option(option.getId(), option.getContent(), option.getOrderNo(),
@@ -70,7 +80,8 @@ public class AdminExamPaperQuery {
                         mapping(q -> new AdminExamPaperProjection.Question(q.getId(), q.getQuestionType(),
                                 q.getContent(), q.getDifficultyLevel(), q.getSkillType(), q.getQuestionCategory(),
                                 q.getOrderNo(), q.getMaxRawScore(), q.getExplanation(), q.getSourceQuestionId(),
-                                optionsByQuestion.getOrDefault(q.getId(), List.of())), toList())));
+                                optionsByQuestion.getOrDefault(q.getId(), List.of()),
+                                acceptedByQuestion.getOrDefault(q.getId(), List.of())), toList())));
 
         Map<UUID, List<AdminExamPaperProjection.QuestionSet>> setsByPart = questionSets.stream().collect(groupingBy(
                 QuestionSet::getSectionPartId,

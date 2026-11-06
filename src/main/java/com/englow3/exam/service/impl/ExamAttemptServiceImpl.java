@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,7 +50,16 @@ import com.englow3.exam.entity.ExamAttemptMode;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.AttemptSectionResult;
+import com.englow3.exam.entity.CertificateType;
 import com.englow3.exam.entity.QuestionType;
+import com.englow3.exam.entity.ScoreConversion;
+import com.englow3.exam.entity.SectionType;
+import com.englow3.exam.helper.AnswerKey;
+import com.englow3.exam.helper.BandConversion;
+import com.englow3.exam.helper.QuestionNumbering;
+import com.englow3.exam.repository.AttemptSectionResultRepository;
+import com.englow3.exam.repository.ScoreConversionRepository;
 import com.englow3.exam.query.ExamGradingQuery.GradingQuestion;
 import com.englow3.exam.query.ExamGradingQuery;
 import com.englow3.exam.query.ExamOutlineQuery;
@@ -86,6 +98,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final ExamOutlineQuery outlineQuery;
     private final Duration fullAttemptGrace;
     private final ApplicationEventPublisher events;
+    private final ScoreConversionRepository conversionRepo;
+    private final AttemptSectionResultRepository sectionResultRepo;
 
     /** The longest clock a learner can set on a practice. */
     static final int MAX_PRACTICE_MINUTES = 300;
@@ -97,7 +111,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl, ExamAttemptDraftRepository draftRepo,
             com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery,
-            @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace, ApplicationEventPublisher events) {
+            @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace, ApplicationEventPublisher events,
+            ScoreConversionRepository conversionRepo, AttemptSectionResultRepository sectionResultRepo) {
         this.examRepo = examRepo;
         this.attemptRepo = attemptRepo;
         this.answerRepo = answerRepo;
@@ -115,6 +130,8 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         this.outlineQuery = outlineQuery;
         this.fullAttemptGrace = fullAttemptGrace;
         this.events = events;
+        this.conversionRepo = conversionRepo;
+        this.sectionResultRepo = sectionResultRepo;
     }
 
     @Transactional(readOnly = true)
@@ -277,7 +294,10 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         requireNotAbandoned(attempt, clock.instant());
         var paper = attempt.isPractice() ? paperQuery.load(attempt.getExamId(), attempt.getPartIds())
                 : paperQuery.load(attempt.getExamId());
-        return toResult(paper.orElseThrow(() -> examNotFound(attempt.getExamId())));
+        LearnerExamPaperProjection loaded = paper.orElseThrow(() -> examNotFound(attempt.getExamId()));
+        List<GradingQuestion> wholePaper = gradingQuery.load(attempt.getExamId());
+        return toResult(loaded, numbersFor(loaded.exam(), wholePaper),
+                wholePaper.stream().collect(Collectors.toMap(GradingQuestion::id, GradingQuestion::key)));
     }
 
     @Transactional
@@ -315,17 +335,16 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
 
         for (SubmittedAnswer submitted : submittedAnswers) {
             GradingQuestion question = questionById.get(submitted.questionId());
-            Set<UUID> selectedIds = new HashSet<>(submitted.selectedOptionIds());
-            Set<UUID> correctIds = question.options().stream().filter(option -> option.correct())
-                    .map(option -> option.id()).collect(Collectors.toSet());
-            boolean correct = !correctIds.isEmpty() && selectedIds.equals(correctIds);
-            BigDecimal awarded = correct ? question.maxRawScore() : BigDecimal.ZERO;
-            if (correct) {
-                rawScore = rawScore.add(awarded);
+            String text = question.questionType() == QuestionType.TEXT_ENTRY ? blankToNull(submitted.textAnswer())
+                    : null;
+            AnswerKey.Grade grade = question.key().grade(new HashSet<>(submitted.selectedOptionIds()), text);
+            rawScore = rawScore.add(grade.awarded());
+            if (grade.correct()) {
                 correctCount++;
             }
 
-            AttemptAnswer answer = AttemptAnswer.graded(attempt.getId(), question.id(), correct, awarded, now);
+            AttemptAnswer answer = AttemptAnswer.graded(attempt.getId(), question.id(), text, grade.correct(),
+                    grade.awarded(), now);
             storedAnswers.add(answer);
             submitted.selectedOptionIds()
                     .forEach(optionId -> storedOptions.add(AttemptAnswerOption.selected(answer.getId(), optionId)));
@@ -334,16 +353,75 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         answerRepo.saveAll(storedAnswers);
         answerOptionRepo.saveAll(storedOptions);
         attempt.score(rawScore, correctCount, now);
+        Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
+        List<AttemptSectionResult> sections = sectionResults(exam, attempt, questions, storedAnswers, now);
+        sectionResultRepo.saveAll(sections);
         events.publishEvent(new ExamSittingScored(attempt.getId(), attempt.getUserId(), attempt.getExamId(),
                 !attempt.isPractice()));
 
-        Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
         // A practice never sets a level: it is a chosen slice of the paper, on a clock the learner picked.
         if (exam.getExamType() == ExamType.PLACEMENT && !attempt.isPractice()) {
             placementRecorder.record(attempt.getUserId(), attempt.getId(), attempt.getScorePercentage());
         }
 
-        return named(ExamAttemptResult.scored(attempt, buildReview(questions, storedAnswers, storedOptions)));
+        return named(ExamAttemptResult.scored(attempt, buildReview(exam, questions, storedAnswers, storedOptions),
+                sectionScores(sections)));
+    }
+
+    /**
+     * Each section's points, and its band where the certificate converts a whole section. A practice never gets a band:
+     * it covers a chosen slice on a clock the learner picked, and the tables are written for the full section.
+     */
+    private List<AttemptSectionResult> sectionResults(Exam exam, ExamAttempt attempt, List<GradingQuestion> questions,
+            List<AttemptAnswer> answers, Instant now) {
+        Map<UUID, AttemptAnswer> answerByQuestion = answers.stream()
+                .collect(Collectors.toMap(AttemptAnswer::getQuestionId, Function.identity()));
+        Map<SectionType, List<GradingQuestion>> bySection = questions.stream()
+                .collect(Collectors.groupingBy(GradingQuestion::sectionType, LinkedHashMap::new, Collectors.toList()));
+        List<ScoreConversion> conversions = exam.getCertificateType() == null || attempt.isPractice() ? List.of()
+                : conversionRepo.findByCertificateType(exam.getCertificateType());
+        LocalDate scoredOn = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        List<AttemptSectionResult> results = new ArrayList<>();
+        bySection.forEach((sectionType, sectionQuestions) -> {
+            BigDecimal max = BigDecimal.ZERO;
+            BigDecimal raw = BigDecimal.ZERO;
+            int correct = 0;
+            for (GradingQuestion question : sectionQuestions) {
+                max = max.add(question.maxRawScore());
+                AttemptAnswer answer = answerByQuestion.get(question.id());
+                if (answer != null) {
+                    raw = raw.add(answer.getAwardedRawScore());
+                    correct += answer.isCorrect() ? 1 : 0;
+                }
+            }
+            BigDecimal band = BandConversion
+                    .convert(conversions, exam.getCertificateVariant(), sectionType, raw, max, scoredOn).orElse(null);
+            results.add(AttemptSectionResult.of(attempt.getId(), sectionType, raw, max, band, correct,
+                    sectionQuestions.size()));
+        });
+        return results;
+    }
+
+    private static List<ExamAttemptResult.SectionScore> sectionScores(List<AttemptSectionResult> sections) {
+        return sections.stream()
+                .map(section -> new ExamAttemptResult.SectionScore(section.getSectionType(), section.getRawScore(),
+                        section.getMaxRawScore(), section.getConvertedScore(), section.getCorrectAnswerCount(),
+                        section.getQuestionCount()))
+                .toList();
+    }
+
+    /** Question numbers over the whole paper, so a practice keeps the numbers its parts have in the full test. */
+    private static Map<UUID, QuestionNumbering.Numbers> numbersFor(Exam exam, List<GradingQuestion> wholePaper) {
+        return QuestionNumbering.assign(
+                wholePaper.stream()
+                        .map(question -> new QuestionNumbering.Slot(question.id(), question.sectionId(),
+                                question.key().numberSpan()))
+                        .toList(),
+                exam.getCertificateType() == CertificateType.IELTS);
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text;
     }
 
     @Transactional
@@ -364,7 +442,11 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         List<UUID> answerIds = answers.stream().map(AttemptAnswer::getId).toList();
         List<AttemptAnswerOption> selectedOptions = answerIds.isEmpty() ? List.of()
                 : answerOptionRepo.findByAttemptAnswerIdIn(answerIds);
-        return named(ExamAttemptResult.scored(attempt, buildReview(gradingFor(attempt), answers, selectedOptions)));
+        Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
+        List<ExamAttemptResult.SectionScore> sections = sectionScores(sectionResultRepo.findByExamAttemptId(attemptId))
+                .stream().sorted(Comparator.comparing(ExamAttemptResult.SectionScore::sectionType)).toList();
+        return named(ExamAttemptResult.scored(attempt, buildReview(exam, gradingFor(attempt), answers, selectedOptions),
+                sections));
     }
 
     @Transactional(readOnly = true)
@@ -455,37 +537,49 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         }
     }
 
-    private LearnerExamPaperResult toResult(LearnerExamPaperProjection paper) {
-        return LearnerExamPaperResult.of(paper.exam(), paper.sections().stream().map(this::toSection).toList());
+    /** The numbers and choice limits travel alongside the tree: the paper itself carries no answer key. */
+    private record PaperNumbers(Map<UUID, QuestionNumbering.Numbers> numbers, Map<UUID, AnswerKey> keys) {
     }
 
-    private LearnerExamPaperResult.LearnerSection toSection(Section section) {
+    private LearnerExamPaperResult toResult(LearnerExamPaperProjection paper,
+            Map<UUID, QuestionNumbering.Numbers> numbers, Map<UUID, AnswerKey> keys) {
+        PaperNumbers extra = new PaperNumbers(numbers, keys);
+        return LearnerExamPaperResult.of(paper.exam(),
+                paper.sections().stream().map(section -> toSection(section, extra)).toList());
+    }
+
+    private LearnerExamPaperResult.LearnerSection toSection(Section section, PaperNumbers extra) {
         return new LearnerExamPaperResult.LearnerSection(section.id(), section.sectionType(), section.orderNo(),
                 section.maxRawScore(), section.scoredByCriteria(), section.timeLimitSeconds(),
-                section.parts().stream().map(this::toPart).toList());
+                section.parts().stream().map(part -> toPart(part, extra)).toList());
     }
 
-    private LearnerExamPaperResult.LearnerPart toPart(Part part) {
+    private LearnerExamPaperResult.LearnerPart toPart(Part part, PaperNumbers extra) {
         return new LearnerExamPaperResult.LearnerPart(part.id(), part.orderNo(), part.title(), part.instruction(),
                 part.content(), presignedUrls.resolve(examBucket, part.audioObjectKey(), mediaUrlTtl),
                 presignedUrls.resolve(examBucket, part.imageObjectKey(), mediaUrlTtl),
-                part.questionSets().stream().map(this::toQuestionSet).toList());
+                part.questionSets().stream().map(set -> toQuestionSet(set, extra)).toList());
     }
 
-    private LearnerExamPaperResult.QuestionSetResult toQuestionSet(QuestionSet questionSet) {
+    private LearnerExamPaperResult.QuestionSetResult toQuestionSet(QuestionSet questionSet, PaperNumbers extra) {
         return new LearnerExamPaperResult.QuestionSetResult(questionSet.id(), questionSet.title(),
                 questionSet.instruction(), questionSet.orderNo(), questionSet.content(),
                 presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
                 presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
-                questionSet.questions().stream().map(this::toQuestion).toList());
+                questionSet.questions().stream().map(question -> toQuestion(question, extra)).toList());
     }
 
-    private LearnerExamPaperResult.QuestionResult toQuestion(Question question) {
+    private LearnerExamPaperResult.QuestionResult toQuestion(Question question, PaperNumbers extra) {
+        QuestionNumbering.Numbers number = extra.numbers().getOrDefault(question.id(),
+                new QuestionNumbering.Numbers(question.orderNo(), question.orderNo()));
+        AnswerKey key = extra.keys().get(question.id());
+        int choiceLimit = question.questionType() == QuestionType.TEXT_ENTRY ? 0 : key == null ? 1 : key.choiceLimit();
         return new LearnerExamPaperResult.QuestionResult(question.id(), question.questionType(), question.content(),
                 question.difficultyLevel(), question.skillType(), question.questionCategory(), question.orderNo(),
                 question.maxRawScore(),
                 question.options().stream().map(option -> new LearnerExamPaperResult.QuestionOptionResult(option.id(),
-                        option.content(), option.orderNo())).toList());
+                        option.content(), option.orderNo())).toList(),
+                number.from(), number.to(), choiceLimit);
     }
 
     private void validateSubmission(List<SubmittedAnswer> submittedAnswers, Map<UUID, GradingQuestion> questionById) {
@@ -510,15 +604,25 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                 throw new BadRequestException("OPTION_NOT_IN_QUESTION",
                         "A selected option does not belong to question %s".formatted(answer.questionId()));
             }
-            if (question.questionType() == QuestionType.SINGLE_CHOICE && selected.size() > 1) {
+            if (question.questionType() == QuestionType.TEXT_ENTRY) {
+                continue;
+            }
+            if (answer.textAnswer() != null && !answer.textAnswer().isBlank()) {
+                throw new BadRequestException("TEXT_ANSWER_NOT_ACCEPTED",
+                        "Question %s is answered by choosing options, not by typing".formatted(answer.questionId()));
+            }
+            int limit = question.key().choiceLimit();
+            if (selected.size() > Math.max(1, limit)) {
                 throw new BadRequestException("TOO_MANY_SELECTED_OPTIONS",
-                        "Question %s accepts only one option".formatted(answer.questionId()));
+                        "Question %s accepts at most %d option(s)".formatted(answer.questionId(), Math.max(1, limit)));
             }
         }
     }
 
-    private List<QuestionReviewResult> buildReview(List<GradingQuestion> questions, List<AttemptAnswer> answers,
-            List<AttemptAnswerOption> selectedOptions) {
+    private List<QuestionReviewResult> buildReview(Exam exam, List<GradingQuestion> questions,
+            List<AttemptAnswer> answers, List<AttemptAnswerOption> selectedOptions) {
+        Map<UUID, QuestionNumbering.Numbers> numbers = numbersFor(exam,
+                questions.isEmpty() ? List.of() : gradingQuery.load(exam.getId()));
         Map<UUID, AttemptAnswer> answerByQuestion = answers.stream()
                 .collect(Collectors.toMap(AttemptAnswer::getQuestionId, Function.identity()));
         Map<UUID, List<UUID>> optionsByAnswer = new HashMap<>();
@@ -539,9 +643,13 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             List<OptionReviewResult> options = question.options().stream()
                     .map(option -> new OptionReviewResult(option.id(), option.correct(), option.explanation()))
                     .toList();
+            QuestionNumbering.Numbers number = numbers.getOrDefault(question.id(), new QuestionNumbering.Numbers(0, 0));
             return new QuestionReviewResult(question.id(), optionsByAnswer.getOrDefault(question.id(), List.of()),
                     correctIds, answer != null && answer.isCorrect(),
-                    answer == null ? BigDecimal.ZERO : answer.getAwardedRawScore(), question.explanation(), options);
+                    answer == null ? BigDecimal.ZERO : answer.getAwardedRawScore(), question.explanation(), options,
+                    answer == null ? null : answer.getTextAnswer(),
+                    question.acceptedAnswers().stream().map(ExamGradingQuery.GradingAcceptedAnswer::text).toList(),
+                    number.from(), number.to());
         }).toList();
     }
 

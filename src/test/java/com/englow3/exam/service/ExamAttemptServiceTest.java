@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -70,10 +71,24 @@ class ExamAttemptServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
     private final ExamOutlineQuery outlineQuery = mock(ExamOutlineQuery.class);
     private final ExamAttemptDraftRepository draftRepo = mock(ExamAttemptDraftRepository.class);
+    private final com.englow3.exam.repository.ScoreConversionRepository conversionRepo = mock(
+            com.englow3.exam.repository.ScoreConversionRepository.class);
+    private final com.englow3.exam.repository.AttemptSectionResultRepository sectionResultRepo = mock(
+            com.englow3.exam.repository.AttemptSectionResultRepository.class);
     private final ExamAttemptService service = new ExamAttemptServiceImpl(examRepo, attemptRepo, answerRepo,
             answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder, presignedUrls, CLOCK, "exams",
             Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery,
-            Duration.ofMinutes(2), mock(org.springframework.context.ApplicationEventPublisher.class));
+            Duration.ofMinutes(2), mock(org.springframework.context.ApplicationEventPublisher.class), conversionRepo,
+            sectionResultRepo);
+
+    private static final UUID SECTION_ID = UUID.randomUUID();
+
+    /** A question of the paper's one READING section, answered by choosing. */
+    private static GradingQuestion graded(UUID id, QuestionType type, BigDecimal maxRawScore, String explanation,
+            List<GradingOption> options) {
+        return new GradingQuestion(id, type, maxRawScore, explanation, options, SECTION_ID,
+                com.englow3.exam.entity.SectionType.READING, List.of());
+    }
 
     private final UUID userId = UUID.randomUUID();
 
@@ -210,7 +225,7 @@ class ExamAttemptServiceTest {
         UUID questionId = UUID.randomUUID();
         UUID correctOptionId = UUID.randomUUID();
         UUID wrongOptionId = UUID.randomUUID();
-        GradingQuestion question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE,
+        GradingQuestion question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE,
                 "Because it fits the sentence", List.of(new GradingOption(correctOptionId, true, "Correct form"),
                         new GradingOption(wrongOptionId, false, "Wrong tense")));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
@@ -238,7 +253,7 @@ class ExamAttemptServiceTest {
         Exam exam = publishedExam();
         ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, Instant.now());
         UUID questionId = UUID.randomUUID();
-        GradingQuestion question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
+        GradingQuestion question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(UUID.randomUUID(), true, null)));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
@@ -268,7 +283,7 @@ class ExamAttemptServiceTest {
         Exam exam = publishedExam();
         ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant().minusSeconds(7200));
         UUID questionId = UUID.randomUUID(), correct = UUID.randomUUID(), wrong = UUID.randomUUID();
-        var question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
+        var question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
         var draft = ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant().minusSeconds(1));
         draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
@@ -424,7 +439,7 @@ class ExamAttemptServiceTest {
         Instant left = CLOCK.instant().minusSeconds(900);
         ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, left);
         UUID questionId = UUID.randomUUID(), correct = UUID.randomUUID(), wrong = UUID.randomUUID();
-        var question = new GradingQuestion(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
+        var question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
         var draft = ExamAttemptDraft.empty(attempt.getId(), left);
         draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper()
@@ -467,5 +482,131 @@ class ExamAttemptServiceTest {
 
         assertThat(gone.getStatus()).isEqualTo(ExamAttemptStatus.SCORED);
         assertThat(here.getStatus()).isEqualTo(ExamAttemptStatus.IN_PROGRESS);
+    }
+
+    private static Exam publishedIelts(int questions) {
+        Exam exam = Exam.draft("IELTS Academic Mock", "Listening", ExamType.MOCK, CertificateType.IELTS,
+                CertificateVariant.ACADEMIC, TargetLevel.B2, 1800, new BigDecimal(questions), null, UUID.randomUUID());
+        exam.publish(1, questions, new BigDecimal(questions), List.of(), Instant.now());
+        return exam;
+    }
+
+    private static GradingQuestion typed(UUID id, String... accepted) {
+        return new GradingQuestion(id, QuestionType.TEXT_ENTRY, BigDecimal.ONE, null, List.of(), SECTION_ID,
+                com.englow3.exam.entity.SectionType.LISTENING, java.util.Arrays.stream(accepted)
+                        .map(text -> new ExamGradingQuery.GradingAcceptedAnswer(text, false)).toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void storesWhatWasTypedOnATextQuestionAndGradesItAgainstTheAcceptedAnswers() {
+        Exam exam = publishedIelts(1);
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
+        UUID questionId = UUID.randomUUID();
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(typed(questionId, "museum")));
+
+        ExamAttemptResult result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(), "Museum"))));
+
+        var stored = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        verify(answerRepo).saveAll(stored.capture());
+        assertThat((Iterable<com.englow3.exam.entity.AttemptAnswer>) stored.getValue()).singleElement()
+                .satisfies(answer -> {
+                    assertThat(answer.getTextAnswer()).isEqualTo("Museum");
+                    assertThat(answer.isCorrect()).isTrue();
+                });
+        assertThat(result.questions()).singleElement().satisfies(review -> {
+            assertThat(review.textAnswer()).isEqualTo("Museum");
+            assertThat(review.acceptedAnswers()).containsExactly("museum");
+        });
+    }
+
+    @Test
+    void refusesATypedAnswerToAChoiceQuestion() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
+        UUID questionId = UUID.randomUUID();
+        UUID option = UUID.randomUUID();
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(graded(questionId, QuestionType.SINGLE_CHOICE,
+                BigDecimal.ONE, null,
+                List.of(new GradingOption(option, true, null), new GradingOption(UUID.randomUUID(), false, null)))));
+
+        assertThatThrownBy(() -> service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(option), "B")))))
+                        .isInstanceOf(BadRequestException.class)
+                        .extracting(error -> ((BadRequestException) error).getCode())
+                        .isEqualTo("TEXT_ANSWER_NOT_ACCEPTED");
+        verify(answerRepo, never()).saveAll(any());
+    }
+
+    @Test
+    void refusesMoreChoicesThanAChooseTwoQuestionAllows() {
+        Exam exam = publishedExam();
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
+        UUID questionId = UUID.randomUUID(), a = UUID.randomUUID(), b = UUID.randomUUID(), c = UUID.randomUUID();
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(graded(questionId, QuestionType.MULTIPLE_CHOICE,
+                new BigDecimal("2"), null, List.of(new GradingOption(a, true, null), new GradingOption(b, true, null),
+                        new GradingOption(c, false, null)))));
+
+        assertThatThrownBy(() -> service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(a, b, c)))))).isInstanceOf(BadRequestException.class)
+                        .extracting(error -> ((BadRequestException) error).getCode())
+                        .isEqualTo("TOO_MANY_SELECTED_OPTIONS");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void recordsEachSectionWithTheBandFromTheCertificatesConversion() {
+        Exam exam = publishedIelts(1);
+        ExamAttempt attempt = ExamAttempt.start(exam, userId, 1, CLOCK.instant());
+        UUID questionId = UUID.randomUUID();
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId())).thenReturn(List.of(typed(questionId, "museum")));
+        when(conversionRepo.findByCertificateType(CertificateType.IELTS)).thenReturn(List.of(
+                com.englow3.exam.entity.ScoreConversion.of(CertificateType.IELTS, null,
+                        com.englow3.exam.entity.SectionType.LISTENING, 0, 0, new BigDecimal("0.0"),
+                        java.time.LocalDate.parse("2026-01-01")),
+                com.englow3.exam.entity.ScoreConversion.of(CertificateType.IELTS, null,
+                        com.englow3.exam.entity.SectionType.LISTENING, 1, 1, new BigDecimal("9.0"),
+                        java.time.LocalDate.parse("2026-01-01"))));
+
+        ExamAttemptResult result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(), "museum"))));
+
+        var saved = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        verify(sectionResultRepo).saveAll(saved.capture());
+        assertThat((Iterable<com.englow3.exam.entity.AttemptSectionResult>) saved.getValue()).singleElement()
+                .satisfies(section -> {
+                    assertThat(section.getSectionType()).isEqualTo(com.englow3.exam.entity.SectionType.LISTENING);
+                    assertThat(section.getRawScore()).isEqualByComparingTo("1");
+                    assertThat(section.getConvertedScore()).isEqualByComparingTo("9.0");
+                });
+        assertThat(result.sections()).singleElement()
+                .satisfies(section -> assertThat(section.band()).isEqualByComparingTo("9.0"));
+    }
+
+    @Test
+    void aPracticeIsNeverConvertedToABand() {
+        Exam exam = publishedIelts(1);
+        UUID partId = UUID.randomUUID();
+        ExamAttempt attempt = ExamAttempt.startPractice(exam, userId, Set.of(partId), 1, BigDecimal.ONE, null,
+                CLOCK.instant());
+        UUID questionId = UUID.randomUUID();
+        when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(gradingQuery.load(exam.getId(), attempt.getPartIds())).thenReturn(List.of(typed(questionId, "museum")));
+
+        ExamAttemptResult result = service.submit(new SubmitExamAttemptCommand(attempt.getId(),
+                List.of(new SubmittedAnswer(questionId, List.of(), "museum"))));
+
+        verify(conversionRepo, never()).findByCertificateType(any());
+        assertThat(result.sections()).singleElement().satisfies(section -> assertThat(section.band()).isNull());
     }
 }

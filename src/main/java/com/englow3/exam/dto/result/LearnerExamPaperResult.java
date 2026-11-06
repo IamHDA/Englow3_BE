@@ -61,15 +61,16 @@ public record LearnerExamPaperResult(UUID id, String title, String description, 
         }
     }
 
+    /**
+     * @param numberFrom
+     *            the number the learner sees, computed over the whole paper; {@code numberTo} differs only on a "choose
+     *            N" question, which takes N numbers
+     * @param choiceLimit
+     *            how many options may be chosen; 0 on a TEXT_ENTRY question
+     */
     public record QuestionResult(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore,
-            List<QuestionOptionResult> options) {
-
-        public static QuestionResult of(Question question, List<QuestionOptionResult> options) {
-            return new QuestionResult(question.getId(), question.getQuestionType(), question.getContent(),
-                    question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
-                    question.getOrderNo(), question.getMaxRawScore(), options);
-        }
+            List<QuestionOptionResult> options, int numberFrom, int numberTo, int choiceLimit) {
     }
 
     public record QuestionOptionResult(UUID id, String content, int orderNo) {

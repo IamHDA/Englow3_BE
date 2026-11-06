@@ -1,10 +1,16 @@
 package com.englow3.exam.entity;
 
 /**
- * Only the shapes that {@code question_options} can express. Matching, gap-fill and free text need
- * {@code question_matching_answers}, {@code question_accepted_answers} and {@code question_set_options}, none of which
- * is mapped while the catalogue is TOEIC L&R - adding their values here first would be enum entries nothing can read.
+ * The answer shapes the sitting engine can grade.
+ * <ul>
+ * <li>{@code SINGLE_CHOICE}: exactly one correct option, right or wrong.</li>
+ * <li>{@code MULTIPLE_CHOICE}: "choose N letters" - N correct options, each worth an equal share of the question, in no
+ * order, and never more than N chosen.</li>
+ * <li>{@code TEXT_ENTRY}: the learner types the answer, graded against {@code question_accepted_answers} (gap-fill,
+ * completion, short answer).</li>
+ * </ul>
+ * Matching still needs {@code question_set_options} and {@code question_matching_answers}, which are not mapped yet.
  */
 public enum QuestionType {
-    SINGLE_CHOICE, MULTIPLE_CHOICE
+    SINGLE_CHOICE, MULTIPLE_CHOICE, TEXT_ENTRY
 }

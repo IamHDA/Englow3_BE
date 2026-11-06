@@ -10,10 +10,12 @@ import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.SkillType;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 /**
  * The whole content tree of a paper, replacing everything below {@code exams} in one call - see
@@ -47,7 +49,16 @@ public record UpdateExamContentRequest(@NotNull List<@NotNull @Valid SectionRequ
     public record QuestionRequest(@NotNull QuestionType questionType, @NotBlank String content,
             @NotNull DifficultyLevel difficultyLevel, @NotNull SkillType skillType, String questionCategory,
             @PositiveOrZero int orderNo, @NotNull BigDecimal maxRawScore, String explanation, UUID sourceQuestionId,
-            @NotNull List<@NotNull @Valid OptionRequest> options) {
+            @NotNull List<@NotNull @Valid OptionRequest> options,
+            @Schema(description = "Spellings a TEXT_ENTRY question accepts; omit or leave empty on a choice question") List<@NotNull @Valid AcceptedAnswerRequest> acceptedAnswers) {
+
+        public QuestionRequest {
+            acceptedAnswers = acceptedAnswers == null ? List.of() : acceptedAnswers;
+        }
+    }
+
+    public record AcceptedAnswerRequest(@NotBlank @Size(max = 200) String text, boolean caseSensitive,
+            @PositiveOrZero int orderNo) {
     }
 
     public record OptionRequest(@NotBlank String content, @PositiveOrZero int orderNo, boolean correct,

@@ -61,11 +61,15 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
 
     public record QuestionResponse(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, @Schema(nullable = true) String questionCategory, int orderNo, BigDecimal maxRawScore,
-            List<QuestionOptionResponse> options) {
+            List<QuestionOptionResponse> options,
+            @Schema(description = "The number shown to the learner, computed over the whole paper") int numberFrom,
+            @Schema(description = "Equals numberFrom except on a choose-N question, which takes N numbers") int numberTo,
+            @Schema(description = "How many options may be chosen; 0 on a TEXT_ENTRY question") int choiceLimit) {
         static QuestionResponse from(LearnerExamPaperResult.QuestionResult result) {
             return new QuestionResponse(result.id(), result.questionType(), result.content(), result.difficultyLevel(),
                     result.skillType(), result.questionCategory(), result.orderNo(), result.maxRawScore(),
-                    result.options().stream().map(QuestionOptionResponse::from).toList());
+                    result.options().stream().map(QuestionOptionResponse::from).toList(), result.numberFrom(),
+                    result.numberTo(), result.choiceLimit());
         }
     }
 

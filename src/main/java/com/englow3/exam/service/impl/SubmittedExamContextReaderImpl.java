@@ -50,6 +50,11 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
         String correct = choices.stream()
                 .filter(o -> o.getQuestionId().equals(questionId) && review.correctOptionIds().contains(o.getId()))
                 .map(o -> o.getContent()).collect(java.util.stream.Collectors.joining("; "));
+        if (question.getQuestionType() == com.englow3.exam.entity.QuestionType.TEXT_ENTRY) {
+            // A typed answer has no options: what the learner wrote and what would have counted are the context.
+            selected = review.textAnswer() == null ? "" : review.textAnswer();
+            correct = String.join(" / ", review.acceptedAnswers());
+        }
         String passage = clip(set.getContent(), 1400) + "\n" + clip(part.getContent(), 400);
         String instruction = clip(part.getInstruction(), 200) + "\n" + clip(set.getInstruction(), 200);
         return new Question(attemptId, questionId, clip(question.getContent(), 1000), passage, instruction,

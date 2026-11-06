@@ -49,10 +49,12 @@ class ExamContentServiceTest {
     private final QuestionSetRepository questionSetRepo = mock(QuestionSetRepository.class);
     private final QuestionRepository questionRepo = mock(QuestionRepository.class);
     private final QuestionOptionRepository questionOptionRepo = mock(QuestionOptionRepository.class);
+    private final com.englow3.exam.repository.QuestionAcceptedAnswerRepository acceptedAnswerRepo = mock(
+            com.englow3.exam.repository.QuestionAcceptedAnswerRepository.class);
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final ExamContentService service = new ExamContentServiceImpl(examRepo, examSectionRepo, sectionPartRepo,
-            questionSetRepo, questionRepo, questionOptionRepo, examPaperQuery, objectStorage,
+            questionSetRepo, questionRepo, questionOptionRepo, acceptedAnswerRepo, examPaperQuery, objectStorage,
             mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
 
     @Test
@@ -104,8 +106,9 @@ class ExamContentServiceTest {
 
         ExamDetailResult result = service.replaceContent(new UpdateExamContentCommand(exam.getId(), List.of()));
 
-        InOrder deletionOrder = inOrder(questionOptionRepo, questionRepo, questionSetRepo, sectionPartRepo,
-                examSectionRepo);
+        InOrder deletionOrder = inOrder(acceptedAnswerRepo, questionOptionRepo, questionRepo, questionSetRepo,
+                sectionPartRepo, examSectionRepo);
+        deletionOrder.verify(acceptedAnswerRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionOptionRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionSetRepo).deleteAllForExam(exam.getId());
@@ -134,5 +137,66 @@ class ExamContentServiceTest {
         assertThatThrownBy(() -> service.replaceContent(new UpdateExamContentCommand(missing, List.of())))
                 .isInstanceOf(NotFoundException.class).extracting(e -> ((NotFoundException) e).getCode())
                 .isEqualTo("EXAM_NOT_FOUND");
+    }
+
+    private static UpdateExamContentCommand withOneQuestion(UUID examId,
+            UpdateExamContentCommand.QuestionCommand question) {
+        var set = new UpdateExamContentCommand.QuestionSetCommand(null, null, 1, null, null, null, null,
+                List.of(question));
+        var part = new UpdateExamContentCommand.PartCommand(1, "Part 1", null, null, null, null, List.of(set));
+        var section = new UpdateExamContentCommand.SectionCommand(SectionType.LISTENING, 1, java.math.BigDecimal.ONE,
+                false, null, List.of(part));
+        return new UpdateExamContentCommand(examId, List.of(section));
+    }
+
+    private static UpdateExamContentCommand.QuestionCommand question(com.englow3.exam.entity.QuestionType type,
+            List<UpdateExamContentCommand.OptionCommand> options,
+            List<UpdateExamContentCommand.AcceptedAnswerCommand> accepted) {
+        return new UpdateExamContentCommand.QuestionCommand(type, "Name: Sarah {{1}}",
+                com.englow3.exam.entity.DifficultyLevel.MEDIUM, com.englow3.exam.entity.SkillType.LISTENING, null, 1,
+                java.math.BigDecimal.ONE, null, null, options, accepted);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void savesTheAcceptedAnswersOfATextQuestion() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examPaperQuery.loadForAdmin(exam.getId()))
+                .thenReturn(Optional.of(new AdminExamPaperProjection(exam, List.of())));
+
+        service.replaceContent(withOneQuestion(exam.getId(), question(com.englow3.exam.entity.QuestionType.TEXT_ENTRY,
+                List.of(), List.of(new UpdateExamContentCommand.AcceptedAnswerCommand(" Mitchell ", false, 1)))));
+
+        var saved = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        verify(acceptedAnswerRepo).saveAll(saved.capture());
+        assertThat((Iterable<com.englow3.exam.entity.QuestionAcceptedAnswer>) saved.getValue()).singleElement()
+                .satisfies(answer -> assertThat(answer.getAnswerText()).isEqualTo("Mitchell"));
+    }
+
+    @Test
+    void refusesOptionsOnATextQuestion() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+
+        assertThatThrownBy(() -> service.replaceContent(withOneQuestion(exam.getId(),
+                question(com.englow3.exam.entity.QuestionType.TEXT_ENTRY,
+                        List.of(new UpdateExamContentCommand.OptionCommand("A", 1, true, null)), List.of()))))
+                                .isInstanceOf(BadRequestException.class)
+                                .extracting(e -> ((BadRequestException) e).getCode())
+                                .isEqualTo("TEXT_QUESTION_HAS_OPTIONS");
+    }
+
+    @Test
+    void refusesAcceptedAnswersOnAChoiceQuestion() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+
+        assertThatThrownBy(() -> service.replaceContent(withOneQuestion(exam.getId(),
+                question(com.englow3.exam.entity.QuestionType.SINGLE_CHOICE, List.of(),
+                        List.of(new UpdateExamContentCommand.AcceptedAnswerCommand("museum", false, 1))))))
+                                .isInstanceOf(BadRequestException.class)
+                                .extracting(e -> ((BadRequestException) e).getCode())
+                                .isEqualTo("CHOICE_QUESTION_HAS_ACCEPTED_ANSWERS");
     }
 }

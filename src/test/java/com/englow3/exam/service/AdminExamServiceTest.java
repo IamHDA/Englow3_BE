@@ -83,7 +83,7 @@ class AdminExamServiceTest {
         var option = new AdminExamPaperProjection.Option(UUID.randomUUID(), "option", 1, true, "because");
         var question = new AdminExamPaperProjection.Question(UUID.randomUUID(), QuestionType.SINGLE_CHOICE, "question",
                 DifficultyLevel.MEDIUM, SkillType.READING, null, 1, BigDecimal.ONE, "explanation", null,
-                List.of(option));
+                List.of(option), List.of());
         var questionSet = new AdminExamPaperProjection.QuestionSet(UUID.randomUUID(), "set", null, 1, null,
                 "sets/audio.mp3", "sets/image.png", null, List.of(question));
         var part = new AdminExamPaperProjection.Part(UUID.randomUUID(), 1, "part", null, null, "parts/audio.mp3",

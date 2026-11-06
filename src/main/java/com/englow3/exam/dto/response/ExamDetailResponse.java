@@ -75,13 +75,20 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
     public record QuestionResponse(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, @Schema(nullable = true) String questionCategory, int orderNo, BigDecimal maxRawScore,
             @Schema(nullable = true) String explanation, @Schema(nullable = true) UUID sourceQuestionId,
-            List<QuestionOptionResponse> options) {
+            List<QuestionOptionResponse> options, List<AcceptedAnswerResponse> acceptedAnswers) {
 
         static QuestionResponse from(ExamDetailResult.QuestionResult result) {
             return new QuestionResponse(result.id(), result.questionType(), result.content(), result.difficultyLevel(),
                     result.skillType(), result.questionCategory(), result.orderNo(), result.maxRawScore(),
                     result.explanation(), result.sourceQuestionId(),
-                    result.options().stream().map(QuestionOptionResponse::from).toList());
+                    result.options().stream().map(QuestionOptionResponse::from).toList(),
+                    result.acceptedAnswers().stream().map(AcceptedAnswerResponse::from).toList());
+        }
+    }
+
+    public record AcceptedAnswerResponse(UUID id, String text, boolean caseSensitive, int orderNo) {
+        static AcceptedAnswerResponse from(ExamDetailResult.AcceptedAnswerResult result) {
+            return new AcceptedAnswerResponse(result.id(), result.text(), result.caseSensitive(), result.orderNo());
         }
     }
 }

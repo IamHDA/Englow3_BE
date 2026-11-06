@@ -27,7 +27,10 @@ public record AdminExamPaperProjection(Exam exam, List<Section> sections) {
 
     public record Question(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<Option> options) {
+            UUID sourceQuestionId, List<Option> options, List<AcceptedAnswer> acceptedAnswers) {
+    }
+
+    public record AcceptedAnswer(UUID id, String text, boolean caseSensitive, int orderNo) {
     }
 
     public record Option(UUID id, String content, int orderNo, boolean correct, String explanation) {

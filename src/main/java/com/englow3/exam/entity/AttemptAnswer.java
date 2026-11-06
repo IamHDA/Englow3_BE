@@ -23,6 +23,10 @@ public class AttemptAnswer extends BasePersistedEntity {
     @Column(name = "question_id", nullable = false, updatable = false)
     private UUID questionId;
 
+    /** What the learner typed on a TEXT_ENTRY question, as submitted; null on a choice question. */
+    @Column(name = "text_answer", updatable = false)
+    private String textAnswer;
+
     @Column(name = "is_correct", nullable = false)
     private boolean correct;
 
@@ -44,10 +48,16 @@ public class AttemptAnswer extends BasePersistedEntity {
 
     public static AttemptAnswer graded(UUID attemptId, UUID questionId, boolean correct, BigDecimal awardedRawScore,
             Instant now) {
+        return graded(attemptId, questionId, null, correct, awardedRawScore, now);
+    }
+
+    public static AttemptAnswer graded(UUID attemptId, UUID questionId, String textAnswer, boolean correct,
+            BigDecimal awardedRawScore, Instant now) {
         AttemptAnswer answer = new AttemptAnswer();
         answer.id = UUID.randomUUID();
         answer.examAttemptId = attemptId;
         answer.questionId = questionId;
+        answer.textAnswer = textAnswer;
         answer.correct = correct;
         answer.awardedRawScore = awardedRawScore;
         answer.gradingStatus = AnswerGradingStatus.GRADED;

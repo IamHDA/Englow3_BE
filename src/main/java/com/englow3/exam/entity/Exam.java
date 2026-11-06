@@ -266,7 +266,7 @@ public class Exam extends BasePersistedEntity {
         }
         if (!incompleteQuestionOrderNos.isEmpty()) {
             throw new ConflictException("EXAM_HAS_INCOMPLETE_QUESTION",
-                    "Question(s) at order_no %s have no option, no correct option, or more than one correct option on a single-choice question"
+                    "Question(s) at order_no %s cannot be graded: a choice question needs two or more options with a correct one (exactly one on a single-choice question, not all of them on a multiple-choice one), and a text-entry question needs an accepted answer"
                             .formatted(incompleteQuestionOrderNos));
         }
     }

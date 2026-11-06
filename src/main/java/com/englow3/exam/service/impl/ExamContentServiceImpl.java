@@ -24,13 +24,16 @@ import com.englow3.exam.dto.result.QuestionOptionResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionAcceptedAnswer;
 import com.englow3.exam.entity.QuestionOption;
+import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
+import com.englow3.exam.repository.QuestionAcceptedAnswerRepository;
 import com.englow3.exam.repository.QuestionOptionRepository;
 import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.exam.repository.QuestionSetRepository;
@@ -56,6 +59,7 @@ public class ExamContentServiceImpl implements ExamContentService {
     private final QuestionSetRepository questionSetRepo;
     private final QuestionRepository questionRepo;
     private final QuestionOptionRepository questionOptionRepo;
+    private final QuestionAcceptedAnswerRepository acceptedAnswerRepo;
     private final AdminExamPaperQuery examPaperQuery;
     private final ObjectStorageClient objectStorage;
     private final PresignedUrlResolver presignedUrls;
@@ -65,7 +69,8 @@ public class ExamContentServiceImpl implements ExamContentService {
     public ExamContentServiceImpl(ExamRepository examRepo, ExamSectionRepository examSectionRepo,
             SectionPartRepository sectionPartRepo, QuestionSetRepository questionSetRepo,
             QuestionRepository questionRepo, QuestionOptionRepository questionOptionRepo,
-            AdminExamPaperQuery examPaperQuery, ObjectStorageClient objectStorage, PresignedUrlResolver presignedUrls,
+            QuestionAcceptedAnswerRepository acceptedAnswerRepo, AdminExamPaperQuery examPaperQuery,
+            ObjectStorageClient objectStorage, PresignedUrlResolver presignedUrls,
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
         this.examRepo = examRepo;
@@ -74,6 +79,7 @@ public class ExamContentServiceImpl implements ExamContentService {
         this.questionSetRepo = questionSetRepo;
         this.questionRepo = questionRepo;
         this.questionOptionRepo = questionOptionRepo;
+        this.acceptedAnswerRepo = acceptedAnswerRepo;
         this.examPaperQuery = examPaperQuery;
         this.objectStorage = objectStorage;
         this.presignedUrls = presignedUrls;
@@ -128,6 +134,7 @@ public class ExamContentServiceImpl implements ExamContentService {
     }
 
     private void deleteContent(UUID examId) {
+        acceptedAnswerRepo.deleteAllForExam(examId);
         questionOptionRepo.deleteAllForExam(examId);
         questionRepo.deleteAllForExam(examId);
         questionSetRepo.deleteAllForExam(examId);
@@ -141,6 +148,7 @@ public class ExamContentServiceImpl implements ExamContentService {
         List<QuestionSet> questionSetRows = new ArrayList<>();
         List<Question> questionRows = new ArrayList<>();
         List<QuestionOption> optionRows = new ArrayList<>();
+        List<QuestionAcceptedAnswer> acceptedRows = new ArrayList<>();
 
         for (UpdateExamContentCommand.SectionCommand s : sections) {
             ExamSection section = ExamSection.create(examId, s.sectionType(), s.orderNo(), s.maxRawScore(),
@@ -168,6 +176,10 @@ public class ExamContentServiceImpl implements ExamContentService {
                             optionRows.add(QuestionOption.create(question.getId(), o.content(), o.orderNo(),
                                     o.correct(), o.explanation()));
                         }
+                        for (UpdateExamContentCommand.AcceptedAnswerCommand a : q.acceptedAnswers()) {
+                            acceptedRows.add(QuestionAcceptedAnswer.create(question.getId(), a.text().strip(),
+                                    a.caseSensitive(), a.orderNo()));
+                        }
                     }
                 }
             }
@@ -178,6 +190,7 @@ public class ExamContentServiceImpl implements ExamContentService {
         questionSetRepo.saveAll(questionSetRows);
         questionRepo.saveAll(questionRows);
         questionOptionRepo.saveAll(optionRows);
+        acceptedAnswerRepo.saveAll(acceptedRows);
     }
 
     private void validateContentTree(UUID examId, List<UpdateExamContentCommand.SectionCommand> sections) {
@@ -204,6 +217,9 @@ public class ExamContentServiceImpl implements ExamContentService {
                     for (UpdateExamContentCommand.QuestionCommand question : questionSet.questions()) {
                         requireUniqueOrderNo("option", question.options(),
                                 UpdateExamContentCommand.OptionCommand::orderNo);
+                        requireUniqueOrderNo("accepted answer", question.acceptedAnswers(),
+                                UpdateExamContentCommand.AcceptedAnswerCommand::orderNo);
+                        requireAnswerShape(question);
                     }
                 }
             }
@@ -215,6 +231,23 @@ public class ExamContentServiceImpl implements ExamContentService {
         if (distinctCount != items.size()) {
             throw new BadRequestException("DUPLICATE_ORDER_NO",
                     "Two %ss under the same parent share an order_no".formatted(level));
+        }
+    }
+
+    /**
+     * A question is answered either by choosing or by typing, never both: options on a TEXT_ENTRY question would be
+     * shown to nobody, and accepted spellings on a choice question would grade nothing. Refused on save rather than
+     * kept, so the stored paper never disagrees with what the editor shows.
+     */
+    private static void requireAnswerShape(UpdateExamContentCommand.QuestionCommand question) {
+        boolean typed = question.questionType() == QuestionType.TEXT_ENTRY;
+        if (typed && !question.options().isEmpty()) {
+            throw new BadRequestException("TEXT_QUESTION_HAS_OPTIONS",
+                    "A text-entry question is answered by typing; remove its options");
+        }
+        if (!typed && !question.acceptedAnswers().isEmpty()) {
+            throw new BadRequestException("CHOICE_QUESTION_HAS_ACCEPTED_ANSWERS",
+                    "Only a text-entry question has accepted answers");
         }
     }
 
@@ -254,8 +287,12 @@ public class ExamContentServiceImpl implements ExamContentService {
         return new ExamDetailResult.QuestionResult(question.id(), question.questionType(), question.content(),
                 question.difficultyLevel(), question.skillType(), question.questionCategory(), question.orderNo(),
                 question.maxRawScore(), question.explanation(), question.sourceQuestionId(),
-                question.options().stream().map(option -> new QuestionOptionResult(option.id(), option.content(),
-                        option.orderNo(), option.correct(), option.explanation())).toList());
+                question.options().stream()
+                        .map(option -> new QuestionOptionResult(option.id(), option.content(), option.orderNo(),
+                                option.correct(), option.explanation()))
+                        .toList(),
+                question.acceptedAnswers().stream().map(a -> new ExamDetailResult.AcceptedAnswerResult(a.id(), a.text(),
+                        a.caseSensitive(), a.orderNo())).toList());
     }
 
     private Exam requireExam(UUID examId) {

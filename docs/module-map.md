@@ -51,6 +51,18 @@ answers, and section results.
   stay out of the learner catalogue. `exam.api.ScoredExamAttemptReader` reports a
   learner's sitting as per-section points for the roadmap's milestones and level
   checks, without exposing exam entities.
+- **Answer shapes:** `SINGLE_CHOICE`, `MULTIPLE_CHOICE` ("choose N", a share per
+  correct option, never more than N chosen) and `TEXT_ENTRY` (typed, graded against
+  `question_accepted_answers` with only case and whitespace forgiven). The rules live in
+  `helper.AnswerKey`. Matching (`question_set_options`, `question_matching_answers`) is
+  not mapped yet.
+- **Question numbers:** computed once by `helper.QuestionNumbering` over the whole
+  paper and sent with the paper and the review; screens do not count. IELTS restarts
+  at 1 in each section, TOEIC counts on.
+- **Bands:** each scored attempt writes one `attempt_section_results` row per section.
+  A full section whose points the certificate's `score_conversions` table covers gets
+  a band (`helper.BandConversion`); a practice never does. `score_conversions` is
+  reference data seeded by migration and never written by the application.
 - **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the

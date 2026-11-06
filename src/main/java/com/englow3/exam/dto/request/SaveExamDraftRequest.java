@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Size;
 public record SaveExamDraftRequest(@PositiveOrZero long version,
         @NotNull @Size(max = 500) List<@NotNull @Valid AnswerRequest> answers) {
     public SaveExamDraftCommand toCommand(UUID id) {
-        return new SaveExamDraftCommand(id, version,
-                answers.stream().map(a -> new SubmittedAnswer(a.questionId(), a.selectedOptionIds())).toList());
+        return new SaveExamDraftCommand(id, version, answers.stream()
+                .map(a -> new SubmittedAnswer(a.questionId(), a.selectedOptionIds(), a.textAnswer())).toList());
     }
 }

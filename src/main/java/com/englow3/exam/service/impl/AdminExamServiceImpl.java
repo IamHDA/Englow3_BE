@@ -120,8 +120,12 @@ public class AdminExamServiceImpl implements AdminExamService {
         return new ExamDetailResult.QuestionResult(question.id(), question.questionType(), question.content(),
                 question.difficultyLevel(), question.skillType(), question.questionCategory(), question.orderNo(),
                 question.maxRawScore(), question.explanation(), question.sourceQuestionId(),
-                question.options().stream().map(option -> new QuestionOptionResult(option.id(), option.content(),
-                        option.orderNo(), option.correct(), option.explanation())).toList());
+                question.options().stream()
+                        .map(option -> new QuestionOptionResult(option.id(), option.content(), option.orderNo(),
+                                option.correct(), option.explanation()))
+                        .toList(),
+                question.acceptedAnswers().stream().map(a -> new ExamDetailResult.AcceptedAnswerResult(a.id(), a.text(),
+                        a.caseSensitive(), a.orderNo())).toList());
     }
 
     @Transactional(readOnly = true)
@@ -145,6 +149,10 @@ public class AdminExamServiceImpl implements AdminExamService {
                                         q.options().stream()
                                                 .map(o -> new UpdateExamContentCommand.OptionCommand(o.content(),
                                                         o.orderNo(), o.correct(), o.explanation()))
+                                                .toList(),
+                                        q.acceptedAnswers().stream()
+                                                .map(a -> new UpdateExamContentCommand.AcceptedAnswerCommand(a.text(),
+                                                        a.caseSensitive(), a.orderNo()))
                                                 .toList()))
                                         .toList()))
                                 .toList()))

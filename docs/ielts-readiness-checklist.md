@@ -1,6 +1,6 @@
 # Việc cần làm trước khi tạo dữ liệu đề IELTS
 
-**Cập nhật:** 2026-11-05 · **Đọc từ nhánh:** `testing` (`58308b3`)
+**Cập nhật:** 2026-11-06 · **Đọc từ nhánh:** `testing` (`58308b3`)
 
 Dữ liệu IELTS nhập vào trước khi xong các mục dưới đây sẽ không lưu được, không chấm
 được, hoặc phải sinh lại. Thứ tự làm:
@@ -61,7 +61,7 @@ Các bảng cho Listening và Reading **đã có sẵn**: V011, V014, V015, V017
 V021. Theo [module-map.md](module-map.md), module `exam` sở hữu chúng. Chỉ có Java là
 chưa map. Những việc còn phải làm ở DB:
 
-- [ ] **Nạp dữ liệu `score_conversions`** (bảng có từ V017 nhưng đang rỗng). Cần 3
+- [x] **Nạp dữ liệu `score_conversions`** (bảng có từ V017 nhưng đang rỗng). Cần 3
   bảng quy đổi:
   - Listening, với `certificate_variant` để NULL vì Academic và GT dùng chung;
   - Reading `ACADEMIC`;
@@ -69,7 +69,7 @@ chưa map. Những việc còn phải làm ở DB:
 
   Đây là dữ liệu tham chiếu, cùng loại với `V079__level_check_weights.sql`, không phải
   seed demo. Ghi nguồn của bảng quy đổi và ghi rõ đây là band **ước tính**.
-- [ ] **(Nên làm) Sửa ràng buộc unique của `score_conversions`.** Hai cột
+- [x] **(Nên làm) Sửa ràng buộc unique của `score_conversions`.** Hai cột
   `certificate_variant` và `section_type` cho phép NULL, mà Postgres coi các NULL là
   khác nhau, nên dòng trùng không bị chặn. DB chạy pg17, nên đổi được sang
   `unique nulls not distinct (...)` ngay trong migration ở trên.
@@ -105,38 +105,48 @@ chưa map. Những việc còn phải làm ở DB:
 - [ ] Thêm giá trị vào `exam/entity/QuestionType.java`, ví dụ `TEXT_ENTRY` và
   `MATCHING`. True/False/Not Given và Yes/No/Not Given dùng `SINGLE_CHOICE` với 3 lựa
   chọn cố định.
+  - Đã làm `TEXT_ENTRY`. `MATCHING` chưa làm.
 - [ ] Tạo entity và repository cho `question_accepted_answers`, `question_set_options`
   và `question_matching_answers`.
-- [ ] `AttemptAnswer`: map cột `text_answer`.
+  - Đã làm `question_accepted_answers`. `question_set_options` và `question_matching_answers` chưa làm (đi cùng `MATCHING`).
+- [x] `AttemptAnswer`: map cột `text_answer`.
 - [ ] `AttemptAnswerOption`: map `question_set_option_id`. Hiện entity chỉ có
   `questionOptionId`, trong khi CHECK ở V021 yêu cầu đúng một trong hai cột có giá trị.
 - [ ] Map `questions.metadata` nếu giới hạn số từ để ở đó.
 
 ### 2.2 Chấm điểm
 
-- [ ] **Chuyển quy tắc chấm vào entity.** Hiện nó nằm trong service
+- [x] **Chuyển quy tắc chấm vào entity.** Hiện nó nằm trong service
   (`ExamAttemptServiceImpl.java:316–331`) và chỉ so sánh tập option id.
   - Quy tắc điền từ theo D-IELTS-4, quy tắc matching, và chấm từng phần theo D-IELTS-3.
   - Viết entity test cho từng quy tắc, theo `CONTRIBUTING.md` mục *Tests*.
-- [ ] `ExamGradingQuery.GradingQuestion` hiện chỉ mang `options`. Thêm accepted answers
+  - Đã làm cho `SINGLE_CHOICE`, `MULTIPLE_CHOICE` (chấm từng phần) và `TEXT_ENTRY`, trong
+    `exam/helper/AnswerKey` kèm `AnswerKeyTest`. Đặt ở `helper/` chứ không ở một entity,
+    vì luật cần cả câu hỏi, các option và các đáp án được chấp nhận. Matching chưa làm.
+- [x] `ExamGradingQuery.GradingQuestion` hiện chỉ mang `options`. Thêm accepted answers
   và đáp án matching.
-- [ ] **Quy đổi band.**
+- [x] **Quy đổi band.**
   - Tra `score_conversions` theo (IELTS, variant, section) rồi gán
     `ExamAttempt.convertedScore`.
   - Hiện không chỗ nào gán giá trị này, nên `RoadmapProgressionImpl.java:120` luôn bỏ
     qua lần thi mock. **TOEIC cũng đang bị lỗi này.**
   - Lưu band từng kỹ năng vào `attempt_section_results`. Bảng này chưa có entity.
+  - Đã làm: band từng section được ghi vào `attempt_section_results` (entity
+    `AttemptSectionResult`, helper `BandConversion`) và trả trong kết quả.
+    `ExamAttempt.convertedScore` vẫn để trống với đề L+R làm riêng, đúng D-IELTS-6: band
+    tổng chỉ có từ full test. Lỗi roadmap với TOEIC vẫn còn, vì TOEIC chưa có bảng quy
+    đổi.
 
 ### 2.3 Xuất bản đề
 
-- [ ] `QuestionRepository.findIncompleteQuestionOrderNos` (dòng 63) coi câu nào có
+- [x] `QuestionRepository.findIncompleteQuestionOrderNos` (dòng 63) coi câu nào có
   dưới 2 `question_options` là chưa hoàn chỉnh. Vì vậy **mọi câu điền từ và matching
   đều chặn xuất bản**. Viết lại theo từng loại:
   - `TEXT_ENTRY` cần ít nhất 1 accepted answer;
   - `MATCHING` cần đúng 1 option của bộ lựa chọn chung.
-- [ ] Sửa nội dung lỗi `EXAM_HAS_INCOMPLETE_QUESTION` (`Exam.java:269`) cho các loại
+- [x] Sửa nội dung lỗi `EXAM_HAS_INCOMPLETE_QUESTION` (`Exam.java:269`) cho các loại
   mới.
-- [ ] `Exam.requireSittable` (`Exam.java:263`) bắt tổng điểm các section phải bằng
+- [x] `Exam.requireSittable` (`Exam.java:263`) bắt tổng điểm các section phải bằng
   `exams.max_raw_score`. Vì vậy đề IELTS L+R khai **80** (40 + 40), không phải 9. Band
   nằm ở `converted_score`.
 
@@ -144,28 +154,30 @@ chưa map. Những việc còn phải làm ở DB:
 
 - [ ] `UpdateExamContentRequest` và `SaveAuthoringRequest`: thêm accepted answers, bộ
   lựa chọn chung và đáp án matching.
-- [ ] `ExamContentServiceImpl.deleteContent` (dòng 130–135) xoá rồi lưu lại toàn bộ nội
+  - Đã làm accepted answers. Bộ lựa chọn chung và đáp án matching chưa làm.
+- [x] `ExamContentServiceImpl.deleteContent` (dòng 130–135) xoá rồi lưu lại toàn bộ nội
   dung đề. Mọi khoá ngoại đều là `on delete restrict`, nên phải xoá
   `question_matching_answers`, `question_accepted_answers` và `question_set_options`
   **trước** khi xoá câu hỏi và nhóm câu.
 - [ ] `QuestionBankServiceImpl`: khi copy nhóm câu từ ngân hàng, phải copy cả 3 bảng
   mới.
+  - Không cần: `QuestionBankServiceImpl` chỉ tìm kiếm và đọc, không copy nhóm câu vào đề.
 
 ### 2.5 Làm bài, xem kết quả, tutor
 
-- [ ] `SubmitExamAttemptRequest` và `SaveExamDraftRequest` chỉ có `selectedOptionIds`.
+- [x] `SubmitExamAttemptRequest` và `SaveExamDraftRequest` chỉ có `selectedOptionIds`.
   Thêm câu trả lời dạng chữ, và cho `validateSubmission` kiểm tra kiểu câu trả lời khớp
   với loại câu.
-- [ ] Tính số câu hiển thị ở một chỗ (D-IELTS-5), rồi trả nó trong đề cho học viên,
+- [x] Tính số câu hiển thị ở một chỗ (D-IELTS-5), rồi trả nó trong đề cho học viên,
   màn kết quả và ngữ cảnh tutor.
-- [ ] Đề trả cho học viên (`LearnerExamPaperProjection`, `LearnerExamPaperQuery`):
+- [x] Đề trả cho học viên (`LearnerExamPaperProjection`, `LearnerExamPaperQuery`):
   - trả bộ lựa chọn chung cho câu matching;
   - **không bao giờ** trả accepted answers;
   - không gửi transcript trong lúc làm bài (giống TOEIC: transcript nằm ở
     `question_sets.metadata`).
-- [ ] Màn kết quả (`ExamAttemptServiceImpl.java:537`) hiện chỉ trả `correctOptionIds`.
+- [x] Màn kết quả (`ExamAttemptServiceImpl.java:537`) hiện chỉ trả `correctOptionIds`.
   Thêm đáp án dạng chữ.
-- [ ] `SubmittedExamContextReaderImpl` (ngữ cảnh cho tutor) hiện chỉ đọc option. Thêm
+- [x] `SubmittedExamContextReaderImpl` (ngữ cảnh cho tutor) hiện chỉ đọc option. Thêm
   câu trả lời dạng chữ.
 
 ### 2.6 Writing và Speaking (module `assessment`)

@@ -80,13 +80,10 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
     /** {@code sourceQuestionId} is surfaced for the same round-trip reason as {@code QuestionSetResult}'s. */
     public record QuestionResult(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<QuestionOptionResult> options) {
+            UUID sourceQuestionId, List<QuestionOptionResult> options, List<AcceptedAnswerResult> acceptedAnswers) {
+    }
 
-        public static QuestionResult of(Question question, List<QuestionOptionResult> options) {
-            return new QuestionResult(question.getId(), question.getQuestionType(), question.getContent(),
-                    question.getDifficultyLevel(), question.getSkillType(), question.getQuestionCategory(),
-                    question.getOrderNo(), question.getMaxRawScore(), question.getExplanation(),
-                    question.getSourceQuestionId(), options);
-        }
+    /** A spelling a TEXT_ENTRY question accepts. Answer-key data, for the admin tree only. */
+    public record AcceptedAnswerResult(UUID id, String text, boolean caseSensitive, int orderNo) {
     }
 }
