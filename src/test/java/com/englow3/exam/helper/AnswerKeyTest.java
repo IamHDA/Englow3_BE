@@ -138,4 +138,27 @@ class AnswerKeyTest {
             assertThat(strict.grade(Set.of(), "dna").correct()).isFalse();
         }
     }
+
+    /** Picking one entry of the set's shared list: right or wrong, like a single choice. */
+    @Nested
+    class Matching {
+
+        private final AnswerKey key = new AnswerKey(QuestionType.MATCHING, BigDecimal.ONE, Set.of(c), List.of());
+
+        @Test
+        void theEntryThatAnswersTheQuestionEarnsIt() {
+            assertThat(key.grade(Set.of(c), null).correct()).isTrue();
+        }
+
+        @Test
+        void anotherEntryOfTheListEarnsNothing() {
+            assertThat(key.grade(Set.of(a), null).awarded()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        void takesOneNumberAndOneChoice() {
+            assertThat(key.numberSpan()).isEqualTo(1);
+            assertThat(key.choiceLimit()).isEqualTo(1);
+        }
+    }
 }

@@ -22,7 +22,11 @@ public record LearnerExamPaperProjection(Exam exam, List<Section> sections) {
     }
 
     public record QuestionSet(UUID id, String title, String instruction, int orderNo, String content,
-            String audioObjectKey, String imageObjectKey, List<Question> questions) {
+            String audioObjectKey, String imageObjectKey, List<Question> questions, List<SetOption> setOptions) {
+    }
+
+    /** An entry of the list a set's MATCHING questions choose from. Which question it answers is never here. */
+    public record SetOption(UUID id, String label, String content, int orderNo) {
     }
 
     public record Question(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,

@@ -67,20 +67,19 @@ public record ExamDetailResult(UUID id, String title, String description, ExamTy
      * drop the bank provenance the frontend never re-derives on its own.
      */
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
-            String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResult> questions) {
+            String audioUrl, String imageUrl, UUID sourceQuestionSetId, List<QuestionResult> questions,
+            List<SetOptionResult> setOptions) {
+    }
 
-        public static QuestionSetResult of(QuestionSet questionSet, String audioUrl, String imageUrl,
-                List<QuestionResult> questions) {
-            return new QuestionSetResult(questionSet.getId(), questionSet.getTitle(), questionSet.getInstruction(),
-                    questionSet.getOrderNo(), questionSet.getContent(), audioUrl, imageUrl,
-                    questionSet.getSourceQuestionSetId(), questions);
-        }
+    /** An entry of the list a set's MATCHING questions choose from. */
+    public record SetOptionResult(UUID id, String label, String content, int orderNo) {
     }
 
     /** {@code sourceQuestionId} is surfaced for the same round-trip reason as {@code QuestionSetResult}'s. */
     public record QuestionResult(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<QuestionOptionResult> options, List<AcceptedAnswerResult> acceptedAnswers) {
+            UUID sourceQuestionId, List<QuestionOptionResult> options, List<AcceptedAnswerResult> acceptedAnswers,
+            List<String> matchingLabels) {
     }
 
     /** A spelling a TEXT_ENTRY question accepts. Answer-key data, for the admin tree only. */

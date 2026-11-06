@@ -16,7 +16,9 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
 import com.englow3.exam.entity.QuestionAcceptedAnswer;
+import com.englow3.exam.entity.QuestionMatchingAnswer;
 import com.englow3.exam.entity.QuestionOption;
+import com.englow3.exam.entity.QuestionSetOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.dto.projection.AdminExamPaperProjection;
@@ -60,12 +62,30 @@ public class AdminExamPaperQuery {
                 "select a from QuestionAcceptedAnswer a where a.questionId in :parentIds order by a.orderNo",
                 QuestionAcceptedAnswer.class);
 
-        return Optional.of(assemble(exam, sections, parts, questionSets, questions, options, accepted));
+        List<QuestionSetOption> setOptions = childrenOf(idsOf(questionSets, QuestionSet::getId),
+                "select o from QuestionSetOption o where o.questionSetId in :parentIds order by o.orderNo",
+                QuestionSetOption.class);
+        List<QuestionMatchingAnswer> matching = childrenOf(idsOf(questions, Question::getId),
+                "select a from QuestionMatchingAnswer a where a.key.questionId in :parentIds",
+                QuestionMatchingAnswer.class);
+
+        return Optional
+                .of(assemble(exam, sections, parts, questionSets, questions, options, accepted, setOptions, matching));
     }
 
     private AdminExamPaperProjection assemble(Exam exam, List<ExamSection> sections, List<SectionPart> parts,
             List<QuestionSet> questionSets, List<Question> questions, List<QuestionOption> options,
-            List<QuestionAcceptedAnswer> accepted) {
+            List<QuestionAcceptedAnswer> accepted, List<QuestionSetOption> setOptions,
+            List<QuestionMatchingAnswer> matching) {
+        Map<UUID, String> labelById = setOptions.stream()
+                .collect(java.util.stream.Collectors.toMap(QuestionSetOption::getId, QuestionSetOption::getLabel));
+        Map<UUID, List<String>> labelsByQuestion = matching.stream()
+                .collect(groupingBy(QuestionMatchingAnswer::getQuestionId,
+                        mapping(answer -> labelById.get(answer.getQuestionSetOptionId()), toList())));
+        Map<UUID, List<AdminExamPaperProjection.SetOption>> setOptionsBySet = setOptions.stream()
+                .collect(groupingBy(QuestionSetOption::getQuestionSetId,
+                        mapping(o -> new AdminExamPaperProjection.SetOption(o.getId(), o.getLabel(), o.getContent(),
+                                o.getOrderNo()), toList())));
         Map<UUID, List<AdminExamPaperProjection.AcceptedAnswer>> acceptedByQuestion = accepted.stream()
                 .collect(groupingBy(QuestionAcceptedAnswer::getQuestionId,
                         mapping(a -> new AdminExamPaperProjection.AcceptedAnswer(a.getId(), a.getAnswerText(),
@@ -76,18 +96,24 @@ public class AdminExamPaperQuery {
                                 option.isCorrect(), option.getExplanation()), toList())));
 
         Map<UUID, List<AdminExamPaperProjection.Question>> questionsBySet = questions.stream()
-                .collect(groupingBy(Question::getQuestionSetId,
-                        mapping(q -> new AdminExamPaperProjection.Question(q.getId(), q.getQuestionType(),
-                                q.getContent(), q.getDifficultyLevel(), q.getSkillType(), q.getQuestionCategory(),
-                                q.getOrderNo(), q.getMaxRawScore(), q.getExplanation(), q.getSourceQuestionId(),
-                                optionsByQuestion.getOrDefault(q.getId(), List.of()),
-                                acceptedByQuestion.getOrDefault(q.getId(), List.of())), toList())));
+                .collect(
+                        groupingBy(
+                                Question::getQuestionSetId, mapping(
+                                        q -> new AdminExamPaperProjection.Question(q.getId(), q.getQuestionType(),
+                                                q.getContent(), q.getDifficultyLevel(), q.getSkillType(),
+                                                q.getQuestionCategory(), q.getOrderNo(), q.getMaxRawScore(),
+                                                q.getExplanation(), q.getSourceQuestionId(),
+                                                optionsByQuestion.getOrDefault(q.getId(), List.of()),
+                                                acceptedByQuestion.getOrDefault(q.getId(), List.of()), labelsByQuestion
+                                                        .getOrDefault(q.getId(), List.of()).stream().sorted().toList()),
+                                        toList())));
 
         Map<UUID, List<AdminExamPaperProjection.QuestionSet>> setsByPart = questionSets.stream().collect(groupingBy(
                 QuestionSet::getSectionPartId,
                 mapping(qs -> new AdminExamPaperProjection.QuestionSet(qs.getId(), qs.getTitle(), qs.getInstruction(),
                         qs.getOrderNo(), qs.getContent(), qs.getAudioObjectKey(), qs.getImageObjectKey(),
-                        qs.getSourceQuestionSetId(), questionsBySet.getOrDefault(qs.getId(), List.of())), toList())));
+                        qs.getSourceQuestionSetId(), questionsBySet.getOrDefault(qs.getId(), List.of()),
+                        setOptionsBySet.getOrDefault(qs.getId(), List.of())), toList())));
 
         Map<UUID, List<Part>> partsBySection = parts.stream().collect(groupingBy(SectionPart::getExamSectionId,
                 mapping(part -> new Part(part.getId(), part.getOrderNo(), part.getTitle(), part.getInstruction(),

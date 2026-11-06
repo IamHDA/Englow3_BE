@@ -18,7 +18,8 @@ import com.englow3.exam.entity.QuestionType;
  * @param maxRawScore
  *            what the question is worth
  * @param correctOptionIds
- *            the options marked correct; empty on a TEXT_ENTRY question
+ *            the options marked correct - on a MATCHING question, the entries of the set's shared list that answer it;
+ *            empty on a TEXT_ENTRY question
  * @param acceptedAnswers
  *            the spellings a TEXT_ENTRY question accepts; empty on a choice question
  */
@@ -53,9 +54,10 @@ public record AnswerKey(QuestionType type, BigDecimal maxRawScore, Set<UUID> cor
 
     public Grade grade(Set<UUID> selectedOptionIds, String textAnswer) {
         return switch (type) {
-            case SINGLE_CHOICE -> !correctOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds)
-                    ? new Grade(true, maxRawScore)
-                    : Grade.none();
+            case SINGLE_CHOICE,
+                    MATCHING -> !correctOptionIds.isEmpty() && selectedOptionIds.equals(correctOptionIds)
+                            ? new Grade(true, maxRawScore)
+                            : Grade.none();
             case MULTIPLE_CHOICE -> gradeChoices(selectedOptionIds);
             case TEXT_ENTRY -> accepts(textAnswer) ? new Grade(true, maxRawScore) : Grade.none();
         };

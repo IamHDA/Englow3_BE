@@ -113,7 +113,10 @@ public class AdminExamServiceImpl implements AdminExamService {
                 questionSet.orderNo(), questionSet.content(),
                 presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
                 presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
-                questionSet.sourceQuestionSetId(), questionSet.questions().stream().map(this::toQuestion).toList());
+                questionSet.sourceQuestionSetId(), questionSet.questions().stream().map(this::toQuestion).toList(),
+                questionSet.setOptions().stream()
+                        .map(o -> new ExamDetailResult.SetOptionResult(o.id(), o.label(), o.content(), o.orderNo()))
+                        .toList());
     }
 
     private ExamDetailResult.QuestionResult toQuestion(AdminExamPaperProjection.Question question) {
@@ -125,7 +128,8 @@ public class AdminExamServiceImpl implements AdminExamService {
                                 option.correct(), option.explanation()))
                         .toList(),
                 question.acceptedAnswers().stream().map(a -> new ExamDetailResult.AcceptedAnswerResult(a.id(), a.text(),
-                        a.caseSensitive(), a.orderNo())).toList());
+                        a.caseSensitive(), a.orderNo())).toList(),
+                question.matchingLabels());
     }
 
     @Transactional(readOnly = true)
@@ -153,7 +157,11 @@ public class AdminExamServiceImpl implements AdminExamService {
                                         q.acceptedAnswers().stream()
                                                 .map(a -> new UpdateExamContentCommand.AcceptedAnswerCommand(a.text(),
                                                         a.caseSensitive(), a.orderNo()))
-                                                .toList()))
+                                                .toList(),
+                                        q.matchingLabels())).toList(),
+                                qs.setOptions().stream()
+                                        .map(o -> new UpdateExamContentCommand.SetOptionCommand(o.label(), o.content(),
+                                                o.orderNo()))
                                         .toList()))
                                 .toList()))
                         .toList()))

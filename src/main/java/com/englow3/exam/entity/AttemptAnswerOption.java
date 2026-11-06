@@ -19,6 +19,10 @@ public class AttemptAnswerOption extends BasePersistedEntity {
     @Column(name = "question_option_id", updatable = false)
     private UUID questionOptionId;
 
+    /** Set instead of {@code questionOptionId} on a MATCHING question; the database checks exactly one is. */
+    @Column(name = "question_set_option_id", updatable = false)
+    private UUID questionSetOptionId;
+
     protected AttemptAnswerOption() {
     }
 
@@ -28,5 +32,18 @@ public class AttemptAnswerOption extends BasePersistedEntity {
         option.attemptAnswerId = attemptAnswerId;
         option.questionOptionId = questionOptionId;
         return option;
+    }
+
+    public static AttemptAnswerOption selectedFromSet(UUID attemptAnswerId, UUID questionSetOptionId) {
+        AttemptAnswerOption option = new AttemptAnswerOption();
+        option.id = UUID.randomUUID();
+        option.attemptAnswerId = attemptAnswerId;
+        option.questionSetOptionId = questionSetOptionId;
+        return option;
+    }
+
+    /** Whichever of the two was chosen. */
+    public UUID chosenId() {
+        return questionOptionId != null ? questionOptionId : questionSetOptionId;
     }
 }

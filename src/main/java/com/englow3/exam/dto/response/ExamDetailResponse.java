@@ -63,26 +63,36 @@ public record ExamDetailResponse(UUID id, String title, String description, Exam
     public record QuestionSetResponse(UUID id, @Schema(nullable = true) String title,
             @Schema(nullable = true) String instruction, int orderNo, @Schema(nullable = true) String content,
             @Schema(nullable = true) String audioUrl, @Schema(nullable = true) String imageUrl,
-            @Schema(nullable = true) UUID sourceQuestionSetId, List<QuestionResponse> questions) {
+            @Schema(nullable = true) UUID sourceQuestionSetId, List<QuestionResponse> questions,
+            List<SetOptionResponse> setOptions) {
 
         static QuestionSetResponse from(ExamDetailResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
                     result.content(), result.audioUrl(), result.imageUrl(), result.sourceQuestionSetId(),
-                    result.questions().stream().map(QuestionResponse::from).toList());
+                    result.questions().stream().map(QuestionResponse::from).toList(),
+                    result.setOptions().stream().map(SetOptionResponse::from).toList());
+        }
+    }
+
+    public record SetOptionResponse(UUID id, String label, @Schema(nullable = true) String content, int orderNo) {
+        static SetOptionResponse from(ExamDetailResult.SetOptionResult result) {
+            return new SetOptionResponse(result.id(), result.label(), result.content(), result.orderNo());
         }
     }
 
     public record QuestionResponse(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, @Schema(nullable = true) String questionCategory, int orderNo, BigDecimal maxRawScore,
             @Schema(nullable = true) String explanation, @Schema(nullable = true) UUID sourceQuestionId,
-            List<QuestionOptionResponse> options, List<AcceptedAnswerResponse> acceptedAnswers) {
+            List<QuestionOptionResponse> options, List<AcceptedAnswerResponse> acceptedAnswers,
+            @Schema(description = "On a MATCHING question, the label of the set's list entry that answers it") List<String> matchingLabels) {
 
         static QuestionResponse from(ExamDetailResult.QuestionResult result) {
             return new QuestionResponse(result.id(), result.questionType(), result.content(), result.difficultyLevel(),
                     result.skillType(), result.questionCategory(), result.orderNo(), result.maxRawScore(),
                     result.explanation(), result.sourceQuestionId(),
                     result.options().stream().map(QuestionOptionResponse::from).toList(),
-                    result.acceptedAnswers().stream().map(AcceptedAnswerResponse::from).toList());
+                    result.acceptedAnswers().stream().map(AcceptedAnswerResponse::from).toList(),
+                    result.matchingLabels());
         }
     }
 

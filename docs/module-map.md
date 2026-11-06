@@ -54,8 +54,10 @@ answers, and section results.
 - **Answer shapes:** `SINGLE_CHOICE`, `MULTIPLE_CHOICE` ("choose N", a share per
   correct option, never more than N chosen) and `TEXT_ENTRY` (typed, graded against
   `question_accepted_answers` with only case and whitespace forgiven). The rules live in
-  `helper.AnswerKey`. Matching (`question_set_options`, `question_matching_answers`) is
-  not mapped yet.
+  `helper.AnswerKey`. `MATCHING` picks one entry of the list its question set shares
+  (`question_set_options`, keyed by `question_matching_answers`); the learner's paper
+  carries the list but never the key, and the choice is stored in
+  `attempt_answer_options.question_set_option_id`.
 - **Question numbers:** computed once by `helper.QuestionNumbering` over the whole
   paper and sent with the paper and the review; screens do not count. IELTS restarts
   at 1 in each section, TOEIC counts on.

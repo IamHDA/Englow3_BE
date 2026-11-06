@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.ToIntFunction;
@@ -25,6 +28,8 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
 import com.englow3.exam.entity.QuestionAcceptedAnswer;
+import com.englow3.exam.entity.QuestionMatchingAnswer;
+import com.englow3.exam.entity.QuestionSetOption;
 import com.englow3.exam.entity.QuestionOption;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.QuestionSet;
@@ -34,6 +39,8 @@ import com.englow3.exam.query.AdminExamPaperQuery;
 import com.englow3.exam.repository.ExamRepository;
 import com.englow3.exam.repository.ExamSectionRepository;
 import com.englow3.exam.repository.QuestionAcceptedAnswerRepository;
+import com.englow3.exam.repository.QuestionMatchingAnswerRepository;
+import com.englow3.exam.repository.QuestionSetOptionRepository;
 import com.englow3.exam.repository.QuestionOptionRepository;
 import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.exam.repository.QuestionSetRepository;
@@ -60,6 +67,8 @@ public class ExamContentServiceImpl implements ExamContentService {
     private final QuestionRepository questionRepo;
     private final QuestionOptionRepository questionOptionRepo;
     private final QuestionAcceptedAnswerRepository acceptedAnswerRepo;
+    private final QuestionSetOptionRepository setOptionRepo;
+    private final QuestionMatchingAnswerRepository matchingAnswerRepo;
     private final AdminExamPaperQuery examPaperQuery;
     private final ObjectStorageClient objectStorage;
     private final PresignedUrlResolver presignedUrls;
@@ -69,7 +78,8 @@ public class ExamContentServiceImpl implements ExamContentService {
     public ExamContentServiceImpl(ExamRepository examRepo, ExamSectionRepository examSectionRepo,
             SectionPartRepository sectionPartRepo, QuestionSetRepository questionSetRepo,
             QuestionRepository questionRepo, QuestionOptionRepository questionOptionRepo,
-            QuestionAcceptedAnswerRepository acceptedAnswerRepo, AdminExamPaperQuery examPaperQuery,
+            QuestionAcceptedAnswerRepository acceptedAnswerRepo, QuestionSetOptionRepository setOptionRepo,
+            QuestionMatchingAnswerRepository matchingAnswerRepo, AdminExamPaperQuery examPaperQuery,
             ObjectStorageClient objectStorage, PresignedUrlResolver presignedUrls,
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
@@ -80,6 +90,8 @@ public class ExamContentServiceImpl implements ExamContentService {
         this.questionRepo = questionRepo;
         this.questionOptionRepo = questionOptionRepo;
         this.acceptedAnswerRepo = acceptedAnswerRepo;
+        this.setOptionRepo = setOptionRepo;
+        this.matchingAnswerRepo = matchingAnswerRepo;
         this.examPaperQuery = examPaperQuery;
         this.objectStorage = objectStorage;
         this.presignedUrls = presignedUrls;
@@ -134,9 +146,11 @@ public class ExamContentServiceImpl implements ExamContentService {
     }
 
     private void deleteContent(UUID examId) {
+        matchingAnswerRepo.deleteAllForExam(examId);
         acceptedAnswerRepo.deleteAllForExam(examId);
         questionOptionRepo.deleteAllForExam(examId);
         questionRepo.deleteAllForExam(examId);
+        setOptionRepo.deleteAllForExam(examId);
         questionSetRepo.deleteAllForExam(examId);
         sectionPartRepo.deleteAllForExam(examId);
         examSectionRepo.deleteAllForExam(examId);
@@ -149,6 +163,8 @@ public class ExamContentServiceImpl implements ExamContentService {
         List<Question> questionRows = new ArrayList<>();
         List<QuestionOption> optionRows = new ArrayList<>();
         List<QuestionAcceptedAnswer> acceptedRows = new ArrayList<>();
+        List<QuestionSetOption> setOptionRows = new ArrayList<>();
+        List<QuestionMatchingAnswer> matchingRows = new ArrayList<>();
 
         for (UpdateExamContentCommand.SectionCommand s : sections) {
             ExamSection section = ExamSection.create(examId, s.sectionType(), s.orderNo(), s.maxRawScore(),
@@ -165,6 +181,13 @@ public class ExamContentServiceImpl implements ExamContentService {
                             qs.orderNo(), qs.content(), qs.audioObjectKey(), qs.imageObjectKey(),
                             qs.sourceQuestionSetId());
                     questionSetRows.add(questionSet);
+                    Map<String, UUID> setOptionByLabel = new HashMap<>();
+                    for (UpdateExamContentCommand.SetOptionCommand o : qs.setOptions()) {
+                        QuestionSetOption entry = QuestionSetOption.create(questionSet.getId(), o.label().strip(),
+                                o.content(), o.orderNo());
+                        setOptionRows.add(entry);
+                        setOptionByLabel.put(entry.getLabel(), entry.getId());
+                    }
 
                     for (UpdateExamContentCommand.QuestionCommand q : qs.questions()) {
                         Question question = Question.create(questionSet.getId(), q.questionType(), q.content(),
@@ -180,6 +203,10 @@ public class ExamContentServiceImpl implements ExamContentService {
                             acceptedRows.add(QuestionAcceptedAnswer.create(question.getId(), a.text().strip(),
                                     a.caseSensitive(), a.orderNo()));
                         }
+                        for (String label : q.matchingLabels()) {
+                            matchingRows.add(
+                                    QuestionMatchingAnswer.of(question.getId(), setOptionByLabel.get(label.strip())));
+                        }
                     }
                 }
             }
@@ -188,9 +215,11 @@ public class ExamContentServiceImpl implements ExamContentService {
         examSectionRepo.saveAll(sectionRows);
         sectionPartRepo.saveAll(partRows);
         questionSetRepo.saveAll(questionSetRows);
+        setOptionRepo.saveAll(setOptionRows);
         questionRepo.saveAll(questionRows);
         questionOptionRepo.saveAll(optionRows);
         acceptedAnswerRepo.saveAll(acceptedRows);
+        matchingAnswerRepo.saveAll(matchingRows);
     }
 
     private void validateContentTree(UUID examId, List<UpdateExamContentCommand.SectionCommand> sections) {
@@ -214,12 +243,34 @@ public class ExamContentServiceImpl implements ExamContentService {
                     requireOwnedKey(prefix, questionSet.imageObjectKey());
                     requireUniqueOrderNo("question", questionSet.questions(),
                             UpdateExamContentCommand.QuestionCommand::orderNo);
+                    requireUniqueOrderNo("list entry", questionSet.setOptions(),
+                            UpdateExamContentCommand.SetOptionCommand::orderNo);
+                    Set<String> labels = new HashSet<>();
+                    for (UpdateExamContentCommand.SetOptionCommand entry : questionSet.setOptions()) {
+                        if (!labels.add(entry.label().strip())) {
+                            throw new BadRequestException("DUPLICATE_SET_OPTION_LABEL",
+                                    "Two entries of a question set's list share the label %s"
+                                            .formatted(entry.label().strip()));
+                        }
+                    }
                     for (UpdateExamContentCommand.QuestionCommand question : questionSet.questions()) {
                         requireUniqueOrderNo("option", question.options(),
                                 UpdateExamContentCommand.OptionCommand::orderNo);
                         requireUniqueOrderNo("accepted answer", question.acceptedAnswers(),
                                 UpdateExamContentCommand.AcceptedAnswerCommand::orderNo);
                         requireAnswerShape(question);
+                        if (question.matchingLabels().stream().map(String::strip).distinct().count() != question
+                                .matchingLabels().size()) {
+                            throw new BadRequestException("DUPLICATE_MATCHING_LABEL",
+                                    "A matching question names the same list entry twice");
+                        }
+                        for (String label : question.matchingLabels()) {
+                            if (!labels.contains(label.strip())) {
+                                throw new BadRequestException("MATCHING_LABEL_NOT_IN_SET",
+                                        "Label %s is not an entry of this question set's list"
+                                                .formatted(label.strip()));
+                            }
+                        }
                     }
                 }
             }
@@ -241,9 +292,18 @@ public class ExamContentServiceImpl implements ExamContentService {
      */
     private static void requireAnswerShape(UpdateExamContentCommand.QuestionCommand question) {
         boolean typed = question.questionType() == QuestionType.TEXT_ENTRY;
+        boolean matched = question.questionType() == QuestionType.MATCHING;
         if (typed && !question.options().isEmpty()) {
             throw new BadRequestException("TEXT_QUESTION_HAS_OPTIONS",
                     "A text-entry question is answered by typing; remove its options");
+        }
+        if (matched && !question.options().isEmpty()) {
+            throw new BadRequestException("MATCHING_QUESTION_HAS_OPTIONS",
+                    "A matching question chooses from its question set's list; remove its own options");
+        }
+        if (!matched && !question.matchingLabels().isEmpty()) {
+            throw new BadRequestException("CHOICE_QUESTION_HAS_MATCHING_LABELS",
+                    "Only a matching question names an entry of the set's list as its answer");
         }
         if (!typed && !question.acceptedAnswers().isEmpty()) {
             throw new BadRequestException("CHOICE_QUESTION_HAS_ACCEPTED_ANSWERS",
@@ -280,7 +340,10 @@ public class ExamContentServiceImpl implements ExamContentService {
                 questionSet.orderNo(), questionSet.content(),
                 presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
                 presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
-                questionSet.sourceQuestionSetId(), questionSet.questions().stream().map(this::toQuestion).toList());
+                questionSet.sourceQuestionSetId(), questionSet.questions().stream().map(this::toQuestion).toList(),
+                questionSet.setOptions().stream()
+                        .map(o -> new ExamDetailResult.SetOptionResult(o.id(), o.label(), o.content(), o.orderNo()))
+                        .toList());
     }
 
     private ExamDetailResult.QuestionResult toQuestion(AdminExamPaperProjection.Question question) {
@@ -292,7 +355,8 @@ public class ExamContentServiceImpl implements ExamContentService {
                                 option.correct(), option.explanation()))
                         .toList(),
                 question.acceptedAnswers().stream().map(a -> new ExamDetailResult.AcceptedAnswerResult(a.id(), a.text(),
-                        a.caseSensitive(), a.orderNo())).toList());
+                        a.caseSensitive(), a.orderNo())).toList(),
+                question.matchingLabels());
     }
 
     private Exam requireExam(UUID examId) {

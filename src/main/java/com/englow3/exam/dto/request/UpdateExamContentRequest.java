@@ -43,17 +43,29 @@ public record UpdateExamContentRequest(@NotNull List<@NotNull @Valid SectionRequ
 
     public record QuestionSetRequest(String title, String instruction, @PositiveOrZero int orderNo, String content,
             String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId,
-            @NotNull List<@NotNull @Valid QuestionRequest> questions) {
+            @NotNull List<@NotNull @Valid QuestionRequest> questions,
+            @Schema(description = "The list every MATCHING question of this set chooses from; omit when it has none") List<@NotNull @Valid SetOptionRequest> setOptions) {
+
+        public QuestionSetRequest {
+            setOptions = setOptions == null ? List.of() : setOptions;
+        }
+    }
+
+    /** One entry of a set's shared list: a heading "iv", a person "B", a map label "F". */
+    public record SetOptionRequest(@NotBlank @Size(max = 10) String label, String content,
+            @PositiveOrZero int orderNo) {
     }
 
     public record QuestionRequest(@NotNull QuestionType questionType, @NotBlank String content,
             @NotNull DifficultyLevel difficultyLevel, @NotNull SkillType skillType, String questionCategory,
             @PositiveOrZero int orderNo, @NotNull BigDecimal maxRawScore, String explanation, UUID sourceQuestionId,
             @NotNull List<@NotNull @Valid OptionRequest> options,
-            @Schema(description = "Spellings a TEXT_ENTRY question accepts; omit or leave empty on a choice question") List<@NotNull @Valid AcceptedAnswerRequest> acceptedAnswers) {
+            @Schema(description = "Spellings a TEXT_ENTRY question accepts; omit or leave empty on a choice question") List<@NotNull @Valid AcceptedAnswerRequest> acceptedAnswers,
+            @Schema(description = "On a MATCHING question, the label of the set's list entry that answers it") List<@NotBlank @Size(max = 10) String> matchingLabels) {
 
         public QuestionRequest {
             acceptedAnswers = acceptedAnswers == null ? List.of() : acceptedAnswers;
+            matchingLabels = matchingLabels == null ? List.of() : matchingLabels;
         }
     }
 

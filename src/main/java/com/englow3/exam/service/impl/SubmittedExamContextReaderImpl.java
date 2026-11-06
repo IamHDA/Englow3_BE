@@ -20,6 +20,7 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
     private final QuestionRepository questions;
     private final QuestionOptionRepository options;
     private final com.englow3.exam.repository.QuestionSetRepository sets;
+    private final com.englow3.exam.repository.QuestionSetOptionRepository setOptions;
     private final com.englow3.exam.repository.SectionPartRepository parts;
     private final ExamAttemptService exams;
     private final UserDirectory users;
@@ -50,6 +51,18 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
         String correct = choices.stream()
                 .filter(o -> o.getQuestionId().equals(questionId) && review.correctOptionIds().contains(o.getId()))
                 .map(o -> o.getContent()).collect(java.util.stream.Collectors.joining("; "));
+        if (question.getQuestionType() == com.englow3.exam.entity.QuestionType.MATCHING) {
+            // The choice came from the set's shared list, not from options of the question itself.
+            var entries = setOptions.findAllById(java.util.stream.Stream
+                    .concat(review.selectedOptionIds().stream(), review.correctOptionIds().stream()).distinct()
+                    .toList());
+            selected = entries.stream().filter(e -> review.selectedOptionIds().contains(e.getId()))
+                    .map(e -> e.getLabel() + (e.getContent() == null ? "" : " " + e.getContent()))
+                    .collect(java.util.stream.Collectors.joining("; "));
+            correct = entries.stream().filter(e -> review.correctOptionIds().contains(e.getId()))
+                    .map(e -> e.getLabel() + (e.getContent() == null ? "" : " " + e.getContent()))
+                    .collect(java.util.stream.Collectors.joining("; "));
+        }
         if (question.getQuestionType() == com.englow3.exam.entity.QuestionType.TEXT_ENTRY) {
             // A typed answer has no options: what the learner wrote and what would have counted are the context.
             selected = review.textAnswer() == null ? "" : review.textAnswer();

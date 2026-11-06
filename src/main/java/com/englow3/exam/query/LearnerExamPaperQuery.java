@@ -18,6 +18,7 @@ import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamSection;
 import com.englow3.exam.entity.Question;
 import com.englow3.exam.entity.QuestionOption;
+import com.englow3.exam.entity.QuestionSetOption;
 import com.englow3.exam.entity.QuestionSet;
 import com.englow3.exam.entity.SectionPart;
 import com.englow3.exam.dto.projection.LearnerExamPaperProjection;
@@ -70,6 +71,13 @@ public class LearnerExamPaperQuery {
                 "select o from QuestionOption o where o.questionId in :parentIds order by o.orderNo",
                 QuestionOption.class);
 
+        List<QuestionSetOption> setOptions = childrenOf(idsOf(sets, QuestionSet::getId),
+                "select o from QuestionSetOption o where o.questionSetId in :parentIds order by o.orderNo",
+                QuestionSetOption.class);
+        Map<UUID, List<LearnerExamPaperProjection.SetOption>> setOptionsBySet = setOptions.stream()
+                .collect(groupingBy(QuestionSetOption::getQuestionSetId,
+                        mapping(o -> new LearnerExamPaperProjection.SetOption(o.getId(), o.getLabel(), o.getContent(),
+                                o.getOrderNo()), toList())));
         Map<UUID, List<Option>> optionsByQuestion = options.stream().collect(groupingBy(QuestionOption::getQuestionId,
                 mapping(option -> new Option(option.getId(), option.getContent(), option.getOrderNo()), toList())));
         Map<UUID, List<LearnerExamPaperProjection.Question>> questionsBySet = questions.stream().collect(groupingBy(
@@ -77,11 +85,12 @@ public class LearnerExamPaperQuery {
                 mapping(q -> new LearnerExamPaperProjection.Question(q.getId(), q.getQuestionType(), q.getContent(),
                         q.getDifficultyLevel(), q.getSkillType(), q.getQuestionCategory(), q.getOrderNo(),
                         q.getMaxRawScore(), optionsByQuestion.getOrDefault(q.getId(), List.of())), toList())));
-        Map<UUID, List<LearnerExamPaperProjection.QuestionSet>> setsByPart = sets.stream().collect(groupingBy(
-                QuestionSet::getSectionPartId,
-                mapping(set -> new LearnerExamPaperProjection.QuestionSet(set.getId(), set.getTitle(),
-                        set.getInstruction(), set.getOrderNo(), set.getContent(), set.getAudioObjectKey(),
-                        set.getImageObjectKey(), questionsBySet.getOrDefault(set.getId(), List.of())), toList())));
+        Map<UUID, List<LearnerExamPaperProjection.QuestionSet>> setsByPart = sets.stream()
+                .collect(groupingBy(QuestionSet::getSectionPartId,
+                        mapping(set -> new LearnerExamPaperProjection.QuestionSet(set.getId(), set.getTitle(),
+                                set.getInstruction(), set.getOrderNo(), set.getContent(), set.getAudioObjectKey(),
+                                set.getImageObjectKey(), questionsBySet.getOrDefault(set.getId(), List.of()),
+                                setOptionsBySet.getOrDefault(set.getId(), List.of())), toList())));
         Map<UUID, List<Part>> partsBySection = parts.stream().collect(groupingBy(SectionPart::getExamSectionId,
                 mapping(part -> new Part(part.getId(), part.getOrderNo(), part.getTitle(), part.getInstruction(),
                         part.getContent(), part.getAudioObjectKey(), part.getImageObjectKey(),

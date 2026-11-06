@@ -51,11 +51,15 @@ class ExamContentServiceTest {
     private final QuestionOptionRepository questionOptionRepo = mock(QuestionOptionRepository.class);
     private final com.englow3.exam.repository.QuestionAcceptedAnswerRepository acceptedAnswerRepo = mock(
             com.englow3.exam.repository.QuestionAcceptedAnswerRepository.class);
+    private final com.englow3.exam.repository.QuestionSetOptionRepository setOptionRepo = mock(
+            com.englow3.exam.repository.QuestionSetOptionRepository.class);
+    private final com.englow3.exam.repository.QuestionMatchingAnswerRepository matchingAnswerRepo = mock(
+            com.englow3.exam.repository.QuestionMatchingAnswerRepository.class);
     private final AdminExamPaperQuery examPaperQuery = mock(AdminExamPaperQuery.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final ExamContentService service = new ExamContentServiceImpl(examRepo, examSectionRepo, sectionPartRepo,
-            questionSetRepo, questionRepo, questionOptionRepo, acceptedAnswerRepo, examPaperQuery, objectStorage,
-            mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
+            questionSetRepo, questionRepo, questionOptionRepo, acceptedAnswerRepo, setOptionRepo, matchingAnswerRepo,
+            examPaperQuery, objectStorage, mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
 
     @Test
     void uploadsMediaThroughTheObjectStorageClient() {
@@ -106,11 +110,13 @@ class ExamContentServiceTest {
 
         ExamDetailResult result = service.replaceContent(new UpdateExamContentCommand(exam.getId(), List.of()));
 
-        InOrder deletionOrder = inOrder(acceptedAnswerRepo, questionOptionRepo, questionRepo, questionSetRepo,
-                sectionPartRepo, examSectionRepo);
+        InOrder deletionOrder = inOrder(matchingAnswerRepo, acceptedAnswerRepo, questionOptionRepo, questionRepo,
+                setOptionRepo, questionSetRepo, sectionPartRepo, examSectionRepo);
+        deletionOrder.verify(matchingAnswerRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(acceptedAnswerRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionOptionRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionRepo).deleteAllForExam(exam.getId());
+        deletionOrder.verify(setOptionRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(questionSetRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(sectionPartRepo).deleteAllForExam(exam.getId());
         deletionOrder.verify(examSectionRepo).deleteAllForExam(exam.getId());
@@ -198,5 +204,63 @@ class ExamContentServiceTest {
                                 .isInstanceOf(BadRequestException.class)
                                 .extracting(e -> ((BadRequestException) e).getCode())
                                 .isEqualTo("CHOICE_QUESTION_HAS_ACCEPTED_ANSWERS");
+    }
+
+    private static UpdateExamContentCommand matchingSet(UUID examId, List<String> labels) {
+        var question = new UpdateExamContentCommand.QuestionCommand(com.englow3.exam.entity.QuestionType.MATCHING,
+                "Paragraph A", com.englow3.exam.entity.DifficultyLevel.MEDIUM,
+                com.englow3.exam.entity.SkillType.READING, null, 1, java.math.BigDecimal.ONE, null, null, List.of(),
+                List.of(), labels);
+        var set = new UpdateExamContentCommand.QuestionSetCommand(null, null, 1, null, null, null, null,
+                List.of(question), List.of(new UpdateExamContentCommand.SetOptionCommand("i", "A new beginning", 1),
+                        new UpdateExamContentCommand.SetOptionCommand("ii", "An old problem", 2)));
+        var part = new UpdateExamContentCommand.PartCommand(1, "Passage 1", null, null, null, null, List.of(set));
+        return new UpdateExamContentCommand(examId,
+                List.of(new UpdateExamContentCommand.SectionCommand(SectionType.READING, 1, java.math.BigDecimal.ONE,
+                        false, null, List.of(part))));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void linksAMatchingQuestionToTheListEntryItsLabelNames() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+        when(examPaperQuery.loadForAdmin(exam.getId()))
+                .thenReturn(Optional.of(new AdminExamPaperProjection(exam, List.of())));
+
+        service.replaceContent(matchingSet(exam.getId(), List.of("ii")));
+
+        var entries = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        var answers = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        verify(setOptionRepo).saveAll(entries.capture());
+        verify(matchingAnswerRepo).saveAll(answers.capture());
+        UUID second = java.util.stream.StreamSupport
+                .stream(((Iterable<com.englow3.exam.entity.QuestionSetOption>) entries.getValue()).spliterator(), false)
+                .filter(entry -> entry.getLabel().equals("ii")).findFirst().orElseThrow().getId();
+        assertThat((Iterable<com.englow3.exam.entity.QuestionMatchingAnswer>) answers.getValue()).singleElement()
+                .satisfies(answer -> assertThat(answer.getQuestionSetOptionId()).isEqualTo(second));
+    }
+
+    @Test
+    void refusesALabelThatIsNotInTheSetsList() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+
+        assertThatThrownBy(() -> service.replaceContent(matchingSet(exam.getId(), List.of("vii"))))
+                .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                .isEqualTo("MATCHING_LABEL_NOT_IN_SET");
+    }
+
+    @Test
+    void refusesOwnOptionsOnAMatchingQuestion() {
+        Exam exam = AdminExamServiceTest.draft();
+        when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
+
+        assertThatThrownBy(() -> service.replaceContent(withOneQuestion(exam.getId(),
+                question(com.englow3.exam.entity.QuestionType.MATCHING,
+                        List.of(new UpdateExamContentCommand.OptionCommand("A", 1, true, null)), List.of()))))
+                                .isInstanceOf(BadRequestException.class)
+                                .extracting(e -> ((BadRequestException) e).getCode())
+                                .isEqualTo("MATCHING_QUESTION_HAS_OPTIONS");
     }
 }

@@ -22,12 +22,17 @@ public record AdminExamPaperProjection(Exam exam, List<Section> sections) {
     }
 
     public record QuestionSet(UUID id, String title, String instruction, int orderNo, String content,
-            String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId, List<Question> questions) {
+            String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId, List<Question> questions,
+            List<SetOption> setOptions) {
+    }
+
+    public record SetOption(UUID id, String label, String content, int orderNo) {
     }
 
     public record Question(UUID id, QuestionType questionType, String content, DifficultyLevel difficultyLevel,
             SkillType skillType, String questionCategory, int orderNo, BigDecimal maxRawScore, String explanation,
-            UUID sourceQuestionId, List<Option> options, List<AcceptedAnswer> acceptedAnswers) {
+            UUID sourceQuestionId, List<Option> options, List<AcceptedAnswer> acceptedAnswers,
+            List<String> matchingLabels) {
     }
 
     public record AcceptedAnswer(UUID id, String text, boolean caseSensitive, int orderNo) {

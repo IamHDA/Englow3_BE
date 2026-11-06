@@ -51,14 +51,15 @@ public record LearnerExamPaperResult(UUID id, String title, String description, 
         }
     }
 
+    /**
+     * @param setOptions
+     *            the list the set's MATCHING questions choose from; empty when it has none
+     */
     public record QuestionSetResult(UUID id, String title, String instruction, int orderNo, String content,
-            String audioUrl, String imageUrl, List<QuestionResult> questions) {
+            String audioUrl, String imageUrl, List<QuestionResult> questions, List<SetOptionResult> setOptions) {
+    }
 
-        public static QuestionSetResult of(QuestionSet set, String audioUrl, String imageUrl,
-                List<QuestionResult> questions) {
-            return new QuestionSetResult(set.getId(), set.getTitle(), set.getInstruction(), set.getOrderNo(),
-                    set.getContent(), audioUrl, imageUrl, questions);
-        }
+    public record SetOptionResult(UUID id, String label, String content, int orderNo) {
     }
 
     /**

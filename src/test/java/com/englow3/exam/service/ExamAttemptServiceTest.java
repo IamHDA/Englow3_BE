@@ -194,7 +194,7 @@ class ExamAttemptServiceTest {
         var question = new LearnerExamPaperProjection.Question(UUID.randomUUID(), QuestionType.SINGLE_CHOICE,
                 "question", DifficultyLevel.MEDIUM, SkillType.READING, null, 1, BigDecimal.ONE, List.of(option));
         var questionSet = new LearnerExamPaperProjection.QuestionSet(UUID.randomUUID(), "set", null, 1, null,
-                "sets/audio.mp3", "sets/image.png", List.of(question));
+                "sets/audio.mp3", "sets/image.png", List.of(question), List.of());
         var part = new LearnerExamPaperProjection.Part(UUID.randomUUID(), 1, "part", null, null, "parts/audio.mp3",
                 "parts/image.png", List.of(questionSet));
         var section = new LearnerExamPaperProjection.Section(UUID.randomUUID(), SectionType.LISTENING, 1,

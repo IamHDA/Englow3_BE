@@ -8,9 +8,11 @@ package com.englow3.exam.entity;
  * order, and never more than N chosen.</li>
  * <li>{@code TEXT_ENTRY}: the learner types the answer, graded against {@code question_accepted_answers} (gap-fill,
  * completion, short answer).</li>
+ * <li>{@code MATCHING}: the learner picks one entry from the list the whole question set shares
+ * ({@code question_set_options}) - matching headings, information, features, sentence endings, map labels. The key is
+ * in {@code question_matching_answers}.</li>
  * </ul>
- * Matching still needs {@code question_set_options} and {@code question_matching_answers}, which are not mapped yet.
  */
 public enum QuestionType {
-    SINGLE_CHOICE, MULTIPLE_CHOICE, TEXT_ENTRY
+    SINGLE_CHOICE, MULTIPLE_CHOICE, TEXT_ENTRY, MATCHING
 }

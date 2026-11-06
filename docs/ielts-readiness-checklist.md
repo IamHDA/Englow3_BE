@@ -102,15 +102,14 @@ chưa map. Những việc còn phải làm ở DB:
 
 ### 2.1 Loại câu hỏi và entity
 
-- [ ] Thêm giá trị vào `exam/entity/QuestionType.java`, ví dụ `TEXT_ENTRY` và
+- [x] Thêm giá trị vào `exam/entity/QuestionType.java`, ví dụ `TEXT_ENTRY` và
   `MATCHING`. True/False/Not Given và Yes/No/Not Given dùng `SINGLE_CHOICE` với 3 lựa
   chọn cố định.
-  - Đã làm `TEXT_ENTRY`. `MATCHING` chưa làm.
-- [ ] Tạo entity và repository cho `question_accepted_answers`, `question_set_options`
+  - Đã làm cả `TEXT_ENTRY` và `MATCHING`.
+- [x] Tạo entity và repository cho `question_accepted_answers`, `question_set_options`
   và `question_matching_answers`.
-  - Đã làm `question_accepted_answers`. `question_set_options` và `question_matching_answers` chưa làm (đi cùng `MATCHING`).
 - [x] `AttemptAnswer`: map cột `text_answer`.
-- [ ] `AttemptAnswerOption`: map `question_set_option_id`. Hiện entity chỉ có
+- [x] `AttemptAnswerOption`: map `question_set_option_id`. Hiện entity chỉ có
   `questionOptionId`, trong khi CHECK ở V021 yêu cầu đúng một trong hai cột có giá trị.
 - [ ] Map `questions.metadata` nếu giới hạn số từ để ở đó.
 
@@ -122,7 +121,8 @@ chưa map. Những việc còn phải làm ở DB:
   - Viết entity test cho từng quy tắc, theo `CONTRIBUTING.md` mục *Tests*.
   - Đã làm cho `SINGLE_CHOICE`, `MULTIPLE_CHOICE` (chấm từng phần) và `TEXT_ENTRY`, trong
     `exam/helper/AnswerKey` kèm `AnswerKeyTest`. Đặt ở `helper/` chứ không ở một entity,
-    vì luật cần cả câu hỏi, các option và các đáp án được chấp nhận. Matching chưa làm.
+    vì luật cần cả câu hỏi, các option và các đáp án được chấp nhận. `MATCHING` chấm như
+    chọn một đáp án, trên danh sách chung của nhóm câu.
 - [x] `ExamGradingQuery.GradingQuestion` hiện chỉ mang `options`. Thêm accepted answers
   và đáp án matching.
 - [x] **Quy đổi band.**
@@ -152,9 +152,10 @@ chưa map. Những việc còn phải làm ở DB:
 
 ### 2.4 Soạn, sửa và copy nội dung
 
-- [ ] `UpdateExamContentRequest` và `SaveAuthoringRequest`: thêm accepted answers, bộ
+- [x] `UpdateExamContentRequest` và `SaveAuthoringRequest`: thêm accepted answers, bộ
   lựa chọn chung và đáp án matching.
-  - Đã làm accepted answers. Bộ lựa chọn chung và đáp án matching chưa làm.
+  - Đã làm. Nhóm câu có `setOptions` (nhãn, nội dung); câu matching ghi `matchingLabels`
+    theo nhãn, vì id được tạo lại mỗi lần lưu.
 - [x] `ExamContentServiceImpl.deleteContent` (dòng 130–135) xoá rồi lưu lại toàn bộ nội
   dung đề. Mọi khoá ngoại đều là `on delete restrict`, nên phải xoá
   `question_matching_answers`, `question_accepted_answers` và `question_set_options`

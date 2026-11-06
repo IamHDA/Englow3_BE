@@ -51,11 +51,19 @@ public record LearnerExamPaperResponse(UUID id, String title, String description
     public record QuestionSetResponse(UUID id, @Schema(nullable = true) String title,
             @Schema(nullable = true) String instruction, int orderNo, @Schema(nullable = true) String content,
             @Schema(nullable = true) String audioUrl, @Schema(nullable = true) String imageUrl,
-            List<QuestionResponse> questions) {
+            List<QuestionResponse> questions,
+            @Schema(description = "The list this set's MATCHING questions choose from; empty when it has none") List<SetOptionResponse> setOptions) {
         static QuestionSetResponse from(LearnerExamPaperResult.QuestionSetResult result) {
             return new QuestionSetResponse(result.id(), result.title(), result.instruction(), result.orderNo(),
                     result.content(), result.audioUrl(), result.imageUrl(),
-                    result.questions().stream().map(QuestionResponse::from).toList());
+                    result.questions().stream().map(QuestionResponse::from).toList(),
+                    result.setOptions().stream().map(SetOptionResponse::from).toList());
+        }
+    }
+
+    public record SetOptionResponse(UUID id, String label, @Schema(nullable = true) String content, int orderNo) {
+        static SetOptionResponse from(LearnerExamPaperResult.SetOptionResult result) {
+            return new SetOptionResponse(result.id(), result.label(), result.content(), result.orderNo());
         }
     }
 

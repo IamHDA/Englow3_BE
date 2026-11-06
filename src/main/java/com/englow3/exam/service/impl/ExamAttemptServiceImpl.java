@@ -346,8 +346,11 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             AttemptAnswer answer = AttemptAnswer.graded(attempt.getId(), question.id(), text, grade.correct(),
                     grade.awarded(), now);
             storedAnswers.add(answer);
+            boolean fromSet = question.questionType() == QuestionType.MATCHING;
             submitted.selectedOptionIds()
-                    .forEach(optionId -> storedOptions.add(AttemptAnswerOption.selected(answer.getId(), optionId)));
+                    .forEach(optionId -> storedOptions
+                            .add(fromSet ? AttemptAnswerOption.selectedFromSet(answer.getId(), optionId)
+                                    : AttemptAnswerOption.selected(answer.getId(), optionId)));
         }
 
         answerRepo.saveAll(storedAnswers);
@@ -566,7 +569,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                 questionSet.instruction(), questionSet.orderNo(), questionSet.content(),
                 presignedUrls.resolve(examBucket, questionSet.audioObjectKey(), mediaUrlTtl),
                 presignedUrls.resolve(examBucket, questionSet.imageObjectKey(), mediaUrlTtl),
-                questionSet.questions().stream().map(question -> toQuestion(question, extra)).toList());
+                questionSet.questions().stream().map(question -> toQuestion(question, extra)).toList(),
+                questionSet.setOptions().stream().map(entry -> new LearnerExamPaperResult.SetOptionResult(entry.id(),
+                        entry.label(), entry.content(), entry.orderNo())).toList());
     }
 
     private LearnerExamPaperResult.QuestionResult toQuestion(Question question, PaperNumbers extra) {
@@ -632,7 +637,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             for (AttemptAnswerOption option : selectedOptions) {
                 UUID answerId = option.getAttemptAnswerId();
                 optionsByAnswer.computeIfAbsent(answerQuestionIds.get(answerId), ignored -> new ArrayList<>())
-                        .add(option.getQuestionOptionId());
+                        .add(option.chosenId());
             }
         }
 
