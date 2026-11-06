@@ -80,6 +80,18 @@ public class AssessmentAuthoringController {
         return ResponseEntity.ok(AssessmentTaskResponse.from(service.edit(id, command(r), version)));
     }
 
+    /** Writing Task 1's chart: PNG or JPEG, checked by its bytes. Replaces any earlier chart. */
+    @PostMapping(path = "/tasks/{id}/image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AssessmentTaskResponse> attachImage(@PathVariable UUID id,
+            @org.springframework.web.bind.annotation.RequestPart("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(AssessmentTaskResponse.from(service.attachImage(id, file)));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/tasks/{id}/image")
+    public ResponseEntity<AssessmentTaskResponse> removeImage(@PathVariable UUID id) {
+        return ResponseEntity.ok(AssessmentTaskResponse.from(service.removeImage(id)));
+    }
+
     @PostMapping("/tasks/{id}/submit")
     public ResponseEntity<AssessmentTaskResponse> submit(@PathVariable UUID id) {
         return ResponseEntity.ok(AssessmentTaskResponse.from(service.transition(id, "submit", null)));

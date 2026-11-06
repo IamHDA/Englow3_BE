@@ -33,6 +33,8 @@ public class AssessmentTask {
     private String rubricNotes;
     @Column(columnDefinition = "text")
     private String sampleAnswer;
+    /** Writing Task 1 only: the chart the learner describes, as a key in the learning bucket. */
+    private String imageObjectKey;
     private int minimumWords;
     private int timeLimitSeconds;
     /** CEFR band the task is pitched at; null for a task meant for any level. */
@@ -116,6 +118,31 @@ public class AssessmentTask {
         targetLevel = c.targetLevel();
         purpose = nextPurpose;
         certificateType = c.certificateType();
+    }
+
+    /**
+     * The chart a Writing Task 1 describes. Only that task has one - a Task 2 essay or a spoken part describing a
+     * picture would be a different exercise - and only while the task can still be edited, since a published task is
+     * what attempts were snapshotted from.
+     */
+    public void attachImage(String objectKey) {
+        requireImageable();
+        this.imageObjectKey = objectKey;
+    }
+
+    public void removeImage() {
+        requireImageable();
+        this.imageObjectKey = null;
+    }
+
+    /** Whether a chart may be attached now; changes nothing. */
+    public void requireImageable() {
+        if (status != AssessmentTaskStatus.DRAFT && status != AssessmentTaskStatus.REJECTED) {
+            throw new ConflictException("TASK_NOT_EDITABLE", "Only draft or rejected tasks can be edited");
+        }
+        if (skill != AssessmentSkill.WRITING || !"TASK_1".equals(taskType)) {
+            throw new BadRequestException("TASK_IMAGE_NOT_ALLOWED", "Only a Writing Task 1 has a chart");
+        }
     }
 
     public void submit() {

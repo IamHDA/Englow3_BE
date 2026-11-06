@@ -296,6 +296,10 @@ exercise and retain their existing percentage scores.
   roadmap's level check and stays out of the learner catalogue.
   `assessment.api.SpeakingLevelReader` turns a graded answer's four-criterion mean
   into a CEFR band using the conversion in force when it was graded.
+- **Task 1 charts:** a Writing Task 1 may carry a chart (`image_object_key`, V084) in
+  the learning bucket, uploaded by its author while it is editable. `helper.TaskImages`
+  checks the bytes, stores it, and signs a fresh URL whenever a task is shown; a
+  snapshot keeps the key only. The figures the grader reads stay in `rubric_notes`.
 - **Full test:** `assessment.api.AssessmentBandReader` gives the exam module's IELTS
   full test an answer's band (the four-criterion mean), when it was submitted, and a
   task's skill, type, certificate and whether it is published. Plain values only.

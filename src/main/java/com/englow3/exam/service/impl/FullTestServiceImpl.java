@@ -114,8 +114,8 @@ public class FullTestServiceImpl implements FullTestService {
         return java.util.Arrays.stream(FullTest.Slot.values())
                 .map(slot -> assessments.task(test.taskId(slot))
                         .map(task -> new FullTest.TaskFacts(slot, true, task.skill(), task.taskType(),
-                                task.certificateType(), task.published()))
-                        .orElse(new FullTest.TaskFacts(slot, false, null, null, null, false)))
+                                task.certificateType(), task.published(), task.hasImage()))
+                        .orElse(new FullTest.TaskFacts(slot, false, null, null, null, false, false)))
                 .toList();
     }
 

@@ -59,6 +59,10 @@ class AssessmentServiceTest {
     @BeforeEach
     void setup() {
         service = new AssessmentServiceImpl(tasks, results, attempts, users, queue, new ObjectMapper(), storage, tx,
+                new com.englow3.assessment.helper.TaskImages(
+                        mock(com.englow3.shared.storage.PresignedUrlResolver.class),
+                        mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",
+                        java.time.Duration.ofHours(3)),
                 Clock.systemUTC(), new UserRateLimiter(Clock.systemUTC()));
         when(users.requireCurrentUserId()).thenReturn(user);
         when(tx.execute(any())).thenAnswer(

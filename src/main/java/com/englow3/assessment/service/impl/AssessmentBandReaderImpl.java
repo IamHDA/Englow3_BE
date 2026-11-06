@@ -45,8 +45,10 @@ public class AssessmentBandReaderImpl implements AssessmentBandReader {
     @Override
     @Transactional(readOnly = true)
     public Optional<Task> task(UUID taskId) {
-        return taskRepo.findById(taskId).map(task -> new Task(task.getId(), task.getSkill().name(), task.getTaskType(),
-                task.getCertificateType(), task.getStatus() == AssessmentTaskStatus.PUBLISHED));
+        return taskRepo.findById(taskId)
+                .map(task -> new Task(task.getId(), task.getSkill().name(), task.getTaskType(),
+                        task.getCertificateType(), task.getStatus() == AssessmentTaskStatus.PUBLISHED,
+                        task.getImageObjectKey() != null));
     }
 
     private Answer answerOf(AssessmentAttempt attempt) {

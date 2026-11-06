@@ -49,6 +49,7 @@ public class AssessmentServiceImpl implements AssessmentService {
     private final ObjectMapper mapper;
     private final ObjectStorageClient storage;
     private final TransactionTemplate transactionTemplate;
+    private final com.englow3.assessment.helper.TaskImages images;
     private final Clock clock;
     private final UserRateLimiter rateLimiter;
 
@@ -71,11 +72,11 @@ public class AssessmentServiceImpl implements AssessmentService {
     public Page<AssessmentTaskResult> catalog(AssessmentSkill skill, Pageable page) {
         return transactionTemplate.execute(
                 tx -> taskRepo.search(skill, AssessmentTaskStatus.PUBLISHED, null, AssessmentTaskPurpose.PRACTICE, page)
-                        .map(t -> AssessmentTaskResult.from(t, false)));
+                        .map(t -> signedFrom(t, false)));
     }
 
     public AssessmentTaskResult task(UUID id) {
-        return transactionTemplate.execute(tx -> AssessmentTaskResult.from(publishedTask(id), false));
+        return transactionTemplate.execute(tx -> signedFrom(publishedTask(id), false));
     }
 
     public AssessmentUploadResult start(UUID taskId, UUID clientKey, String contentType, Long contentLength) {
@@ -313,5 +314,10 @@ public class AssessmentServiceImpl implements AssessmentService {
         } catch (Exception e) {
             throw new IllegalStateException("Cannot serialize assessment");
         }
+    }
+
+    /** A task as a screen shows it, its chart signed. Not for snapshots: those keep the key only. */
+    private AssessmentTaskResult signedFrom(com.englow3.assessment.entity.AssessmentTask task, boolean authoring) {
+        return images.signed(AssessmentTaskResult.from(task, authoring));
     }
 }

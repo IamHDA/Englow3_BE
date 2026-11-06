@@ -57,6 +57,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final com.englow3.assessment.helper.TaskImages images;
     private final ApplicationEventPublisher events;
 
     public AssessmentWorkloadResult workload() {
@@ -65,19 +66,19 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
 
     public Page<AssessmentTaskResult> tasks(AssessmentSkill skill, AssessmentTaskStatus status, Pageable page) {
         UUID author = currentUser.hasRole("ADMIN") ? null : users.requireCurrentUserId();
-        return transactionTemplate.execute(
-                tx -> taskRepo.search(skill, status, author, null, page).map(t -> AssessmentTaskResult.from(t, true)));
+        return transactionTemplate
+                .execute(tx -> taskRepo.search(skill, status, author, null, page).map(t -> signedFrom(t, true)));
     }
 
     public AssessmentTaskResult create(AssessmentTaskCommand c) {
         UUID author = users.requireCurrentUserId();
         return transactionTemplate
-                .execute(tx -> AssessmentTaskResult.from(taskRepo.saveAndFlush(AssessmentTask.draft(c, author)), true));
+                .execute(tx -> signedFrom(taskRepo.saveAndFlush(AssessmentTask.draft(c, author)), true));
     }
 
     public AssessmentTaskResult taskDetail(UUID id) {
         UUID author = users.requireCurrentUserId();
-        return transactionTemplate.execute(tx -> AssessmentTaskResult.from(task(id, author), true));
+        return transactionTemplate.execute(tx -> signedFrom(task(id, author), true));
     }
 
     public List<AssessmentReviewResult> reviews(UUID id) {
@@ -103,7 +104,31 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
                 throw new ConflictException("TASK_CHANGED", "The task changed. Reload before editing");
             }
             task.edit(c);
-            return AssessmentTaskResult.from(taskRepo.saveAndFlush(task), true);
+            return signedFrom(taskRepo.saveAndFlush(task), true);
+        });
+    }
+
+    /**
+     * Checked before the upload, so a task that cannot take a chart costs no storage, and again when attaching, in case
+     * it changed meanwhile. The upload itself runs outside any transaction.
+     */
+    public AssessmentTaskResult attachImage(UUID id, org.springframework.web.multipart.MultipartFile image) {
+        UUID author = users.requireCurrentUserId();
+        transactionTemplate.executeWithoutResult(tx -> task(id, author).requireImageable());
+        String key = images.upload(id, image);
+        return transactionTemplate.execute(tx -> {
+            AssessmentTask task = task(id, author);
+            task.attachImage(key);
+            return signedFrom(taskRepo.saveAndFlush(task), true);
+        });
+    }
+
+    public AssessmentTaskResult removeImage(UUID id) {
+        UUID author = users.requireCurrentUserId();
+        return transactionTemplate.execute(tx -> {
+            AssessmentTask task = task(id, author);
+            task.removeImage();
+            return signedFrom(taskRepo.saveAndFlush(task), true);
         });
     }
 
@@ -131,7 +156,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
                 }
                 default -> throw new BadRequestException("TASK_ACTION_INVALID", "Unknown task action");
             }
-            return AssessmentTaskResult.from(taskRepo.saveAndFlush(task), true);
+            return signedFrom(taskRepo.saveAndFlush(task), true);
         });
     }
 
@@ -211,5 +236,10 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
         if (!currentUser.hasRole("ADMIN")) {
             throw new ForbiddenException("ADMIN_REQUIRED", "Only administrators can review or archive tasks");
         }
+    }
+
+    /** A task as a screen shows it, its chart signed. Not for snapshots: those keep the key only. */
+    private AssessmentTaskResult signedFrom(com.englow3.assessment.entity.AssessmentTask task, boolean authoring) {
+        return images.signed(AssessmentTaskResult.from(task, authoring));
     }
 }

@@ -31,6 +31,11 @@ public interface AssessmentAuthoringService {
 
     AssessmentTaskResult transition(UUID id, String action, String note);
 
+    /** Writing Task 1 only: stores the chart and attaches it, replacing any earlier one. */
+    AssessmentTaskResult attachImage(UUID id, org.springframework.web.multipart.MultipartFile image);
+
+    AssessmentTaskResult removeImage(UUID id);
+
     Page<AssessmentAttemptResult> submissions(AssessmentAttemptStatus status, Pageable page);
 
     Page<AssessmentSubmissionSummary> searchSubmissions(AssessmentAttemptStatus status, AssessmentSkill skill,

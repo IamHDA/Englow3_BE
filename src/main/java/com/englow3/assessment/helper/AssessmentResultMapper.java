@@ -21,6 +21,7 @@ public class AssessmentResultMapper {
     private final ObjectMapper mapper;
     private final ObjectStorageClient storage;
     private final CurrentUser currentUser;
+    private final TaskImages images;
     @Value("${app.storage.speaking-bucket:speaking}")
     private String bucket;
 
@@ -38,6 +39,7 @@ public class AssessmentResultMapper {
         if (!backOffice && a.getStatus() != AssessmentAttemptStatus.COMPLETED) {
             snapshot = snapshot.hideSolution();
         }
+        snapshot = images.signed(snapshot);
         // Staff and admins see every criterion band, including when they practise as a learner to test the flow.
         boolean fullScores = backOffice || currentUser.hasRole("STAFF") || currentUser.hasRole("ADMIN");
         String report = fullScores ? a.getReport() : AssessmentReportRedactor.forLearner(mapper, a.getReport());

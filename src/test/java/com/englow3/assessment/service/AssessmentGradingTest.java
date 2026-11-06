@@ -47,6 +47,9 @@ class AssessmentGradingTest {
     private final AssessmentAuthoringService service = new AssessmentAuthoringServiceImpl(taskRepo, attemptRepo,
             reviewRepo, mock(AssessmentWorkloadQuery.class), mock(AssessmentQueueQuery.class), users, currentUser,
             mock(AssessmentResultMapper.class), new ObjectMapper(), Clock.systemUTC(), tx,
+            new com.englow3.assessment.helper.TaskImages(mock(com.englow3.shared.storage.PresignedUrlResolver.class),
+                    mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",
+                    java.time.Duration.ofHours(3)),
             mock(org.springframework.context.ApplicationEventPublisher.class));
 
     /** Staff can sit any published task, their own included; marking that work would be grading themselves. */

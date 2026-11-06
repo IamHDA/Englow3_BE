@@ -96,10 +96,11 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
             UUID id = UUID.randomUUID();
             jdbc.sql("""
                     insert into assessment_tasks (id, skill, title, task_type, instructions, time_limit_seconds,
-                                                  status, created_by_user_id, certificate_type)
-                    values (:id, :skill, :title, :type, 'Answer the task', 1200, 'PUBLISHED', :author, 'IELTS')
+                                                  status, created_by_user_id, certificate_type, image_object_key)
+                    values (:id, :skill, :title, :type, 'Answer the task', 1200, 'PUBLISHED', :author, 'IELTS', :chart)
                     """).param("id", id).param("skill", task[0]).param("title", task[0] + " " + task[1])
-                    .param("type", task[1]).param("author", author).update();
+                    .param("type", task[1]).param("author", author)
+                    .param("chart", "TASK_1".equals(task[1]) ? "assessment-tasks/" + id + "/chart.png" : null).update();
             tasks.add(id);
         }
     }

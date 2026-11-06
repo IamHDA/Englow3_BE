@@ -41,6 +41,6 @@ public interface AssessmentBandReader {
      * @param certificateType
      *            IELTS, TOEIC or null for general English
      */
-    record Task(UUID id, String skill, String taskType, String certificateType, boolean published) {
+    record Task(UUID id, String skill, String taskType, String certificateType, boolean published, boolean hasImage) {
     }
 }

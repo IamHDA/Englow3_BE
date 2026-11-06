@@ -101,7 +101,7 @@ public final class AssessmentRubric {
                 """
                 + String.join(",", keys(skill))
                 + (skill == AssessmentSkill.WRITING
-                        ? " Evaluate task fulfillment, organization, vocabulary and grammar. Consider the task type and the actual word count; do not invent a fixed word-count penalty."
+                        ? " Evaluate task fulfillment, organization, vocabulary and grammar. Consider the task type and the actual word count; do not invent a fixed word-count penalty. For a TASK_1 that describes a chart, graph, table, map or process, the task's rubricNotes hold the data the picture shows: the learner saw the picture, you have its figures; judge the accuracy of the overview and the key features against them."
                         : " Evaluate fluency/coherence, vocabulary, grammar and pronunciation. Use BOTH the recognized transcript and acoustic speech evidence. Do not infer pronunciation from spelling, and do not mechanically convert a percentage into a band. When recording.segmented is true, acoustic scores are duration-weighted segment estimates; they do not measure pauses between segments or a continuous interview. When recording.estimated is true, pronunciation comes from speech-recognition confidence and fluency from speaking rate and pauses, not from phoneme scoring: treat them as indicative and lean on the transcript for vocabulary and grammar. Explain these evidence limits in the summary.");
     }
 }

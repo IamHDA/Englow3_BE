@@ -32,7 +32,11 @@ class AssessmentResultMapperTest {
     private String reportSeenBy(String role, boolean backOffice) {
         CurrentUser user = mock(CurrentUser.class);
         when(user.hasRole(role == null ? "NONE" : role)).thenReturn(true);
-        var mapper = new AssessmentResultMapper(new ObjectMapper(), mock(ObjectStorageClient.class), user);
+        var mapper = new AssessmentResultMapper(new ObjectMapper(), mock(ObjectStorageClient.class), user,
+                new com.englow3.assessment.helper.TaskImages(
+                        mock(com.englow3.shared.storage.PresignedUrlResolver.class),
+                        mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",
+                        java.time.Duration.ofHours(3)));
         AssessmentAttempt attempt = AssessmentAttempt.draft(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), AssessmentSkill.WRITING, TASK, null, null, null);
         ReflectionTestUtils.setField(attempt, "report", REPORT);

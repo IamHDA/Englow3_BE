@@ -73,10 +73,12 @@ chưa map. Những việc còn phải làm ở DB:
   `certificate_variant` và `section_type` cho phép NULL, mà Postgres coi các NULL là
   khác nhau, nên dòng trùng không bị chặn. DB chạy pg17, nên đổi được sang
   `unique nulls not distinct (...)` ngay trong migration ở trên.
-- [ ] **Writing Task 1 Academic:** `assessment_tasks` (V049, V075) chưa có cột ảnh.
+- [x] **Writing Task 1 Academic (V084):** `assessment_tasks` chưa có cột ảnh.
   - Thêm `image_object_key varchar(500)`.
   - Thêm `certificate_variant` nếu cần tách Academic với GT. Task 1 bên GT là viết thư,
     không có ảnh.
+  - Đã thêm cột ảnh. Không thêm `certificate_variant`: luật "Task 1 Academic phải có
+    biểu đồ" nằm ở full test, vì chính full test mới biết nó là Academic hay GT.
 - [x] **Full test (D-IELTS-10):** thêm 2 bảng (V082) trong `exam`, gồm định nghĩa full test và
   lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
   có một lượt đang mở cho mỗi full test. Lượt full test cũng phải lưu hạn nộp (lúc bắt
@@ -183,10 +185,14 @@ chưa map. Những việc còn phải làm ở DB:
 
 ### 2.6 Writing và Speaking (module `assessment`)
 
-- [ ] `AssessmentTask` đã hỗ trợ `TASK_1`/`TASK_2`, `PART_1`/`PART_2`/`PART_3` và
+- [x] `AssessmentTask` đã hỗ trợ `TASK_1`/`TASK_2`, `PART_1`/`PART_2`/`PART_3` và
   `certificateType = IELTS`. Còn phải:
   - map cột ảnh cho Task 1 Academic (sau migration ở mục 1);
   - xử lý D-IELTS-9 trong `AssessmentRubric`.
+  - Đã làm: admin tải ảnh qua `POST /api/admin/assessments/tasks/{id}/image` (PNG/JPEG,
+    kiểm tra theo nội dung file) và xoá qua `DELETE`. Chỉ Writing Task 1 còn sửa được
+    mới gắn được ảnh. Link ảnh được ký mới mỗi lần trả task, snapshot chỉ giữ key. Prompt
+    chấm Writing dặn AI đối chiếu bài Task 1 với số liệu trong `rubricNotes`.
 
 ### 2.7 Full test (D-IELTS-10, module `exam`)
 

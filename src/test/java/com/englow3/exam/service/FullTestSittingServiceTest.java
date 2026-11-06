@@ -81,7 +81,8 @@ class FullTestSittingServiceTest {
     }
 
     private static List<FullTest.TaskFacts> facts() {
-        return List.of(new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_1, true, "WRITING", "TASK_1", "IELTS", true),
+        return List.of(
+                new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_1, true, "WRITING", "TASK_1", "IELTS", true, true),
                 new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_2, true, "WRITING", "TASK_2", "IELTS", true),
                 new FullTest.TaskFacts(FullTest.Slot.SPEAKING_PART_1, true, "SPEAKING", "PART_1", "IELTS", true),
                 new FullTest.TaskFacts(FullTest.Slot.SPEAKING_PART_2, true, "SPEAKING", "PART_2", "IELTS", true),

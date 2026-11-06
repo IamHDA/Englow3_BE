@@ -9,17 +9,30 @@ import com.englow3.assessment.entity.AssessmentTaskStatus;
 
 public record AssessmentTaskResult(UUID id, AssessmentSkill skill, String title, String taskType, String instructions,
         String rubricNotes, String sampleAnswer, int minimumWords, int timeLimitSeconds, AssessmentTaskStatus status,
-        String reviewNote, long version, String targetLevel, AssessmentTaskPurpose purpose, String certificateType) {
+        String reviewNote, long version, String targetLevel, AssessmentTaskPurpose purpose, String certificateType,
+        String imageObjectKey, String imageUrl) {
+
+    /**
+     * The key is what a snapshot keeps; the URL is signed fresh each time the task is shown, so an attempt's copy never
+     * holds a link that has expired.
+     */
+    public AssessmentTaskResult withImageUrl(String url) {
+        return new AssessmentTaskResult(id, skill, title, taskType, instructions, rubricNotes, sampleAnswer,
+                minimumWords, timeLimitSeconds, status, reviewNote, version, targetLevel, purpose, certificateType,
+                imageObjectKey, url);
+    }
+
     public static AssessmentTaskResult from(AssessmentTask task, boolean authoring) {
         return new AssessmentTaskResult(task.getId(), task.getSkill(), task.getTitle(), task.getTaskType(),
                 task.getInstructions(), authoring ? task.getRubricNotes() : null,
                 authoring ? task.getSampleAnswer() : null, task.getMinimumWords(), task.getTimeLimitSeconds(),
                 task.getStatus(), authoring ? task.getReviewNote() : null, task.getVersion(), task.getTargetLevel(),
-                task.getPurpose(), task.getCertificateType());
+                task.getPurpose(), task.getCertificateType(), task.getImageObjectKey(), null);
     }
 
     public AssessmentTaskResult hideSolution() {
         return new AssessmentTaskResult(id, skill, title, taskType, instructions, null, null, minimumWords,
-                timeLimitSeconds, status, null, version, targetLevel, purpose, certificateType);
+                timeLimitSeconds, status, null, version, targetLevel, purpose, certificateType, imageObjectKey,
+                imageUrl);
     }
 }

@@ -49,7 +49,12 @@ public class FullTest extends BasePersistedEntity {
 
     /** What the service found for one task; null fields when the task does not exist. */
     public record TaskFacts(Slot slot, boolean exists, String skill, String taskType, String certificateType,
-            boolean published) {
+            boolean published, boolean hasImage) {
+
+        public TaskFacts(Slot slot, boolean exists, String skill, String taskType, String certificateType,
+                boolean published) {
+            this(slot, exists, skill, taskType, certificateType, published, false);
+        }
     }
 
     @Column(nullable = false)
@@ -222,6 +227,11 @@ public class FullTest extends BasePersistedEntity {
                     || !slot.taskType.equals(task.taskType()) || !"IELTS".equals(task.certificateType())) {
                 throw new ConflictException("FULL_TEST_TASK_INVALID",
                         "%s must be a published IELTS %s %s task".formatted(slot, slot.skill, slot.taskType));
+            }
+            // Academic Task 1 describes a chart; General Training Task 1 is a letter and has none.
+            if (slot == Slot.WRITING_TASK_1 && certificateVariant == CertificateVariant.ACADEMIC && !task.hasImage()) {
+                throw new ConflictException("FULL_TEST_TASK1_NEEDS_CHART",
+                        "An Academic full test's Writing Task 1 must have its chart");
             }
         }
     }

@@ -40,7 +40,7 @@ class FullTestTest {
     }
 
     private static FullTest.TaskFacts task(FullTest.Slot slot, String skill, String type) {
-        return new FullTest.TaskFacts(slot, true, skill, type, "IELTS", true);
+        return new FullTest.TaskFacts(slot, true, skill, type, "IELTS", true, slot == FullTest.Slot.WRITING_TASK_1);
     }
 
     private static String code(Throwable error) {
@@ -166,5 +166,29 @@ class FullTestTest {
 
         assertThatThrownBy(() -> test.update("x", "", CertificateVariant.ACADEMIC, test.getExamId(), fiveTasks()))
                 .extracting(FullTestTest::code).isEqualTo("FULL_TEST_NOT_EDITABLE");
+    }
+
+    @Test
+    void anAcademicTestsTaskOneMustHaveItsChart() {
+        List<FullTest.TaskFacts> tasks = new ArrayList<>(goodTasks());
+        tasks.set(0,
+                new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_1, true, "WRITING", "TASK_1", "IELTS", true, false));
+
+        assertThatThrownBy(() -> draft().submitForReview(goodPaper(), tasks, NOW)).extracting(FullTestTest::code)
+                .isEqualTo("FULL_TEST_TASK1_NEEDS_CHART");
+    }
+
+    @Test
+    void aGeneralTrainingTaskOneIsALetterWithoutAChart() {
+        FullTest general = FullTest.draft("IELTS General 1", "", CertificateVariant.GENERAL, UUID.randomUUID(),
+                fiveTasks(), UUID.randomUUID());
+        List<FullTest.TaskFacts> tasks = new ArrayList<>(goodTasks());
+        tasks.set(0,
+                new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_1, true, "WRITING", "TASK_1", "IELTS", true, false));
+
+        general.submitForReview(new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
+                CertificateVariant.GENERAL, true, true), tasks, NOW);
+
+        assertThat(general.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
     }
 }
