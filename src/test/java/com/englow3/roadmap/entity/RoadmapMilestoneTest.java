@@ -70,4 +70,61 @@ class RoadmapMilestoneTest {
         milestone.recordLevelCheck(UUID.randomUUID(), CefrLevel.C1, NOW);
         assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.PASSED);
     }
+
+    /** An IELTS mock milestone is a full test, passed on its overall band (D-IELTS-6). */
+    @org.junit.jupiter.api.Nested
+    class FullTest {
+
+        private final UUID fullTest = UUID.randomUUID();
+
+        private RoadmapMilestone milestone() {
+            return RoadmapMilestone.mockFullTest(UUID.randomUUID(), UUID.randomUUID(), fullTest, new BigDecimal("6.5"));
+        }
+
+        @Test
+        void passesWhenTheOverallBandReachesTheRequiredScore() {
+            RoadmapMilestone milestone = milestone();
+            milestone.recordFullTestSitting(UUID.randomUUID(), fullTest, new BigDecimal("6.0"), NOW);
+            assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.FAILED);
+
+            milestone.recordFullTestSitting(UUID.randomUUID(), fullTest, new BigDecimal("6.5"), NOW);
+            assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.PASSED);
+            assertThat(milestone.getResultScore()).isEqualByComparingTo("6.5");
+        }
+
+        @Test
+        void takesEachSittingOnce() {
+            RoadmapMilestone milestone = milestone();
+            UUID sitting = UUID.randomUUID();
+            milestone.recordFullTestSitting(sitting, fullTest, new BigDecimal("6.0"), NOW);
+
+            assertThatThrownBy(() -> milestone.recordFullTestSitting(sitting, fullTest, new BigDecimal("6.0"), NOW))
+                    .hasMessageContaining("already recorded");
+        }
+
+        @Test
+        void refusesAnotherFullTest() {
+            assertThatThrownBy(() -> milestone().recordFullTestSitting(UUID.randomUUID(), UUID.randomUUID(),
+                    new BigDecimal("7.0"), NOW)).hasMessageContaining("different full test");
+        }
+
+        @Test
+        void refusesASittingWithoutAnOverallBand() {
+            assertThatThrownBy(() -> milestone().recordFullTestSitting(UUID.randomUUID(), fullTest, null, NOW))
+                    .hasMessageContaining("completed full test");
+        }
+
+        @Test
+        void isNotPassedByAPaperOnItsOwn() {
+            assertThatThrownBy(() -> milestone().recordMockSitting(UUID.randomUUID(), UUID.randomUUID(), true, true,
+                    new BigDecimal("9.0"), NOW)).hasMessageContaining("passed by a full test");
+        }
+
+        @Test
+        void aPaperMilestoneIsNotPassedByAFullTest() {
+            assertThatThrownBy(
+                    () -> mock().recordFullTestSitting(UUID.randomUUID(), fullTest, new BigDecimal("9.0"), NOW))
+                            .hasMessageContaining("passed by a paper");
+        }
+    }
 }

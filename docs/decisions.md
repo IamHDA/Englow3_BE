@@ -264,6 +264,10 @@ phải đổi.
 - Đề L+R làm riêng, ngoài full test, chỉ để luyện tập: hiện band từng kỹ năng, không
   ra band tổng.
 - Mốc thi thử trên roadmap chỉ tính band chính thức của full test.
+  - Đã làm (V083): với mục tiêu IELTS, roadmap chỉ đưa full test vào danh sách mốc thi
+    thử. Hệ quả: **chưa có full test nào được xuất bản thì không tạo được roadmap IELTS**
+    (báo "There is not enough published content to plan this goal yet"). Mốc TOEIC vẫn
+    dùng đề như cũ.
 
 **Lý do:**
 - Đề L+R thiếu hai kỹ năng thường kéo band tổng xuống, nên trung bình L+R dễ làm học

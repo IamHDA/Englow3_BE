@@ -81,7 +81,8 @@ public class RoadmapTodayReaderImpl implements RoadmapTodayReader {
         TodayMilestone milestone = !requiredDone ? null
                 : milestoneRepo.findByStageId(stage.getId())
                         .filter(found -> found.getStatus() != MilestoneStatus.PASSED)
-                        .map(found -> new TodayMilestone(found.getId(), found.getKind().name(), found.getExamId()))
+                        .map(found -> new TodayMilestone(found.getId(), found.getKind().name(), found.getExamId(),
+                                found.getFullTestId()))
                         .orElse(null);
         return Optional.of(new TodayPlan(roadmap.get().getId(), stage.getTitle(), stage.getOrderNo(), due, milestone));
     }

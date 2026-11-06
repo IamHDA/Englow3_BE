@@ -44,6 +44,13 @@ public class RoadmapResultSyncImpl implements RoadmapResultSync {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void fullTestCompleted(UUID userId) {
+        roadmapRepo.findOpen(userId).filter(roadmap -> roadmap.getStatus() == RoadmapStatus.ACTIVE)
+                .ifPresent(progression::recordLatestMockSitting);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void speakingAnswerGraded(UUID userId, UUID taskId) {
         checkRepo.findByUserIdAndSpeakingTaskIdAndStatusNot(userId, taskId, LevelCheckStatus.COMPLETED)
                 .forEach(check -> refreshLocked(check.getId()));

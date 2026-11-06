@@ -31,6 +31,9 @@ public interface FullTestSittingRepository extends JpaRepository<FullTestSitting
 
     List<FullTestSitting> findByUserIdOrderByStartedAtDesc(UUID userId);
 
+    Optional<FullTestSitting> findFirstByUserIdAndFullTestIdAndStatusAndCompletedAtGreaterThanEqualOrderByCompletedAtDesc(
+            UUID userId, UUID fullTestId, FullTestSittingStatus status, Instant since);
+
     /** Sittings the sweep should look at again: past their deadline, or waiting on a grade. */
     @Query("""
             select s from FullTestSitting s

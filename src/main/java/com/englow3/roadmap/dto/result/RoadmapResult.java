@@ -46,9 +46,13 @@ public record RoadmapResult(UUID id, RoadmapStatus status, RoadmapGoalType goalT
      * @param ready
      *            every required item of the stage is done, so the milestone is the next thing to do
      */
+    /**
+     * @param fullTestId
+     *            set instead of {@code examId} on an IELTS mock milestone
+     */
     public record Milestone(UUID id, MilestoneKind kind, UUID examId, BigDecimal requiredScore, CefrLevel requiredLevel,
             MilestoneStatus status, BigDecimal resultScore, CefrLevel resultLevel, int attemptCount, Instant achievedAt,
-            boolean ready) {
+            boolean ready, UUID fullTestId) {
     }
 
     public record Adjustment(AdjustmentReason reason, Instant createdAt) {

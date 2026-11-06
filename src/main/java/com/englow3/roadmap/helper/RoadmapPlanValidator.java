@@ -172,7 +172,7 @@ public final class RoadmapPlanValidator {
         if (score.compareTo(lastScore) < 0) {
             throw invalid("stage %d milestone asks for less than the stage before".formatted(position));
         }
-        return new ProposedMilestone(examId, score, null);
+        return new ProposedMilestone(examId, score, null, papers.get(examId).fullTest());
     }
 
     static BigDecimal scoreCeiling(String certificate) {

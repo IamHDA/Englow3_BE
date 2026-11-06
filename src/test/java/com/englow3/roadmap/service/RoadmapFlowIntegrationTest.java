@@ -170,31 +170,32 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aFailedMockAsksForAReplanAndAPassMovesToTheNextStage() throws Exception {
-        profile("B1", "IELTS", new BigDecimal("6.5"), null);
+        // A TOEIC goal: its milestones are papers. An IELTS goal's are full tests (IeltsFullTestIntegrationTest).
+        profile("B1", "TOEIC", new BigDecimal("650"), null);
         purpose("CERTIFICATE");
-        UUID mock = new ExamFixture(jdbc).publishedExam("IELTS mock " + learner, learner);
-        jdbc.sql("update exams set certificate_type = 'IELTS' where id = :id").param("id", mock).update();
+        UUID mock = new ExamFixture(jdbc).publishedExam("TOEIC mock " + learner, learner);
+        jdbc.sql("update exams set certificate_type = 'TOEIC' where id = :id").param("id", mock).update();
         RoadmapResult requested = roadmapService.create();
         LocalDate today = calendar.today();
         answerWith("""
                 {"stages": [
                   {"fromLevel": "B1", "toLevel": "B2", "plannedStart": "%s", "plannedEnd": "%s",
                    "items": [{"kind": "QUIZ", "contentId": "%s", "plannedWeek": 1}],
-                   "milestone": {"examId": "%s", "requiredScore": 5.5}},
+                   "milestone": {"examId": "%s", "requiredScore": 550}},
                   {"fromLevel": "B2", "toLevel": "B2", "plannedStart": "%s", "plannedEnd": "%s",
                    "items": [{"kind": "QUIZ", "contentId": "%s", "plannedWeek": 1}],
-                   "milestone": {"examId": "%s", "requiredScore": 6.5}}]}
+                   "milestone": {"examId": "%s", "requiredScore": 650}}]}
                 """.formatted(today, today.plusWeeks(4), quiz, mock, today.plusWeeks(4).plusDays(1),
                 today.plusWeeks(10), quiz, mock));
         runJob(requested.id());
         UUID milestone = roadmapService.current().orElseThrow().stages().getFirst().milestone().id();
 
-        RoadmapResult afterFail = roadmapService.recordMockSitting(milestone, mockSitting(mock, "5.0"));
+        RoadmapResult afterFail = roadmapService.recordMockSitting(milestone, mockSitting(mock, "500"));
         assertThat(afterFail.stages().getFirst().milestone().status()).hasToString("FAILED");
         assertThat(afterFail.adjusting()).isTrue();
         assertThat(afterFail.pendingReason()).hasToString("MILESTONE_FAILED");
 
-        UUID passing = mockSitting(mock, "6.0");
+        UUID passing = mockSitting(mock, "600");
         // Practising a few parts of the paper is no milestone.
         events.publishEvent(new ExamSittingScored(passing, learner, mock, false));
         assertThat(stageStatuses(requested.id())).containsExactly("CURRENT", "LOCKED");
@@ -209,7 +210,7 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(afterPass.stages()).extracting(stage -> stage.status().name()).containsExactly("PASSED", "CURRENT");
         assertThat(afterPass.adjustments()).extracting(adjustment -> adjustment.reason().name())
                 .contains("MILESTONE_PASSED");
-        assertThatThrownBy(() -> roadmapService.recordMockSitting(milestone, mockSitting(mock, "7.0")))
+        assertThatThrownBy(() -> roadmapService.recordMockSitting(milestone, mockSitting(mock, "700")))
                 .hasFieldOrPropertyWithValue("code", "MILESTONE_NOT_CURRENT");
     }
 
@@ -218,10 +219,11 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         profile("A2", null, null, "B1");
         RoadmapResult first = roadmapService.create();
         purpose("CERTIFICATE");
-        jdbc.sql("update learner_profiles set target_level = null, target_certificate_type = 'IELTS', "
-                + "target_score = 6.0 where user_id = :id").param("id", learner).update();
-        UUID mock = new ExamFixture(jdbc).publishedExam("IELTS mock " + learner, learner);
-        jdbc.sql("update exams set certificate_type = 'IELTS' where id = :id").param("id", mock).update();
+        // TOEIC, whose mocks are papers; an IELTS plan would also need a published full test.
+        jdbc.sql("update learner_profiles set target_level = null, target_certificate_type = 'TOEIC', "
+                + "target_score = 650 where user_id = :id").param("id", learner).update();
+        UUID mock = new ExamFixture(jdbc).publishedExam("TOEIC mock " + learner, learner);
+        jdbc.sql("update exams set certificate_type = 'TOEIC' where id = :id").param("id", mock).update();
 
         RoadmapResult second = roadmapService.create();
 

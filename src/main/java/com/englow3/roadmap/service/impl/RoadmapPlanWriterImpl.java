@@ -80,11 +80,14 @@ public class RoadmapPlanWriterImpl implements RoadmapPlanWriter {
                         item.title(), item.skill(), item.required(), item.targetPercent(), item.plannedWeek(),
                         item.estimatedMinutes()));
             }
-            milestones.add(proposed.milestone().examId() != null
-                    ? RoadmapMilestone.mockExam(UUID.randomUUID(), stage.getId(), proposed.milestone().examId(),
+            milestones.add(proposed.milestone().fullTest()
+                    ? RoadmapMilestone.mockFullTest(UUID.randomUUID(), stage.getId(), proposed.milestone().examId(),
                             proposed.milestone().requiredScore())
-                    : RoadmapMilestone.levelCheck(UUID.randomUUID(), stage.getId(),
-                            proposed.milestone().requiredLevel()));
+                    : proposed.milestone().examId() != null
+                            ? RoadmapMilestone.mockExam(UUID.randomUUID(), stage.getId(), proposed.milestone().examId(),
+                                    proposed.milestone().requiredScore())
+                            : RoadmapMilestone.levelCheck(UUID.randomUUID(), stage.getId(),
+                                    proposed.milestone().requiredLevel()));
         }
         itemRepo.saveAll(items);
         milestoneRepo.saveAll(milestones);

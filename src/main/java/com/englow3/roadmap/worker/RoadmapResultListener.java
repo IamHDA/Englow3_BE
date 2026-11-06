@@ -42,6 +42,16 @@ public class RoadmapResultListener {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onFullTestCompleted(com.englow3.exam.api.FullTestCompleted event) {
+        try {
+            sync.fullTestCompleted(event.userId());
+        } catch (RuntimeException failure) {
+            log.warn("Roadmap did not take full test sitting {} yet; the sweep will retry: {}", event.sittingId(),
+                    failure.toString());
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onAnswerGraded(AssessmentAnswerGraded event) {
         if (!"SPEAKING".equals(event.skill())) {
             return;

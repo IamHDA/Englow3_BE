@@ -16,6 +16,9 @@ public interface RoadmapResultSync {
     /** A full sitting of {@code examId} was scored: level checks on that paper, and a mock milestone, may move on. */
     void examSittingScored(UUID userId, UUID examId);
 
+    /** An IELTS full test of the learner's has its overall band: an IELTS mock milestone may move on. */
+    void fullTestCompleted(UUID userId);
+
     /** A spoken answer to {@code taskId} was graded: level checks asking for that task may move on. */
     void speakingAnswerGraded(UUID userId, UUID taskId);
 

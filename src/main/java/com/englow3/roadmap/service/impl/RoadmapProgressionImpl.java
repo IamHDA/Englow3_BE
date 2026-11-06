@@ -42,6 +42,7 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
     private final RoadmapAdjustmentRepository adjustmentRepo;
     private final RoadmapPlanner planner;
     private final ScoredExamAttemptReader sittings;
+    private final com.englow3.exam.api.CompletedFullTestReader fullTests;
     private final Clock clock;
     private final StudyCalendar calendar;
 
@@ -114,6 +115,9 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
         if (milestone.isEmpty()) {
             return Optional.empty();
         }
+        if (milestone.get().isFullTest()) {
+            return recordLatestFullTest(roadmap, current.get(), milestone.get());
+        }
         var sitting = sittings.latestFullSitting(milestone.get().getExamId(), roadmap.getUserId(),
                 openedAt(current.get()));
         if (sitting.isEmpty() || sitting.get().attemptId().equals(milestone.get().getResultExamAttemptId())
@@ -126,6 +130,23 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
         }
         context.milestone().recordMockSitting(sitting.get().attemptId(), sitting.get().examId(), sitting.get().scored(),
                 sitting.get().full(), sitting.get().convertedScore(), clock.instant());
+        settle(context);
+        return Optional.of(context);
+    }
+
+    /** An IELTS mock milestone moves on when a sitting of its full test, taken since the stage opened, completes. */
+    private Optional<MilestoneContext> recordLatestFullTest(LearningRoadmap roadmap, RoadmapStage stage,
+            RoadmapMilestone milestone) {
+        var completed = fullTests.latestCompleted(milestone.getFullTestId(), roadmap.getUserId(), openedAt(stage));
+        if (completed.isEmpty() || completed.get().sittingId().equals(milestone.getResultFullTestSittingId())) {
+            return Optional.empty();
+        }
+        MilestoneContext context = locate(roadmap.getUserId(), milestone.getId());
+        if (completed.get().sittingId().equals(context.milestone().getResultFullTestSittingId())) {
+            return Optional.empty();
+        }
+        context.milestone().recordFullTestSitting(completed.get().sittingId(), completed.get().fullTestId(),
+                completed.get().overallBand(), clock.instant());
         settle(context);
         return Optional.of(context);
     }

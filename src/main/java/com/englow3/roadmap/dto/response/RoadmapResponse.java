@@ -48,7 +48,7 @@ public record RoadmapResponse(UUID id, RoadmapStatus status, RoadmapGoalType goa
                     m == null ? null
                             : new MilestoneResponse(m.id(), m.kind(), m.examId(), m.requiredScore(), m.requiredLevel(),
                                     m.status(), m.resultScore(), m.resultLevel(), m.attemptCount(), m.achievedAt(),
-                                    m.ready()));
+                                    m.ready(), m.fullTestId()));
         }
     }
 
@@ -64,9 +64,11 @@ public record RoadmapResponse(UUID id, RoadmapStatus status, RoadmapGoalType goa
      * @param ready
      *            every required item of the stage is done
      */
-    public record MilestoneResponse(UUID id, MilestoneKind kind, UUID examId, BigDecimal requiredScore,
+    public record MilestoneResponse(UUID id, MilestoneKind kind,
+            @io.swagger.v3.oas.annotations.media.Schema(nullable = true) UUID examId, BigDecimal requiredScore,
             CefrLevel requiredLevel, MilestoneStatus status, BigDecimal resultScore, CefrLevel resultLevel,
-            int attemptCount, Instant achievedAt, boolean ready) {
+            int attemptCount, Instant achievedAt, boolean ready,
+            @io.swagger.v3.oas.annotations.media.Schema(nullable = true, description = "Set instead of examId on an IELTS mock milestone: the full test to sit") UUID fullTestId) {
     }
 
     public record AdjustmentResponse(AdjustmentReason reason, Instant createdAt) {

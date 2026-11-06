@@ -20,8 +20,17 @@ public final class RoadmapPlan {
             int estimatedMinutes) {
     }
 
-    /** A published mock paper of the learner's certificate, for a milestone. */
-    public record MockPaper(UUID id, String title, String variant) {
+    /**
+     * A published mock of the learner's certificate, for a milestone: a paper, or for IELTS a full test of four skills.
+     *
+     * @param fullTest
+     *            {@code id} is a full test rather than a paper
+     */
+    public record MockPaper(UUID id, String title, String variant, boolean fullTest) {
+
+        public MockPaper(UUID id, String title, String variant) {
+            this(id, title, variant, false);
+        }
     }
 
     /**
@@ -44,7 +53,16 @@ public final class RoadmapPlan {
             int targetPercent, int plannedWeek, int estimatedMinutes) {
     }
 
-    public record ProposedMilestone(UUID examId, BigDecimal requiredScore, CefrLevel requiredLevel) {
+    /**
+     * @param fullTest
+     *            {@code examId} names a full test rather than a paper
+     */
+    public record ProposedMilestone(UUID examId, BigDecimal requiredScore, CefrLevel requiredLevel, boolean fullTest) {
+
+        public ProposedMilestone(UUID examId, BigDecimal requiredScore, CefrLevel requiredLevel) {
+            this(examId, requiredScore, requiredLevel, false);
+        }
+
     }
 
     public record ProposedStage(String title, String summary, CefrLevel fromLevel, CefrLevel toLevel,

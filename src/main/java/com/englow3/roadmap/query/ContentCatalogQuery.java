@@ -83,8 +83,21 @@ public class ContentCatalogQuery {
                 .list();
     }
 
-    /** Published mock papers of a certificate, newest first. */
+    /**
+     * Published mocks of a certificate, newest first. For IELTS these are full tests - a milestone is passed on the
+     * overall band, which a Listening + Reading paper alone cannot give (docs/decisions.md, D-IELTS-6) - read from the
+     * exam module's {@code full_tests} through this declared read-only join.
+     */
     public List<MockPaper> mockPapers(String certificate) {
+        if ("IELTS".equals(certificate)) {
+            return jdbc.sql("""
+                    select id, title, certificate_variant from full_tests
+                     where status = 'PUBLISHED'
+                     order by published_at desc nulls last
+                     limit 20
+                    """).query((rs, row) -> new MockPaper(rs.getObject("id", UUID.class), rs.getString("title"),
+                    rs.getString("certificate_variant"), true)).list();
+        }
         return jdbc.sql("""
                 select id, title, certificate_variant from exams
                  where status = 'PUBLISHED' and exam_type = 'MOCK' and certificate_type = :certificate

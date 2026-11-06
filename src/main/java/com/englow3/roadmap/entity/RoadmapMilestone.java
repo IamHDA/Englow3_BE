@@ -31,10 +31,15 @@ public class RoadmapMilestone extends BasePersistedEntity {
     @Enumerated(EnumType.STRING)
     private MilestoneKind kind;
     private UUID examId;
+    /**
+     * Instead of {@code examId} on an IELTS mock milestone: the exam module's full test, passed on its overall band.
+     */
+    private UUID fullTestId;
     private BigDecimal requiredScore;
     @Enumerated(EnumType.STRING)
     private CefrLevel requiredLevel;
     private UUID resultExamAttemptId;
+    private UUID resultFullTestSittingId;
     private UUID resultLevelCheckId;
     private BigDecimal resultScore;
     @Enumerated(EnumType.STRING)
@@ -57,6 +62,22 @@ public class RoadmapMilestone extends BasePersistedEntity {
         milestone.examId = examId;
         milestone.requiredScore = requiredScore;
         return milestone;
+    }
+
+    /** An IELTS mock milestone: a full test, passed when its overall band reaches {@code requiredScore}. */
+    public static RoadmapMilestone mockFullTest(UUID id, UUID stageId, UUID fullTestId, BigDecimal requiredScore) {
+        if (fullTestId == null || requiredScore == null || requiredScore.signum() <= 0) {
+            throw new BadRequestException("ROADMAP_MILESTONE_INVALID",
+                    "A mock milestone needs a full test and a score");
+        }
+        RoadmapMilestone milestone = base(id, stageId, MilestoneKind.CERTIFICATE_MOCK);
+        milestone.fullTestId = fullTestId;
+        milestone.requiredScore = requiredScore;
+        return milestone;
+    }
+
+    public boolean isFullTest() {
+        return fullTestId != null;
     }
 
     public static RoadmapMilestone levelCheck(UUID id, UUID stageId, CefrLevel requiredLevel) {
@@ -90,6 +111,10 @@ public class RoadmapMilestone extends BasePersistedEntity {
     public void recordMockSitting(UUID attemptId, UUID examId, boolean scored, boolean full, BigDecimal score,
             Instant now) {
         requireKind(MilestoneKind.CERTIFICATE_MOCK);
+        if (isFullTest()) {
+            throw new BadRequestException("MILESTONE_NEEDS_FULL_TEST",
+                    "This milestone is passed by a full test, not by a paper on its own");
+        }
         requireOpenFor(attemptId.equals(resultExamAttemptId));
         if (!this.examId.equals(examId)) {
             throw new BadRequestException("MILESTONE_WRONG_EXAM", "That sitting is of a different paper");
@@ -101,6 +126,29 @@ public class RoadmapMilestone extends BasePersistedEntity {
         resultExamAttemptId = attemptId;
         resultScore = score;
         settle(score.compareTo(requiredScore) >= 0, now);
+    }
+
+    /**
+     * A completed sitting of the milestone's full test.
+     *
+     * @param overallBand
+     *            null when the sitting has no overall band yet, which does not count
+     */
+    public void recordFullTestSitting(UUID sittingId, UUID fullTestId, BigDecimal overallBand, Instant now) {
+        requireKind(MilestoneKind.CERTIFICATE_MOCK);
+        if (!isFullTest()) {
+            throw new BadRequestException("MILESTONE_WRONG_EXAM", "This milestone is passed by a paper");
+        }
+        requireOpenFor(sittingId.equals(resultFullTestSittingId));
+        if (!this.fullTestId.equals(fullTestId)) {
+            throw new BadRequestException("MILESTONE_WRONG_EXAM", "That sitting is of a different full test");
+        }
+        if (overallBand == null) {
+            throw new BadRequestException("MILESTONE_RESULT_NOT_SCORED", "Only a completed full test counts");
+        }
+        resultFullTestSittingId = sittingId;
+        resultScore = overallBand;
+        settle(overallBand.compareTo(requiredScore) >= 0, now);
     }
 
     /** A completed level check. */

@@ -3,7 +3,7 @@ package com.englow3.roadmap.helper;
 /** The instructions the roadmap generator runs under. Bump {@link #VERSION} whenever the text changes. */
 public final class RoadmapPrompt {
 
-    public static final String VERSION = "roadmap-v1";
+    public static final String VERSION = "roadmap-v2";
 
     public static final String SYSTEM = """
             You plan an English learner's study roadmap. You receive JSON with:
@@ -34,6 +34,8 @@ public final class RoadmapPrompt {
             4. Every stage has one milestone. For a LEVEL goal use {} (a level check is used). For a CERTIFICATE goal
                pick an examId from mockPapers and a requiredScore on the certificate scale (IELTS 0-9 in half bands,
                TOEIC 10-990), never below minimumScore or the previous stage's, the last one at least targetScore.
+               For IELTS every entry of mockPapers is a four-skill full test passed on its overall band; still put its
+               id in examId.
             5. The estimated minutes of the items placed in any one week of a stage must not exceed dailyMinutes x 7.
                Each candidate carries its estimated minutes.
             Prefer content at the stage's levels, cover the learner's focus skills, mix kinds within a week, and mark

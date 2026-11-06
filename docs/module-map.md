@@ -95,7 +95,7 @@ answers, and section results.
     sitting per learner and full test is a partial unique index.
   - **Results out:** both bands reach the learner profile through
     `user.api.PlacementRecorder.recordIeltsBand`. `exam.api.FullTestCompleted` announces
-    a final band; the roadmap does not listen to it yet.
+    a final band, and `exam.api.CompletedFullTestReader` lets the roadmap read it.
   - **Why:** the full test must exist without a roadmap, and exam already owns mock
     papers and sittings. The grouping has no rules beyond combining bands, so a module
     of its own would only add wiring. `assessment` does not depend on `exam`, so the
@@ -198,9 +198,14 @@ of how the plan changed.
   check keeps the weights it used. The screen lists purposes through a declared
   read-only read of `learning_purposes`. The result is recorded on the
   learner profile through `user.api.PlacementRecorder`.
+- **IELTS mock milestones:** an IELTS roadmap's mocks are the exam module's full
+  tests, passed on the overall band (D-IELTS-6), so `roadmap_milestones` names a
+  `full_test_id` instead of an `exam_id` (V083). `RoadmapResultListener` hears
+  `exam.api.FullTestCompleted`; progression reads the result through
+  `exam.api.CompletedFullTestReader`. TOEIC milestones still name a paper.
 - **Cross-module read:** `ContentCatalogQuery` reads published
   `flashcard_sets`, `dictation_lessons`, `quizzes`, `speaking_prompts`,
-  `assessment_tasks` and `exams`; `ItemProgressQuery` reads `flashcards`,
+  `assessment_tasks`, `exams` and `full_tests`; `ItemProgressQuery` reads `flashcards`,
   `flashcard_reviews`, `dictation_sentences`, `dictation_attempts`,
   `quiz_attempts`, `speaking_attempts` and `assessment_attempts`. Both are
   documented read-only joins; no roadmap code writes those tables.

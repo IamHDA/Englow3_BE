@@ -221,7 +221,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                 : new RoadmapResult.Milestone(milestone.getId(), milestone.getKind(), milestone.getExamId(),
                         milestone.getRequiredScore(), milestone.getRequiredLevel(), milestone.getStatus(),
                         milestone.getResultScore(), milestone.getResultLevel(), milestone.getAttemptCount(),
-                        milestone.getAchievedAt(), ready);
+                        milestone.getAchievedAt(), ready, milestone.getFullTestId());
         List<String> skills = stage.getFocusSkills().isBlank() ? List.of()
                 : Arrays.asList(stage.getFocusSkills().split(","));
         return new RoadmapResult.Stage(stage.getId(), stage.getOrderNo(), stage.getTitle(), stage.getSummary(),

@@ -118,6 +118,8 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
         fullTests.submitForReview(draft.id());
         assertThat(fullTests.approve(draft.id()).status()).isEqualTo(ExamStatus.PUBLISHED);
 
+        UUID milestone = ieltsRoadmapWaitingOn(draft.id(), "6.5");
+
         SignedIn.as(jdbc, learner);
         FullTestSittingResult sitting = sittings.start(draft.id());
         assertThat(sittings.start(draft.id()).id()).isEqualTo(sitting.id());
@@ -150,6 +152,40 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
         assertThat(profileScore()).isEqualByComparingTo("6.5");
         assertThat(jdbc.sql("select current_level from learner_profiles where user_id = :u").param("u", learner)
                 .query(String.class).single()).isEqualTo("B2");
+        // The roadmap heard FullTestCompleted after the view committed: its IELTS mock milestone took the band.
+        assertThat(jdbc.sql("select status from roadmap_milestones where id = :id").param("id", milestone)
+                .query(String.class).single()).isEqualTo("PASSED");
+        assertThat(jdbc.sql("select result_score from roadmap_milestones where id = :id").param("id", milestone)
+                .query(java.math.BigDecimal.class).single()).isEqualByComparingTo("6.5");
+    }
+
+    /** An active IELTS roadmap whose current stage closes with a mock milestone on this full test. */
+    private UUID ieltsRoadmapWaitingOn(UUID fullTestId, String requiredScore) {
+        UUID roadmap = UUID.randomUUID();
+        UUID stage = UUID.randomUUID();
+        UUID milestone = UUID.randomUUID();
+        jdbc.sql("""
+                insert into learning_roadmaps (id, user_id, status, goal_type, target_certificate, target_score,
+                                               start_level)
+                values (:id, :user, 'ACTIVE', 'CERTIFICATE', 'IELTS', 7.0, 'B1')
+                """).param("id", roadmap).param("user", learner).update();
+        jdbc.sql("""
+                insert into roadmap_stages (id, roadmap_id, order_no, title, from_level, to_level, planned_start,
+                                            planned_end, status, created_at)
+                values (:id, :roadmap, 1, 'Stage 1', 'B1', 'B2', current_date, current_date + 30, 'CURRENT',
+                        now() - interval '1 hour')
+                """).param("id", stage).param("roadmap", roadmap).update();
+        jdbc.sql("""
+                insert into roadmap_stages (id, roadmap_id, order_no, title, from_level, to_level, planned_start,
+                                            planned_end, status)
+                values (:id, :roadmap, 2, 'Stage 2', 'B2', 'C1', current_date + 31, current_date + 60, 'LOCKED')
+                """).param("id", UUID.randomUUID()).param("roadmap", roadmap).update();
+        jdbc.sql("""
+                insert into roadmap_milestones (id, stage_id, kind, full_test_id, required_score, status)
+                values (:id, :stage, 'CERTIFICATE_MOCK', :fullTest, cast(:score as numeric), 'PENDING')
+                """).param("id", milestone).param("stage", stage).param("fullTest", fullTestId)
+                .param("score", requiredScore).update();
+        return milestone;
     }
 
     private void gradedAnswer(UUID task, String band) {

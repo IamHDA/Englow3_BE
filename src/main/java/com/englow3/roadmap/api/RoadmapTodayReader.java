@@ -34,8 +34,9 @@ public interface RoadmapTodayReader {
 
     /**
      * @param kind
-     *            CERTIFICATE_MOCK (sit {@code examId}) or LEVEL_CHECK (start a level check for {@code milestoneId})
+     *            CERTIFICATE_MOCK (sit {@code examId}, or for IELTS the full test {@code fullTestId}) or LEVEL_CHECK
+     *            (start a level check for {@code milestoneId})
      */
-    record TodayMilestone(UUID milestoneId, String kind, UUID examId) {
+    record TodayMilestone(UUID milestoneId, String kind, UUID examId, UUID fullTestId) {
     }
 }

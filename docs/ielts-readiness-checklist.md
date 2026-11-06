@@ -81,7 +81,7 @@ chưa map. Những việc còn phải làm ở DB:
   lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
   có một lượt đang mở cho mỗi full test. Lượt full test cũng phải lưu hạn nộp (lúc bắt
   đầu cộng 7 ngày).
-- [ ] **Roadmap:** `roadmap_milestones` phải trỏ được tới full test và lượt full test.
+- [x] **Roadmap (V083):** `roadmap_milestones` phải trỏ được tới full test và lượt full test.
   Hiện bảng chỉ có `exam_id` và `result_exam_attempt_id`.
 
 **Những thứ không cần đổi DB:**
@@ -213,10 +213,11 @@ chưa map. Những việc còn phải làm ở DB:
   - Đã làm (`recordIeltsBand`). CEFR lấy theo mốc Cambridge trong `helper.IeltsBand`,
     không lấy từ `score_conversions.cefr_level`: cột đó gắn với điểm thô của một section,
     còn ở đây là band tổng.
-- [ ] `exam.api`: phát sự kiện khi một lượt full test có band chính thức. Roadmap nghe
+- [x] `exam.api`: phát sự kiện khi một lượt full test có band chính thức. Roadmap nghe
   sự kiện này để tính mốc thi thử IELTS.
-  - Đã phát `exam.api.FullTestCompleted`. Roadmap **chưa** nghe sự kiện này, nên mốc thi thử
-    IELTS vẫn chưa tính bằng full test (cần đổi `roadmap_milestones`).
+  - Đã làm: roadmap IELTS chỉ chọn full test làm mốc thi thử, nghe
+    `FullTestCompleted`, đọc band qua `exam.api.CompletedFullTestReader`, và job định kỳ
+    của roadmap cũng bắt kịp. Mốc TOEIC vẫn dùng đề như cũ.
 
 ### 2.8 Tài liệu
 
