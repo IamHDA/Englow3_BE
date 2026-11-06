@@ -294,17 +294,24 @@ chưa map. Những việc còn phải làm ở DB:
 
 ## 5. Chạy thử với một đề trước khi sinh hàng loạt
 
-- [ ] Viết tay 1 đề Listening và 1 đề Reading, phủ đủ mọi loại câu ở bảng tham chiếu
-  bên dưới.
-- [ ] Nạp đề bằng loader. Admin mở editor, lưu lại, gửi duyệt, duyệt rồi xuất bản. Đề
-  phải đi qua cả vòng này mà không mất dữ liệu.
+- [x] Viết tay 1 đề Listening và 1 đề Reading, phủ đủ mọi loại câu ở bảng tham chiếu
+  bên dưới: `src/test/resources/ielts/academic-trial-paper-1.json` (77 câu, 80 điểm), transcript
+  Listening, 5 đề Writing/Speaking và biểu đồ Task 1. Nạp vào hệ thống thật bằng
+  `scripts/load_ielts_trial.py`. Bài đọc ngắn hơn đề thật (~450 từ mỗi bài) và chưa có audio.
+- [x] Nạp đề bằng loader. Admin mở editor, lưu lại, gửi duyệt, duyệt rồi xuất bản. Đề
+  phải đi qua cả vòng này mà không mất dữ liệu. (`IeltsTrialPaperIntegrationTest`, cùng
+  JSON editor gửi.)
 - [ ] Học viên làm bài ở cả chế độ FULL và PRACTICE, lưu nháp rồi nộp. Kiểm tra: điểm
   thô, band từng kỹ năng, band tổng, màn kết quả, ngữ cảnh tutor.
-- [ ] Roadmap: milestone `CERTIFICATE_MOCK` phải ghi nhận được lần thi.
-- [ ] Full test: một học viên IELTS mới đăng ký làm trọn full test từ onboarding. Band
+  - Đã chạy: FULL, lưu nháp, nộp, điểm thô từng kỹ năng, band L/R, nửa điểm câu chọn hai,
+    đáp án gõ và đáp án được chấp nhận ở màn kết quả.
+  - Chưa chạy: chế độ PRACTICE và ngữ cảnh tutor với đề này.
+- [x] Roadmap: milestone `CERTIFICATE_MOCK` phải ghi nhận được lần thi.
+  (`IeltsFullTestIntegrationTest`.)
+- [x] Full test: một học viên IELTS mới đăng ký làm trọn full test từ onboarding. Band
   tạm hiện ngay sau phần L+R, và band chính thức thay vào khi Writing/Speaking chấm xong.
-- [ ] Bỏ dở full test quá 7 ngày: lượt đóng lại, band tạm giữ nguyên, và học viên bắt đầu
-  được lượt mới.
+- [x] Bỏ dở full test quá 7 ngày: lượt đóng lại, band tạm giữ nguyên, và học viên bắt đầu
+  được lượt mới. (`FullTestSittingTest`; thêm hạn chấm 7 ngày sau hạn nộp.)
 - [ ] Chạy các lệnh kiểm tra trong `CONTRIBUTING.md` mục *Verification*:
   - `mvn formatter:validate`
   - `mvn --batch-mode clean verify`

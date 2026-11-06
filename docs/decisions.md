@@ -224,9 +224,12 @@ kê vẫn đúng, chỉ thành thừa.
 ### D-IELTS-5 — Ô trống đánh dấu theo thứ tự trong nhóm; số câu do BE tính
 
 **Chốt:**
-- Ô trống trong `question_sets.content` được đánh dấu bằng `{{n}}`, với n là
-  `questions.order_no` của câu trong nhóm đó (`{{1}}`, `{{2}}`…). FE thay mỗi dấu bằng ô
-  nhập của câu tương ứng.
+- Ô trống trong `question_sets.content` được đánh dấu bằng `{{n}}`, với n là **vị trí**
+  của câu trong nhóm đó, xếp theo `questions.order_no` (`{{1}}` là câu đầu tiên của nhóm,
+  `{{2}}` là câu thứ hai…). FE thay mỗi dấu bằng ô nhập của câu tương ứng.
+  - Đếm theo vị trí chứ không dùng thẳng `order_no`: editor đánh `order_no` liên tục cả đề
+    (nhóm thứ hai bắt đầu từ 11), nên `{{1}}` ở nhóm thứ hai sẽ không khớp câu nào. Lỗi này
+    lộ ra khi chạy thử đề đầu tiên (`ielts/academic-trial-paper-1.json`).
 - Số câu hiển thị không lưu vào DB. BE tính ở một chỗ rồi trả qua API (`numberFrom`,
   `numberTo`); FE thôi tự đếm.
 - Quy tắc tính:

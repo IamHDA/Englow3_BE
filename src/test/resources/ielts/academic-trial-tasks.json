@@ -1,0 +1,68 @@
+[
+  {
+    "skill": "WRITING",
+    "taskType": "TASK_1",
+    "title": "Trial Task 1: Recycling in four cities",
+    "instructions": "You should spend about 20 minutes on this task.\n\nThe chart below shows the percentage of household waste that was recycled in four European cities in 2000 and 2020.\n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.\n\nWrite at least 150 words.",
+    "rubricNotes": "Chart data (bar chart, % of household waste recycled):\nCity | 2000 | 2020\nLeeds | 22% | 48%\nLyon | 31% | 52%\nPorto | 12% | 41%\nTurin | 27% | 39%\n\nKey features: every city rose; Porto grew most (12% to 41%, more than tripled); Lyon highest in both years (31%, 52%); Turin smallest rise (27% to 39%) and lowest in 2020; Leeds more than doubled (22% to 48%). A strong overview notes the general rise and Lyon's lead.",
+    "sampleAnswer": null,
+    "minimumWords": 150,
+    "timeLimitSeconds": 1200,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "chart": "academic-trial-writing-task-1-chart.png"
+  },
+  {
+    "skill": "WRITING",
+    "taskType": "TASK_2",
+    "title": "Trial Task 2: Working from home",
+    "instructions": "You should spend about 40 minutes on this task.\n\nMany companies now allow employees to work from home for part or all of the week. Some people believe this benefits both workers and employers, while others think it causes more problems than it solves.\n\nDiscuss both views and give your own opinion.\n\nGive reasons for your answer and include any relevant examples from your own knowledge or experience.\n\nWrite at least 250 words.",
+    "rubricNotes": "Both views must be discussed and a clear opinion given. Benefits: no commute, flexibility, lower office costs. Problems: isolation, weaker teamwork, blurred work-life boundary, not possible for every job.",
+    "sampleAnswer": null,
+    "minimumWords": 250,
+    "timeLimitSeconds": 2400,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS"
+  },
+  {
+    "skill": "SPEAKING",
+    "taskType": "PART_1",
+    "title": "Trial Speaking Part 1: Home and free time",
+    "instructions": "The examiner asks you about yourself.\n\n- Do you live in a house or an apartment?\n- What do you like most about the area where you live?\n- How do you usually spend your weekends?\n- Have your free-time activities changed since you were a child?\n- Do you prefer spending free time alone or with other people? Why?",
+    "rubricNotes": "Short, natural answers of 2-3 sentences each; reasons and examples raise the band.",
+    "sampleAnswer": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 300,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS"
+  },
+  {
+    "skill": "SPEAKING",
+    "taskType": "PART_2",
+    "title": "Trial Speaking Part 2: A useful skill",
+    "instructions": "Describe a skill you learned that has been useful to you.\n\nYou should say:\n- what the skill is\n- when and how you learned it\n- how often you use it\nand explain why this skill has been useful to you.\n\nYou have one minute to prepare. Then speak for one to two minutes.",
+    "rubricNotes": "Covers all four prompts; speaks for close to two minutes with a clear sequence.",
+    "sampleAnswer": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 120,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS"
+  },
+  {
+    "skill": "SPEAKING",
+    "taskType": "PART_3",
+    "title": "Trial Speaking Part 3: Learning skills",
+    "instructions": "Discussion questions:\n\n- Which skills do you think young people most need to learn today?\n- Is it better to learn practical skills at school or from family? Why?\n- How has technology changed the way people learn new skills?\n- Will people need to keep learning new skills throughout their working lives in the future?",
+    "rubricNotes": "Extended, reasoned answers that compare, speculate and give examples.",
+    "sampleAnswer": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 300,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS"
+  }
+]

@@ -22,12 +22,23 @@ public final class SignedIn {
     }
 
     public static void as(JdbcClient jdbc, UUID userId) {
+        as(jdbc, userId, new String[0]);
+    }
+
+    /**
+     * With roles granted as the app's converter grants them ({@code ROLE_ADMIN}), for calling a controller whose
+     * {@code @PreAuthorize} would otherwise refuse.
+     */
+    public static void as(JdbcClient jdbc, UUID userId, String... roles) {
         UUID authProviderId = jdbc.sql("select auth_provider_id from users where id = :id").param("id", userId)
                 .query(UUID.class).single();
 
         Jwt jwt = Jwt.withTokenValue("integration-test").header("alg", "none").subject(authProviderId.toString())
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext()
+                .setAuthentication(new JwtAuthenticationToken(jwt, java.util.Arrays.stream(roles).map(
+                        role -> new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role))
+                        .toList()));
     }
 
     public static void out() {
