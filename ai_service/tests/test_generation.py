@@ -201,3 +201,49 @@ def test_the_endpoints_need_the_internal_key():
     assert (
         client.post("/internal/v1/generation/ielts/step", json={"step": "plan"}).status_code == 401
     )
+
+
+def _provider_capturing(sent: list, **overrides):
+    import asyncio
+
+    import httpx
+
+    from app.providers.generation import GenerationProvider
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+        )
+
+    async def call():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+            return await GenerationProvider(client, settings(**overrides)).complete(
+                [{"role": "user", "content": "hi"}]
+            )
+
+    return asyncio.run(call())
+
+
+def test_the_reasoning_effort_is_sent_when_set():
+    sent: list = []
+    _provider_capturing(sent, generation_reasoning_effort="high")
+
+    assert sent[0]["reasoning_effort"] == "high"
+    assert "temperature" not in sent[0]
+
+
+def test_without_a_reasoning_effort_the_models_default_stands():
+    sent: list = []
+    _provider_capturing(sent)
+
+    assert "reasoning_effort" not in sent[0]
+    assert sent[0]["temperature"] == 0.8
+
+
+def test_an_unknown_reasoning_effort_is_refused_at_startup():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        settings(generation_reasoning_effort="extreme")

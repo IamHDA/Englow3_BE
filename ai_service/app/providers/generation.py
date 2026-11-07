@@ -51,12 +51,17 @@ class GenerationProvider:
                 message="Content generation is not configured",
                 status_code=503,
             )
-        body = {
+        body: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "temperature": 0.8,
             "response_format": {"type": "json_object"},
         }
+        effort = self._settings.generation_reasoning_effort
+        if effort:
+            # Reasoning models fix their own sampling; a temperature alongside is refused by some.
+            body["reasoning_effort"] = effort
+        else:
+            body["temperature"] = 0.8
         try:
             response = await self._client.post(
                 f"{str(self._settings.generation_base_url).rstrip('/')}/chat/completions",

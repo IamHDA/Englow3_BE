@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     generation_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
     generation_api_key: SecretStr = SecretStr("")
     generation_model: str = ""
+    # Sent as reasoning_effort when set; empty leaves the model's own default. Which values a
+    # model accepts is the provider's (OpenAI's GPT-6.1 take low to max). Higher is slower:
+    # keep each step under generation_timeout_seconds.
+    generation_reasoning_effort: str | None = Field(
+        default=None, pattern="^(none|minimal|low|medium|high|xhigh|max)?$"
+    )
     generation_timeout_seconds: float = Field(default=110.0, gt=0, le=300)
 
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)

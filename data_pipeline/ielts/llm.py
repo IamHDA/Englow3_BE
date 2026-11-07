@@ -4,7 +4,8 @@ Configured by environment, so the key never lands in a file:
 
     IELTS_LLM_BASE_URL   e.g. https://api.openai.com/v1 or https://api.groq.com/openai/v1
     IELTS_LLM_API_KEY    the provider key
-    IELTS_LLM_MODEL      e.g. gpt-4.1, openai/gpt-oss-120b
+    IELTS_LLM_MODEL      e.g. gpt-6.1-sol, gpt-6.1-terra
+    IELTS_LLM_REASONING_EFFORT  optional: low | medium | high | xhigh | max; empty keeps the default
 """
 from __future__ import annotations
 
@@ -39,25 +40,30 @@ def parse_json(text: str) -> dict:
 
 
 class OpenAiCompatible:
-    def __init__(self, base_url: str, api_key: str, model: str, temperature: float = 0.8, timeout: int = 180):
+    def __init__(self, base_url: str, api_key: str, model: str, temperature: float = 0.8, timeout: int = 180,
+                 reasoning_effort: str | None = None):
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.api_key = api_key
         self.model = model
         self.temperature = temperature
         self.timeout = timeout
+        self.reasoning_effort = reasoning_effort or None
 
     @classmethod
     def from_env(cls) -> "OpenAiCompatible":
         missing = [k for k in ("IELTS_LLM_BASE_URL", "IELTS_LLM_API_KEY", "IELTS_LLM_MODEL") if not os.environ.get(k)]
         if missing:
             raise SystemExit(f"Set {', '.join(missing)} (see data_pipeline/ielts/llm.py).")
-        return cls(os.environ["IELTS_LLM_BASE_URL"], os.environ["IELTS_LLM_API_KEY"], os.environ["IELTS_LLM_MODEL"])
+        return cls(os.environ["IELTS_LLM_BASE_URL"], os.environ["IELTS_LLM_API_KEY"], os.environ["IELTS_LLM_MODEL"],
+                   reasoning_effort=os.environ.get("IELTS_LLM_REASONING_EFFORT"))
 
     def complete(self, messages: list[dict]) -> dict:
-        body = json.dumps({
-            "model": self.model, "messages": messages, "temperature": self.temperature,
-            "response_format": {"type": "json_object"},
-        }).encode()
+        request_body = {"model": self.model, "messages": messages, "response_format": {"type": "json_object"}}
+        if self.reasoning_effort:
+            request_body["reasoning_effort"] = self.reasoning_effort
+        else:
+            request_body["temperature"] = self.temperature
+        body = json.dumps(request_body).encode()
         for attempt in range(4):
             request = urllib.request.Request(self.url, data=body, method="POST", headers={
                 "Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"})
