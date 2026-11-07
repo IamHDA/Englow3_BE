@@ -112,9 +112,11 @@ class StandIn:
     def complete(self, messages: list[dict]) -> dict:
         self.calls.append(messages)
         ask = messages[1]["content"]
+        listening_part = re.search(r"Listening Part (\d)", ask)
+        reading_passage = re.search(r"Reading Passage (\d)", ask)
         component = ("plan" if ask.startswith("Plan one") else
-                     f"listening-{re.search(r'Listening Part (\d)', ask).group(1)}" if "Listening Part" in ask else
-                     f"reading-{re.search(r'Reading Passage (\d)', ask).group(1)}" if "Reading Passage" in ask else
+                     "listening-" + listening_part.group(1) if listening_part else
+                     "reading-" + reading_passage.group(1) if reading_passage else
                      "writing-1" if "Writing Task 1" in ask else "writing-2" if "Writing Task 2" in ask else
                      "speaking")
         if self.broken.get(component):
