@@ -150,6 +150,21 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         assertThat(count("question_set_options o join questions q on q.question_set_id = o.question_set_id", examId))
                 .isPositive();
 
+        // 1b. Listening audio, the way scripts/load_ielts_trial.py adds it: upload one file per part to the
+        // draft, then save the paper again with each part's key and the version the draft is at.
+        ObjectNode withAudio = (ObjectNode) mapper.readTree(read(PAPER));
+        JsonNode listeningParts = withAudio.path("content").path("sections").get(0).path("parts");
+        for (JsonNode part : listeningParts) {
+            byte[] mp3 = { (byte) 0xFF, (byte) 0xF3, 0x44, (byte) 0xC4, 0, 0, 0, 0 };
+            String key = exams.uploadMedia(examId, new MockMultipartFile("file", "part.mp3", "audio/mpeg", mp3))
+                    .getBody().objectKey();
+            ((ObjectNode) part).put("audioObjectKey", key);
+        }
+        withAudio.put("version", exams.authoring(examId).getBody().version());
+        exams.updateAuthoring(examId, mapper.treeToValue(withAudio, SaveAuthoringRequest.class));
+        assertThat(exams.authoring(examId).getBody().content().sections().get(0).parts())
+                .allSatisfy(part -> assertThat(part.audioObjectKey()).startsWith(examId + "/"));
+
         // 2. Reviewed and published like any paper.
         reviews.submitForReview(new SubmitExamForReviewCommand(examId));
         SignedIn.as(jdbc, admin, "ADMIN");
@@ -186,6 +201,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         List<Item> items = items(paper);
 
         assertThat(items).hasSize(77);
+        assertThat(paper.sections().get(0).parts()).allSatisfy(part -> assertThat(part.audioUrl()).isNotBlank());
         assertThat(numbers(items, SectionType.LISTENING)).startsWith("1", "2").contains("21-22", "23-24")
                 .endsWith("40");
         assertThat(numbers(items, SectionType.READING)).startsWith("1").contains("24-25").endsWith("40");

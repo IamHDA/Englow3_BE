@@ -8,6 +8,13 @@ Usage (standard library only):
 
     ENGLOW_TOKEN=<a staff or admin access token> python scripts/load_ielts_trial.py --base-url https://api.example.com
 
+Listening audio: record it first with data_pipeline/generators/synthesize_ielts_trial_audio.py. When
+the four part files are there, the paper is created as a draft, the files are uploaded and attached to
+Parts 1-4, and only then is it sent for review. Without them the paper goes in silent.
+
+--skip-tasks loads the paper alone, for when the five tasks are already in (a published paper cannot be
+edited, so adding audio to one already loaded means loading a new copy and building a new full test).
+
 The token is the Supabase access token of a STAFF or ADMIN account (for example copied from the
 browser's network tab while signed in to the admin site). Run it once: a second run creates a second
 copy.
@@ -25,6 +32,8 @@ from pathlib import Path
 RESOURCES = Path(__file__).resolve().parent.parent / "src" / "test" / "resources" / "ielts"
 PAPER = RESOURCES / "academic-trial-paper-1.json"
 TASKS = RESOURCES / "academic-trial-tasks.json"
+AUDIO = Path(__file__).resolve().parent.parent / "data_pipeline" / "output" / "audio" / "ielts"
+AUDIO_STEM = "academic-trial-paper-1-part-{}.mp3"
 
 
 def call(base, token, method, path, body=None, content_type="application/json"):
@@ -53,6 +62,8 @@ def multipart(field, filename, content_type, payload):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base-url", required=True, help="backend root, e.g. https://api.example.com")
+    parser.add_argument("--skip-tasks", action="store_true", help="load the paper only")
+    parser.add_argument("--audio-dir", type=Path, default=AUDIO, help="where the part MP3s are")
     args = parser.parse_args()
     token = os.environ.get("ENGLOW_TOKEN")
     if not token:
@@ -60,9 +71,26 @@ def main():
     base = args.base_url.rstrip("/")
 
     paper = json.loads(PAPER.read_text(encoding="utf-8"))
+    listening = next(s for s in paper["content"]["sections"] if s["sectionType"] == "LISTENING")
+    audio = [args.audio_dir / AUDIO_STEM.format(n) for n in range(1, len(listening["parts"]) + 1)]
+    missing = [path.name for path in audio if not path.is_file()]
+    if missing:
+        print(f"No audio for {', '.join(missing)}: the Listening section goes in silent.")
+
     exam = call(base, token, "POST", "/api/admin/exams/authoring", paper)
+    if not missing:
+        for part, path in zip(listening["parts"], audio):
+            body, content_type = multipart("file", path.name, "audio/mpeg", path.read_bytes())
+            uploaded = call(base, token, "POST", f"/api/admin/exams/{exam['id']}/media", body, content_type)
+            part["audioObjectKey"] = uploaded["objectKey"]
+        exam = call(base, token, "PUT", f"/api/admin/exams/{exam['id']}/authoring",
+                    {**paper, "version": exam["version"]})
+        print(f"Audio attached to {len(audio)} Listening parts.")
     call(base, token, "POST", f"/api/admin/exams/{exam['id']}/submit-for-review")
     print(f"Paper sent for review: {paper['metadata']['title']} ({exam['id']})")
+    if args.skip_tasks:
+        print("\nNext: approve the paper, then build a full test with it at /admin/full-tests.")
+        return
 
     for task in json.loads(TASKS.read_text(encoding="utf-8")):
         chart = task.pop("chart", None)
@@ -74,7 +102,8 @@ def main():
         print(f"Task sent for review: {task['title']} ({created['id']})")
 
     print("\nNext: approve the paper and the five tasks, then build the full test at /admin/full-tests.")
-    print("Listening has no audio yet: record it from academic-trial-paper-1.listening-transcript.md first.")
+    if missing:
+        print("Listening has no audio: record it with data_pipeline/generators/synthesize_ielts_trial_audio.py.")
 
 
 if __name__ == "__main__":
