@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     azure_speech_base_url: AnyHttpUrl = AnyHttpUrl("https://example.cognitiveservices.azure.com")
     azure_speech_api_key: SecretStr = SecretStr("")
 
+    # Writing IELTS sets for the backend's generation module: its own provider, key and model,
+    # so a stronger (or cheaper) model can write content without touching grading or the tutor.
+    generation_enabled: bool = False
+    generation_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
+    generation_api_key: SecretStr = SecretStr("")
+    generation_model: str = ""
+    generation_timeout_seconds: float = Field(default=110.0, gt=0, le=300)
+
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     read_timeout_seconds: float = Field(default=45.0, gt=0, le=300)
     speech_timeout_seconds: float = Field(default=60.0, gt=0, le=180)

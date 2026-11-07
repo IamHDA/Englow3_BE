@@ -13,7 +13,9 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import Settings, get_settings
 from app.errors import ServiceError
+from app.generation.routes import router as generation_router
 from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
+from app.providers.generation import EdgeSpeechSynthesizer, GenerationProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
 from app.providers.whisper import WhisperSpeechProvider
@@ -42,10 +44,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         speech_timeout = httpx.Timeout(
             configured.speech_timeout_seconds, connect=configured.connect_timeout_seconds
         )
+        generation_timeout = httpx.Timeout(
+            configured.generation_timeout_seconds, connect=configured.connect_timeout_seconds
+        )
         async with (
             httpx.AsyncClient(timeout=timeout) as client,
             httpx.AsyncClient(timeout=speech_timeout) as speech_client,
+            httpx.AsyncClient(timeout=generation_timeout) as generation_client,
         ):
+            app.state.generation_provider = GenerationProvider(generation_client, configured)
+            app.state.speech_synthesizer = EdgeSpeechSynthesizer()
             app.state.llm_provider = OpenAiCompatibleProvider(client, configured)
             app.state.embedding_provider = OpenAiCompatibleEmbeddingProvider(client, configured)
             app.state.speech_provider = (
@@ -135,6 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     internal = [Depends(require_internal_api_key)]
+    app.include_router(generation_router, dependencies=internal)
 
     @app.post(
         "/internal/v1/llm/generate",
@@ -242,11 +251,15 @@ def _readiness(settings: Settings) -> dict[str, bool]:
     embedding = not settings.embedding_enabled or bool(
         settings.embedding_api_key.get_secret_value()
     )
+    generation = not settings.generation_enabled or bool(
+        settings.generation_api_key.get_secret_value() and settings.generation_model
+    )
     return {
         "internal_auth": internal_auth,
         "llm": llm,
         "embedding": embedding,
         "speech": speech,
+        "generation": generation,
     }
 
 
