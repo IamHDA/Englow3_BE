@@ -372,6 +372,54 @@ Owns the AI tutor conversation.
   and known/missing token usage without returning raw prompts or answers.
 - **Release:** see `tutor-release-runbook.md`; memory, streaming and voice default off.
 
+## `generation`
+
+Owns AI content generation requests: an ADMIN or STAFF member presses "generate",
+the server writes a whole set with a model, and the result lands as drafts in the
+modules that own that content. Today the only kind is `IELTS_FULL_TEST`; the name is
+general because TOEIC papers, flashcards or quizzes are the next likely kinds.
+
+- **Subdomain:** supporting. It speeds up authoring; the product wins on the content
+  and the review behind it, which stay where they are.
+- **Owns writes to:** `generation_requests` - who asked, the kind, an optional
+  author's brief (free text, at most 1000 characters, steering topics, difficulty and
+  style), status, the step running and its attempt count, the components written so
+  far, the ids it produced and the failure reason.
+- **Owns no content:** the paper and full test stay in `exam`, the five Writing and
+  Speaking tasks in `assessment`. It creates them through their APIs as drafts
+  authored by the requester, sends the paper and tasks for review and builds a draft
+  full test, and keeps only their ids. Nothing it makes reaches learners without an
+  administrator approving it.
+- **Entity with rules:** `GenerationRequest` - status only moves forward (`QUEUED ->
+  RUNNING -> COMPLETED | FAILED`); a step is tried at most three times, then the whole
+  request fails with its reason. Version column: the worker and the requester can
+  touch one row.
+- **Rules across rows (service, under a per-user lock):** at most three requests a day
+  per user, counting queued, running and completed ones - a failed request does not
+  count (decided 2026-11-07, accepting that repeated failures have no cost ceiling);
+  one request in progress per user at a time.
+- **Talks to:** `ai` by enqueueing one job per step (`CONTENT_GENERATION`, outside the
+  learners' daily allowance); `exam` and `assessment` through module APIs taking an
+  explicit author id, because the worker has no signed-in user; `ai_service` over the
+  internal HTTP contract.
+- **Steps:** plan topics -> each Listening part, Reading passage, Writing Task 1,
+  Task 2 and Speaking test (a rule failure retries that step with the problems fed
+  back) -> assemble (paper, tasks, Task 1 chart as drafts) -> record each Listening
+  part -> finish (submit for review, draft full test). One step per job keeps every
+  job under the worker's run limit.
+- **Prompts and rules:** live once in `ai_service` (moved from
+  `data_pipeline/ielts`); the offline command-line generator reuses them. The model is
+  configured on its own (`AI_SERVICE_GENERATION_*`), apart from grading and the tutor.
+  The author's brief is added to every prompt; the structural rules still apply, so a
+  brief cannot produce a paper without its 40 + 40 marks and question types.
+- **Why:** a generation run has its own lifecycle and language (request, step,
+  attempt, brief) that is neither a paper's nor a task's, and more kinds of generated
+  content are expected.
+- **Revisit if:** generation stays IELTS-only for long (fold it into `exam`), or failed
+  runs start costing real money (add a ceiling on failed requests).
+- **Left open:** cancelling a running request; regenerating one part of a finished
+  set; similarity checks between passages of different sets.
+
 ## `shared` and `config`
 
 These are technical packages, not business modules, and own no business tables.
