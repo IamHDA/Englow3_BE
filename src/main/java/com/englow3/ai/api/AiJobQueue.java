@@ -66,6 +66,12 @@ public interface AiJobQueue {
      */
     boolean hasRoadmapAllowance(UUID userId);
 
+    /**
+     * Asks for one step of a content generation request. Outside the learners' daily allowance - staff ask, and the
+     * generation module bounds how many requests a day each may make.
+     */
+    void enqueueContentGeneration(UUID requestId, String inputPayload, String idempotencyKey, UUID requestedByUserId);
+
     void enqueueTranslationAssessment(UUID attemptId, String inputPayload, String idempotencyKey, String promptVersion,
             UUID requestedByUserId);
 }

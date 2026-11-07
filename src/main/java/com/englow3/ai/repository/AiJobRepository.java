@@ -154,6 +154,7 @@ public interface AiJobRepository extends JpaRepository<AiJob, UUID> {
             select count(j) from AiJob j
              where j.requestedByUserId = :userId and j.createdAt >= :from
                and j.jobType <> com.englow3.ai.entity.AiJobType.ROADMAP_GENERATION
+               and j.jobType <> com.englow3.ai.entity.AiJobType.CONTENT_GENERATION
             """)
     long countRequestedSince(@Param("userId") UUID userId, @Param("from") Instant from);
 

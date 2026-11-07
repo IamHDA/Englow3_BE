@@ -19,5 +19,10 @@ public enum AiJobType {
     /** Propose a learning roadmap, or its remaining stages after an adjustment. Target is the learning roadmap. */
     ROADMAP_GENERATION,
     /** Grade a learner's English translation of a Vietnamese sentence. Target is a translation attempt. */
-    TRANSLATION_ASSESSMENT
+    TRANSLATION_ASSESSMENT,
+    /**
+     * One step of an AI content generation request (write a component, assemble, record). Target is the generation
+     * request. Asked by staff, not learners: outside the learners' daily allowance, bounded by the generation module.
+     */
+    CONTENT_GENERATION
 }

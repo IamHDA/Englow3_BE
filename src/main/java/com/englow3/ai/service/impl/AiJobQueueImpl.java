@@ -250,6 +250,14 @@ public class AiJobQueueImpl implements AiJobQueue, AiJobWorkerQueue {
         });
     }
 
+    @Override
+    @Transactional
+    public void enqueueContentGeneration(UUID requestId, String inputPayload, String idempotencyKey,
+            UUID requestedByUserId) {
+        enqueue(AiJobType.CONTENT_GENERATION, "GENERATION_REQUEST", requestId, inputPayload, idempotencyKey,
+                "ielts-generation-v1", requestedByUserId);
+    }
+
     /** Generations and adjustments one learner may cause in a day. */
     static final int ROADMAP_DAILY_LIMIT = 5;
 

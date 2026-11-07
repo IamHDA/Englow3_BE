@@ -122,7 +122,10 @@ class AiJobWorkerTest {
             worker.drain();
             assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
             worker.drain();
-            verify(queue, times(2)).claimBatch(eq(1), anyList(), any());
+            // A busy lane claims nothing more; the generation lane, idle here, may look again.
+            verify(queue, times(1)).claimBatch(eq(1), eq(List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION")), any());
+            verify(queue, times(1)).claimBatch(eq(1), eq(List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT",
+                    "ROADMAP_GENERATION", "TRANSLATION_ASSESSMENT")), any());
             release.countDown();
         }
         verify(queue).record(eq(tutor.getId()), eq(tutor.getStartedAt()), any(), any());

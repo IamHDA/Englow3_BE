@@ -106,7 +106,22 @@ public class ExamContentServiceImpl implements ExamContentService {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("MEDIA_REQUIRED", "No media file was uploaded");
         }
-        String contentType = file.getContentType();
+        try {
+            return store(examId, file.getInputStream(), file.getSize(), file.getContentType());
+        } catch (IOException e) {
+            throw new BadRequestException("MEDIA_UNREADABLE", "The uploaded media could not be read");
+        }
+    }
+
+    public ExamMediaResult uploadMedia(UUID examId, byte[] content, String contentType) {
+        requireExam(examId).requireEditable();
+        if (content == null || content.length == 0) {
+            throw new BadRequestException("MEDIA_REQUIRED", "No media file was uploaded");
+        }
+        return store(examId, new java.io.ByteArrayInputStream(content), content.length, contentType);
+    }
+
+    private ExamMediaResult store(UUID examId, java.io.InputStream input, long size, String contentType) {
         String extension = ALLOWED_MEDIA_TYPES.get(contentType);
         if (extension == null) {
             throw new BadRequestException("MEDIA_TYPE_NOT_SUPPORTED",
@@ -117,14 +132,14 @@ public class ExamContentServiceImpl implements ExamContentService {
         String objectKey = "%s/%s/%s.%s".formatted(examId, subfolder, UUID.randomUUID(), extension);
         try {
             // The declared type is the browser's word; the dictation and flashcard uploads already check the bytes.
-            var content = new BufferedInputStream(file.getInputStream());
+            var content = new BufferedInputStream(input);
             content.mark(ImageFileHeader.LENGTH);
             byte[] header = content.readNBytes(ImageFileHeader.LENGTH);
             content.reset();
             if (audio ? !AudioFileHeader.matches(header, contentType) : !ImageFileHeader.matches(header, contentType)) {
                 throw new BadRequestException("MEDIA_CONTENT_MISMATCH", "The file does not match its declared format");
             }
-            objectStorage.upload(examBucket, objectKey, content, file.getSize(), contentType);
+            objectStorage.upload(examBucket, objectKey, content, size, contentType);
         } catch (IOException e) {
             throw new BadRequestException("MEDIA_UNREADABLE", "The uploaded media could not be read");
         }

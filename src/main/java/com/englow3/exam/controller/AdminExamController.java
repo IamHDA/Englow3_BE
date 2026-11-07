@@ -190,10 +190,6 @@ class AdminExamController {
     }
 
     private SaveAuthoringCommand authoringCommand(UUID id, SaveAuthoringRequest r) {
-        var m = r.metadata();
-        return new SaveAuthoringCommand(id, r.version(),
-                new CreateExamCommand(m.title(), m.description(), m.examType(), m.certificateType(),
-                        m.certificateVariant(), m.targetLevel(), m.durationSeconds(), m.maxRawScore(), m.passScore()),
-                UpdateExamContentCommand.of(id, r.content()));
+        return SaveAuthoringCommand.of(id, r);
     }
 }

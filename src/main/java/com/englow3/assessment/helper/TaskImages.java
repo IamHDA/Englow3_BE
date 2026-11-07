@@ -52,21 +52,37 @@ public class TaskImages {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("TASK_IMAGE_REQUIRED", "No image was uploaded");
         }
-        String extension = EXTENSIONS.get(file.getContentType());
+        try {
+            return store(taskId, file.getInputStream(), file.getSize(), file.getContentType());
+        } catch (IOException unreadable) {
+            throw new BadRequestException("TASK_IMAGE_UNREADABLE", "The uploaded image could not be read");
+        }
+    }
+
+    /** The same check and storage, for an image the server drew itself (a generated Task 1 chart). */
+    public String upload(UUID taskId, byte[] image, String contentType) {
+        if (image == null || image.length == 0) {
+            throw new BadRequestException("TASK_IMAGE_REQUIRED", "No image was uploaded");
+        }
+        return store(taskId, new java.io.ByteArrayInputStream(image), image.length, contentType);
+    }
+
+    private String store(UUID taskId, java.io.InputStream input, long size, String contentType) {
+        String extension = EXTENSIONS.get(contentType);
         if (extension == null) {
             throw new BadRequestException("TASK_IMAGE_TYPE_NOT_SUPPORTED", "Only PNG and JPEG charts are accepted");
         }
         String key = "assessment-tasks/%s/%s.%s".formatted(taskId, UUID.randomUUID(), extension);
         try {
-            var content = new BufferedInputStream(file.getInputStream());
+            var content = new BufferedInputStream(input);
             content.mark(ImageFileHeader.LENGTH);
             byte[] header = content.readNBytes(ImageFileHeader.LENGTH);
             content.reset();
-            if (!ImageFileHeader.matches(header, file.getContentType())) {
+            if (!ImageFileHeader.matches(header, contentType)) {
                 throw new BadRequestException("TASK_IMAGE_CONTENT_MISMATCH",
                         "The file does not match its declared format");
             }
-            storage.upload(bucket, key, content, file.getSize(), file.getContentType());
+            storage.upload(bucket, key, content, size, contentType);
         } catch (IOException unreadable) {
             throw new BadRequestException("TASK_IMAGE_UNREADABLE", "The uploaded image could not be read");
         }

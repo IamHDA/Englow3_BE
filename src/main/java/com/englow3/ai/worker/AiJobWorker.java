@@ -40,10 +40,12 @@ public class AiJobWorker implements AutoCloseable {
     private final Duration lockTimeout;
     private final Duration maxRun;
     private final AiServiceReadiness readiness;
-    private final ExecutorService executor = Executors.newFixedThreadPool(2);
+    /** One thread per lane: tutor, grading, and content generation. */
+    private final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final ScheduledExecutorService heartbeat = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean tutorBusy = new AtomicBoolean();
     private final AtomicBoolean gradingBusy = new AtomicBoolean();
+    private final AtomicBoolean generationBusy = new AtomicBoolean();
     private final AtomicBoolean wakeupQueued = new AtomicBoolean();
     private final Map<UUID, Running> running = new ConcurrentHashMap<>();
     private volatile boolean closing;
@@ -72,6 +74,8 @@ public class AiJobWorker implements AutoCloseable {
         dispatch(tutorBusy, List.of("TUTOR_REPLY", "TUTOR_TRANSCRIPTION"));
         dispatch(gradingBusy,
                 List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION", "TRANSLATION_ASSESSMENT"));
+        // Its own lane: a generation step can take a couple of minutes and must not hold up a learner's grade.
+        dispatch(generationBusy, List.of("CONTENT_GENERATION"));
     }
 
     /** No database or provider I/O on the submitting request's after-commit callback. */

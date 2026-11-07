@@ -64,9 +64,13 @@ public class AdminExamServiceImpl implements AdminExamService {
 
     @Transactional
     public ExamResult create(CreateExamCommand command) {
+        return create(command, userDirectory.requireCurrentUserId());
+    }
+
+    private ExamResult create(CreateExamCommand command, UUID authorId) {
         Exam exam = Exam.draft(command.title(), command.description(), command.examType(), command.certificateType(),
                 command.certificateVariant(), command.targetLevel(), command.durationSeconds(), command.maxRawScore(),
-                command.passScore(), userDirectory.requireCurrentUserId());
+                command.passScore(), authorId);
         return ExamResult.of(examRepo.save(exam));
     }
 
@@ -195,9 +199,19 @@ public class AdminExamServiceImpl implements AdminExamService {
 
     @Transactional
     public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
+        return saveAuthoring(command, null);
+    }
+
+    /**
+     * @param authorId
+     *            who a new paper is created for; null means the signed-in user. The generation worker has no signed-in
+     *            user, so it names the person who asked for the paper.
+     */
+    @Transactional
+    public AuthoringResult saveAuthoring(SaveAuthoringCommand command, UUID authorId) {
         UUID id = command.id();
         if (id == null) {
-            id = create(command.metadata()).id();
+            id = create(command.metadata(), authorId != null ? authorId : userDirectory.requireCurrentUserId()).id();
         } else {
             if (command.version() == null) {
                 throw new BadRequestException("CONTENT_VERSION_REQUIRED", "A version is required when editing");

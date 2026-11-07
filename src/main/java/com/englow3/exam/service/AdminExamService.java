@@ -20,6 +20,9 @@ public interface AdminExamService {
 
     AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 
+    /** As {@link #saveAuthoring(SaveAuthoringCommand)}, creating a new paper for {@code authorId}. */
+    AuthoringResult saveAuthoring(SaveAuthoringCommand command, UUID authorId);
+
     ExamResult create(CreateExamCommand command);
 
     Page<ExamListItemResult> search(SearchExamCommand command, Pageable pageable);
