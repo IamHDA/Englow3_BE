@@ -12,6 +12,9 @@ Listening audio: record it first with data_pipeline/generators/synthesize_ielts_
 the four part files are there, the paper is created as a draft, the files are uploaded and attached to
 Parts 1-4, and only then is it sent for review. Without them the paper goes in silent.
 
+--set-dir loads an AI-written set from data_pipeline/generators/generate_ielts_set.py instead of the
+trial paper: its folder holds paper.json, tasks.json, task1-chart.png and audio/part-N.mp3.
+
 --skip-tasks loads the paper alone, for when the five tasks are already in (a published paper cannot be
 edited, so adding audio to one already loaded means loading a new copy and building a new full test).
 
@@ -64,15 +67,20 @@ def main():
     parser.add_argument("--base-url", required=True, help="backend root, e.g. https://api.example.com")
     parser.add_argument("--skip-tasks", action="store_true", help="load the paper only")
     parser.add_argument("--audio-dir", type=Path, default=AUDIO, help="where the part MP3s are")
+    parser.add_argument("--set-dir", type=Path, help="an AI-written set folder to load instead of the trial")
     args = parser.parse_args()
+    paper_file, tasks_file, assets, audio_dir, audio_stem = PAPER, TASKS, RESOURCES, args.audio_dir, AUDIO_STEM
+    if args.set_dir:
+        paper_file, tasks_file, assets = args.set_dir / "paper.json", args.set_dir / "tasks.json", args.set_dir
+        audio_dir, audio_stem = args.set_dir / "audio", "part-{}.mp3"
     token = os.environ.get("ENGLOW_TOKEN")
     if not token:
         sys.exit("Set ENGLOW_TOKEN to a STAFF or ADMIN access token.")
     base = args.base_url.rstrip("/")
 
-    paper = json.loads(PAPER.read_text(encoding="utf-8"))
+    paper = json.loads(paper_file.read_text(encoding="utf-8"))
     listening = next(s for s in paper["content"]["sections"] if s["sectionType"] == "LISTENING")
-    audio = [args.audio_dir / AUDIO_STEM.format(n) for n in range(1, len(listening["parts"]) + 1)]
+    audio = [audio_dir / audio_stem.format(n) for n in range(1, len(listening["parts"]) + 1)]
     missing = [path.name for path in audio if not path.is_file()]
     if missing:
         print(f"No audio for {', '.join(missing)}: the Listening section goes in silent.")
@@ -92,11 +100,11 @@ def main():
         print("\nNext: approve the paper, then build a full test with it at /admin/full-tests.")
         return
 
-    for task in json.loads(TASKS.read_text(encoding="utf-8")):
+    for task in json.loads(tasks_file.read_text(encoding="utf-8")):
         chart = task.pop("chart", None)
         created = call(base, token, "POST", "/api/admin/assessments/tasks", task)
         if chart:
-            body, content_type = multipart("file", chart, "image/png", (RESOURCES / chart).read_bytes())
+            body, content_type = multipart("file", chart, "image/png", (assets / chart).read_bytes())
             call(base, token, "POST", f"/api/admin/assessments/tasks/{created['id']}/image", body, content_type)
         call(base, token, "POST", f"/api/admin/assessments/tasks/{created['id']}/submit")
         print(f"Task sent for review: {task['title']} ({created['id']})")

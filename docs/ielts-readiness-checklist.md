@@ -263,32 +263,39 @@ chưa map. Những việc còn phải làm ở DB:
 
 ## 4. Data pipeline
 
-- [ ] Viết đề gốc theo D-IELTS-1. Đề mẫu chính thức chỉ dùng để đối chiếu format, không
-  đưa vào thư mục nguồn của pipeline.
-- [ ] **Schema.** Trong `schemas/exam.py`, `part_number` 1–7 và quy tắc 3/4 lựa chọn là
-  của TOEIC. Cần một schema IELTS riêng:
-  - Listening 4 part, Reading 3 section, 40 câu mỗi kỹ năng;
-  - các loại câu IELTS;
-  - accepted answers và giới hạn số từ.
-- [ ] **Validator** thay cho `validators/part_rules.py`. Cần kiểm tra:
-  - đủ 40 câu mỗi kỹ năng;
-  - đáp án điền từ nằm trong giới hạn số từ và xuất hiện trong passage hoặc transcript;
-  - câu điền từ xếp theo thứ tự thông tin xuất hiện trong bài;
-  - phân bố True/False/Not Given hợp lý.
-- [ ] **Tiêu chuẩn chất lượng IELTS**, tương đương [exam-quality-bar.md](exam-quality-bar.md)
-  của TOEIC. Lưu ý `generators/authoring.py` đang cố định nhãn A–D và ngưỡng vị trí
-  đáp án theo TOEIC.
-- [ ] **Loader `load_ielts_sets.py`**, theo mẫu `generators/load_toeic_sets.py`:
-  - insert SQL trực tiếp;
-  - id cố định sinh từ một namespace riêng, để chạy lại không bị trùng;
-  - thêm insert vào 3 bảng mới;
-  - transcript lưu vào `question_sets.metadata`.
-- [ ] **Audio.** `generators/synthesize_listening_audio.py` đã có giọng US, UK, AU, CA.
-  - Part 1 và Part 3 là hội thoại; Part 2 và Part 4 là độc thoại.
-  - Mỗi part một file, gắn vào `section_parts.audio_object_key`.
-- [ ] **Ảnh** cho câu gắn nhãn bản đồ/sơ đồ: gắn vào `question_sets.image_object_key`.
-- [ ] **Biểu đồ Writing Task 1:** vẽ bằng code từ bộ số liệu ghi trong `rubric_notes`
+Đã làm: luồng AI viết cả bộ full test (`data_pipeline/generators/generate_ielts_set.py`, gói
+`data_pipeline/ielts/`). Một lần chạy: lên chủ đề mới → AI viết 4 part Listening, 3 bài Reading, Writing
+Task 1/2 và Speaking → kiểm tra từng phần, gửi lỗi lại cho AI viết lại (tối đa `--attempts`) → dựng đề
+đúng khuôn editor → vẽ biểu đồ Task 1 → thu audio (`--record`) → nạp dạng nháp bằng
+`scripts/load_ielts_trial.py --set-dir`. Model: bất kỳ nhà cung cấp chuẩn OpenAI (`IELTS_LLM_BASE_URL`,
+`IELTS_LLM_API_KEY`, `IELTS_LLM_MODEL`).
+
+- [x] Viết đề gốc theo D-IELTS-1: AI viết nội dung mới, prompt cấm chép đề đã xuất bản; admin vẫn duyệt
+  từng đề trước khi phát hành.
+- [x] **Schema IELTS riêng** (`ielts/rules.py`): Listening 4 part × 10 điểm, Reading 13/13/14 điểm,
+  các dạng câu gap / single / multi (chọn hai) / matching / TFNG / YNNG, giới hạn số từ.
+- [x] **Validator** (`ielts/rules.py`):
+  - đủ điểm từng part và cả đề;
+  - đáp án điền từ có nguyên văn trong bài đọc hoặc transcript và trong giới hạn số từ;
+  - `{{n}}` khớp số câu và đúng thứ tự;
+  - TFNG/YNNG dùng đủ cả ba đáp án;
+  - danh sách ghép dài hơn số câu;
+  - đề có đủ mọi dạng câu.
+  Còn thiếu: kiểm tra câu hỏi xếp theo thứ tự thông tin xuất hiện trong bài.
+- [ ] **Tiêu chuẩn chất lượng IELTS** dạng văn bản, tương đương [exam-quality-bar.md](exam-quality-bar.md).
+- [x] **Chống trùng chủ đề** (`seeds/ielts/topics.json`, `ielts/topics.py`): chủ đề gần giống chủ đề đã dùng
+  bị trả về ở bước lên kế hoạch; chủ đề chỉ được ghi khi cả bộ đạt.
+  Còn thiếu: so trùng nội dung bài đọc giữa các bộ.
+- [x] **Loader**: đi qua API admin (`load_ielts_trial.py --set-dir`) thay vì SQL trực tiếp, để mọi đề qua
+  đúng kiểm tra của backend và vào hàng chờ duyệt. Đổi lại, chạy lại sẽ tạo bản sao.
+- [x] **Audio** (`synthesize_ielts_trial_audio.py --set-dir`): mỗi người nói một giọng theo giọng vùng và giới
+  tính AI chọn, mỗi part một file.
+- [x] **Biểu đồ Writing Task 1** (`ielts/chart.py`) vẽ từ số liệu; số liệu ghi trong `rubric_notes`
   (D-IELTS-9).
+- [ ] **Ảnh** cho câu gắn nhãn bản đồ/sơ đồ: chưa sinh; pipeline chưa ra dạng câu này.
+- [x] Kiểm tra: `tests/test_ielts_generation.py` chạy cả luồng với model giả (viết lại khi sai, loại khi
+  sai mãi, chủ đề lặp). `IeltsTrialPaperIntegrationTest.anAiWrittenSetLoadsPassesReviewAndCanBeSat` nạp
+  một bộ do pipeline dựng (`src/test/resources/ielts/ai-sample-set`) qua duyệt, full test và bài làm 40/40.
 
 ---
 

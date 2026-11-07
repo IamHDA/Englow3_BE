@@ -1,0 +1,12 @@
+[
+  {"set": "academic-trial-paper-1", "slot": "listening-1", "topic": "booking a beginners' pottery course at an arts centre"},
+  {"set": "academic-trial-paper-1", "slot": "listening-2", "topic": "guided introduction to a woodland nature reserve"},
+  {"set": "academic-trial-paper-1", "slot": "listening-3", "topic": "students discussing a survey project on food waste"},
+  {"set": "academic-trial-paper-1", "slot": "listening-4", "topic": "history of lighthouse lamps and lenses"},
+  {"set": "academic-trial-paper-1", "slot": "reading-1", "topic": "community fruit orchards returning to European cities"},
+  {"set": "academic-trial-paper-1", "slot": "reading-2", "topic": "footbridges that sway under crowds and how engineers fixed them"},
+  {"set": "academic-trial-paper-1", "slot": "reading-3", "topic": "the psychological value of boredom"},
+  {"set": "academic-trial-paper-1", "slot": "writing-1", "topic": "household waste recycling rates in four cities"},
+  {"set": "academic-trial-paper-1", "slot": "writing-2", "topic": "working from home: benefits and problems"},
+  {"set": "academic-trial-paper-1", "slot": "speaking", "topic": "home, free time and learning useful skills"}
+]

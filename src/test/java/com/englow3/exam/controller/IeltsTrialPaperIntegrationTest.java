@@ -260,14 +260,66 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         assertThat(done.overallBand()).isEqualByComparingTo("7.0");
     }
 
+    /**
+     * A set written by data_pipeline/generators/generate_ielts_set.py (made with its stand-in model, so the content is
+     * filler but the shape is exactly what the pipeline builds) goes in the way load_ielts_trial.py --set-dir loads it,
+     * passes review, makes a full test, and gives 40/40 and band 9.0 when every answer is right.
+     */
+    @Test
+    void anAiWrittenSetLoadsPassesReviewAndCanBeSat() throws IOException {
+        String set = "ielts/ai-sample-set/";
+        SignedIn.as(jdbc, author, "STAFF");
+        SaveAuthoringRequest request = mapper.readValue(read(set + "paper.json"), SaveAuthoringRequest.class);
+        assertThat(validator.validate(request)).isEmpty();
+        UUID examId = exams.createAuthoring(request).getBody().id();
+        reviews.submitForReview(new SubmitExamForReviewCommand(examId));
+
+        SignedIn.as(jdbc, admin, "ADMIN");
+        assertThat(reviews.approve(new ApproveExamCommand(examId)).status()).isEqualTo(ExamStatus.PUBLISHED);
+        List<UUID> taskIds = new ArrayList<>();
+        for (JsonNode task : mapper.readTree(read(set + "tasks.json"))) {
+            ObjectNode body = (ObjectNode) task.deepCopy();
+            String chart = body.has("chart") ? body.remove("chart").asText() : null;
+            AssessmentTaskRequest taskRequest = mapper.treeToValue(body, AssessmentTaskRequest.class);
+            assertThat(validator.validate(taskRequest)).isEmpty();
+            UUID id = tasks.create(taskRequest).getBody().id();
+            if (chart != null) {
+                tasks.attachImage(id, new MockMultipartFile("file", chart, "image/png", read(set + chart)));
+            }
+            tasks.submit(id);
+            tasks.approve(id);
+            taskIds.add(id);
+        }
+        var fullTest = fullTests
+                .save(new SaveFullTestCommand(null, "IELTS Academic AI Set", "", CertificateVariant.ACADEMIC, examId,
+                        taskIds.get(0), taskIds.get(1), taskIds.get(2), taskIds.get(3), taskIds.get(4)));
+        fullTests.submitForReview(fullTest.id());
+        assertThat(fullTests.approve(fullTest.id()).status()).isEqualTo(ExamStatus.PUBLISHED);
+
+        SignedIn.as(jdbc, learner);
+        sittings.start(fullTest.id());
+        var attempt = attempts.start(StartExamAttemptCommand.full(examId));
+        List<Item> items = items(attempts.paperForAttempt(attempt.id()), set + "paper.json");
+        assertThat(numbers(items, SectionType.LISTENING)).startsWith("1").endsWith("40");
+        assertThat(numbers(items, SectionType.READING)).startsWith("1").endsWith("40");
+        ExamAttemptResult result = attempts.submit(new SubmitExamAttemptCommand(attempt.id(),
+                items.stream().map(IeltsTrialPaperIntegrationTest::rightAnswer).toList()));
+        assertThat(band(result, SectionType.LISTENING)).isEqualByComparingTo("9.0");
+        assertThat(band(result, SectionType.READING)).isEqualByComparingTo("9.0");
+    }
+
     /** A question as the learner sees it, with the key the paper file gives it. */
     private record Item(SectionType section, LearnerExamPaperResult.QuestionSetResult set,
             LearnerExamPaperResult.QuestionResult question, JsonNode key) {
     }
 
     private List<Item> items(LearnerExamPaperResult paper) throws IOException {
+        return items(paper, PAPER);
+    }
+
+    private List<Item> items(LearnerExamPaperResult paper, String paperFile) throws IOException {
         List<JsonNode> keys = new ArrayList<>();
-        for (JsonNode section : mapper.readTree(read(PAPER)).path("content").path("sections")) {
+        for (JsonNode section : mapper.readTree(read(paperFile)).path("content").path("sections")) {
             for (JsonNode part : section.path("parts")) {
                 for (JsonNode set : part.path("questionSets")) {
                     set.path("questions").forEach(keys::add);
@@ -335,6 +387,27 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
                 : listening && number == 23 ? List.of(wrong.get(0), wrong.get(1))
                         : !listening && number == 1 ? List.of(wrong.get(0)) : correct;
         return new SubmittedAnswer(q.id(), chosen, null);
+    }
+
+    /** The answer the key gives, with nothing wrong on purpose. */
+    private static SubmittedAnswer rightAnswer(Item item) {
+        var q = item.question();
+        if (q.questionType() == QuestionType.TEXT_ENTRY) {
+            return new SubmittedAnswer(q.id(), List.of(),
+                    item.key().path("acceptedAnswers").get(0).path("text").asText());
+        }
+        if (q.questionType() == QuestionType.MATCHING) {
+            String label = item.key().path("matchingLabels").get(0).asText();
+            return new SubmittedAnswer(q.id(), List.of(item.set().setOptions().stream()
+                    .filter(o -> o.label().equals(label)).findFirst().orElseThrow().id()), null);
+        }
+        List<UUID> correct = new ArrayList<>();
+        for (int i = 0; i < q.options().size(); i++) {
+            if (item.key().path("options").get(i).path("correct").asBoolean()) {
+                correct.add(q.options().get(i).id());
+            }
+        }
+        return new SubmittedAnswer(q.id(), correct, null);
     }
 
     private static BigDecimal band(ExamAttemptResult result, SectionType section) {
