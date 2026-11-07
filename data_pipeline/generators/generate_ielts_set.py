@@ -29,15 +29,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "generators"))
 
-from ielts import build, chart, prompts, rules, topics  # noqa: E402
+from ielts import build, chart, prompts, rules, steps, topics  # noqa: E402
 from ielts.llm import LlmError, OpenAiCompatible, Writer  # noqa: E402
 
 OUTPUT = ROOT / "output" / "ielts"
 REJECTS = ROOT / "rejects" / "ielts"
 
-# The kinds each component must include, so that every question type appears somewhere in the paper.
-LISTENING_KINDS = {1: ["gap"], 2: ["single", "matching"], 3: ["multi", "matching"], 4: ["gap"]}
-READING_KINDS = {1: ["tfng", "gap"], 2: ["matching", "single"], 3: ["ynng"]}
 
 
 class Rejected(Exception):
@@ -65,68 +62,38 @@ def write(writer: Writer, component: str, messages: list[dict], check, attempts:
     raise Rejected(component, reply, problems)
 
 
-def requires(kinds: list[str]):
-    def check(spec: dict) -> list[str]:
-        present = {s.get("kind") for s in spec.get("sets", [])}
-        return [f"include a {kind!r} question set here" for kind in kinds if kind not in present]
-    return check
-
-
-def check_plan(used: list[dict]):
-    def check(plan: dict) -> list[str]:
-        problems = []
-        if len(plan.get("listening") or []) != 4 or len(plan.get("reading") or []) != 3:
-            problems.append("give exactly 4 listening topics and 3 reading topics")
-        for field in ("title", "writing_task1", "writing_task2", "speaking"):
-            if not str(plan.get(field, "")).strip():
-                problems.append(f"give {field}")
-        chosen = list(plan.get("listening") or []) + list(plan.get("reading") or []) + [
-            plan.get("writing_task1", ""), plan.get("writing_task2", ""), plan.get("speaking", "")]
-        seen: list[dict] = []
-        for topic in [str(t) for t in chosen if str(t).strip()]:
-            repeat = topics.taken(topic, used) or topics.taken(topic, seen)
-            if repeat:
-                problems.append(f"{topic!r} repeats a topic already used ({repeat!r}); choose another")
-            seen.append({"topic": topic})
-        return problems
-    return check
-
-
 def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40] or "set"
 
 
 def generate(writer: Writer, out_root: Path = OUTPUT, rejects_root: Path = REJECTS, registry: Path = topics.REGISTRY,
-             attempts: int = 3, min_words: int = rules.MIN_PASSAGE_WORDS, draw_chart: bool = True) -> Path:
+             attempts: int = 3, min_words: int = rules.MIN_PASSAGE_WORDS, draw_chart: bool = True,
+             brief: str | None = None) -> Path:
     log: list[str] = []
-    used = topics.load(registry)
-    plan = write(writer, "plan", prompts.plan([u["topic"] for u in used]), check_plan(used), attempts, log)
-    set_id = f"ai-{datetime.now(UTC):%Y%m%d-%H%M}-{slugify(plan['title'])}"
+    used = [u["topic"] for u in topics.load(registry)]
+    components: dict[str, dict] = {}
+    set_id = None
     try:
-        listening = {}
-        for n in range(1, 5):
-            listening[n] = write(
-                writer, f"listening-{n}", prompts.listening(n, plan["listening"][n - 1], rules.LISTENING_MARKS[n], LISTENING_KINDS[n]),
-                lambda spec, n=n: rules.check_listening_part(n, spec) + requires(LISTENING_KINDS[n])(spec),
+        for step in steps.WRITING_STEPS:
+            components[step] = write(
+                writer, step,
+                steps.messages(step, components.get("plan"), brief, used if step == steps.PLAN else [], min_words),
+                lambda reply, s=step: steps.check(s, reply, used, min_words),
                 attempts, log)
-        reading = {}
-        for n in range(1, 4):
-            reading[n] = write(
-                writer, f"reading-{n}",
-                prompts.reading(n, plan["reading"][n - 1], rules.READING_MARKS[n], min_words, READING_KINDS[n]),
-                lambda spec, n=n: rules.check_reading_passage(n, spec, min_words) + requires(READING_KINDS[n])(spec),
-                attempts, log)
-        task1 = write(writer, "writing-1", prompts.task1(plan["writing_task1"]), rules.check_task1, attempts, log)
-        task2 = write(writer, "writing-2", prompts.task2(plan["writing_task2"]), rules.check_task2, attempts, log)
-        speaking = write(writer, "speaking", prompts.speaking(plan["speaking"]), rules.check_speaking, attempts, log)
+            if step == steps.PLAN:
+                set_id = f"ai-{datetime.now(UTC):%Y%m%d-%H%M}-{slugify(components[step]['title'])}"
     except Rejected as rejected:
-        folder = rejects_root / set_id
+        folder = rejects_root / (set_id or f"ai-{datetime.now(UTC):%Y%m%d-%H%M}-unplanned")
         folder.mkdir(parents=True, exist_ok=True)
         (folder / f"{rejected.component}.json").write_text(json.dumps(
             {"problems": rejected.problems, "last_reply": rejected.reply}, indent=2, ensure_ascii=False),
             encoding="utf-8")
         raise SystemExit(f"{rejected.component} still failed after {attempts} attempts; see {folder}") from rejected
 
+    plan = components[steps.PLAN]
+    listening = {int(s[-1]): components[s] for s in steps.LISTENING}
+    reading = {int(s[-1]): components[s] for s in steps.READING}
+    task1, task2, speaking = components[steps.WRITING_1], components[steps.WRITING_2], components[steps.SPEAKING]
     mix = rules.check_paper_mix(listening, reading)
     if mix:
         raise SystemExit("The paper misses question types: " + "; ".join(mix))
@@ -162,9 +129,11 @@ def main() -> None:
     parser.add_argument("--attempts", type=int, default=3, help="tries per component before giving up")
     parser.add_argument("--min-words", type=int, default=rules.MIN_PASSAGE_WORDS, help="shortest reading passage")
     parser.add_argument("--record", action="store_true", help="also record the Listening audio (edge-tts)")
+    parser.add_argument("--brief", help="what you want: topics, difficulty, question types (the rules still apply)")
     args = parser.parse_args()
 
-    folder = generate(OpenAiCompatible.from_env(), attempts=args.attempts, min_words=args.min_words)
+    folder = generate(OpenAiCompatible.from_env(), attempts=args.attempts, min_words=args.min_words,
+                      brief=args.brief)
     print(f"Set written: {folder}")
     if args.record:
         from synthesize_ielts_trial_audio import record_all, voices_from
