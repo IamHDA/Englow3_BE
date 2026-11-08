@@ -39,6 +39,11 @@ public interface AiJobHandler {
     default void onGaveUp(UUID targetId, String errorCode) {
     }
 
+    /** Includes the failed step's identity for multi-step targets that may already have advanced. */
+    default void onGaveUp(UUID targetId, String inputPayload, String errorCode) {
+        onGaveUp(targetId, errorCode);
+    }
+
     /**
      * @param outputPayload
      *            JSON to store on success, ignored otherwise

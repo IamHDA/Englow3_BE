@@ -2,18 +2,26 @@ package com.englow3.generation.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.generation.entity.GenerationRequest;
 import com.englow3.generation.entity.GenerationStatus;
 
+import jakarta.persistence.LockModeType;
+
 public interface GenerationRequestRepository extends JpaRepository<GenerationRequest, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from GenerationRequest r where r.id = :id")
+    Optional<GenerationRequest> findByIdForUpdate(@Param("id") UUID id);
 
     /** Held for the surrounding transaction, so two presses at once cannot both pass the limit. */
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:key,0)) as text)", nativeQuery = true)

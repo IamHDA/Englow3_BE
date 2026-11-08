@@ -25,4 +25,7 @@ public interface FullTestService {
 
     /** What learners may choose from: published full tests, newest first. */
     List<FullTestResult> catalogue();
+
+    /** Rechecks the components before a learner starts, including older published full tests. */
+    void requireAvailable(UUID id);
 }

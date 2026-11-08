@@ -15,6 +15,7 @@ import com.englow3.exam.dto.command.SubmitExamForReviewCommand;
 import com.englow3.exam.dto.result.ExamResult;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.repository.ExamRepository;
+import com.englow3.exam.repository.FullTestRepository;
 import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.exam.service.ExamReviewService;
 import com.englow3.shared.error.ConflictException;
@@ -32,6 +33,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     private final QuestionRepository questionRepo;
     private final UserDirectory userDirectory;
     private final Clock clock;
+    private final FullTestRepository fullTestRepo;
 
     @Transactional
     public ExamResult publish(PublishExamCommand command) {
@@ -107,6 +109,11 @@ public class ExamReviewServiceImpl implements ExamReviewService {
 
     @Transactional
     public ExamResult archive(ArchiveExamCommand command) {
+        fullTestRepo.lockAvailability();
+        if (fullTestRepo.protectsPaper(command.examId())) {
+            throw new ConflictException("FULL_TEST_COMPONENT_IN_USE",
+                    "Archive the full test and wait for its open sittings to settle before archiving this paper");
+        }
         Exam exam = requireExam(command.examId());
         exam.archive();
         return ExamResult.of(exam);

@@ -74,9 +74,9 @@ public class GenerationSteps {
      * Records what a step produced and asks for the next one, or for the same step again when the model has to fix its
      * reply. Runs in the queue's completion transaction: no network calls.
      */
-    public void apply(UUID requestId, String step, String outputJson) {
-        GenerationRequest request = requestRepo.findById(requestId).orElse(null);
-        if (request == null || !request.isAt(step)) {
+    public void apply(UUID requestId, String step, int attempt, String outputJson) {
+        GenerationRequest request = requestRepo.findByIdForUpdate(requestId).orElse(null);
+        if (request == null || !request.isAt(step) || request.getAttempt() != attempt) {
             return;
         }
         JsonNode output = read(outputJson);
@@ -120,9 +120,12 @@ public class GenerationSteps {
 
     /** The queue gave up on a step: an outage that outlasted its retries, or a failure no retry can fix. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void fail(UUID requestId, String code, String message) {
-        requestRepo.findById(requestId).ifPresent(request -> {
-            request.fail(code, message, clock.instant());
+    public void failAt(UUID requestId, String step, int attempt, String code) {
+        requestRepo.findByIdForUpdate(requestId).ifPresent(request -> {
+            if (!request.isAt(step) || request.getAttempt() != attempt) {
+                return;
+            }
+            request.fail(code, "A step stopped and was not retried: " + code, clock.instant());
             requestRepo.saveAndFlush(request);
         });
     }

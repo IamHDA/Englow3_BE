@@ -28,7 +28,7 @@ class FullTestTest {
 
     private static FullTest.PaperFacts goodPaper() {
         return new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
-                CertificateVariant.ACADEMIC, true, true);
+                CertificateVariant.ACADEMIC, true, true, true);
     }
 
     private static List<FullTest.TaskFacts> goodTasks() {
@@ -70,6 +70,14 @@ class FullTestTest {
     }
 
     @Test
+    void aPublishedPaperMustBeAbleToProduceBothBands() {
+        var paper = new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
+                CertificateVariant.ACADEMIC, true, true, false);
+        assertThatThrownBy(() -> draft().submitForReview(paper, goodTasks(), NOW)).extracting(FullTestTest::code)
+                .isEqualTo("FULL_TEST_PAPER_NOT_BANDABLE");
+    }
+
+    @Test
     void namesFiveDifferentTasks() {
         UUID same = UUID.randomUUID();
 
@@ -88,7 +96,7 @@ class FullTestTest {
     @Test
     void refusesAnUnpublishedPaper() {
         var paper = new FullTest.PaperFacts(ExamStatus.DRAFT, ExamType.MOCK, CertificateType.IELTS,
-                CertificateVariant.ACADEMIC, true, true);
+                CertificateVariant.ACADEMIC, true, true, true);
 
         assertThatThrownBy(() -> draft().submitForReview(paper, goodTasks(), NOW)).extracting(FullTestTest::code)
                 .isEqualTo("FULL_TEST_PAPER_INVALID");
@@ -97,7 +105,7 @@ class FullTestTest {
     @Test
     void refusesAPaperOfTheOtherVariant() {
         var paper = new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
-                CertificateVariant.GENERAL, true, true);
+                CertificateVariant.GENERAL, true, true, true);
 
         assertThatThrownBy(() -> draft().submitForReview(paper, goodTasks(), NOW)).extracting(FullTestTest::code)
                 .isEqualTo("FULL_TEST_PAPER_INVALID");
@@ -106,7 +114,7 @@ class FullTestTest {
     @Test
     void refusesAPaperWithoutAReadingSection() {
         var paper = new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
-                CertificateVariant.ACADEMIC, true, false);
+                CertificateVariant.ACADEMIC, true, false, true);
 
         assertThatThrownBy(() -> draft().submitForReview(paper, goodTasks(), NOW)).extracting(FullTestTest::code)
                 .isEqualTo("FULL_TEST_PAPER_INVALID");
@@ -187,7 +195,7 @@ class FullTestTest {
                 new FullTest.TaskFacts(FullTest.Slot.WRITING_TASK_1, true, "WRITING", "TASK_1", "IELTS", true, false));
 
         general.submitForReview(new FullTest.PaperFacts(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS,
-                CertificateVariant.GENERAL, true, true), tasks, NOW);
+                CertificateVariant.GENERAL, true, true, true), tasks, NOW);
 
         assertThat(general.getStatus()).isEqualTo(ExamStatus.PENDING_REVIEW);
     }

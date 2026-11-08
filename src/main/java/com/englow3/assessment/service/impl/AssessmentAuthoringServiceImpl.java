@@ -1,17 +1,18 @@
 package com.englow3.assessment.service.impl;
 
-import org.springframework.context.ApplicationEventPublisher;
-import com.englow3.assessment.api.AssessmentAnswerGraded;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.englow3.assessment.api.AssessmentAnswerGraded;
+import com.englow3.assessment.api.AssessmentTaskArchiving;
 import com.englow3.assessment.dto.command.AssessmentTaskCommand;
 import com.englow3.assessment.dto.result.AssessmentAttemptResult;
 import com.englow3.assessment.dto.result.AssessmentReviewResult;
@@ -148,6 +149,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
                 }
                 case "archive" -> {
                     requireAdmin();
+                    events.publishEvent(new AssessmentTaskArchiving(id));
                     task.archive();
                 }
                 case "restore" -> {

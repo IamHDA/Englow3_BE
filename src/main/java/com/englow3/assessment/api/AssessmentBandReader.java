@@ -31,8 +31,11 @@ public interface AssessmentBandReader {
      *            mean of the four criteria on the 0-9 scale, in half bands; null until graded
      * @param status
      *            the attempt's status by name: DRAFT, QUEUED, NEEDS_REVIEW, COMPLETED or FAILED
+     * @param assessedAt
+     *            when the grade was saved; full-test grading deadlines use this, not the time of a later read
      */
-    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band, String status) {
+    record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band, String status,
+            Instant assessedAt) {
     }
 
     /**

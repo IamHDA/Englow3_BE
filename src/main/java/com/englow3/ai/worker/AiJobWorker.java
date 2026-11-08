@@ -195,7 +195,7 @@ public class AiJobWorker implements AutoCloseable {
         if (handler == null)
             return;
         try {
-            handler.onGaveUp(job.getTargetId(), code);
+            handler.onGaveUp(job.getTargetId(), job.getInputPayload(), code);
         } catch (RuntimeException failure) {
             log.error("AI terminal notification failed id={} exceptionType={}", job.getId(),
                     failure.getClass().getSimpleName());

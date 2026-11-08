@@ -43,8 +43,8 @@ public class FullTestSitting extends BasePersistedEntity {
      */
     public static final Duration GRADING_WINDOW = Duration.ofDays(7);
 
-    /** A Writing or Speaking answer the service found for a slot: when it was submitted, and its band once graded. */
-    public record Part(UUID attemptId, Instant submittedAt, BigDecimal band) {
+    /** An answer's submission time and grade's actual save time; reconciliation may happen after either deadline. */
+    public record Part(UUID attemptId, Instant submittedAt, BigDecimal band, Instant assessedAt) {
     }
 
     /**
@@ -169,7 +169,8 @@ public class FullTestSitting extends BasePersistedEntity {
             if (parts[i] == null && inTime(found.submittedAt())) {
                 parts[i] = found.attemptId();
             }
-            if (Objects.equals(parts[i], found.attemptId())) {
+            if (Objects.equals(parts[i], found.attemptId()) && found.assessedAt() != null
+                    && !found.assessedAt().isAfter(gradesDueAt())) {
                 partBands[i] = found.band();
             }
         }

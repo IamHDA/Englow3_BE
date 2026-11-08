@@ -25,7 +25,7 @@ class FullTestSittingTest {
     }
 
     private static FullTestSitting.Part part(Instant submittedAt, String band) {
-        return new FullTestSitting.Part(UUID.randomUUID(), submittedAt, b(band));
+        return new FullTestSitting.Part(UUID.randomUUID(), submittedAt, b(band), band == null ? null : DURING);
     }
 
     private FullTestSitting.Progress progress(String listening, String reading, FullTestSitting.Part... parts) {
@@ -44,6 +44,30 @@ class FullTestSittingTest {
     @Test
     void aSittingHasSevenDays() {
         assertThat(started().getDeadlineAt()).isEqualTo(START.plus(Duration.ofDays(7)));
+    }
+
+    @Test
+    void gradesSavedInTimeStillCountWhenReconciliationRunsAfterTheCutoff() {
+        var sitting = started();
+        var change = sitting.settle(progress("7.0", "6.0", part(DURING, "6.0"), part(DURING, "6.0"),
+                part(DURING, "6.0"), part(DURING, "6.0"), part(DURING, "6.0")), sitting.gradesDueAt().plusSeconds(60));
+        assertThat(change.completed()).isTrue();
+        assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.COMPLETED);
+    }
+
+    @Test
+    void aGradeAfterTheGradingCutoffCannotCompleteAnUnexpiredRow() {
+        var sitting = started();
+        FullTestSitting.Part[] parts = { part(DURING, null), part(DURING, "6.0"), part(DURING, "6.0"),
+                part(DURING, "6.0"), part(DURING, "6.0") };
+        sitting.settle(progress("7.0", "6.0", parts), DURING);
+        parts[0] = new FullTestSitting.Part(parts[0].attemptId(), DURING, b("6.0"),
+                sitting.gradesDueAt().plusSeconds(1));
+        var change = sitting.settle(progress("7.0", "6.0", parts), sitting.gradesDueAt().plusSeconds(1));
+        assertThat(change.completed()).isFalse();
+        assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.EXPIRED);
+        assertThat(sitting.getOverallBand()).isNull();
+        assertThat(sitting.getProvisionalBand()).isEqualByComparingTo("6.0");
     }
 
     @Test
@@ -121,7 +145,7 @@ class FullTestSittingTest {
         assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.AWAITING_GRADES);
 
         FullTestSitting.Part[] graded = ungraded.stream()
-                .map(p -> new FullTestSitting.Part(p.attemptId(), p.submittedAt(), b("6.0")))
+                .map(p -> new FullTestSitting.Part(p.attemptId(), p.submittedAt(), b("6.0"), AFTER.plusSeconds(3600)))
                 .toArray(FullTestSitting.Part[]::new);
         assertThat(sitting.settle(progress("7.0", "6.5", graded), AFTER.plusSeconds(3600)).completed()).isTrue();
         assertThat(sitting.getStatus()).isEqualTo(FullTestSittingStatus.COMPLETED);
@@ -176,7 +200,7 @@ class FullTestSittingTest {
                 part(DURING, "6.0") };
         sitting.settle(progress("7.0", "6.5", waiting), AFTER);
 
-        waiting[1] = new FullTestSitting.Part(late.attemptId(), late.submittedAt(), b("6.0"));
+        waiting[1] = new FullTestSitting.Part(late.attemptId(), late.submittedAt(), b("6.0"), sitting.gradesDueAt());
         assertThat(sitting.settle(progress("7.0", "6.5", waiting), sitting.gradesDueAt()).completed()).isTrue();
     }
 }

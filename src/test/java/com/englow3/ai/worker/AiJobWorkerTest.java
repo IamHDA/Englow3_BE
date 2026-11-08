@@ -161,7 +161,7 @@ class AiJobWorkerTest {
             logger.detachAppender(capture);
             capture.stop();
         }
-        verify(handler).onGaveUp(job.getTargetId(), "AI_JOB_HANDLER_ERROR");
+        verify(handler).onGaveUp(job.getTargetId(), job.getInputPayload(), "AI_JOB_HANDLER_ERROR");
         verify(handler, never()).complete(any(), any(), any());
     }
 

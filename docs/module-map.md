@@ -77,6 +77,14 @@ answers, and section results.
     start one (`user.api.LearnerGoalReader`); TOEIC learners keep the placement paper.
   - **Tables:** `full_tests` and `full_test_sittings` (V082). Only exam writes them.
     The five tasks are assessment's and are referenced by id only.
+  - **Availability:** sending for review, approval and starting recheck that each skill
+    has 40 whole marks and usable band conversions for every score from 0 through 40.
+    Grading deadlines use assessment's `assessedAt`, so an on-time grade still counts
+    if a missed event is reconciled after the cutoff. A paper or task cannot be archived
+    while referenced by a pending/published full test or an unsettled sitting, even if
+    that full test has been archived. Publication, starting and archival share an
+    advisory transaction lock. Assessment publishes `AssessmentTaskArchiving` synchronously
+    before archival; exam may veto it without making assessment depend on exam.
   - **Rules:** `FullTest` follows a paper's review workflow and can be published only
     when its paper is a published IELTS mock of its variant with Listening and Reading
     and all five tasks are published IELTS tasks of the right slot. `FullTestSitting`
@@ -373,6 +381,13 @@ Owns the AI tutor conversation.
 - **Release:** see `tutor-release-runbook.md`; memory, streaming and voice default off.
 
 ## `generation`
+
+GenerationArtifacts commits the paper, five task drafts and the assemble checkpoint in one
+short database transaction under a generation-request row lock. The finish step likewise
+commits all review submissions, the full-test draft and its checkpoint together. A repeated
+job observes the advanced checkpoint and creates nothing. Job completion and terminal
+failure callbacks check both step and attempt; a late callback cannot fail newer work.
+Provider calls and media uploads remain outside those transactions.
 
 Owns AI content generation requests: an ADMIN or STAFF member presses "generate",
 the server writes a whole set with a model, and the result lands as drafts in the

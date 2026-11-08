@@ -44,7 +44,7 @@ public class FullTest extends BasePersistedEntity {
 
     /** What the service found for the paper. */
     public record PaperFacts(ExamStatus status, ExamType examType, CertificateType certificateType,
-            CertificateVariant certificateVariant, boolean hasListening, boolean hasReading) {
+            CertificateVariant certificateVariant, boolean hasListening, boolean hasReading, boolean bandReady) {
     }
 
     /** What the service found for one task; null fields when the task does not exist. */
@@ -213,13 +213,17 @@ public class FullTest extends BasePersistedEntity {
      * Learners can sit it: a published IELTS mock paper of this variant with both a Listening and a Reading section,
      * and in every slot a published IELTS task of the slot's skill and type.
      */
-    private void requireSittable(PaperFacts paper, List<TaskFacts> tasks) {
+    public void requireSittable(PaperFacts paper, List<TaskFacts> tasks) {
         if (paper == null || paper.status() != ExamStatus.PUBLISHED || paper.examType() != ExamType.MOCK
                 || paper.certificateType() != CertificateType.IELTS || paper.certificateVariant() != certificateVariant
                 || !paper.hasListening() || !paper.hasReading()) {
             throw new ConflictException("FULL_TEST_PAPER_INVALID",
                     "The paper must be a published IELTS %s mock with a Listening and a Reading section"
                             .formatted(certificateVariant));
+        }
+        if (!paper.bandReady()) {
+            throw new ConflictException("FULL_TEST_PAPER_NOT_BANDABLE",
+                    "The paper must have 40 whole marks in each skill and a matching IELTS band conversion");
         }
         for (Slot slot : Slot.values()) {
             TaskFacts task = tasks.stream().filter(facts -> facts.slot() == slot).findFirst().orElse(null);

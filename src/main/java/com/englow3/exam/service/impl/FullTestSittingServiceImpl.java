@@ -32,6 +32,7 @@ import com.englow3.exam.repository.AttemptSectionResultRepository;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.FullTestRepository;
 import com.englow3.exam.repository.FullTestSittingRepository;
+import com.englow3.exam.service.FullTestService;
 import com.englow3.exam.service.FullTestSittingService;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
@@ -65,10 +66,12 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     private final UserDirectory userDirectory;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final FullTestService fullTests;
 
     @Override
     @Transactional
     public FullTestSittingResult start(UUID fullTestId) {
+        fullTestRepo.lockAvailability();
         UUID userId = userDirectory.requireCurrentUserId();
         FullTest test = fullTestRepo.findById(fullTestId).filter(found -> found.getStatus() == ExamStatus.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("FULL_TEST_NOT_FOUND",
@@ -79,6 +82,7 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
             throw new ConflictException("FULL_TEST_IELTS_ONLY",
                     "The IELTS full test is for learners preparing for IELTS");
         }
+        fullTests.requireAvailable(fullTestId);
         Optional<FullTestSitting> open = sittingRepo.findFirstByUserIdAndFullTestIdAndStatus(userId, fullTestId,
                 FullTestSittingStatus.IN_PROGRESS);
         if (open.isPresent()) {
@@ -188,9 +192,8 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
             UUID attemptId = attached.get(slot.ordinal());
             Optional<AssessmentBandReader.Answer> answer = attemptId != null ? assessments.read(attemptId, userId)
                     : assessments.latestAnswer(test.taskId(slot), userId, sitting.getStartedAt());
-            parts.add(
-                    answer.map(found -> new FullTestSitting.Part(found.attemptId(), found.submittedAt(), found.band()))
-                            .orElse(null));
+            parts.add(answer.map(found -> new FullTestSitting.Part(found.attemptId(), found.submittedAt(), found.band(),
+                    found.assessedAt())).orElse(null));
         }
         Instant paperSubmitted = paper
                 .map(attempt -> attempt.getSubmittedAt() != null ? attempt.getSubmittedAt() : attempt.getScoredAt())

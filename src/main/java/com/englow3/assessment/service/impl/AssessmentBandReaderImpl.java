@@ -54,11 +54,12 @@ public class AssessmentBandReaderImpl implements AssessmentBandReader {
     private Answer answerOf(AssessmentAttempt attempt) {
         boolean completed = attempt.getStatus() == AssessmentAttemptStatus.COMPLETED;
         if (attempt.getStatus() == AssessmentAttemptStatus.DRAFT) {
-            return new Answer(attempt.getId(), attempt.getTaskId(), null, false, null, attempt.getStatus().name());
+            return new Answer(attempt.getId(), attempt.getTaskId(), null, false, null, attempt.getStatus().name(),
+                    null);
         }
         Instant submittedAt = attempt.getSubmittedAt() != null ? attempt.getSubmittedAt() : attempt.getCreatedAt();
         return new Answer(attempt.getId(), attempt.getTaskId(), submittedAt, completed,
-                completed ? overall(attempt.getReport()) : null, attempt.getStatus().name());
+                completed ? overall(attempt.getReport()) : null, attempt.getStatus().name(), attempt.getAssessedAt());
     }
 
     private BigDecimal overall(String report) {

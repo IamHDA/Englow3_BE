@@ -60,7 +60,8 @@ class FullTestSittingServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final FullTestSittingService service = new FullTestSittingServiceImpl(fullTestRepo, sittingRepo,
-            attemptRepo, sectionResultRepo, assessments, goals, placements, userDirectory, events, CLOCK);
+            attemptRepo, sectionResultRepo, assessments, goals, placements, userDirectory, events, CLOCK,
+            mock(FullTestService.class));
 
     private final UUID userId = UUID.randomUUID();
     private FullTest test;
@@ -72,11 +73,14 @@ class FullTestSittingServiceTest {
         test = FullTest.draft("IELTS Academic 1", "", CertificateVariant.ACADEMIC, UUID.randomUUID(),
                 List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
                 UUID.randomUUID());
-        test.submitForReview(new FullTest.PaperFacts(com.englow3.exam.entity.ExamStatus.PUBLISHED, ExamType.MOCK,
-                CertificateType.IELTS, CertificateVariant.ACADEMIC, true, true), facts(), CLOCK.instant());
-        test.approve(UUID.randomUUID(), new FullTest.PaperFacts(com.englow3.exam.entity.ExamStatus.PUBLISHED,
-                ExamType.MOCK, CertificateType.IELTS, CertificateVariant.ACADEMIC, true, true), facts(),
-                CLOCK.instant());
+        test.submitForReview(
+                new FullTest.PaperFacts(com.englow3.exam.entity.ExamStatus.PUBLISHED, ExamType.MOCK,
+                        CertificateType.IELTS, CertificateVariant.ACADEMIC, true, true, true),
+                facts(), CLOCK.instant());
+        test.approve(UUID.randomUUID(),
+                new FullTest.PaperFacts(com.englow3.exam.entity.ExamStatus.PUBLISHED, ExamType.MOCK,
+                        CertificateType.IELTS, CertificateVariant.ACADEMIC, true, true, true),
+                facts(), CLOCK.instant());
         when(fullTestRepo.findById(test.getId())).thenReturn(Optional.of(test));
     }
 
@@ -132,9 +136,9 @@ class FullTestSittingServiceTest {
                 AttemptSectionResult.of(paper.getId(), SectionType.READING, BigDecimal.TEN, BigDecimal.TEN,
                         new BigDecimal("7.0"), 30, 40)));
         for (UUID taskId : test.taskIds()) {
-            when(assessments.latestAnswer(taskId, userId, sitting.getStartedAt()))
-                    .thenReturn(Optional.of(new AssessmentBandReader.Answer(UUID.randomUUID(), taskId,
-                            CLOCK.instant().minusSeconds(30), true, new BigDecimal("6.0"), "COMPLETED")));
+            when(assessments.latestAnswer(taskId, userId, sitting.getStartedAt())).thenReturn(Optional
+                    .of(new AssessmentBandReader.Answer(UUID.randomUUID(), taskId, CLOCK.instant().minusSeconds(30),
+                            true, new BigDecimal("6.0"), "COMPLETED", CLOCK.instant().minusSeconds(10))));
         }
 
         var result = service.view(sitting.getId());
@@ -173,7 +177,7 @@ class FullTestSittingServiceTest {
         UUID task2 = test.taskId(FullTest.Slot.WRITING_TASK_2);
         UUID failed = UUID.randomUUID();
         var answer = new AssessmentBandReader.Answer(failed, task2, CLOCK.instant().minusSeconds(30), false, null,
-                "FAILED");
+                "FAILED", null);
         when(assessments.latestAnswer(task2, userId, sitting.getStartedAt())).thenReturn(Optional.of(answer));
         when(assessments.read(failed, userId)).thenReturn(Optional.of(answer));
 

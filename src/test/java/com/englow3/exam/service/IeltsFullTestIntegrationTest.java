@@ -1,6 +1,7 @@
 package com.englow3.exam.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,16 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
     private ExamAttemptService attempts;
 
     @Autowired
+    private ExamReviewService review;
+
+    @Autowired
+    private com.englow3.assessment.service.AssessmentAuthoringService taskAuthoring;
+
+    @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactions;
 
     private UUID author;
     private UUID learner;
@@ -158,6 +168,80 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
                 .query(String.class).single()).isEqualTo("PASSED");
         assertThat(jdbc.sql("select result_score from roadmap_milestones where id = :id").param("id", milestone)
                 .query(java.math.BigDecimal.class).single()).isEqualByComparingTo("6.5");
+    }
+
+    private UUID draftFullTest() {
+        return fullTests.save(new SaveFullTestCommand(null, "Full test safety", "", CertificateVariant.ACADEMIC, examId,
+                tasks.get(0), tasks.get(1), tasks.get(2), tasks.get(3), tasks.get(4))).id();
+    }
+
+    @Test
+    void reviewRejectsConversionTablesWithAMissingMiddleRange() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        transactions.executeWithoutResult(tx -> {
+            tx.setRollbackOnly();
+            UUID fullTest = draftFullTest();
+            jdbc.sql(
+                    "delete from score_conversions where certificate_type='IELTS' and section_type='LISTENING' and raw_score_from=18")
+                    .update();
+            assertThatThrownBy(() -> fullTests.submitForReview(fullTest)).hasFieldOrPropertyWithValue("code",
+                    "FULL_TEST_PAPER_NOT_BANDABLE");
+        });
+    }
+
+    @Test
+    void reviewRejectsAPaperWithoutFortyWholeMarksPerSkill() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID fullTest = draftFullTest();
+        jdbc.sql("update questions set max_raw_score=0.5 where id=:id").param("id", questions.getFirst()).update();
+        assertThatThrownBy(() -> fullTests.submitForReview(fullTest)).hasFieldOrPropertyWithValue("code",
+                "FULL_TEST_PAPER_NOT_BANDABLE");
+        assertThat(fullTests.detail(fullTest).status()).isEqualTo(ExamStatus.DRAFT);
+    }
+
+    @Test
+    void componentsCannotBeArchivedUntilTheFullTestIsArchived() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID fullTest = draftFullTest();
+        fullTests.submitForReview(fullTest);
+        assertThatThrownBy(() -> review.archive(new com.englow3.exam.dto.command.ArchiveExamCommand(examId)))
+                .hasFieldOrPropertyWithValue("code", "FULL_TEST_COMPONENT_IN_USE");
+        fullTests.approve(fullTest);
+        assertThatThrownBy(() -> taskAuthoring.transition(tasks.getFirst(), "archive", null))
+                .hasFieldOrPropertyWithValue("code", "FULL_TEST_COMPONENT_IN_USE");
+        fullTests.archive(fullTest);
+        assertThat(review.archive(new com.englow3.exam.dto.command.ArchiveExamCommand(examId)).status())
+                .isEqualTo(ExamStatus.ARCHIVED);
+        taskAuthoring.transition(tasks.getFirst(), "archive", null);
+    }
+
+    @Test
+    void archivedFullTestsStillProtectTheirLearnersOpenSittings() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID fullTest = draftFullTest();
+        fullTests.submitForReview(fullTest);
+        fullTests.approve(fullTest);
+        SignedIn.as(jdbc, learner);
+        sittings.start(fullTest);
+        SignedIn.as(jdbc, author, "ADMIN");
+        fullTests.archive(fullTest);
+        assertThatThrownBy(() -> review.archive(new com.englow3.exam.dto.command.ArchiveExamCommand(examId)))
+                .hasFieldOrPropertyWithValue("code", "FULL_TEST_COMPONENT_IN_USE");
+        assertThatThrownBy(() -> taskAuthoring.transition(tasks.getFirst(), "archive", null))
+                .hasFieldOrPropertyWithValue("code", "FULL_TEST_COMPONENT_IN_USE");
+    }
+
+    @Test
+    void olderPublishedFullTestsAreRecheckedBeforeStarting() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID fullTest = draftFullTest();
+        fullTests.submitForReview(fullTest);
+        fullTests.approve(fullTest);
+        // A legacy inconsistency predating the archive guard.
+        jdbc.sql("update assessment_tasks set status='ARCHIVED' where id=:id").param("id", tasks.getFirst()).update();
+        SignedIn.as(jdbc, learner);
+        assertThatThrownBy(() -> sittings.start(fullTest)).hasFieldOrPropertyWithValue("code",
+                "FULL_TEST_TASK_INVALID");
     }
 
     /** An active IELTS roadmap whose current stage closes with a mock milestone on this full test. */

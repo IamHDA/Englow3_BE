@@ -37,7 +37,7 @@ class ExamReviewServiceTest {
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final QuestionRepository questionRepo = mock(QuestionRepository.class);
     private final ExamReviewService service = new ExamReviewServiceImpl(examRepo, questionRepo,
-            mock(UserDirectory.class), CLOCK);
+            mock(UserDirectory.class), CLOCK, mock(com.englow3.exam.repository.FullTestRepository.class));
 
     @BeforeEach
     void completeQuestions() {

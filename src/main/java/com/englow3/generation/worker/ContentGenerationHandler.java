@@ -1,8 +1,6 @@
 package com.englow3.generation.worker;
 
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -12,6 +10,7 @@ import com.englow3.ai.client.GenerationClient;
 import com.englow3.ai.client.LlmException;
 import com.englow3.assessment.api.GeneratedTaskWriter;
 import com.englow3.exam.api.GeneratedPaperWriter;
+import com.englow3.generation.service.GenerationArtifacts;
 import com.englow3.generation.service.impl.GenerationSteps;
 import com.englow3.generation.service.impl.GenerationSteps.Work;
 import com.englow3.shared.error.DomainException;
@@ -26,9 +25,9 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Runs one step of a generation request per job.
  * <p>
- * {@link #run} does the step's outside work - the adapter call, storage uploads, and the drafts it creates or changes
- * through the exam and assessment APIs, each in its own transaction - and returns what happened. {@link #complete} then
- * records it on the request and asks for the next step, inside the queue's transaction. A step whose job is late or
+ * {@link #run} does the step's outside work - the adapter call and storage uploads - and returns what happened. Draft
+ * creation and review submission use GenerationArtifacts to commit their database changes and step checkpoint
+ * atomically. Other steps are recorded by {@link #complete} inside the queue's transaction. A step whose job is late or
  * repeated finds the request elsewhere and does nothing.
  */
 @Component
@@ -41,6 +40,7 @@ public class ContentGenerationHandler implements AiJobHandler {
     private final GeneratedPaperWriter papers;
     private final GeneratedTaskWriter tasks;
     private final ObjectMapper mapper;
+    private final GenerationArtifacts artifacts;
 
     @Override
     public String handles() {
@@ -50,9 +50,10 @@ public class ContentGenerationHandler implements AiJobHandler {
     @Override
     public Outcome run(UUID jobId, UUID requestId, String inputPayload) {
         try {
-            String step = mapper.readTree(inputPayload).path("step").asText();
+            var payload = mapper.readTree(inputPayload);
+            String step = payload.path("step").asText();
             Work work = steps.work(requestId, step);
-            if (work == null) {
+            if (work == null || work.attempt() != payload.path("attempt").asInt()) {
                 return Outcome.succeeded("{\"stale\":true}");
             }
             return Outcome.succeeded(work.writes() ? write(work) : switch (step) {
@@ -76,15 +77,21 @@ public class ContentGenerationHandler implements AiJobHandler {
     @Override
     public void complete(UUID requestId, String inputPayload, String outputPayload) {
         try {
-            steps.apply(requestId, mapper.readTree(inputPayload).path("step").asText(), outputPayload);
+            var payload = mapper.readTree(inputPayload);
+            steps.apply(requestId, payload.path("step").asText(), payload.path("attempt").asInt(), outputPayload);
         } catch (JsonProcessingException unreadable) {
             throw new IllegalArgumentException("Invalid generation job payload", unreadable);
         }
     }
 
     @Override
-    public void onGaveUp(UUID requestId, String errorCode) {
-        steps.fail(requestId, errorCode, "A step stopped and was not retried: " + errorCode);
+    public void onGaveUp(UUID requestId, String inputPayload, String errorCode) {
+        try {
+            var payload = mapper.readTree(inputPayload);
+            steps.failAt(requestId, payload.path("step").asText(), payload.path("attempt").asInt(), errorCode);
+        } catch (JsonProcessingException unreadable) {
+            throw new IllegalArgumentException("Invalid generation job payload", unreadable);
+        }
     }
 
     /** One model call; the adapter returns the component with any rule problems, which complete() acts on. */
@@ -111,18 +118,8 @@ public class ContentGenerationHandler implements AiJobHandler {
         if (!built.path("problems").isEmpty()) {
             throw new IllegalArgumentException("The set misses question types: " + built.path("problems"));
         }
-        UUID examId = papers.createDraft(work.requestedByUserId(), built.path("paper").toString());
-        List<UUID> taskIds = new ArrayList<>();
-        for (JsonNode task : built.path("tasks")) {
-            ObjectNode request = task.deepCopy();
-            request.remove("chart");
-            taskIds.add(tasks.createDraft(work.requestedByUserId(), request.toString()));
-        }
-        ObjectNode result = mapper.createObjectNode().put("examId", examId.toString());
-        result.set("taskIds", mapper.valueToTree(taskIds));
-        result.set("chart_png_base64", built.path("chart_png_base64"));
-        result.set("listening", built.path("listening"));
-        return result.toString();
+        artifacts.assemble(work.requestId(), built.toString());
+        return "{}";
     }
 
     /** The Task 1 chart, uploaded and attached to the first task. */
@@ -146,12 +143,7 @@ public class ContentGenerationHandler implements AiJobHandler {
 
     /** Everything goes for review, and a draft full test joins the paper and the five tasks. */
     private String finish(Work work) {
-        papers.submitForReview(work.examId());
-        work.taskIds().forEach(tasks::submitForReview);
-        String title = "IELTS Academic AI Set: " + work.components().path("plan").path("title").asText("Untitled");
-        UUID fullTestId = papers.createFullTestDraft(work.requestedByUserId(),
-                title.substring(0, Math.min(title.length(), 100)),
-                "Written with AI. Review the paper and every task before approving.", work.examId(), work.taskIds());
-        return mapper.createObjectNode().put("fullTestId", fullTestId.toString()).toString();
+        artifacts.finish(work.requestId());
+        return "{}";
     }
 }

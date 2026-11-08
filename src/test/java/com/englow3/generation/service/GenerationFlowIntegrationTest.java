@@ -59,6 +59,9 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
     private GenerationService generation;
 
     @Autowired
+    private GenerationArtifacts artifacts;
+
+    @Autowired
     private ContentGenerationHandler handler;
 
     @Autowired
@@ -189,6 +192,10 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
 
     /** Plays the worker until no job of this request is pending. Returns how many it ran. */
     private int runAllJobs(UUID requestId) {
+        return runUntil(requestId, null);
+    }
+
+    private int runUntil(UUID requestId, String stopBefore) {
         int ran = 0;
         while (true) {
             var job = jdbc.sql("""
@@ -203,6 +210,9 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
             UUID id = (UUID) job.get()[0];
             UUID target = (UUID) job.get()[1];
             String payload = (String) job.get()[2];
+            if (stopBefore != null && payload.contains("\"" + stopBefore + "\"")) {
+                return ran;
+            }
             AiJobHandler.Outcome outcome = handler.run(id, target, payload);
             assertThat(outcome.success()).as("job %s: %s", payload, outcome.errorMessage()).isTrue();
             transactions.executeWithoutResult(tx -> {
@@ -212,6 +222,70 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
             ran++;
             assertThat(ran).as("runaway job loop").isLessThan(40);
         }
+    }
+
+    @Test
+    void assemblyAndItsCheckpointSurviveLostJobAcknowledgementWithoutDuplicateDrafts() throws Exception {
+        SignedIn.as(jdbc, staff, "STAFF");
+        UUID id = generation.request(GenerationKind.IELTS_FULL_TEST, null).id();
+        SignedIn.out();
+        runUntil(id, "assemble");
+        String built = client.assemble("{}");
+        artifacts.assemble(id, built);
+        var first = generation.detail(id);
+        artifacts.assemble(id, built);
+        var repeated = generation.detail(id);
+        handler.onGaveUp(id, "{\"step\":\"assemble\",\"attempt\":0}", "AI_JOB_STALLED");
+        assertThat(generation.detail(id).status()).isEqualTo(GenerationStatus.RUNNING);
+        assertThat(repeated.examId()).isEqualTo(first.examId());
+        assertThat(repeated.taskIds()).containsExactlyElementsOf(first.taskIds());
+        assertThat(jdbc.sql("select count(*) from exams where created_by_user_id=:u").param("u", staff)
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from assessment_tasks where created_by_user_id=:u").param("u", staff)
+                .query(Long.class).single()).isEqualTo(5);
+    }
+
+    @Test
+    void invalidAssemblyRollsBackEveryDraftAndCanBeRetried() throws Exception {
+        SignedIn.as(jdbc, staff, "STAFF");
+        UUID id = generation.request(GenerationKind.IELTS_FULL_TEST, null).id();
+        SignedIn.out();
+        runUntil(id, "assemble");
+        String good = client.assemble("{}");
+        var broken = mapper.readTree(good);
+        ((ObjectNode) broken.path("tasks").get(1)).put("title", "");
+        assertThatThrownBy(() -> artifacts.assemble(id, broken.toString()))
+                .isInstanceOf(com.englow3.shared.error.BadRequestException.class);
+        assertThat(generation.detail(id).step()).isEqualTo("assemble");
+        assertThat(jdbc.sql("select count(*) from exams where created_by_user_id=:u").param("u", staff)
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from assessment_tasks where created_by_user_id=:u").param("u", staff)
+                .query(Long.class).single()).isZero();
+        artifacts.assemble(id, good);
+        assertThat(generation.detail(id).taskIds()).hasSize(5);
+    }
+
+    @Test
+    void finishingRollsBackPartialSubmissionAndRepeatsSafely() {
+        SignedIn.as(jdbc, staff, "STAFF");
+        UUID id = generation.request(GenerationKind.IELTS_FULL_TEST, null).id();
+        SignedIn.out();
+        runUntil(id, "finish");
+        var pending = generation.detail(id);
+        UUID conflicting = pending.taskIds().get(2);
+        jdbc.sql("update assessment_tasks set status='PENDING_REVIEW' where id=:id").param("id", conflicting).update();
+        assertThatThrownBy(() -> artifacts.finish(id)).isInstanceOf(ConflictException.class);
+        assertThat(status("exams", pending.examId())).isEqualTo("DRAFT");
+        assertThat(status("assessment_tasks", pending.taskIds().getFirst())).isEqualTo("DRAFT");
+        assertThat(generation.detail(id).step()).isEqualTo("finish");
+        jdbc.sql("update assessment_tasks set status='DRAFT' where id=:id").param("id", conflicting).update();
+        artifacts.finish(id);
+        var done = generation.detail(id);
+        artifacts.finish(id);
+        assertThat(generation.detail(id).fullTestId()).isEqualTo(done.fullTestId());
+        assertThat(done.status()).isEqualTo(GenerationStatus.COMPLETED);
+        assertThat(jdbc.sql("select count(*) from full_tests where created_by_user_id=:u").param("u", staff)
+                .query(Long.class).single()).isEqualTo(1);
     }
 
     private void insertRequest(String status) {
