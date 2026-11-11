@@ -152,7 +152,7 @@ def places(tmp_path):
 def test_a_whole_set_is_written_built_and_ready_to_record(places):
     folder = generate(StandIn(), **places)
 
-    paper = json.loads((folder / "paper.json").read_text())
+    paper = json.loads((folder / "paper.json").read_text(encoding="utf-8"))
     sections = paper["content"]["sections"]
     assert [s["sectionType"] for s in sections] == ["LISTENING", "READING"]
     assert [s["maxRawScore"] for s in sections] == [40, 40]
@@ -163,13 +163,13 @@ def test_a_whole_set_is_written_built_and_ready_to_record(places):
     assert kinds == {"TEXT_ENTRY", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "MATCHING"}
     assert sections[1]["parts"][1]["content"].count("\n\nB. ") == 1  # headings need labelled paragraphs
 
-    tasks = json.loads((folder / "tasks.json").read_text())
+    tasks = json.loads((folder / "tasks.json").read_text(encoding="utf-8"))
     assert [t["taskType"] for t in tasks] == ["TASK_1", "TASK_2", "PART_1", "PART_2", "PART_3"]
     assert "2005 | 2025" in tasks[0]["rubricNotes"]
     assert (folder / "task1-chart.png").stat().st_size > 1000
 
     # The audio script can record it: every speaker of every part has a voice.
-    parts = parse_transcript((folder / "transcript.md").read_text())
+    parts = parse_transcript((folder / "transcript.md").read_text(encoding="utf-8"))
     table = voices_from(folder / "voices.json")
     assert sorted(parts) == [1, 2, 3, 4]
     assert all(voice_for(n, s.speaker, table) for n, segments in parts.items() for s in segments)
