@@ -34,7 +34,7 @@ public class AttemptSectionResult extends BasePersistedEntity {
     @Column(name = "max_raw_score", nullable = false)
     private BigDecimal maxRawScore;
 
-    /** The band, or null where no conversion applies (a practice, a TOEIC section, a section not out of 40). */
+    /** The configured section score, or null when no complete conversion applies (including every practice). */
     @Column(name = "converted_score")
     private BigDecimal convertedScore;
 

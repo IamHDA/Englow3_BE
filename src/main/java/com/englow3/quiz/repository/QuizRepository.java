@@ -13,6 +13,10 @@ import com.englow3.quiz.entity.QuizCategory;
 import com.englow3.quiz.entity.QuizStatus;
 
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
+    @Query("select c from Quiz c where (:status is null or c.status = :status) and (:title is null or lower(c.title) like lower(concat('%', cast(:title as String), '%'))) and (c.createdByUserId = :author or c.status = com.englow3.quiz.entity.QuizStatus.PUBLISHED)")
+    Page<Quiz> searchVisibleForAuthoring(@Param("status") QuizStatus status, @Param("title") String title,
+            @Param("author") UUID author, Pageable pageable);
+
     boolean existsBySlugAndIdNot(String slug, UUID id);
 
     boolean existsBySlug(String slug);

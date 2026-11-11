@@ -1,6 +1,6 @@
 # Runbook vận hành production — Englow3
 
-**Cập nhật:** 2026-10-23 · Áp dụng cho BE (Render), FE web + BFF (Vercel), DB/Auth/Storage (Supabase), AI (Groq qua `ai_service`).
+**Cập nhật:** 2026-11-11 · Áp dụng cho BE (Render), FE web + BFF (Vercel), DB/Auth/Storage (Supabase), AI (Groq qua `ai_service`).
 
 Tài liệu này là các việc **vận hành** phải làm trước khi mở cho người dùng thật. Mỗi mục có: hiện trạng (có bằng chứng trong repo), các bước làm, và cách kiểm tra đã xong. Phần nào là việc trên bảng điều khiển của nhà cung cấp thì ghi rõ — code không làm thay được. Giao diện và gói của nhà cung cấp thay đổi theo thời gian: đối chiếu tên menu với trang hiện tại trước khi làm.
 
@@ -201,3 +201,57 @@ Log của Render và Vercel được giữ ngắn. Tạo log drain tới một d
 - [ ] `AI_PLATFORM_DAILY_REQUEST_LIMIT` và giới hạn chi tiêu hàng tháng ở nhà cung cấp đã đặt
 - [ ] `NEXT_PUBLIC_CONTACT_EMAIL` và `NEXT_PUBLIC_OPERATOR_NAME` đã đặt (trang pháp lý)
 - [ ] Trang Điều khoản/Bảo mật đã được người có chuyên môn pháp lý rà soát
+
+## Phát hành các luồng role và roadmap — 2026-11-11
+
+### Thứ tự triển khai và tương thích
+
+1. Chạy CI và migration trên database staging riêng trước. Bản này bổ sung V086–V091:
+   phân công chấm, thứ tự phép đo trình độ, audit đổi role, nguồn bảng điểm, index tác giả
+   và optimistic version của tài khoản. Không chạy bản local chứa migration chưa push
+   vào database dùng chung.
+2. Triển khai BE trước, xác nhận mọi instance đã dùng cùng bản mới, rồi BFF và web.
+   Form sửa full test gửi version đã đọc; BE mới từ chối client cũ không gửi version
+   khi sửa. Nhận `FULL_TEST_CHANGED` hoặc `CONCURRENT_UPDATE` thì tải lại, không ghi đè.
+3. Kiểm tra release SHA/readiness. Không rollback bằng cách xóa migration hoặc sửa
+   checksum. Artifact sửa lỗi/rollback phải giữ các migration đã áp dụng. Tạm dừng thao
+   tác chấm nếu cần quay lại code chưa hiểu phân công reviewer.
+
+### Cấu hình và kiểm tra theo role
+
+- Admin → `/admin/users`: đổi role một tài khoản thử, xác minh audit có lý do và actor.
+  Token giữ role cũ phải bị chặn khi gọi API quản trị. Người dùng đăng nhập lại để nhận
+  claim mới; không tự thay role của tài khoản đang thao tác. Sau khi hạ role Staff,
+  kiểm tra và giao lại các bài đang chờ người đó chấm nếu cần.
+- Staff A tạo nháp; Staff B không được đọc/sửa nháp A qua URL/API trực tiếp. Cả hai vẫn
+  đọc được nội dung đã xuất bản. Kiểm tra autosave, import và upload theo cùng phạm vi.
+- Admin mở Writing & Speaking → bài nộp → Xem/giao chấm: giao cho Staff B dù đề do A tạo.
+  B phải thấy bài trong queue và chấm được; A không được chấm khi bài đang giao cho B.
+  Tự chấm và gửi version cũ phải bị từ chối. Xác minh lịch sử phân công và sửa điểm.
+- Learner mới không được hoàn tất mục tiêu chứng chỉ khi thiếu điểm đích. Người học
+  C2 tổng quát có thể tự luyện mà không tạo lộ trình hướng tới mức CEFR không tồn tại.
+  Tự luyện nội dung đã xuất bản không phụ thuộc popup onboarding.
+- IELTS giữ full test đầu vào và band tạm theo D-IELTS-10. Kết quả cũ chấm về muộn
+  không được ghi đè phép đo mới hơn; callback tạm không được thay band cuối của cùng lượt.
+- Admin → `/admin/exam-score-conversions`: nhập bảng TOEIC đã kiểm duyệt, nguồn và ngày
+  hiệu lực. Không dùng dữ liệu test trong repo làm bảng production. Bảng phải phủ 0–100
+  câu đúng mỗi kỹ năng, không trùng/thiếu dải, điểm không giảm và thuộc thang ứng dụng.
+  Không có bảng hợp lệ thì chỉ hiện điểm bài tập và từ chối tạo mốc điểm roadmap.
+  Làm lại một full paper 100 câu Listening + 100 câu Reading để kiểm tra tổng quy đổi
+  và cập nhật mốc; practice không được nhận tổng điểm quy đổi. Bảng mới không sửa điểm
+  đã chấm. Điểm trong ứng dụng là điểm luyện tập ước tính, không phải chứng nhận thi thật.
+- Export tài khoản phải có full-test sitting, lộ trình và câu trả lời của đúng người.
+  Kiểm tra `exportMetadata.possiblyTruncatedKinds` khi dữ liệu chạm giới hạn từng nhóm.
+
+### Gate latency trước khi mở production
+
+`ProductionJourneysIntegrationTest` chạy HTTP qua MockMvc/Spring Security và PostgreSQL
+thật, với 5.000 tài khoản thêm và 5.000 lượt quiz của người được đo. Mỗi endpoint có
+5 lượt warm-up và 40 mẫu, ghi `LATENCY_LOCAL` với p50/p95/max. Đây là benchmark local,
+không bao gồm xác minh chữ ký JWT, mạng Next/BFF/BE, cold start hoặc suy luận AI.
+
+Trước khi mở production, đo lại bằng tài khoản thử trên staging từ vùng người dùng dự
+kiến: bootstrap, Daily Path, danh mục đề, queue chấm và nộp bài. Ghi p50/p95/p99, tỷ lệ
+lỗi, tải đồng thời, thời gian chờ Hikari và lock wait. Mục tiêu ban đầu cho API đọc nóng
+cùng vùng là p95 ≤ 300 ms; đây là ngân sách kiểm chứng, không phải số đo đã đạt trên
+hosting. Nếu chậm, kiểm tra vùng DB/BFF/BE, pool và query plan trước khi tăng concurrency.

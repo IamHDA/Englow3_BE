@@ -52,14 +52,16 @@ class MigrationsIntegrationTest extends PostgresIntegrationTest {
      */
     @Test
     void createsAProfileWhenAnAuthUserAppears() {
+        String email = "trigger-" + java.util.UUID.randomUUID() + "@example.test";
         jdbc.sql("""
                 insert into auth.users (email, raw_user_meta_data)
-                values ('trigger-test@example.com', '{"full_name":"Nguyen Van A","gender":"MALE"}'::jsonb)
-                """).update();
+                values (:email, '{"full_name":"Nguyen Van A","gender":"MALE"}'::jsonb)
+                """).param("email", email).update();
 
         var profile = jdbc.sql("""
-                select full_name, gender::text, role::text from englow3.users where email = 'trigger-test@example.com'
-                """).query((rs, row) -> new String[] { rs.getString(1), rs.getString(2), rs.getString(3) }).single();
+                select full_name, gender::text, role::text from englow3.users where email = :email
+                """).param("email", email)
+                .query((rs, row) -> new String[] { rs.getString(1), rs.getString(2), rs.getString(3) }).single();
 
         assertThat(profile[0]).isEqualTo("Nguyen Van A");
         assertThat(profile[1]).isEqualTo("MALE");
@@ -69,14 +71,16 @@ class MigrationsIntegrationTest extends PostgresIntegrationTest {
     /** A malformed date must not fail the signup it rides along with - it is dropped instead. */
     @Test
     void doesNotFailASignupOverAnUnreadableBirthDate() {
+        String email = "bad-date-" + java.util.UUID.randomUUID() + "@example.test";
         jdbc.sql("""
                 insert into auth.users (email, raw_user_meta_data)
-                values ('bad-date@example.com', '{"birth_date":"not-a-date","gender":"WHATEVER"}'::jsonb)
-                """).update();
+                values (:email, '{"birth_date":"not-a-date","gender":"WHATEVER"}'::jsonb)
+                """).param("email", email).update();
 
         var row = jdbc.sql("""
-                select birth_date, gender::text from englow3.users where email = 'bad-date@example.com'
-                """).query((rs, index) -> new Object[] { rs.getDate(1), rs.getString(2) }).single();
+                select birth_date, gender::text from englow3.users where email = :email
+                """).param("email", email).query((rs, index) -> new Object[] { rs.getDate(1), rs.getString(2) })
+                .single();
 
         assertThat(row[0]).isNull();
         // Same for a gender nobody recognises: stored as null rather than breaking the enum on every later read.

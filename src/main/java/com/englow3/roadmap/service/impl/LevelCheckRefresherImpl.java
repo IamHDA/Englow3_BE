@@ -92,7 +92,7 @@ public class LevelCheckRefresherImpl implements LevelCheckRefresher {
                 check.getSpeakingLevel(), weights);
         check.complete(result.level(), result.appliedWeights(), clock.instant());
         // The learner's level is what they were last measured at, whichever test measured it.
-        placementRecorder.recordLevelCheck(userId, check.getId(), result.level().name());
+        placementRecorder.recordLevelCheck(userId, check.getId(), result.level().name(), check.getCreatedAt());
         if (check.getPurpose() == LevelCheckPurpose.MILESTONE) {
             progression.find(userId, check.getMilestoneId()).ifPresent(context -> {
                 context.milestone().recordLevelCheck(check.getId(), result.level(), clock.instant());

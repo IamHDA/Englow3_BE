@@ -41,7 +41,9 @@ public class AdminTranslationServiceImpl implements AdminTranslationService {
     @Transactional(readOnly = true)
     public Page<TranslationSetReviewResult> searchForAuthoring(TranslationSetStatus status, String title,
             Pageable pageable) {
-        Page<TranslationSet> page = setRepo.searchForAuthoring(status, title, pageable);
+        UUID scope = userDirectory.authoringScope();
+        Page<TranslationSet> page = scope == null ? setRepo.searchForAuthoring(status, title, pageable)
+                : setRepo.searchVisibleForAuthoring(status, title, scope, pageable);
         Map<UUID, Long> counts = itemCounts(page);
         return page.map(set -> TranslationSetReviewResult.of(set, counts.getOrDefault(set.getId(), 0L)));
     }
@@ -162,7 +164,11 @@ public class AdminTranslationServiceImpl implements AdminTranslationService {
     }
 
     private TranslationSet requireSet(UUID setId) {
-        return setRepo.findById(setId).orElseThrow(() -> new NotFoundException("TRANSLATION_SET_NOT_FOUND",
-                "No translation set with id %s".formatted(setId)));
+        TranslationSet set = setRepo.findById(setId)
+                .orElseThrow(() -> new NotFoundException("TRANSLATION_SET_NOT_FOUND",
+                        "No translation set with id %s".formatted(setId)));
+        if (set.getStatus() != TranslationSetStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(set.getCreatedByUserId());
+        return set;
     }
 }

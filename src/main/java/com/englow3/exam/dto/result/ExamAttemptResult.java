@@ -18,7 +18,7 @@ public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, 
         Instant submittedAt, Instant scoredAt, BigDecimal rawScore, BigDecimal maxRawScore, BigDecimal scorePercentage,
         Integer correctAnswerCount, int questionCount, boolean resumed, String examTitle,
         List<QuestionReviewResult> questions, ExamAttemptMode mode, Integer timeLimitSeconds, List<AttemptPart> parts,
-        List<SectionScore> sections) {
+        List<SectionScore> sections, BigDecimal convertedScore) {
 
     /**
      * One section's points and, where the certificate converts a whole section, its band. Empty until scored.
@@ -43,7 +43,7 @@ public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, 
                 .toList();
         return new ExamAttemptResult(id, examId, status, startedAt, expiresAt, submittedAt, scoredAt, rawScore,
                 maxRawScore, scorePercentage, correctAnswerCount, questionCount, resumed, examTitle, questions, mode,
-                timeLimitSeconds, named, sections);
+                timeLimitSeconds, named, sections, convertedScore);
     }
 
     private static List<AttemptPart> unnamed(ExamAttempt attempt) {
@@ -59,7 +59,7 @@ public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, 
                 attempt.getExpiresAt(), attempt.getSubmittedAt(), attempt.getScoredAt(), attempt.getRawScore(),
                 attempt.getMaxRawScore(), attempt.getScorePercentage(), attempt.getCorrectAnswerCount(),
                 attempt.getQuestionCount(), false, examTitle, List.of(), attempt.getMode(),
-                attempt.getTimeLimitSeconds(), unnamed(attempt), List.of());
+                attempt.getTimeLimitSeconds(), unnamed(attempt), List.of(), attempt.getConvertedScore());
     }
 
     public static ExamAttemptResult started(ExamAttempt attempt, boolean resumed) {
@@ -77,7 +77,7 @@ public record ExamAttemptResult(UUID id, UUID examId, ExamAttemptStatus status, 
                 attempt.getExpiresAt(), attempt.getSubmittedAt(), attempt.getScoredAt(), attempt.getRawScore(),
                 attempt.getMaxRawScore(), attempt.getScorePercentage(), attempt.getCorrectAnswerCount(),
                 attempt.getQuestionCount(), resumed, null, questions, attempt.getMode(), attempt.getTimeLimitSeconds(),
-                unnamed(attempt), sections);
+                unnamed(attempt), sections, attempt.getConvertedScore());
     }
 
     /**

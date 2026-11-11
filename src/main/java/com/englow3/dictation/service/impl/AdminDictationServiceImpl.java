@@ -149,7 +149,9 @@ public class AdminDictationServiceImpl implements AdminDictationService {
      */
     @Transactional(readOnly = true)
     public Page<ContentReviewResult> searchForAuthoring(DictationLessonStatus status, String title, Pageable pageable) {
-        Page<DictationLesson> page = lessonRepo.searchForAuthoring(status, title, pageable);
+        UUID scope = userDirectory.authoringScope();
+        Page<DictationLesson> page = scope == null ? lessonRepo.searchForAuthoring(status, title, pageable)
+                : lessonRepo.searchVisibleForAuthoring(status, title, scope, pageable);
         Map<UUID, Long> counts = sentenceRepo
                 .countByLessonIds(page.getContent().stream().map(DictationLesson::getId).toList());
 
@@ -268,7 +270,11 @@ public class AdminDictationServiceImpl implements AdminDictationService {
     }
 
     private DictationLesson requireLesson(UUID lessonId) {
-        return lessonRepo.findById(lessonId).orElseThrow(() -> new NotFoundException("DICTATION_LESSON_NOT_FOUND",
-                "No dictation lesson with id %s".formatted(lessonId)));
+        DictationLesson lesson = lessonRepo.findById(lessonId)
+                .orElseThrow(() -> new NotFoundException("DICTATION_LESSON_NOT_FOUND",
+                        "No dictation lesson with id %s".formatted(lessonId)));
+        if (lesson.getStatus() != DictationLessonStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(lesson.getCreatedByUserId());
+        return lesson;
     }
 }

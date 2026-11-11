@@ -15,6 +15,8 @@ import com.englow3.roadmap.entity.RoadmapMilestone;
 import jakarta.persistence.LockModeType;
 
 public interface RoadmapMilestoneRepository extends JpaRepository<RoadmapMilestone, UUID> {
+    @Query("select count(m)>0 from RoadmapMilestone m, RoadmapStage s where m.stageId=s.id and s.roadmapId=:roadmap and m.status=com.englow3.roadmap.entity.MilestoneStatus.PASSED and (m.resultExamAttemptId=:sitting or m.resultFullTestSittingId=:sitting)")
+    boolean wasUsedInPassedMilestone(@Param("roadmap") UUID roadmap, @Param("sitting") UUID sitting);
 
     List<RoadmapMilestone> findByStageIdIn(Collection<UUID> stageIds);
 

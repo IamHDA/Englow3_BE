@@ -45,6 +45,7 @@ public class QuizQuestionAuthoringServiceImpl implements QuizQuestionAuthoringSe
     private final QuizQuestionOptionRepository optionRepo;
     private final QuizQuestionTokenRepository tokenRepo;
     private final QuizQuestionPairRepository pairRepo;
+    private final com.englow3.user.api.UserDirectory userDirectory;
 
     @Transactional
     public QuizSummaryResult addQuestions(AddQuizQuestionsCommand command) {
@@ -236,7 +237,10 @@ public class QuizQuestionAuthoringServiceImpl implements QuizQuestionAuthoringSe
     }
 
     private Quiz requireQuiz(UUID quizId) {
-        return quizRepo.findById(quizId)
+        Quiz quiz = quizRepo.findById(quizId)
                 .orElseThrow(() -> new NotFoundException("QUIZ_NOT_FOUND", "No quiz with id %s".formatted(quizId)));
+        if (quiz.getStatus() != QuizStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(quiz.getCreatedByUserId());
+        return quiz;
     }
 }

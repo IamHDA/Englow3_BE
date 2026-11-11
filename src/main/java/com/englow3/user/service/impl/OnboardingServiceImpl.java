@@ -20,6 +20,7 @@ import com.englow3.user.dto.command.SetLearningGoalCommand;
 import com.englow3.user.dto.result.LearningPurposeResult;
 import com.englow3.user.dto.result.OnboardingStateResult;
 import com.englow3.user.entity.CertificateType;
+import com.englow3.user.entity.CertificateLevel;
 import com.englow3.user.entity.LearnerProfile;
 import com.englow3.user.entity.LearningPurpose;
 import com.englow3.user.entity.OnboardingStep;
@@ -39,11 +40,13 @@ public class OnboardingServiceImpl implements OnboardingService {
     private final LearnerProfileRepository learnerProfileRepo;
     private final LearningPurposeRepository learningPurposeRepo;
     private final CurrentUser currentUser;
+    private final java.time.Clock clock;
 
     @Transactional(readOnly = true)
     public OnboardingStateResult currentState() {
         User user = requireCurrentUser();
-        return state(user, profileOf(user));
+        return state(user,
+                learnerProfileRepo.findByUserId(user.getId()).orElseGet(() -> LearnerProfile.forUser(user.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -93,7 +96,7 @@ public class OnboardingServiceImpl implements OnboardingService {
         }
 
         LearnerProfile profile = profileOf(user);
-        profile.declareCurrentLevel(command.level());
+        profile.declareCurrentLevel(command.level(), clock.instant());
         user.moveTo(OnboardingStep.LEARNING_GOAL);
 
         return state(user, profile);
@@ -103,31 +106,38 @@ public class OnboardingServiceImpl implements OnboardingService {
     public OnboardingStateResult setLearningGoal(SetLearningGoalCommand command) {
         User user = requireCurrentUser();
         LearnerProfile profile = profileOf(user);
+        boolean certificateLearner = isCertificateLearner(user);
         if (profile.getCurrentLevel() == null) {
             throw new ConflictException("ONBOARDING_LEVEL_REQUIRED",
                     "The goal step opens only once the level is known");
         }
-        if (command.targetScore() != null && !isCertificateLearner(user)) {
+        if (command.targetScore() != null && !certificateLearner) {
             throw new BadRequestException("TARGET_SCORE_NOT_APPLICABLE",
                     "Only a certificate learner has a score to aim at");
         }
 
-        requireScoreOnScale(command.certificateType(), command.currentScore(), "CURRENT_SCORE_OUT_OF_RANGE");
+        if (command.targetLevel() != null && certificateLearner) {
+            throw new BadRequestException("TARGET_LEVEL_NOT_APPLICABLE",
+                    "A certificate learner aims at a score, not at a level");
+        }
+        if (certificateLearner && command.certificateType() == null) {
+            throw new BadRequestException("ONBOARDING_CERTIFICATE_TARGET_REQUIRED", "Choose a certificate first");
+        }
+        requireGoal(certificateLearner, profile.getCurrentLevel(), command.targetScore(), command.targetLevel());
+        BigDecimal currentScore = command.currentScore() != null ? command.currentScore()
+                : profile.getTargetCertificateType() == command.certificateType() ? profile.getCurrentScore() : null;
+        requireScoreOnScale(command.certificateType(), currentScore, "CURRENT_SCORE_OUT_OF_RANGE");
         requireScoreOnScale(command.certificateType(), command.targetScore(), "TARGET_SCORE_OUT_OF_RANGE");
         // A target at or below the score already held is no goal, and every plan built on the gap would read it as one
         // already reached.
-        if (command.currentScore() != null && command.targetScore() != null
-                && command.targetScore().compareTo(command.currentScore()) <= 0) {
+        if (currentScore != null && command.targetScore() != null
+                && command.targetScore().compareTo(currentScore) <= 0) {
             throw new BadRequestException("TARGET_SCORE_NOT_ABOVE_CURRENT",
                     "The target score must be higher than the current score");
         }
 
-        if (command.targetLevel() != null && isCertificateLearner(user)) {
-            throw new BadRequestException("TARGET_LEVEL_NOT_APPLICABLE",
-                    "A certificate learner aims at a score, not at a level");
-        }
-        profile.setGoal(command.certificateType(), command.currentScore(), command.targetScore(), command.targetDate(),
-                command.targetLevel(), command.dailyStudyMinutes());
+        profile.setGoal(certificateLearner ? command.certificateType() : null, certificateLearner ? currentScore : null,
+                command.targetScore(), command.targetDate(), command.targetLevel(), command.dailyStudyMinutes());
         user.moveTo(OnboardingStep.TARGET_SKILLS);
 
         return state(user, profile);
@@ -145,16 +155,31 @@ public class OnboardingServiceImpl implements OnboardingService {
         User user = requireCurrentUser();
         LearnerProfile profile = profileOf(user);
 
-        user.completeOnboarding(profile.getCurrentLevel(), isCertificateLearner(user),
-                profile.getTargetCertificateType());
+        boolean certificateLearner = isCertificateLearner(user);
+        requireGoal(certificateLearner, profile.getCurrentLevel(), profile.getTargetScore(), profile.getTargetLevel());
+        user.completeOnboarding(profile.getCurrentLevel(), certificateLearner, profile.getTargetCertificateType());
 
         return state(user, profile);
     }
 
     private static void requireScoreOnScale(CertificateType certificate, BigDecimal score, String code) {
-        if (score != null && !certificate.isValidScore(score)) {
+        if (score != null && (certificate == null || !certificate.isValidScore(score))) {
+            if (certificate == null) {
+                throw new BadRequestException(code, "A certificate is required for a score");
+            }
             throw new BadRequestException(code, "%s is not a %s score; %s scores run %s"
                     .formatted(score.toPlainString(), certificate, certificate, certificate.scoreRange()));
+        }
+    }
+
+    private static void requireGoal(boolean certificateLearner, CertificateLevel currentLevel, BigDecimal score,
+            CertificateLevel targetLevel) {
+        if (certificateLearner && score == null) {
+            throw new ConflictException("ONBOARDING_TARGET_SCORE_REQUIRED", "Choose a target score to plan towards");
+        }
+        // C2 learners can keep practising without a higher CEFR goal or a generated roadmap.
+        if (!certificateLearner && currentLevel != null && currentLevel != CertificateLevel.C2 && targetLevel == null) {
+            throw new ConflictException("ONBOARDING_TARGET_LEVEL_REQUIRED", "Choose a target level to plan towards");
         }
     }
 

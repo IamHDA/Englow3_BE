@@ -4,14 +4,14 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface PlacementRecorder {
-    void record(UUID userId, UUID attemptId, BigDecimal scorePercentage);
+    void record(UUID userId, UUID attemptId, BigDecimal scorePercentage, java.time.Instant measuredAt);
 
     /**
      * A level measured by the roadmap's level check (vocabulary, listening and speaking) rather than the placement
      * paper. {@code level} is a CEFR band; an unknown value is refused. Moves onboarding on from the level step the
      * same way a placement does.
      */
-    void recordLevelCheck(UUID userId, UUID levelCheckId, String level);
+    void recordLevelCheck(UUID userId, UUID levelCheckId, String level, java.time.Instant measuredAt);
 
     /**
      * An IELTS band measured by the exam module's full test, the IELTS learner's placement test. Recorded first with
@@ -23,5 +23,6 @@ public interface PlacementRecorder {
      * @param level
      *            CEFR band aligned with {@code band}
      */
-    void recordIeltsBand(UUID userId, UUID examAttemptId, String level, BigDecimal band);
+    void recordIeltsBand(UUID userId, UUID examAttemptId, String level, BigDecimal band, java.time.Instant measuredAt,
+            boolean finalResult);
 }

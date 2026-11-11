@@ -19,7 +19,8 @@ public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status
         List<QuestionReviewResponse> questions, ExamAttemptMode mode,
         @Schema(nullable = true, description = "Null only for an untimed practice") Integer timeLimitSeconds,
         @Schema(description = "Parts a practice covers; empty for a full attempt") List<AttemptPartResponse> parts,
-        @Schema(description = "Each section's points and band; empty until scored") List<SectionScoreResponse> sections) {
+        @Schema(description = "Each section's points and band; empty until scored") List<SectionScoreResponse> sections,
+        @Schema(nullable = true, description = "Configured TOEIC Listening + Reading total; absent when no valid conversion applies") BigDecimal convertedScore) {
 
     public static ExamAttemptResponse from(ExamAttemptResult result) {
         return new ExamAttemptResponse(result.id(), result.examId(), result.status(), result.startedAt(),
@@ -28,7 +29,7 @@ public record ExamAttemptResponse(UUID id, UUID examId, ExamAttemptStatus status
                 result.examTitle(), result.questions().stream().map(QuestionReviewResponse::from).toList(),
                 result.mode(), result.timeLimitSeconds(),
                 result.parts().stream().map(AttemptPartResponse::from).toList(),
-                result.sections().stream().map(SectionScoreResponse::from).toList());
+                result.sections().stream().map(SectionScoreResponse::from).toList(), result.convertedScore());
     }
 
     public record SectionScoreResponse(SectionType sectionType, @Schema(nullable = true) BigDecimal rawScore,

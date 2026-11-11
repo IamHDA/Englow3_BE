@@ -5,6 +5,24 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface UserDirectory {
+    /** Current database role, used only for privileged requests so revocation does not wait for JWT expiry. */
+    default String currentRole() {
+        return null;
+    }
+
+    /** Null is the administrator's view; otherwise private drafts belong to this caller. */
+    default UUID authoringScope() {
+        return requireCurrentUserId();
+    }
+
+    default void requireAuthorAccess(UUID authorId) {
+        UUID scope = authoringScope();
+        if (scope != null && !scope.equals(authorId)) {
+            throw new com.englow3.shared.error.ForbiddenException("CONTENT_NOT_OWNED",
+                    "You can only edit your own content");
+        }
+    }
+
     default boolean isBackOfficeUser(UUID id) {
         return false;
     }

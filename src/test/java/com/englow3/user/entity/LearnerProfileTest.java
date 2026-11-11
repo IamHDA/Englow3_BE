@@ -11,6 +11,27 @@ import org.junit.jupiter.api.Test;
 import com.englow3.shared.error.BadRequestException;
 
 class LearnerProfileTest {
+    @Test
+    void delayedAndProvisionalMeasurementsCannotReplaceNewerOrFinalOnes() {
+        UUID old = UUID.randomUUID(), newer = UUID.randomUUID();
+        var time = java.time.Instant.parse("2026-11-10T00:00:00Z");
+        assertThat(profile.acceptMeasurement(old, time, false)).isTrue();
+        profile.recordPlacement(CertificateLevel.B1, old, new BigDecimal("5"));
+        assertThat(profile.acceptMeasurement(newer, time.plusSeconds(1), false)).isTrue();
+        profile.recordPlacement(CertificateLevel.B2, newer, new BigDecimal("6"));
+        assertThat(profile.acceptMeasurement(old, time, true)).isFalse();
+        assertThat(profile.acceptMeasurement(newer, time.plusSeconds(1), true)).isTrue();
+        profile.recordPlacement(CertificateLevel.C1, newer, new BigDecimal("7"));
+        assertThat(profile.acceptMeasurement(newer, time.plusSeconds(1), false)).isFalse();
+        assertThat(profile.getCurrentScore()).isEqualByComparingTo("7");
+    }
+
+    @Test
+    void declaringALevelDiscardsTheOldMeasuredScore() {
+        profile.recordPlacement(CertificateLevel.B2, UUID.randomUUID(), new BigDecimal("6"));
+        profile.declareCurrentLevel(CertificateLevel.C1, java.time.Instant.now());
+        assertThat(profile.getCurrentScore()).isNull();
+    }
 
     private final LearnerProfile profile = LearnerProfile.forUser(UUID.randomUUID());
 

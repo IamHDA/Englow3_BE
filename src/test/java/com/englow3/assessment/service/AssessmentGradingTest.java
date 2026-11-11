@@ -50,7 +50,8 @@ class AssessmentGradingTest {
             new com.englow3.assessment.helper.TaskImages(mock(com.englow3.shared.storage.PresignedUrlResolver.class),
                     mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",
                     java.time.Duration.ofHours(3)),
-            mock(org.springframework.context.ApplicationEventPublisher.class));
+            mock(org.springframework.context.ApplicationEventPublisher.class),
+            mock(com.englow3.assessment.repository.AssessmentAssignmentRepository.class));
 
     /** Staff can sit any published task, their own included; marking that work would be grading themselves. */
     @Test

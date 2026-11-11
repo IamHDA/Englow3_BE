@@ -17,6 +17,13 @@ import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.assessment.entity.AssessmentTaskStatus;
 
 public interface AssessmentAuthoringService {
+    com.englow3.assessment.dto.result.AssessmentAssignmentResult assignment(UUID id);
+
+    com.englow3.assessment.dto.result.AssessmentAssignmentResult assign(UUID id, UUID reviewerId, long version,
+            String note);
+
+    List<com.englow3.user.api.UserDirectory.StaffMember> reviewers();
+
     AssessmentWorkloadResult workload();
 
     Page<AssessmentTaskResult> tasks(AssessmentSkill skill, AssessmentTaskStatus status, Pageable page);

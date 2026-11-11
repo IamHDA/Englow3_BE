@@ -59,7 +59,8 @@ class ExamContentServiceTest {
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final ExamContentService service = new ExamContentServiceImpl(examRepo, examSectionRepo, sectionPartRepo,
             questionSetRepo, questionRepo, questionOptionRepo, acceptedAnswerRepo, setOptionRepo, matchingAnswerRepo,
-            examPaperQuery, objectStorage, mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1));
+            examPaperQuery, objectStorage, mock(PresignedUrlResolver.class), EXAM_BUCKET, Duration.ofHours(1),
+            mock(com.englow3.user.api.UserDirectory.class));
 
     @Test
     void uploadsMediaThroughTheObjectStorageClient() {

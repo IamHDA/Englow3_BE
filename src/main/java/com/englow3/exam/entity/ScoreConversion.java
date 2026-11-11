@@ -12,8 +12,8 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 
 /**
- * One row of a certificate's published raw-score-to-band table. Read-only reference data: rows are added by migration
- * with a later {@code effectiveFrom}, never edited, so a result keeps the band it was given.
+ * One row of a certificate's reference conversion. Migrations supply IELTS; administrators may append a reviewed TOEIC
+ * version with provenance through ScoreConfigurationService. Existing rows and scored results are never edited.
  */
 @Entity
 @Table(name = "score_conversions")
@@ -50,11 +50,13 @@ public class ScoreConversion {
 
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
+    private String sourceReference;
+    private java.util.UUID createdByUserId;
 
     protected ScoreConversion() {
     }
 
-    /** For tests and the conversion helper; the application never writes this table. */
+    /** For tests and the conversion helper; configuration uses one validated bulk insert. */
     public static ScoreConversion of(CertificateType certificateType, CertificateVariant certificateVariant,
             SectionType sectionType, int rawScoreFrom, int rawScoreTo, BigDecimal convertedScore,
             LocalDate effectiveFrom) {

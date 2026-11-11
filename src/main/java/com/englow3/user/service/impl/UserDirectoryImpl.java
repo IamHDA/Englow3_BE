@@ -16,16 +16,23 @@ import com.englow3.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Identity only - "which internal user is calling". Nothing here decides what anyone is allowed to do: that moved
- * entirely to {@code @PreAuthorize("hasRole(...)")} reading the role from the token, so a gate costs no query at all
- * and only a use case that genuinely needs the id pays for one. It lives in {@code user} because that module owns the
- * {@code users} table. Another module resolving the id by injecting {@code UserRepository} itself would be reaching
- * into this module's persistence - the reason for this class is to keep that one call on the right side of the
- * boundary, not to add a layer.
+ * The user module owns internal identity, current roles and author scopes. Identity mappings are cached; privileged
+ * HTTP requests read the current database role once to reject revoked JWT roles immediately. Learner requests keep
+ * local JWT verification and need no role lookup.
  */
 @Service
 @RequiredArgsConstructor
 public class UserDirectoryImpl implements UserDirectory {
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public String currentRole() {
+        return userRepo.roleByAuthProviderId(currentUser.authProviderId()).map(Enum::name).orElse(null);
+    }
+
+    @Override
+    public UUID authoringScope() {
+        return currentUser.hasRole("ADMIN") ? null : requireCurrentUserId();
+    }
 
     /** Far above the learners one instance serves; only there so a flood of distinct tokens cannot grow it forever. */
     private static final int MAX_CACHED_IDS = 10_000;

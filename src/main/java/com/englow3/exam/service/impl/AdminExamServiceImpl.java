@@ -76,14 +76,18 @@ public class AdminExamServiceImpl implements AdminExamService {
 
     @Transactional(readOnly = true)
     public Page<ExamListItemResult> search(SearchExamCommand command, Pageable pageable) {
-        return examRepo.search(command.status(), command.examType(), command.title(), pageable)
-                .map(ExamListItemResult::of);
+        UUID scope = userDirectory.authoringScope();
+        var page = scope == null ? examRepo.search(command.status(), command.examType(), command.title(), pageable)
+                : examRepo.searchVisibleForAuthoring(command.status(), command.examType(), command.title(), scope,
+                        pageable);
+        return page.map(ExamListItemResult::of);
     }
 
     @Transactional(readOnly = true)
     public ExamDetailResult detail(ExamDetailCommand command) {
-        return toResult(
-                examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId())));
+        var paper = examPaperQuery.loadForAdmin(command.examId()).orElseThrow(() -> examNotFound(command.examId()));
+        checkAccess(paper.exam());
+        return toResult(paper);
     }
 
     @Transactional
@@ -138,8 +142,18 @@ public class AdminExamServiceImpl implements AdminExamService {
 
     @Transactional(readOnly = true)
     public AuthoringResult authoringDetail(UUID id) {
+        return authoringDetail(id, null);
+    }
+
+    private AuthoringResult authoringDetail(UUID id, UUID generatedFor) {
         var paper = examPaperQuery.loadForAdmin(id).orElseThrow(() -> examNotFound(id));
         var e = paper.exam();
+        if (generatedFor != null && !generatedFor.equals(e.getCreatedByUserId())) {
+            throw new com.englow3.shared.error.ForbiddenException("CONTENT_NOT_OWNED",
+                    "Generated content must belong to the job's author");
+        }
+        if (generatedFor == null)
+            checkAccess(e);
         var metadata = new CreateExamCommand(e.getTitle(), e.getDescription(), e.getExamType(), e.getCertificateType(),
                 e.getCertificateVariant(), e.getTargetLevel(), e.getDurationSeconds(), e.getMaxRawScore(),
                 e.getPassScore());
@@ -197,6 +211,12 @@ public class AdminExamServiceImpl implements AdminExamService {
                 Collectors.toMap(Function.identity(), key -> presignedUrls.resolve(examBucket, key, mediaUrlTtl)));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AuthoringResult generatedAuthoringDetail(UUID id, UUID authorId) {
+        return authoringDetail(id, java.util.Objects.requireNonNull(authorId));
+    }
+
     @Transactional
     public AuthoringResult saveAuthoring(SaveAuthoringCommand command) {
         return saveAuthoring(command, null);
@@ -222,13 +242,30 @@ public class AdminExamServiceImpl implements AdminExamService {
             e.updateDraft(m.title(), m.description(), m.examType(), m.certificateType(), m.certificateVariant(),
                     m.targetLevel(), m.durationSeconds(), m.maxRawScore(), m.passScore());
         }
-        contentService.replaceContent(new UpdateExamContentCommand(id, command.content().sections()));
+        if (authorId == null)
+            contentService.replaceContent(new UpdateExamContentCommand(id, command.content().sections()));
+        else
+            contentService.replaceGeneratedContent(new UpdateExamContentCommand(id, command.content().sections()),
+                    authorId);
         examRepo.flush();
-        return authoringDetail(id);
+        return authoringDetail(id, authorId);
     }
 
     private Exam requireExam(UUID examId) {
-        return examRepo.findById(examId).orElseThrow(() -> examNotFound(examId));
+        Exam exam = examRepo.findById(examId).orElseThrow(() -> examNotFound(examId));
+        checkAccess(exam);
+        return exam;
+    }
+
+    private void checkAccess(Exam exam) {
+        if (exam.getStatus() != com.englow3.exam.entity.ExamStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(exam.getCreatedByUserId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void requireAuthoringAccess(UUID id) {
+        requireExam(id);
     }
 
     private static NotFoundException examNotFound(UUID examId) {

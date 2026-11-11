@@ -141,7 +141,9 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
      */
     @Transactional(readOnly = true)
     public Page<ContentReviewResult> searchForAuthoring(FlashcardSetStatus status, String title, Pageable pageable) {
-        Page<FlashcardSet> page = setRepo.searchForAuthoring(status, title, pageable);
+        UUID scope = userDirectory.authoringScope();
+        Page<FlashcardSet> page = scope == null ? setRepo.searchForAuthoring(status, title, pageable)
+                : setRepo.searchVisibleForAuthoring(status, title, scope, pageable);
         Map<UUID, Long> counts = cardRepo.countBySetIds(page.getContent().stream().map(FlashcardSet::getId).toList());
 
         return page.map(set -> ContentReviewResult.of(set, counts.getOrDefault(set.getId(), 0L)));
@@ -253,7 +255,10 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     }
 
     private FlashcardSet requireSet(UUID setId) {
-        return setRepo.findById(setId).orElseThrow(
+        FlashcardSet set = setRepo.findById(setId).orElseThrow(
                 () -> new NotFoundException("FLASHCARD_SET_NOT_FOUND", "No flashcard set with id %s".formatted(setId)));
+        if (set.getStatus() != FlashcardSetStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(set.getCreatedByUserId());
+        return set;
     }
 }

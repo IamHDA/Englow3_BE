@@ -124,3 +124,29 @@ models, teacher approval, or inference budgets:
 - Verify transaction commit/rollback, worker concurrency/shutdown, probe caching,
   and an eight-second simulated reply appearing by 9.5 seconds. These tests do not
   measure or claim a reduction in the external provider's generation time.
+
+## Role-flow release validation — 2026-11-11
+
+`ProductionJourneysIntegrationTest` exercised the real Spring HTTP/security stack
+through MockMvc and PostgreSQL 17. The measured learner has 5,000 scored quiz attempts;
+the same test adds 5,000 accounts before measuring the administrator list. Each route
+has five warm-up requests and 40 measured sequential requests. The release verification
+recorded these p95 values:
+
+- `/api/user/me/bootstrap`: 10.71 ms (p50 8.75 ms).
+- `/api/daily-path`: 14.01 ms (p50 11.10 ms).
+- `/api/exams?size=12`: 14.36 ms (p50 11.51 ms).
+- `/api/admin/users?size=20`: 22.75 ms (p50 19.02 ms).
+
+These are local warm measurements, not a before/after comparison or a production SLO.
+They exclude JWT signature verification, WAN latency, Next/BFF hops, cold starts,
+concurrent peak load, storage transfers and AI inference. Repeat the staging checks
+in `production-ops-runbook.md` before promoting a release.
+
+This change keeps learner authorization free of a role query. Back-office HTTP calls
+pay one indexed role lookup to reject revoked JWT privileges. Author lists filter
+before pagination and use owner/status indexes. Submission/task/history reads no
+longer acquire write locks; assignment and grading retain row locks and version checks.
+TOEIC reference tables are validated and appended with one bulk SQL insert. Roadmap
+polling pauses while the document is hidden, and generation failures retain a visible
+recovery path without blocking self-directed practice.

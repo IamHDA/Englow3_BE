@@ -18,10 +18,11 @@ public record SaveFullTestRequest(@NotBlank @Size(max = 100) String title, @Size
         @NotNull @Schema(description = "ACADEMIC or GENERAL") CertificateVariant certificateVariant,
         @NotNull @Schema(description = "The Listening + Reading mock paper") UUID examId, @NotNull UUID writingTask1Id,
         @NotNull UUID writingTask2Id, @NotNull UUID speakingPart1Id, @NotNull UUID speakingPart2Id,
-        @NotNull UUID speakingPart3Id) {
+        @NotNull UUID speakingPart3Id,
+        @jakarta.validation.constraints.PositiveOrZero @Schema(nullable = true) Long version) {
 
     public SaveFullTestCommand toCommand(UUID id) {
         return new SaveFullTestCommand(id, title, description, certificateVariant, examId, writingTask1Id,
-                writingTask2Id, speakingPart1Id, speakingPart2Id, speakingPart3Id);
+                writingTask2Id, speakingPart1Id, speakingPart2Id, speakingPart3Id, version);
     }
 }

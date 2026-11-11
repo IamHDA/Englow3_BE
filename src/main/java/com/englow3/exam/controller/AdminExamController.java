@@ -115,6 +115,7 @@ class AdminExamController {
     /** Staff hand a paper over for review. Available from a draft or from one that came back. */
     @PostMapping("/{id}/submit-for-review")
     ResponseEntity<ExamResponse> submitForReview(@PathVariable UUID id) {
+        adminExamService.requireAuthoringAccess(id);
         return ResponseEntity
                 .ok(ExamResponse.from(examReviewService.submitForReview(new SubmitExamForReviewCommand(id))));
     }

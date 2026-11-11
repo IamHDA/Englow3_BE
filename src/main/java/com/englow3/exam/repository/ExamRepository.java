@@ -21,6 +21,9 @@ import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.TargetLevel;
 
 public interface ExamRepository extends JpaRepository<Exam, UUID> {
+    @Query("select e from Exam e where (:status is null or e.status = :status) and (:examType is null or e.examType = :examType) and (:title is null or lower(e.title) like lower(concat('%', cast(:title as String), '%'))) and (e.createdByUserId = :author or e.status = com.englow3.exam.entity.ExamStatus.PUBLISHED)")
+    Page<Exam> searchVisibleForAuthoring(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
+            @Param("title") String title, @Param("author") UUID author, Pageable pageable);
 
     /**
      * Entities rather than a projection: the row has no collection to lazy-load and one page is a handful of them, so

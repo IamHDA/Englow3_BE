@@ -89,6 +89,17 @@ public class ContentCatalogQuery {
      * exam module's {@code full_tests} through this declared read-only join.
      */
     public List<MockPaper> mockPapers(String certificate) {
+        if ("TOEIC".equals(certificate)) {
+            long skills = jdbc.sql("""
+                    select count(distinct section_type) from score_conversions
+                    where certificate_type='TOEIC' and section_type in ('LISTENING','READING')
+                      and certificate_variant is null and source_reference is not null
+                      and effective_from <= cast(current_timestamp at time zone 'UTC' as date)
+                    """).query(Long.class).single();
+            if (skills != 2)
+                throw new com.englow3.shared.error.ConflictException("ROADMAP_SCORE_CONFIGURATION_REQUIRED",
+                        "A reviewed TOEIC score conversion must be configured before creating score-based milestones");
+        }
         if ("IELTS".equals(certificate)) {
             return jdbc.sql("""
                     select id, title, certificate_variant from full_tests

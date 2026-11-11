@@ -204,6 +204,15 @@ public class ExamAttempt {
         this.status = ExamAttemptStatus.SCORED;
     }
 
+    public void recordConvertedScore(BigDecimal score) {
+        if (status != ExamAttemptStatus.SCORED || isPractice())
+            throw new ConflictException("ATTEMPT_CONVERSION_NOT_AVAILABLE",
+                    "Only a scored full sitting can receive a converted score");
+        if (convertedScore != null && convertedScore.compareTo(score) != 0)
+            throw new ConflictException("ATTEMPT_ALREADY_CONVERTED", "A recorded conversion is immutable");
+        convertedScore = java.util.Objects.requireNonNull(score);
+    }
+
     public void expire(Instant now) {
         if (status == ExamAttemptStatus.IN_PROGRESS && !now.isBefore(expiresAt)) {
             status = ExamAttemptStatus.EXPIRED;

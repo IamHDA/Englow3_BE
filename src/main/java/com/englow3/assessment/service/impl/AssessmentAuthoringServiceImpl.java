@@ -60,6 +60,50 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     private final TransactionTemplate transactionTemplate;
     private final com.englow3.assessment.helper.TaskImages images;
     private final ApplicationEventPublisher events;
+    private final com.englow3.assessment.repository.AssessmentAssignmentRepository assignmentRepo;
+
+    public List<UserDirectory.StaffMember> reviewers() {
+        requireAdmin();
+        return users.backOfficeUsers();
+    }
+
+    public com.englow3.assessment.dto.result.AssessmentAssignmentResult assignment(UUID id) {
+        UUID actor = users.requireCurrentUserId();
+        return transactionTemplate.execute(tx -> assignmentResult(reviewable(id, actor, false)));
+    }
+
+    public com.englow3.assessment.dto.result.AssessmentAssignmentResult assign(UUID id, UUID reviewerId, long version,
+            String note) {
+        requireAdmin();
+        if (note == null || note.isBlank() || note.strip().length() > 2000)
+            throw new BadRequestException("ASSIGNMENT_NOTE_REQUIRED",
+                    "Explain the assignment in at most 2000 characters");
+        if (reviewerId != null && !users.isBackOfficeUser(reviewerId))
+            throw new BadRequestException("REVIEWER_NOT_AVAILABLE", "Choose an active staff member or administrator");
+        UUID actor = users.requireCurrentUserId();
+        return transactionTemplate.execute(tx -> {
+            AssessmentAttempt a = reviewable(id, actor);
+            UUID previous = a.getAssignedReviewerId();
+            a.assignReviewer(reviewerId, version);
+            if (!java.util.Objects.equals(previous, reviewerId)) {
+                assignmentRepo.save(com.englow3.assessment.entity.AssessmentAssignment.of(id, actor, reviewerId,
+                        note.strip(), clock.instant()));
+                attemptRepo.saveAndFlush(a);
+            }
+            return assignmentResult(a);
+        });
+    }
+
+    private com.englow3.assessment.dto.result.AssessmentAssignmentResult assignmentResult(AssessmentAttempt a) {
+        String name = a.getAssignedReviewerId() == null ? null
+                : users.displayNames(List.of(a.getAssignedReviewerId())).get(a.getAssignedReviewerId());
+        return new com.englow3.assessment.dto.result.AssessmentAssignmentResult(a.getId(), a.getAssignedReviewerId(),
+                name, a.getVersion(),
+                assignmentRepo.findTop20ByAttemptIdOrderByCreatedAtDesc(a.getId()).stream()
+                        .map(e -> new com.englow3.assessment.dto.result.AssessmentAssignmentResult.Entry(e.getId(),
+                                e.getAssignedByUserId(), e.getReviewerId(), e.getNote(), e.getCreatedAt()))
+                        .toList());
+    }
 
     public AssessmentWorkloadResult workload() {
         return workloadQuery.counts(currentUser.hasRole("ADMIN") ? null : users.requireCurrentUserId());
@@ -79,13 +123,13 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
 
     public AssessmentTaskResult taskDetail(UUID id) {
         UUID author = users.requireCurrentUserId();
-        return transactionTemplate.execute(tx -> signedFrom(task(id, author), true));
+        return transactionTemplate.execute(tx -> signedFrom(task(id, author, false), true));
     }
 
     public List<AssessmentReviewResult> reviews(UUID id) {
         UUID author = users.requireCurrentUserId();
         List<AssessmentReview> reviews = transactionTemplate.execute(tx -> {
-            reviewable(id, author);
+            reviewable(id, author, false);
             return reviewRepo.findByAttemptIdOrderByCreatedAtDesc(id);
         });
         Map<UUID, String> names = users
@@ -172,7 +216,7 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
 
     public AssessmentAttemptResult submission(UUID id) {
         UUID author = users.requireCurrentUserId();
-        AssessmentAttempt a = transactionTemplate.execute(tx -> reviewable(id, author));
+        AssessmentAttempt a = transactionTemplate.execute(tx -> reviewable(id, author, false));
         return resultMapper.from(a, true, users.displayNames(List.of(a.getUserId())).get(a.getUserId()));
     }
 
@@ -216,9 +260,19 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     }
 
     private AssessmentAttempt reviewable(UUID id, UUID author) {
-        AssessmentAttempt a = attemptRepo.lockById(id)
+        return reviewable(id, author, true);
+    }
+
+    private AssessmentAttempt reviewable(UUID id, UUID author, boolean lock) {
+        AssessmentAttempt a = (lock ? attemptRepo.lockById(id) : attemptRepo.findById(id))
                 .orElseThrow(() -> new NotFoundException("ATTEMPT_NOT_FOUND", "Submission not found"));
-        task(a.getTaskId(), author);
+        if (!currentUser.hasRole("ADMIN")) {
+            if (a.getAssignedReviewerId() == null)
+                task(a.getTaskId(), author, lock);
+            else if (!a.getAssignedReviewerId().equals(author))
+                throw new ForbiddenException("SUBMISSION_NOT_ASSIGNED",
+                        "This submission is assigned to another reviewer");
+        }
         if (a.getStatus() == AssessmentAttemptStatus.DRAFT) {
             throw new NotFoundException("ATTEMPT_NOT_FOUND", "Submission not found");
         }
@@ -226,7 +280,11 @@ public class AssessmentAuthoringServiceImpl implements AssessmentAuthoringServic
     }
 
     private AssessmentTask task(UUID id, UUID author) {
-        AssessmentTask task = taskRepo.lockById(id)
+        return task(id, author, true);
+    }
+
+    private AssessmentTask task(UUID id, UUID author, boolean lock) {
+        AssessmentTask task = (lock ? taskRepo.lockById(id) : taskRepo.findById(id))
                 .orElseThrow(() -> new NotFoundException("TASK_NOT_FOUND", "Task not found"));
         if (!currentUser.hasRole("ADMIN") && !task.getCreatedByUserId().equals(author)) {
             throw new ForbiddenException("TASK_NOT_OWNED", "Staff can only manage their own tasks");

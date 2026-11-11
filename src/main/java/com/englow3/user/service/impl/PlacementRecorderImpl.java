@@ -53,7 +53,7 @@ public class PlacementRecorderImpl implements PlacementRecorder {
      * a level again.
      */
     @Transactional
-    public void record(UUID userId, UUID attemptId, BigDecimal scorePercentage) {
+    public void record(UUID userId, UUID attemptId, BigDecimal scorePercentage, java.time.Instant measuredAt) {
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) {
             return;
@@ -62,6 +62,8 @@ public class PlacementRecorderImpl implements PlacementRecorder {
         LearnerProfile profile = learnerProfileRepo.findByUserId(userId)
                 .orElseGet(() -> learnerProfileRepo.save(LearnerProfile.forUser(userId)));
 
+        if (!profile.acceptMeasurement(attemptId, measuredAt, true))
+            return;
         profile.recordPlacement(levelFor(scorePercentage), attemptId);
 
         // Only the step this test was meant to answer. A learner who has finished onboarding and retakes the placement
@@ -73,7 +75,7 @@ public class PlacementRecorderImpl implements PlacementRecorder {
 
     @Override
     @Transactional
-    public void recordLevelCheck(UUID userId, UUID levelCheckId, String level) {
+    public void recordLevelCheck(UUID userId, UUID levelCheckId, String level, java.time.Instant measuredAt) {
         CertificateLevel measured = CertificateLevel.valueOf(level);
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) {
@@ -81,6 +83,8 @@ public class PlacementRecorderImpl implements PlacementRecorder {
         }
         LearnerProfile profile = learnerProfileRepo.findByUserId(userId)
                 .orElseGet(() -> learnerProfileRepo.save(LearnerProfile.forUser(userId)));
+        if (!profile.acceptMeasurement(levelCheckId, measuredAt, true))
+            return;
         profile.recordLevelCheck(measured, levelCheckId);
         if (user.getOnboardingStep() == OnboardingStep.CURRENT_LEVEL) {
             user.moveTo(OnboardingStep.LEARNING_GOAL);
@@ -89,7 +93,8 @@ public class PlacementRecorderImpl implements PlacementRecorder {
 
     @Override
     @Transactional
-    public void recordIeltsBand(UUID userId, UUID examAttemptId, String level, BigDecimal band) {
+    public void recordIeltsBand(UUID userId, UUID examAttemptId, String level, BigDecimal band,
+            java.time.Instant measuredAt, boolean finalResult) {
         CertificateLevel measured = CertificateLevel.valueOf(level);
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) {
@@ -97,6 +102,9 @@ public class PlacementRecorderImpl implements PlacementRecorder {
         }
         LearnerProfile profile = learnerProfileRepo.findByUserId(userId)
                 .orElseGet(() -> learnerProfileRepo.save(LearnerProfile.forUser(userId)));
+        if (profile.getTargetCertificateType() != com.englow3.user.entity.CertificateType.IELTS
+                || !profile.acceptMeasurement(examAttemptId, measuredAt, finalResult))
+            return;
         profile.recordPlacement(measured, examAttemptId, band);
         if (user.getOnboardingStep() == OnboardingStep.CURRENT_LEVEL) {
             user.moveTo(OnboardingStep.LEARNING_GOAL);

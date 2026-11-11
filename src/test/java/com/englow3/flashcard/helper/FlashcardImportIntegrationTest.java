@@ -54,6 +54,12 @@ class FlashcardImportIntegrationTest extends PostgresIntegrationTest {
     void setUp() {
         UUID author = new LearnerFixture(jdbc).learner();
         setId = new LearnerFixture(jdbc).draftFlashcardSet("Imported", author);
+        com.englow3.support.SignedIn.as(jdbc, author, "STAFF");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void signOut() {
+        com.englow3.support.SignedIn.out();
     }
 
     @Test

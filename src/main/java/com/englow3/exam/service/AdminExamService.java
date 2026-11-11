@@ -16,7 +16,11 @@ import com.englow3.exam.dto.result.ExamListItemResult;
 import com.englow3.exam.dto.result.ExamResult;
 
 public interface AdminExamService {
+    void requireAuthoringAccess(UUID id);
+
     AuthoringResult authoringDetail(UUID id);
+
+    AuthoringResult generatedAuthoringDetail(UUID id, UUID authorId);
 
     AuthoringResult saveAuthoring(SaveAuthoringCommand command);
 

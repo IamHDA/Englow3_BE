@@ -24,8 +24,11 @@ import lombok.Getter;
  */
 @Entity
 @Table(name = "users")
+@org.hibernate.annotations.DynamicUpdate
 @Getter
 public class User {
+    @jakarta.persistence.Version
+    private long version;
 
     @Id
     private UUID id;
@@ -75,6 +78,12 @@ public class User {
     private Set<TargetSkill> targetSkills = new HashSet<>();
 
     protected User() {
+    }
+
+    public void changeRole(Role expected, Role replacement) {
+        if (role != expected)
+            throw new ConflictException("USER_ROLE_CHANGED", "The role changed; reload before editing");
+        role = java.util.Objects.requireNonNull(replacement);
     }
 
     public void changeFullName(String fullName) {

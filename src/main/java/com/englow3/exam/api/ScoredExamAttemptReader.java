@@ -33,7 +33,7 @@ public interface ScoredExamAttemptReader {
      */
     record Sitting(UUID attemptId, UUID examId, String examType, String certificateType, String certificateVariant,
             boolean scored, boolean full, BigDecimal scorePercentage, BigDecimal convertedScore, Instant scoredAt,
-            List<SectionScore> sections) {
+            List<SectionScore> sections, Instant startedAt) {
     }
 
     /** Points awarded in one section against the points it was worth; unanswered questions count as zero. */

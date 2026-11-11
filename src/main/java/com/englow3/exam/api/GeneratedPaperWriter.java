@@ -22,7 +22,7 @@ public interface GeneratedPaperWriter {
     String uploadAudio(UUID examId, byte[] mp3);
 
     /** Attaches uploaded audio to the Listening part with this order number, while the paper is a draft. */
-    void attachListeningAudio(UUID examId, int partOrderNo, String objectKey);
+    void attachListeningAudio(UUID authorId, UUID examId, int partOrderNo, String objectKey);
 
     void submitForReview(UUID examId);
 

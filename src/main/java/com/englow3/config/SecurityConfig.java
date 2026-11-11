@@ -42,7 +42,10 @@ public class SecurityConfig {
      * exceptionHandling they are overwritten by the resource server's own BearerTokenAuthenticationEntryPoint.
      */
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper,
+            com.englow3.user.api.UserDirectory userDirectory) throws Exception {
+        http.addFilterAfter(new com.englow3.shared.security.BackOfficeRoleFilter(userDirectory, objectMapper),
+                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
         http.cors(Customizer.withDefaults()).csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth

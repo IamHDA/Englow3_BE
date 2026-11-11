@@ -50,7 +50,7 @@ public class ScoredExamAttemptReaderImpl implements ScoredExamAttemptReader {
                 exam.getCertificateVariant() == null ? null : exam.getCertificateVariant().name(), scored,
                 attempt.getMode() == ExamAttemptMode.FULL, scored ? attempt.getScorePercentage() : null,
                 scored ? attempt.getConvertedScore() : null, attempt.getScoredAt(),
-                scored ? sections(attempt.getId(), exam.getId()) : List.of());
+                scored ? sections(attempt.getId(), exam.getId()) : List.of(), attempt.getStartedAt());
     }
 
     /**

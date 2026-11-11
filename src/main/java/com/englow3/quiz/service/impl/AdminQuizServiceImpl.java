@@ -54,7 +54,9 @@ public class AdminQuizServiceImpl implements AdminQuizService {
 
     @Transactional(readOnly = true)
     public Page<ContentReviewResult> searchForAuthoring(QuizStatus status, String title, Pageable pageable) {
-        Page<Quiz> page = quizRepo.searchForAuthoring(status, title, pageable);
+        UUID scope = userDirectory.authoringScope();
+        Page<Quiz> page = scope == null ? quizRepo.searchForAuthoring(status, title, pageable)
+                : quizRepo.searchVisibleForAuthoring(status, title, scope, pageable);
         Map<UUID, Long> counts = questionRepo.countByQuizIds(page.getContent().stream().map(Quiz::getId).toList());
         return page.map(quiz -> ContentReviewResult.of(quiz, counts.getOrDefault(quiz.getId(), 0L)));
     }
@@ -142,7 +144,10 @@ public class AdminQuizServiceImpl implements AdminQuizService {
     }
 
     private Quiz requireQuiz(UUID quizId) {
-        return quizRepo.findById(quizId)
+        Quiz quiz = quizRepo.findById(quizId)
                 .orElseThrow(() -> new NotFoundException("QUIZ_NOT_FOUND", "No quiz with id %s".formatted(quizId)));
+        if (quiz.getStatus() != QuizStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(quiz.getCreatedByUserId());
+        return quiz;
     }
 }

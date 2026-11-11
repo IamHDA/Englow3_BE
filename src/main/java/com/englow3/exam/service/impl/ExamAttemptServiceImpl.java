@@ -359,12 +359,16 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         Exam exam = examRepo.findById(attempt.getExamId()).orElseThrow(() -> examNotFound(attempt.getExamId()));
         List<AttemptSectionResult> sections = sectionResults(exam, attempt, questions, storedAnswers, now);
         sectionResultRepo.saveAll(sections);
+        if (exam.getCertificateType() == CertificateType.TOEIC && !attempt.isPractice()) {
+            com.englow3.exam.helper.ToeicScoring.total(sections).ifPresent(attempt::recordConvertedScore);
+        }
         events.publishEvent(new ExamSittingScored(attempt.getId(), attempt.getUserId(), attempt.getExamId(),
                 !attempt.isPractice()));
 
         // A practice never sets a level: it is a chosen slice of the paper, on a clock the learner picked.
         if (exam.getExamType() == ExamType.PLACEMENT && !attempt.isPractice()) {
-            placementRecorder.record(attempt.getUserId(), attempt.getId(), attempt.getScorePercentage());
+            placementRecorder.record(attempt.getUserId(), attempt.getId(), attempt.getScorePercentage(),
+                    attempt.getStartedAt());
         }
 
         return named(ExamAttemptResult.scored(attempt, buildReview(exam, questions, storedAnswers, storedOptions),
@@ -397,8 +401,12 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
                     correct += answer.isCorrect() ? 1 : 0;
                 }
             }
-            BigDecimal band = BandConversion
-                    .convert(conversions, exam.getCertificateVariant(), sectionType, raw, max, scoredOn).orElse(null);
+            boolean toeic = exam.getCertificateType() == CertificateType.TOEIC;
+            boolean toeicShape = !toeic
+                    || sectionQuestions.stream().allMatch(q -> q.questionType() == QuestionType.SINGLE_CHOICE);
+            BigDecimal band = toeicShape ? BandConversion.convert(conversions, exam.getCertificateVariant(),
+                    sectionType, toeic ? BigDecimal.valueOf(correct) : raw,
+                    toeic ? BigDecimal.valueOf(sectionQuestions.size()) : max, scoredOn).orElse(null) : null;
             results.add(AttemptSectionResult.of(attempt.getId(), sectionType, raw, max, band, correct,
                     sectionQuestions.size()));
         });

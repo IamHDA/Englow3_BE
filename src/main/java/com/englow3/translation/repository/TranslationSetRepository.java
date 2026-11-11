@@ -12,6 +12,9 @@ import com.englow3.translation.entity.TranslationSet;
 import com.englow3.translation.entity.TranslationSetStatus;
 
 public interface TranslationSetRepository extends JpaRepository<TranslationSet, UUID> {
+    @Query("select s from TranslationSet s where (:status is null or s.status=:status) and (:title is null or lower(s.title) like lower(concat('%',cast(:title as String),'%'))) and (s.createdByUserId=:author or s.status=com.englow3.translation.entity.TranslationSetStatus.PUBLISHED)")
+    Page<TranslationSet> searchVisibleForAuthoring(@Param("status") TranslationSetStatus status,
+            @Param("title") String title, @Param("author") UUID author, Pageable page);
 
     /** The slug is the set's public handle, so it is unique across every status, not just published ones. */
     boolean existsBySlug(String slug);

@@ -15,4 +15,7 @@ public interface ExamContentService {
     ExamMediaResult uploadMedia(UUID examId, byte[] content, String contentType);
 
     ExamDetailResult replaceContent(UpdateExamContentCommand command);
+
+    /** Trusted generation boundary: the persisted author must match the job's actor. */
+    ExamDetailResult replaceGeneratedContent(UpdateExamContentCommand command, UUID authorId);
 }

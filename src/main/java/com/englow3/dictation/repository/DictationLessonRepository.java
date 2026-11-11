@@ -12,6 +12,10 @@ import com.englow3.dictation.entity.DictationLesson;
 import com.englow3.dictation.entity.DictationLessonStatus;
 
 public interface DictationLessonRepository extends JpaRepository<DictationLesson, UUID> {
+    @Query("select c from DictationLesson c where (:status is null or c.status = :status) and (:title is null or lower(c.title) like lower(concat('%', cast(:title as String), '%'))) and (c.createdByUserId = :author or c.status = com.englow3.dictation.entity.DictationLessonStatus.PUBLISHED)")
+    Page<DictationLesson> searchVisibleForAuthoring(@Param("status") DictationLessonStatus status,
+            @Param("title") String title, @Param("author") UUID author, Pageable pageable);
+
     boolean existsBySlugAndIdNot(String slug, UUID id);
 
     boolean existsBySlug(String slug);

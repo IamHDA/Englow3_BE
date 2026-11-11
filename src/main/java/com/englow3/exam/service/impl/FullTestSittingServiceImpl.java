@@ -158,12 +158,13 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
         FullTestSitting.Change change = sitting.settle(progress(sitting, test), now);
         if (change.completed()) {
             placements.recordIeltsBand(sitting.getUserId(), sitting.getExamAttemptId(),
-                    IeltsBand.cefr(sitting.getOverallBand()), sitting.getOverallBand());
+                    IeltsBand.cefr(sitting.getOverallBand()), sitting.getOverallBand(), sitting.getStartedAt(), true);
             events.publishEvent(new FullTestCompleted(sitting.getId(), sitting.getUserId(), test.getId(),
                     sitting.getOverallBand()));
         } else if (change.provisionalSet()) {
             placements.recordIeltsBand(sitting.getUserId(), sitting.getExamAttemptId(),
-                    IeltsBand.cefr(sitting.getProvisionalBand()), sitting.getProvisionalBand());
+                    IeltsBand.cefr(sitting.getProvisionalBand()), sitting.getProvisionalBand(), sitting.getStartedAt(),
+                    false);
         }
     }
 

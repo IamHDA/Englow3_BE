@@ -22,6 +22,23 @@ import com.englow3.assessment.service.AssessmentAuthoringService;
         "SUPABASE_JWKS_URI=https://issuer.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class AssessmentAuthorizationTest {
+    @MockitoBean
+    com.englow3.user.api.UserDirectory userDirectory;
+
+    @org.junit.jupiter.api.BeforeEach
+    void currentRole() {
+        when(userDirectory.currentRole()).thenReturn("STAFF");
+    }
+
+    @Test
+    void staffCannotAssignReviewers() throws Exception {
+        mvc.perform(put("/api/admin/assessments/submissions/" + UUID.randomUUID() + "/assignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reviewerId\":null,\"version\":0,\"note\":\"Transfer\"}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF")))).andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
     @Autowired
     MockMvc mvc;
     @MockitoBean

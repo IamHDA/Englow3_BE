@@ -34,7 +34,8 @@ public class AssessmentQueueQuery {
                 "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
         String from = """
                 from assessment_attempts a join assessment_tasks t on a.task_id = t.id join users u on a.user_id = u.id
-                where a.status <> 'DRAFT' and (:allAuthors or t.created_by_user_id = :author)
+                where a.status <> 'DRAFT' and (:allAuthors or a.assigned_reviewer_id = :author
+                  or (a.assigned_reviewer_id is null and t.created_by_user_id = :author))
                   and (:status = '' or a.status = :status) and (:skill = '' or a.skill = :skill)
                   and (lower(t.title) like :term or lower(u.display_name) like :term
                     or cast(a.id as text) like :term or cast(a.user_id as text) like :term)

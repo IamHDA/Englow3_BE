@@ -72,7 +72,9 @@ public class GenerationServiceImpl implements GenerationService {
     @Override
     @Transactional(readOnly = true)
     public Page<GenerationRequestResult> list(Pageable page) {
-        Page<GenerationRequest> requests = requestRepo.findAllByOrderByCreatedAtDesc(page);
+        UUID scope = users.authoringScope();
+        Page<GenerationRequest> requests = scope == null ? requestRepo.findAllByOrderByCreatedAtDesc(page)
+                : requestRepo.findByRequestedByUserIdOrderByCreatedAtDesc(scope, page);
         Map<UUID, String> names = users
                 .displayNames(requests.getContent().stream().map(GenerationRequest::getRequestedByUserId).toList());
         return requests.map(request -> toResult(request, names));
@@ -83,6 +85,7 @@ public class GenerationServiceImpl implements GenerationService {
     public GenerationRequestResult detail(UUID id) {
         GenerationRequest request = requestRepo.findById(id).orElseThrow(
                 () -> new NotFoundException("GENERATION_REQUEST_NOT_FOUND", "No generation request %s".formatted(id)));
+        users.requireAuthorAccess(request.getRequestedByUserId());
         return toResult(request, users.displayNames(List.of(request.getRequestedByUserId())));
     }
 

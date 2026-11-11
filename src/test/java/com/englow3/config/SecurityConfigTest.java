@@ -19,6 +19,30 @@ import org.springframework.web.bind.annotation.RestController;
         "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
+    @MockitoBean
+    private com.englow3.user.api.UserDirectory userDirectory;
+
+    @Test
+    void aRevokedAdminTokenCannotReachPrivilegedEndpoints() throws Exception {
+        org.mockito.Mockito.when(userDirectory.currentRole()).thenReturn("LEARNER");
+        mockMvc.perform(
+                get("/actuator/metrics").with(
+                        org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                        "ROLE_ADMIN"))))
+                .andExpect(status().isForbidden())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value("ROLE_CHANGED"));
+    }
+
+    @Test
+    void learnerRequestsDoNotPayForBackOfficeRoleLookups() throws Exception {
+        mockMvc.perform(get("/api/private-test")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verifyNoInteractions(userDirectory);
+    }
+
     @Test
     void diagnosticsRequireAuthentication() throws Exception {
         for (String path : new String[] { "/actuator/startup", "/actuator/metrics",

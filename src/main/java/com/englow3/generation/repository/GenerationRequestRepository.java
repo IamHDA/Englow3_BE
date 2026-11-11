@@ -18,6 +18,7 @@ import com.englow3.generation.entity.GenerationStatus;
 import jakarta.persistence.LockModeType;
 
 public interface GenerationRequestRepository extends JpaRepository<GenerationRequest, UUID> {
+    Page<GenerationRequest> findByRequestedByUserIdOrderByCreatedAtDesc(UUID userId, Pageable page);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from GenerationRequest r where r.id = :id")

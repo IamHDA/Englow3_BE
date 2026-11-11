@@ -9,14 +9,14 @@ import com.englow3.user.entity.CertificateType;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Positive;
 
 /**
- * Every field but the certificate is optional - sending them empty is how a learner skips this step. A certificate
- * learner aims at {@code targetScore}; anyone else may aim at {@code targetLevel} instead.
+ * Certificate learners need a certificate and target score; general learners need a higher target level unless already
+ * at C2. The service checks these conditional requirements for every caller.
  */
-public record SetLearningGoalRequest(@NotNull CertificateType certificateType, @Positive BigDecimal currentScore,
+public record SetLearningGoalRequest(CertificateType certificateType, @DecimalMin("0") BigDecimal currentScore,
         @Positive BigDecimal targetScore, @Future LocalDate targetDate, CertificateLevel targetLevel,
         @Min(10) @Max(240) Integer dailyStudyMinutes) {
 }

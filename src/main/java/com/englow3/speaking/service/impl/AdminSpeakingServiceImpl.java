@@ -58,7 +58,10 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     @Transactional(readOnly = true)
     public Page<SpeakingPromptReviewResult> searchForAuthoring(SpeakingPromptStatus status, String title,
             Pageable pageable) {
-        return promptRepo.searchForAuthoring(status, title, pageable).map(SpeakingPromptReviewResult::of);
+        UUID scope = userDirectory.authoringScope();
+        return (scope == null ? promptRepo.searchForAuthoring(status, title, pageable)
+                : promptRepo.searchVisibleForAuthoring(status, title, scope, pageable))
+                        .map(SpeakingPromptReviewResult::of);
     }
 
     @Transactional
@@ -159,7 +162,11 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     }
 
     private SpeakingPrompt requirePrompt(UUID promptId) {
-        return promptRepo.findById(promptId).orElseThrow(() -> new NotFoundException("SPEAKING_PROMPT_NOT_FOUND",
-                "No speaking prompt with id %s".formatted(promptId)));
+        SpeakingPrompt prompt = promptRepo.findById(promptId)
+                .orElseThrow(() -> new NotFoundException("SPEAKING_PROMPT_NOT_FOUND",
+                        "No speaking prompt with id %s".formatted(promptId)));
+        if (prompt.getStatus() != SpeakingPromptStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(prompt.getCreatedByUserId());
+        return prompt;
     }
 }

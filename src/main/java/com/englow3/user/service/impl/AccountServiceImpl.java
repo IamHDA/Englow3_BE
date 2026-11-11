@@ -60,7 +60,7 @@ public class AccountServiceImpl implements AccountService {
     private String tutorAudioBucket;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, JsonNode> exportData() {
         UUID userId = requireUser().getId();
         // Reads a dozen tables; a person needs one copy, not one a second.
@@ -72,18 +72,46 @@ public class AccountServiceImpl implements AccountService {
         out.put("targetSkills", rows("user_target_skills", "user_id = :u", userId));
         out.put("subscription", rows("user_subscriptions", "user_id = :u", userId));
         out.put("examAttempts", rows("exam_attempts", "user_id = :u", userId));
+        out.put("examSectionResults", rows("attempt_section_results",
+                "exam_attempt_id in (select id from exam_attempts where user_id = :u)", userId));
+        out.put("fullTestSittings", rows("full_test_sittings", "user_id = :u", userId));
+        out.put("roadmaps", rows("learning_roadmaps", "user_id = :u", userId));
+        out.put("roadmapStages",
+                rows("roadmap_stages", "roadmap_id in (select id from learning_roadmaps where user_id = :u)", userId));
+        out.put("roadmapItems", rows("roadmap_items",
+                "stage_id in (select s.id from roadmap_stages s join learning_roadmaps r on r.id=s.roadmap_id where r.user_id=:u)",
+                userId));
+        out.put("roadmapMilestones", rows("roadmap_milestones",
+                "stage_id in (select s.id from roadmap_stages s join learning_roadmaps r on r.id=s.roadmap_id where r.user_id=:u)",
+                userId));
+        out.put("roadmapAdjustments", rows("roadmap_adjustments",
+                "roadmap_id in (select id from learning_roadmaps where user_id=:u)", userId));
+        out.put("levelChecks", rows("level_checks", "user_id=:u", userId));
         out.put("examAnswers", rows("attempt_answers",
                 "exam_attempt_id in (select id from exam_attempts where user_id = :u)", userId));
+        out.put("examSelections", rows("attempt_answer_options",
+                "attempt_answer_id in (select a.id from attempt_answers a join exam_attempts e on e.id=a.exam_attempt_id where e.user_id=:u)",
+                userId));
         out.put("assessmentAttempts", rows("assessment_attempts", "user_id = :u", userId));
         out.put("speakingAttempts", rows("speaking_attempts", "user_id = :u", userId));
+        out.put("speakingWords", rows("speaking_attempt_words",
+                "speaking_attempt_id in (select id from speaking_attempts where user_id=:u)", userId));
         out.put("dictationAttempts", rows("dictation_attempts", "user_id = :u", userId));
         out.put("quizAttempts", rows("quiz_attempts", "user_id = :u", userId));
+        out.put("quizAnswers", rows("quiz_attempt_answers",
+                "quiz_attempt_id in (select id from quiz_attempts where user_id=:u)", userId));
+        out.put("tours", rows("user_tour_completions", "user_id=:u", userId));
         out.put("translationAttempts", rows("translation_attempts", "user_id = :u", userId));
         out.put("flashcardReviews", rows("flashcard_reviews", "user_id = :u", userId));
         out.put("flashcardReviewLogs", rows("flashcard_review_logs", "user_id = :u", userId));
         out.put("tutorConversations", rows("tutor_conversations", "user_id = :u", userId));
         out.put("tutorMessages", rows("tutor_messages",
                 "tutor_conversation_id in (select id from tutor_conversations where user_id = :u)", userId));
+        var possiblyTruncated = out.entrySet().stream()
+                .filter(e -> e.getValue().isArray() && e.getValue().size() >= MAX_ROWS_PER_KIND).map(Map.Entry::getKey)
+                .toList();
+        out.put("exportMetadata", json.createObjectNode().put("rowLimitPerKind", MAX_ROWS_PER_KIND)
+                .set("possiblyTruncatedKinds", json.valueToTree(possiblyTruncated)));
         return out;
     }
 

@@ -139,6 +139,29 @@ public class AssessmentAuthoringController {
         return ResponseEntity.ok(AssessmentAttemptResponse.from(service.submission(id)));
     }
 
+    @GetMapping("/reviewers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<com.englow3.assessment.dto.response.AssessmentReviewerResponse>> reviewers() {
+        return ResponseEntity.ok(service.reviewers().stream()
+                .map(r -> new com.englow3.assessment.dto.response.AssessmentReviewerResponse(r.id(), r.displayName()))
+                .toList());
+    }
+
+    @GetMapping("/submissions/{id}/assignment")
+    public ResponseEntity<com.englow3.assessment.dto.response.AssessmentAssignmentResponse> assignment(
+            @PathVariable UUID id) {
+        return ResponseEntity
+                .ok(com.englow3.assessment.dto.response.AssessmentAssignmentResponse.from(service.assignment(id)));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/submissions/{id}/assignment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.englow3.assessment.dto.response.AssessmentAssignmentResponse> assign(
+            @PathVariable UUID id, @Valid @RequestBody com.englow3.assessment.dto.request.AssignAssessmentRequest r) {
+        return ResponseEntity.ok(com.englow3.assessment.dto.response.AssessmentAssignmentResponse
+                .from(service.assign(id, r.reviewerId(), r.version(), r.note())));
+    }
+
     @PostMapping("/submissions/{id}/grade")
     public ResponseEntity<AssessmentAttemptResponse> grade(@PathVariable UUID id,
             @Valid @RequestBody AssessmentReviewRequest r) {

@@ -54,6 +54,12 @@ public class FullTestServiceImpl implements FullTestService {
                             command.examId(), command.taskIds(), userDirectory.requireCurrentUserId())));
         }
         FullTest test = require(command.id());
+        if (command.version() == null)
+            throw new com.englow3.shared.error.BadRequestException("CONTENT_VERSION_REQUIRED",
+                    "Reload the full test before editing");
+        if (command.version() != test.getVersion())
+            throw new com.englow3.shared.error.ConflictException("FULL_TEST_CHANGED",
+                    "The full test changed; reload before saving");
         test.update(command.title(), command.description(), command.certificateVariant(), command.examId(),
                 command.taskIds());
         return FullTestResult.of(fullTestRepo.saveAndFlush(test));
@@ -68,7 +74,9 @@ public class FullTestServiceImpl implements FullTestService {
     @Override
     @Transactional(readOnly = true)
     public List<FullTestResult> list() {
-        return fullTestRepo.findAllByOrderByCreatedAtDesc().stream().map(FullTestResult::of).toList();
+        UUID scope = userDirectory.authoringScope();
+        return (scope == null ? fullTestRepo.findAllByOrderByCreatedAtDesc() : fullTestRepo.visibleForAuthoring(scope))
+                .stream().map(FullTestResult::of).toList();
     }
 
     @Override
@@ -109,8 +117,7 @@ public class FullTestServiceImpl implements FullTestService {
     @Override
     @Transactional(readOnly = true)
     public List<FullTestResult> catalogue() {
-        return fullTestRepo.findByStatusOrderByPublishedAtDesc(ExamStatus.PUBLISHED).stream().map(FullTestResult::of)
-                .toList();
+        return fullTestRepo.availableCatalogue().stream().map(FullTestResult::of).toList();
     }
 
     @Override
@@ -162,7 +169,10 @@ public class FullTestServiceImpl implements FullTestService {
     }
 
     private FullTest require(UUID id) {
-        return fullTestRepo.findById(id).orElseThrow(
+        FullTest test = fullTestRepo.findById(id).orElseThrow(
                 () -> new NotFoundException("FULL_TEST_NOT_FOUND", "No full test with id %s".formatted(id)));
+        if (test.getStatus() != ExamStatus.PUBLISHED)
+            userDirectory.requireAuthorAccess(test.getCreatedByUserId());
+        return test;
     }
 }

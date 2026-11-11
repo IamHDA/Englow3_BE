@@ -130,7 +130,7 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
 
         int jobs = runAllJobs(request.id());
 
-        var done = generation.detail(request.id());
+        var done = requestDetail(request.id());
         assertThat(done.status()).isEqualTo(GenerationStatus.COMPLETED);
         assertThat(done.title()).isEqualTo("Rivers and cities");
         assertThat(jobs).isEqualTo(19); // 18 steps, one of them twice
@@ -232,11 +232,11 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         runUntil(id, "assemble");
         String built = client.assemble("{}");
         artifacts.assemble(id, built);
-        var first = generation.detail(id);
+        var first = requestDetail(id);
         artifacts.assemble(id, built);
-        var repeated = generation.detail(id);
+        var repeated = requestDetail(id);
         handler.onGaveUp(id, "{\"step\":\"assemble\",\"attempt\":0}", "AI_JOB_STALLED");
-        assertThat(generation.detail(id).status()).isEqualTo(GenerationStatus.RUNNING);
+        assertThat(requestDetail(id).status()).isEqualTo(GenerationStatus.RUNNING);
         assertThat(repeated.examId()).isEqualTo(first.examId());
         assertThat(repeated.taskIds()).containsExactlyElementsOf(first.taskIds());
         assertThat(jdbc.sql("select count(*) from exams where created_by_user_id=:u").param("u", staff)
@@ -256,13 +256,13 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         ((ObjectNode) broken.path("tasks").get(1)).put("title", "");
         assertThatThrownBy(() -> artifacts.assemble(id, broken.toString()))
                 .isInstanceOf(com.englow3.shared.error.BadRequestException.class);
-        assertThat(generation.detail(id).step()).isEqualTo("assemble");
+        assertThat(requestDetail(id).step()).isEqualTo("assemble");
         assertThat(jdbc.sql("select count(*) from exams where created_by_user_id=:u").param("u", staff)
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("select count(*) from assessment_tasks where created_by_user_id=:u").param("u", staff)
                 .query(Long.class).single()).isZero();
         artifacts.assemble(id, good);
-        assertThat(generation.detail(id).taskIds()).hasSize(5);
+        assertThat(requestDetail(id).taskIds()).hasSize(5);
     }
 
     @Test
@@ -271,21 +271,31 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         UUID id = generation.request(GenerationKind.IELTS_FULL_TEST, null).id();
         SignedIn.out();
         runUntil(id, "finish");
-        var pending = generation.detail(id);
+        var pending = requestDetail(id);
         UUID conflicting = pending.taskIds().get(2);
         jdbc.sql("update assessment_tasks set status='PENDING_REVIEW' where id=:id").param("id", conflicting).update();
         assertThatThrownBy(() -> artifacts.finish(id)).isInstanceOf(ConflictException.class);
         assertThat(status("exams", pending.examId())).isEqualTo("DRAFT");
         assertThat(status("assessment_tasks", pending.taskIds().getFirst())).isEqualTo("DRAFT");
-        assertThat(generation.detail(id).step()).isEqualTo("finish");
+        assertThat(requestDetail(id).step()).isEqualTo("finish");
         jdbc.sql("update assessment_tasks set status='DRAFT' where id=:id").param("id", conflicting).update();
         artifacts.finish(id);
-        var done = generation.detail(id);
+        var done = requestDetail(id);
         artifacts.finish(id);
-        assertThat(generation.detail(id).fullTestId()).isEqualTo(done.fullTestId());
+        assertThat(requestDetail(id).fullTestId()).isEqualTo(done.fullTestId());
         assertThat(done.status()).isEqualTo(GenerationStatus.COMPLETED);
         assertThat(jdbc.sql("select count(*) from full_tests where created_by_user_id=:u").param("u", staff)
                 .query(Long.class).single()).isEqualTo(1);
+    }
+
+    private com.englow3.generation.dto.result.GenerationRequestResult requestDetail(UUID id) {
+        var previous = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        try {
+            SignedIn.as(jdbc, staff, "STAFF");
+            return generation.detail(id);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(previous);
+        }
     }
 
     private void insertRequest(String status) {

@@ -15,6 +15,13 @@ import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 
 class ContentCatalogQueryIntegrationTest extends PostgresIntegrationTest {
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void refusesScoreMilestonesWhenToeicReferenceDataIsMissing() {
+        jdbc.sql("delete from score_conversions where certificate_type='TOEIC'").update();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> catalog.mockPapers("TOEIC"))
+                .isInstanceOf(com.englow3.shared.error.ConflictException.class).hasMessageContaining("conversion");
+    }
 
     @Autowired
     private JdbcClient jdbc;

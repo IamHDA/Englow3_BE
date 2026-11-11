@@ -76,7 +76,7 @@ class PlacementRecorderTest {
         void writesTheMeasuredLevelAndTheAttemptItCameFrom() {
             when(user.getOnboardingStep()).thenReturn(OnboardingStep.CURRENT_LEVEL);
 
-            recorder.record(userId, attemptId, new BigDecimal("62"));
+            recorder.record(userId, attemptId, new BigDecimal("62"), java.time.Instant.now());
 
             assertThat(profile.getCurrentLevel()).isEqualTo(CertificateLevel.B2);
             assertThat(profile.getPlacementAttemptId()).isEqualTo(attemptId);
@@ -86,7 +86,7 @@ class PlacementRecorderTest {
         void movesOnboardingPastTheStepThisTestAnswers() {
             when(user.getOnboardingStep()).thenReturn(OnboardingStep.CURRENT_LEVEL);
 
-            recorder.record(userId, attemptId, new BigDecimal("62"));
+            recorder.record(userId, attemptId, new BigDecimal("62"), java.time.Instant.now());
 
             verify(user).moveTo(OnboardingStep.LEARNING_GOAL);
         }
@@ -96,7 +96,7 @@ class PlacementRecorderTest {
         void leavesTheStepAloneForALearnerWhoIsPastIt() {
             when(user.getOnboardingStep()).thenReturn(OnboardingStep.COMPLETED);
 
-            recorder.record(userId, attemptId, new BigDecimal("62"));
+            recorder.record(userId, attemptId, new BigDecimal("62"), java.time.Instant.now());
 
             assertThat(profile.getCurrentLevel()).isEqualTo(CertificateLevel.B2);
             verify(user, never()).moveTo(OnboardingStep.LEARNING_GOAL);
@@ -107,7 +107,7 @@ class PlacementRecorderTest {
         void staysSilentWhenTheUserRowIsMissing() {
             when(userRepo.findById(userId)).thenReturn(Optional.empty());
 
-            recorder.record(userId, attemptId, new BigDecimal("62"));
+            recorder.record(userId, attemptId, new BigDecimal("62"), java.time.Instant.now());
 
             verify(learnerProfileRepo, never()).findByUserId(userId);
         }

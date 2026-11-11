@@ -9,13 +9,34 @@ Owns authentication-linked identity, learner profile, learning purposes, target
 skills, and onboarding.
 
 - **Tables:** `users`, `learner_profiles`, `learning_purposes`,
-  `user_learning_purposes`, `user_target_skills`, `user_tour_completions`.
+  `user_learning_purposes`, `user_target_skills`, `user_tour_completions`, `user_role_changes`.
 - **Entry points:** profile, onboarding, and role-specific website tour APIs.
 - **Bootstrap read:** `/api/user/me/bootstrap` returns the caller's account and
   learner onboarding snapshot in one transaction. It does not create missing
   profiles, cache another account's data, or load learner state for Staff/Admin.
 - **Authentication:** Supabase issues JWTs. The backend maps the token subject to
   `users.auth_provider_id`; application code does not manage passwords or sessions.
+- **Role administration:** `/api/admin/users` is Admin-only. Role changes require the
+  expected previous role and an audit reason; changing one's own role is refused.
+  Privileged HTTP requests compare JWT authorities with the current database role;
+  changed privileges are rejected with `ROLE_CHANGED` until sign-in refreshes the claim.
+  Learner requests make no additional role lookup. `users.version` and dynamic updates
+  prevent profile/onboarding writes from overwriting a concurrent role change.
+- **Author scopes:** Staff see their private authored content and published shared
+  material; only their own editable content can be changed. Admin sees all authors.
+  The rule covers exams, quizzes, flashcards, dictation, pronunciation, translation,
+  full tests and generation requests. Background generation names its actor explicitly.
+- **Goals and measurements:** certificate goals require a valid target score; general
+  goals require a higher CEFR level unless already C2. Completion and goal writes enforce
+  the same requirements. Scoreless goal edits preserve an existing measured score;
+  changing certificate clears scores from the previous scale. `PlacementRecorder` requires
+  the original measurement time and distinguishes provisional/final IELTS callbacks.
+  Older results cannot replace newer measurements, and provisional callbacks cannot
+  replace a final result of the same sitting. Learner profiles use optimistic versions.
+- **Account export:** declared read-only joins include full-test sittings, roadmap
+  stages/items/milestones/adjustments, level checks, exam selections, quiz answers and
+  pronunciation words. The export uses one repeatable-read snapshot and reports its
+  per-kind row limit and possibly truncated sections in `exportMetadata`.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam
   attempt UUID. It is not a JPA relationship to the exam module.
 - **Public API:** `user.api.UserDirectory` and `user.api.PlacementRecorder` are the
@@ -64,7 +85,13 @@ answers, and section results.
 - **Bands:** each scored attempt writes one `attempt_section_results` row per section.
   A full section whose points the certificate's `score_conversions` table covers gets
   a band (`helper.BandConversion`); a practice never does. `score_conversions` is
-  reference data seeded by migration and never written by the application.
+  reference data. IELTS is supplied by migration. Admin may append a complete TOEIC
+  Listening/Reading reference through `/api/admin/exam-score-conversions/toeic` with
+  source and effective date. Every correct count 0..100 must be covered exactly once
+  per skill, with monotonic scores 5..495 in steps of five. Rows are inserted in one
+  statement; existing dated tables and scored results are immutable. Full TOEIC papers
+  use correct counts rather than weighted raw points for conversion and persist the
+  L/R total in `exam_attempts.converted_score`; practice never receives a total.
 - **Read model:** ordinary reads belong in `ExamRepository`; complex paper assembly
   may use the module's read-only `query/` package.
 - **Files:** question media and private attempt media are exam-owned even when the
@@ -172,6 +199,11 @@ module's table as a JPA entity.
   drift out of step with activity.
 
 ## `roadmap`
+
+Each sitting can pass at most one milestone of a roadmap, for both ordinary mock
+papers and IELTS full tests. Settlement checks consumed result IDs under the roadmap
+lock; timestamp equality never allows reuse. Explicit mock attachment also checks
+the sitting's start time, rather than its later grading time.
 
 Owns each learner's plan towards their goal: stages, the content scheduled in each,
 the milestone that closes each stage, the three-part level check, and the history
@@ -299,7 +331,7 @@ Pronunciation read-aloud tasks remain in `speaking`; they measure a different
 exercise and retain their existing percentage scores.
 
 - **Tables:** `assessment_tasks`, `assessment_attempts`, `assessment_reviews`,
-  `speaking_level_conversions`.
+  `speaking_level_conversions`, `assessment_assignments`.
 - **Level checks:** a `LEVEL_CHECK` task (Speaking only) is the spoken part of the
   roadmap's level check and stays out of the learner catalogue.
   `assessment.api.SpeakingLevelReader` turns a graded answer's four-criterion mean
@@ -311,8 +343,13 @@ exercise and retain their existing percentage scores.
 - **Full test:** `assessment.api.AssessmentBandReader` gives the exam module's IELTS
   full test an answer's band (the four-criterion mean), when it was submitted, and a
   task's skill, type, certificate and whether it is published. Plain values only.
-- **Roles:** staff author and grade their own tasks; administrators approve,
-  reject or archive tasks and may correct a completed grade. Learners only read
+- **Roles:** staff author their own tasks. Admin can assign a waiting/failed submission
+  to another Staff/Admin reviewer with an expected submission version and audit reason.
+  The assigned reviewer has exclusive Staff grading access; an unassigned submission
+  falls back to its task author. Nobody may grade their own submission. Queue lists,
+  workload counts and detail/grade authorization use the same rule. Read-only submission,
+  task and review-history access takes no write lock; assignment/grading writes still do.
+  Administrators approve, reject or archive tasks and may correct a completed grade. Learners only read
   published tasks and their own drafts, submissions and reports.
 - **Reporting:** `AssessmentQueueQuery` performs a declared read-only join to
   `users.display_name` for the authorized back-office search. Batched display-name

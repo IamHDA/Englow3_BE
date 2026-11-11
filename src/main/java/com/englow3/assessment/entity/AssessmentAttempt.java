@@ -53,6 +53,21 @@ public class AssessmentAttempt {
     private Instant createdAt;
     private Instant submittedAt;
     private Instant assessedAt;
+    private UUID assignedReviewerId;
+
+    public void assignReviewer(UUID reviewer, long expectedVersion) {
+        if (version != expectedVersion)
+            throw new ConflictException("GRADE_CHANGED", "The submission changed; reload before assigning");
+        if (status != AssessmentAttemptStatus.NEEDS_REVIEW && status != AssessmentAttemptStatus.FAILED) {
+            throw new ConflictException("ATTEMPT_STATE_INVALID",
+                    "Only submissions waiting for human review can be assigned");
+        }
+        if (reviewer != null && reviewer.equals(userId)) {
+            throw new com.englow3.shared.error.ForbiddenException("REVIEW_OWN_SUBMISSION",
+                    "A learner cannot review their own submission");
+        }
+        assignedReviewerId = reviewer;
+    }
 
     protected AssessmentAttempt() {
     }

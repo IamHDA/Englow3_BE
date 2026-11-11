@@ -40,6 +40,8 @@ import com.englow3.quiz.service.QuizService;
         "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class QuizControllerTest {
+    @MockitoBean
+    private com.englow3.user.api.UserDirectory userDirectory;
 
     @Autowired
     private MockMvc mockMvc;

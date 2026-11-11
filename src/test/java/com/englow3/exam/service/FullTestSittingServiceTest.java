@@ -144,7 +144,8 @@ class FullTestSittingServiceTest {
         var result = service.view(sitting.getId());
 
         assertThat(result.status()).isEqualTo(FullTestSittingStatus.COMPLETED);
-        verify(placements).recordIeltsBand(userId, paper.getId(), "B2", new BigDecimal("6.5"));
+        verify(placements).recordIeltsBand(userId, paper.getId(), "B2", new BigDecimal("6.5"), sitting.getStartedAt(),
+                true);
         verify(events).publishEvent(any(FullTestCompleted.class));
     }
 
@@ -166,7 +167,8 @@ class FullTestSittingServiceTest {
 
         service.refresh(sitting.getId());
 
-        verify(placements).recordIeltsBand(eq(userId), eq(paper.getId()), eq("B2"), eq(new BigDecimal("6.0")));
+        verify(placements).recordIeltsBand(eq(userId), eq(paper.getId()), eq("B2"), eq(new BigDecimal("6.0")),
+                eq(sitting.getStartedAt()), eq(false));
         verify(events, never()).publishEvent(any());
     }
 

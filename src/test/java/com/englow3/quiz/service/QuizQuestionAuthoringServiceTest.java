@@ -44,7 +44,7 @@ class QuizQuestionAuthoringServiceTest {
     private final QuizQuestionTokenRepository tokenRepo = mock(QuizQuestionTokenRepository.class);
     private final QuizQuestionPairRepository pairRepo = mock(QuizQuestionPairRepository.class);
     private final QuizQuestionAuthoringService service = new QuizQuestionAuthoringServiceImpl(quizRepo, questionRepo,
-            optionRepo, tokenRepo, pairRepo);
+            optionRepo, tokenRepo, pairRepo, mock(com.englow3.user.api.UserDirectory.class));
 
     private Quiz quiz;
 

@@ -42,6 +42,13 @@ import com.englow3.quiz.service.QuizQuestionAuthoringService;
         "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class AdminQuizControllerTest {
+    @MockitoBean
+    private com.englow3.user.api.UserDirectory userDirectory;
+
+    @org.junit.jupiter.api.BeforeEach
+    void currentRole() {
+        when(userDirectory.currentRole()).thenReturn("ADMIN");
+    }
 
     @Autowired
     private MockMvc mockMvc;

@@ -72,6 +72,16 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
         quiz = fixture.publishedQuiz("Thì hiện tại đơn " + learner, learner);
         jdbc.sql("update quizzes set target_level = 'A2' where id = :id").param("id", quiz).update();
         SignedIn.as(jdbc, learner);
+        jdbc.sql(
+                """
+                        insert into score_conversions(certificate_type,section_type,raw_score_from,raw_score_to,converted_score,effective_from,source_reference)
+                        values ('TOEIC','LISTENING',0,99,5,'2000-01-01','Integration fixture only'),
+                               ('TOEIC','LISTENING',100,100,495,'2000-01-01','Integration fixture only'),
+                               ('TOEIC','READING',0,99,5,'2000-01-01','Integration fixture only'),
+                               ('TOEIC','READING',100,100,495,'2000-01-01','Integration fixture only')
+                        on conflict do nothing
+                        """)
+                .update();
     }
 
     @AfterEach
@@ -208,6 +218,8 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
                 .as("the sitting that closed stage 1 does not count again for stage 2's mock on the same paper")
                 .hasToString("PENDING");
         assertThat(afterPass.stages()).extracting(stage -> stage.status().name()).containsExactly("PASSED", "CURRENT");
+        assertThatThrownBy(() -> roadmapService.recordMockSitting(afterPass.stages().get(1).milestone().id(), passing))
+                .isInstanceOf(com.englow3.shared.error.DomainException.class);
         assertThat(afterPass.adjustments()).extracting(adjustment -> adjustment.reason().name())
                 .contains("MILESTONE_PASSED");
         assertThatThrownBy(() -> roadmapService.recordMockSitting(milestone, mockSitting(mock, "700")))
@@ -317,13 +329,16 @@ class RoadmapFlowIntegrationTest extends PostgresIntegrationTest {
 
     private UUID insertAttempt(UUID exam, BigDecimal converted) {
         UUID id = UUID.randomUUID();
+        Instant started = Instant.now();
         jdbc.sql("""
                 insert into exam_attempts (id, exam_id, exam_version_number, user_id, status, started_at, expires_at,
                                            max_raw_score, question_count, score_percentage, converted_score, mode,
                                            scored_at)
-                values (:id, :exam, 1, :user, 'SCORED', now(), now() + interval '1 hour', 4, 4, 75, :converted,
-                        'FULL', now() + interval '1 second')
-                """).param("id", id).param("exam", exam).param("user", learner).param("converted", converted).update();
+                values (:id, :exam, 1, :user, 'SCORED', :started, :expires, 4, 4, 75, :converted,
+                        'FULL', :started)
+                """).param("id", id).param("exam", exam).param("user", learner).param("converted", converted)
+                .param("started", java.sql.Timestamp.from(started))
+                .param("expires", java.sql.Timestamp.from(started.plusSeconds(3600))).update();
         return id;
     }
 }

@@ -13,6 +13,10 @@ import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 
 public interface FlashcardSetRepository extends JpaRepository<FlashcardSet, UUID> {
+    @Query("select c from FlashcardSet c where (:status is null or c.status = :status) and (:title is null or lower(c.name) like lower(concat('%', cast(:title as String), '%'))) and (c.createdByUserId = :author or c.status = com.englow3.flashcard.entity.FlashcardSetStatus.PUBLISHED)")
+    Page<FlashcardSet> searchVisibleForAuthoring(@Param("status") FlashcardSetStatus status,
+            @Param("title") String title, @Param("author") UUID author, Pageable pageable);
+
     boolean existsBySlugAndIdNot(String slug, UUID id);
 
     /** The slug is the set's public handle, so it has to be unique across every status, not just published ones. */

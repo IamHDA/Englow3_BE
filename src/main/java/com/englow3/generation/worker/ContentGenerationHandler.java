@@ -137,7 +137,8 @@ public class ContentGenerationHandler implements AiJobHandler {
         body.set("segments", work.assembly().path("listening").path(part));
         byte[] mp3 = Base64.getDecoder()
                 .decode(mapper.readTree(client.audio(body.toString())).path("mp3_base64").asText());
-        papers.attachListeningAudio(work.examId(), Integer.parseInt(part), papers.uploadAudio(work.examId(), mp3));
+        papers.attachListeningAudio(work.requestedByUserId(), work.examId(), Integer.parseInt(part),
+                papers.uploadAudio(work.examId(), mp3));
         return "{}";
     }
 

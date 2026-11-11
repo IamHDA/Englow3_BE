@@ -125,7 +125,8 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
             return Optional.empty();
         }
         MilestoneContext context = locate(roadmap.getUserId(), milestone.get().getId());
-        if (sitting.get().attemptId().equals(context.milestone().getResultExamAttemptId())) {
+        if (sitting.get().attemptId().equals(context.milestone().getResultExamAttemptId())
+                || milestoneRepo.wasUsedInPassedMilestone(roadmap.getId(), sitting.get().attemptId())) {
             return Optional.empty();
         }
         context.milestone().recordMockSitting(sitting.get().attemptId(), sitting.get().examId(), sitting.get().scored(),
@@ -142,7 +143,8 @@ public class RoadmapProgressionImpl implements RoadmapProgression {
             return Optional.empty();
         }
         MilestoneContext context = locate(roadmap.getUserId(), milestone.getId());
-        if (completed.get().sittingId().equals(context.milestone().getResultFullTestSittingId())) {
+        if (completed.get().sittingId().equals(context.milestone().getResultFullTestSittingId())
+                || milestoneRepo.wasUsedInPassedMilestone(roadmap.getId(), completed.get().sittingId())) {
             return Optional.empty();
         }
         context.milestone().recordFullTestSitting(completed.get().sittingId(), completed.get().fullTestId(),

@@ -74,6 +74,7 @@ public class ExamContentServiceImpl implements ExamContentService {
     private final PresignedUrlResolver presignedUrls;
     private final String examBucket;
     private final Duration mediaUrlTtl;
+    private final com.englow3.user.api.UserDirectory userDirectory;
 
     public ExamContentServiceImpl(ExamRepository examRepo, ExamSectionRepository examSectionRepo,
             SectionPartRepository sectionPartRepo, QuestionSetRepository questionSetRepo,
@@ -82,7 +83,8 @@ public class ExamContentServiceImpl implements ExamContentService {
             QuestionMatchingAnswerRepository matchingAnswerRepo, AdminExamPaperQuery examPaperQuery,
             ObjectStorageClient objectStorage, PresignedUrlResolver presignedUrls,
             @Value("${app.storage.exam-bucket}") String examBucket,
-            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl) {
+            @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl,
+            com.englow3.user.api.UserDirectory userDirectory) {
         this.examRepo = examRepo;
         this.examSectionRepo = examSectionRepo;
         this.sectionPartRepo = sectionPartRepo;
@@ -97,9 +99,11 @@ public class ExamContentServiceImpl implements ExamContentService {
         this.presignedUrls = presignedUrls;
         this.examBucket = examBucket;
         this.mediaUrlTtl = mediaUrlTtl;
+        this.userDirectory = userDirectory;
     }
 
     public ExamMediaResult uploadMedia(UUID examId, MultipartFile file) {
+        userDirectory.requireAuthorAccess(requireExam(examId).getCreatedByUserId());
         // The paper first: media can only ever be attached to an editable one, so a file for a missing or published
         // paper would be an orphan in the bucket that nothing points at and nothing cleans up.
         requireExam(examId).requireEditable();
@@ -149,6 +153,22 @@ public class ExamContentServiceImpl implements ExamContentService {
     @Transactional
     public ExamDetailResult replaceContent(UpdateExamContentCommand command) {
         Exam exam = requireExam(command.examId());
+        userDirectory.requireAuthorAccess(exam.getCreatedByUserId());
+        return replaceContent(exam, command);
+    }
+
+    @Override
+    @Transactional
+    public ExamDetailResult replaceGeneratedContent(UpdateExamContentCommand command, UUID authorId) {
+        Exam exam = requireExam(command.examId());
+        if (authorId == null || !authorId.equals(exam.getCreatedByUserId())) {
+            throw new com.englow3.shared.error.ForbiddenException("CONTENT_NOT_OWNED",
+                    "Generated content must belong to the job's author");
+        }
+        return replaceContent(exam, command);
+    }
+
+    private ExamDetailResult replaceContent(Exam exam, UpdateExamContentCommand command) {
         exam.requireEditable();
         validateContentTree(exam.getId(), command.sections());
         exam.touchContent();

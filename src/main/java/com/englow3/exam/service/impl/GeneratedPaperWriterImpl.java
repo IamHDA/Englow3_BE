@@ -64,8 +64,8 @@ public class GeneratedPaperWriterImpl implements GeneratedPaperWriter {
 
     @Override
     @Transactional
-    public void attachListeningAudio(UUID examId, int partOrderNo, String objectKey) {
-        var tree = exams.authoringDetail(examId).content();
+    public void attachListeningAudio(UUID authorId, UUID examId, int partOrderNo, String objectKey) {
+        var tree = exams.generatedAuthoringDetail(examId, authorId).content();
         List<SectionCommand> sections = tree
                 .sections().stream().map(
                         s -> s.sectionType() != SectionType.LISTENING ? s
@@ -76,7 +76,7 @@ public class GeneratedPaperWriterImpl implements GeneratedPaperWriter {
                                                         objectKey, p.imageObjectKey(), p.questionSets()))
                                                 .toList()))
                 .toList();
-        content.replaceContent(new UpdateExamContentCommand(examId, sections));
+        content.replaceGeneratedContent(new UpdateExamContentCommand(examId, sections), authorId);
     }
 
     @Override

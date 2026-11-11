@@ -176,6 +176,20 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void refusesAStaleFullTestEditorWithoutOverwritingTheNewerDraft() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID id = draftFullTest();
+        var original = fullTests.detail(id);
+        var saved = fullTests.save(new SaveFullTestCommand(id, "Newer title", "", CertificateVariant.ACADEMIC, examId,
+                tasks.get(0), tasks.get(1), tasks.get(2), tasks.get(3), tasks.get(4), original.version()));
+        assertThatThrownBy(
+                () -> fullTests.save(new SaveFullTestCommand(id, "Stale title", "", CertificateVariant.ACADEMIC, examId,
+                        tasks.get(0), tasks.get(1), tasks.get(2), tasks.get(3), tasks.get(4), original.version())))
+                                .isInstanceOf(com.englow3.shared.error.ConflictException.class);
+        assertThat(fullTests.detail(id).title()).isEqualTo(saved.title());
+    }
+
+    @Test
     void reviewRejectsConversionTablesWithAMissingMiddleRange() {
         SignedIn.as(jdbc, author, "ADMIN");
         transactions.executeWithoutResult(tx -> {

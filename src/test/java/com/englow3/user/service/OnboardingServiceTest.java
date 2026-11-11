@@ -59,7 +59,7 @@ class OnboardingServiceTest {
     private final OnboardingService service = new OnboardingServiceImpl(userRepo, learnerProfileRepo,
             learningPurposeRepo,
 
-            currentUser);
+            currentUser, java.time.Clock.systemUTC());
 
     private final UUID userId = UUID.randomUUID();
 
@@ -85,13 +85,13 @@ class OnboardingServiceTest {
     class Success {
 
         @Test
-        void createsTheProfileRowOnFirstUseBecauseSignupDoesNotCreateIt() {
+        void readsAnEmptyProfileWithoutWritingInsideAReadOnlyTransaction() {
             when(learnerProfileRepo.findByUserId(userId)).thenReturn(Optional.empty());
             when(learnerProfileRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.currentState();
 
-            verify(learnerProfileRepo).save(any(LearnerProfile.class));
+            verify(learnerProfileRepo, never()).save(any(LearnerProfile.class));
         }
 
         @Test
@@ -131,6 +131,7 @@ class OnboardingServiceTest {
             when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
             profile.declareCurrentLevel(CertificateLevel.B2);
             profile.aimAtCertificate(CertificateType.IELTS);
+            profile.setGoal(CertificateType.IELTS, null, new BigDecimal("7"), null, null, 30);
 
             service.complete();
 
@@ -267,9 +268,8 @@ class OnboardingServiceTest {
                     new BigDecimal("45"), LocalDate.now().plusMonths(6)))).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("TARGET_SCORE_OUT_OF_RANGE");
-            assertThatThrownBy(() -> service.setLearningGoal(
-                    new SetLearningGoalCommand(CertificateType.TOEIC, new BigDecimal("7"), null, null)))
-                            .isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.setLearningGoal(new SetLearningGoalCommand(CertificateType.TOEIC,
+                    new BigDecimal("7"), new BigDecimal("800"), null))).isInstanceOf(BadRequestException.class)
                             .extracting(e -> ((BadRequestException) e).getCode())
                             .isEqualTo("CURRENT_SCORE_OUT_OF_RANGE");
         }
@@ -319,6 +319,37 @@ class OnboardingServiceTest {
             assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("785"))).isTrue();
             assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("787"))).isFalse();
             assertThat(CertificateType.TOEIC.isValidScore(new BigDecimal("995"))).isFalse();
+        }
+
+        @Test
+        void refusesMissingCertificateGoalOnSaveAndOnCompletion() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.declareCurrentLevel(CertificateLevel.B1);
+            profile.aimAtCertificate(CertificateType.IELTS);
+            assertThatThrownBy(
+                    () -> service.setLearningGoal(new SetLearningGoalCommand(CertificateType.IELTS, null, null, null)))
+                            .isInstanceOf(ConflictException.class).hasMessageContaining("target score");
+            assertThatThrownBy(service::complete).isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("target score");
+            verify(user, never()).completeOnboarding(CertificateLevel.B1, true, CertificateType.IELTS);
+        }
+
+        @Test
+        void preservesMeasuredScoreWhenTheGoalFormDoesNotResendIt() {
+            when(user.getLearningPurposeIds()).thenReturn(Set.of(CERTIFICATE_PURPOSE_ID));
+            profile.aimAtCertificate(CertificateType.IELTS);
+            profile.recordPlacement(CertificateLevel.B2, UUID.randomUUID(), new BigDecimal("6"));
+            service.setLearningGoal(new SetLearningGoalCommand(CertificateType.IELTS, null, new BigDecimal("7"), null));
+            assertThat(profile.getCurrentScore()).isEqualByComparingTo("6");
+        }
+
+        @Test
+        void changingCertificateClearsScoresFromThePreviousScale() {
+            profile.aimAtCertificate(CertificateType.IELTS);
+            profile.setGoal(CertificateType.IELTS, new BigDecimal("6"), new BigDecimal("7"), null, null, 30);
+            profile.aimAtCertificate(CertificateType.TOEIC);
+            assertThat(profile.getCurrentScore()).isNull();
+            assertThat(profile.getTargetScore()).isNull();
         }
 
     }

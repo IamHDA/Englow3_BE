@@ -13,6 +13,10 @@ import com.englow3.speaking.entity.SpeakingPromptCategory;
 import com.englow3.speaking.entity.SpeakingPromptStatus;
 
 public interface SpeakingPromptRepository extends JpaRepository<SpeakingPrompt, UUID> {
+    @Query("select p from SpeakingPrompt p where (:status is null or p.status=:status) and (:title is null or lower(p.title) like lower(concat('%',cast(:title as String),'%'))) and (p.createdByUserId=:author or p.status=com.englow3.speaking.entity.SpeakingPromptStatus.PUBLISHED)")
+    Page<SpeakingPrompt> searchVisibleForAuthoring(@Param("status") SpeakingPromptStatus status,
+            @Param("title") String title, @Param("author") UUID author, Pageable page);
+
     boolean existsBySlugAndIdNot(String slug, UUID id);
 
     /** The slug is the prompt's public handle, so it is unique across every status, not just published ones. */

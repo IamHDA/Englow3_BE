@@ -146,9 +146,13 @@ public class RoadmapServiceImpl implements RoadmapService {
         var sitting = sittings.read(examAttemptId, userId)
                 .orElseThrow(() -> new NotFoundException("EXAM_ATTEMPT_NOT_FOUND",
                         "No sitting %s of yours".formatted(examAttemptId)));
-        if (sitting.scoredAt() != null && sitting.scoredAt().isBefore(progression.openedAt(context.stage()))) {
+        if (sitting.startedAt().isBefore(progression.openedAt(context.stage()))) {
             throw new BadRequestException("MILESTONE_SITTING_TOO_OLD",
                     "Only a sitting taken since this stage began counts");
+        }
+        if (milestoneRepo.wasUsedInPassedMilestone(context.roadmap().getId(), examAttemptId)) {
+            throw new ConflictException("MILESTONE_SITTING_ALREADY_USED",
+                    "This sitting already passed an earlier milestone; take a new test");
         }
         context.milestone().recordMockSitting(examAttemptId, sitting.examId(), sitting.scored(), sitting.full(),
                 sitting.convertedScore(), clock.instant());

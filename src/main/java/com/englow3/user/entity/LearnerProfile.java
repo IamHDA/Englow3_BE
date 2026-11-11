@@ -2,6 +2,7 @@ package com.englow3.user.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.UUID;
 
 import com.englow3.shared.error.BadRequestException;
@@ -61,6 +62,10 @@ public class LearnerProfile extends BasePersistedEntity {
      */
     @Column(name = "level_check_id")
     private UUID levelCheckId;
+    private Instant levelMeasuredAt;
+    private boolean levelMeasurementFinal;
+    @jakarta.persistence.Version
+    private long version;
 
     static final int MIN_DAILY_MINUTES = 10;
     static final int MAX_DAILY_MINUTES = 240;
@@ -80,9 +85,32 @@ public class LearnerProfile extends BasePersistedEntity {
      * present a declared C1 as "measured by the placement test" to everything that asks how the level was set.
      */
     public void declareCurrentLevel(CertificateLevel level) {
+        declareCurrentLevel(level, Instant.EPOCH);
+    }
+
+    public void declareCurrentLevel(CertificateLevel level, Instant declaredAt) {
         this.currentLevel = level;
         this.placementAttemptId = null;
         this.levelCheckId = null;
+        this.currentScore = null;
+        this.levelMeasuredAt = declaredAt;
+        this.levelMeasurementFinal = false;
+    }
+
+    /** Grades are ordered by when the test began, never by when its callback happened to arrive. */
+    public boolean acceptMeasurement(UUID source, Instant measuredAt, boolean finalResult) {
+        java.util.Objects.requireNonNull(measuredAt, "A measurement needs its original time");
+        if (levelMeasuredAt != null) {
+            int order = measuredAt.compareTo(levelMeasuredAt);
+            if (order < 0)
+                return false;
+            if (order == 0 && (!source.equals(placementAttemptId) && !source.equals(levelCheckId)
+                    || levelMeasurementFinal && !finalResult))
+                return false;
+        }
+        levelMeasuredAt = measuredAt;
+        levelMeasurementFinal = finalResult;
+        return true;
     }
 
     /**
@@ -109,6 +137,10 @@ public class LearnerProfile extends BasePersistedEntity {
     }
 
     public void aimAtCertificate(CertificateType certificateType) {
+        if (this.targetCertificateType != certificateType) {
+            this.currentScore = null;
+            this.targetScore = null;
+        }
         this.targetCertificateType = certificateType;
     }
 
