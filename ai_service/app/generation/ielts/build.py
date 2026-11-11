@@ -11,6 +11,12 @@ from app.generation.ielts.rules import TFNG, YNNG, set_marks
 LISTENING_SECONDS = 1920  # 30 minutes plus 2 to check answers (D-IELTS-7)
 READING_SECONDS = 3600
 WORD_LIMITS = {1: "ONE WORD", 2: "NO MORE THAN TWO WORDS", 3: "NO MORE THAN THREE WORDS"}
+# What each part is written to be (prompts.LISTENING_BRIEF, READING_BRIEF). A prior, not a
+# measurement: only candidates' answers can say how hard a question really is.
+DIFFICULTY = {
+    "LISTENING": {1: "EASY", 2: "MEDIUM", 3: "HARD", 4: "HARD"},
+    "READING": {1: "EASY", 2: "MEDIUM", 3: "HARD"},
+}
 
 VOICE_POOL = {
     ("UK", "female"): ["en-GB-SoniaNeural", "en-GB-LibbyNeural", "en-GB-MaisieNeural"],
@@ -33,6 +39,7 @@ def _question(
     options=None,
     accepted=None,
     labels=None,
+    explanation: str | None = None,
 ) -> dict:
     return {
         "questionType": qtype,
@@ -40,7 +47,7 @@ def _question(
         "difficultyLevel": difficulty,
         "skillType": skill,
         "maxRawScore": marks,
-        "explanation": None,
+        "explanation": explanation,
         "options": options or [],
         "acceptedAnswers": [
             {"text": a.strip(), "caseSensitive": False, "orderNo": i + 1}
@@ -57,7 +64,30 @@ def _options(texts: list[str], correct: set[int]) -> list[dict]:
     ]
 
 
-def build_set(qset: dict, skill: str, title: str) -> dict:
+def explanation(q: dict, skill: str) -> str | None:
+    """Where the answer is, for the reviewer and for the candidate once the paper is marked."""
+    evidence = q.get("evidence")
+    quotes = [
+        v.strip()
+        for v in (evidence if isinstance(evidence, list) else [evidence])
+        if isinstance(v, str) and v.strip()
+    ]
+    if not quotes:
+        return None
+    heard = skill == "LISTENING"
+    lead = "You hear" if heard else "The passage says"
+    if q.get("answer") == "NOT GIVEN":
+        lead = "The passage comes closest with"
+    text = f"{lead}: " + " / ".join(f"\u201c{quote}\u201d" for quote in quotes)
+    if q.get("answer") == "NOT GIVEN":
+        text += " - it does not say this either way."
+    trap = str(q.get("trap") or "").strip()
+    if heard and trap:
+        text += f" The trap: \u201c{trap}\u201d."
+    return text
+
+
+def build_set(qset: dict, skill: str, title: str, difficulty: str = "MEDIUM") -> dict:
     kind = qset["kind"]
     questions: list[dict] = []
     content = None
@@ -69,7 +99,15 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
         if limit not in instruction.upper():
             instruction = f"{instruction} Write {limit} for each answer."
         questions = [
-            _question("TEXT_ENTRY", q["prompt"], skill, 1, accepted=q["answers"])
+            _question(
+                "TEXT_ENTRY",
+                q["prompt"],
+                skill,
+                1,
+                difficulty,
+                accepted=q["answers"],
+                explanation=explanation(q, skill),
+            )
             for q in qset["questions"]
         ]
     elif kind == "single":
@@ -79,7 +117,9 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
                 q["prompt"],
                 skill,
                 1,
+                difficulty,
                 options=_options(q["options"], {q["answer"]}),
+                explanation=explanation(q, skill),
             )
             for q in qset["questions"]
         ]
@@ -90,7 +130,9 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
                 q["prompt"],
                 skill,
                 len(q["answers"]),
+                difficulty,
                 options=_options(q["options"], set(q["answers"])),
+                explanation=explanation(q, skill),
             )
             for q in qset["questions"]
         ]
@@ -100,7 +142,15 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
             for i, e in enumerate(qset["list"])
         ]
         questions = [
-            _question("MATCHING", q["prompt"], skill, 1, labels=[q["answer"]])
+            _question(
+                "MATCHING",
+                q["prompt"],
+                skill,
+                1,
+                difficulty,
+                labels=[q["answer"]],
+                explanation=explanation(q, skill),
+            )
             for q in qset["questions"]
         ]
     elif kind in ("tfng", "ynng"):
@@ -111,7 +161,9 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
                 q["statement"],
                 skill,
                 1,
+                difficulty,
                 options=_options(labels, {labels.index(q["answer"])}),
+                explanation=explanation(q, skill),
             )
             for q in qset["questions"]
         ]
@@ -124,14 +176,17 @@ def build_set(qset: dict, skill: str, title: str) -> dict:
     }
 
 
-def _sets(sets: list[dict], skill: str, first_number: int) -> list[dict]:
+def _sets(sets: list[dict], skill: str, first_number: int, difficulty: str) -> list[dict]:
     built, number = [], first_number
     for qset in sets:
         marks = set_marks(qset)
         last = number + marks - 1
         built.append(
             build_set(
-                qset, skill, f"Questions {number}-{last}" if last > number else f"Question {number}"
+                qset,
+                skill,
+                f"Questions {number}-{last}" if last > number else f"Question {number}",
+                difficulty,
             )
         )
         number = last + 1
@@ -163,7 +218,7 @@ def build_paper(title: str, listening: dict[int, dict], reading: dict[int, dict]
                     "title": label,
                     "instruction": f"Questions {number}-{number + marks - 1}",
                     "content": None if section_type == "LISTENING" else passage_text(spec),
-                    "questionSets": _sets(spec["sets"], skill, number),
+                    "questionSets": _sets(spec["sets"], skill, number, DIFFICULTY[skill][n]),
                 }
             )
             number += marks

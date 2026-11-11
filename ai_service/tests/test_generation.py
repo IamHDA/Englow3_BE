@@ -42,7 +42,7 @@ class FakeVoice:
     def __init__(self):
         self.segments = None
 
-    async def synthesize(self, segments, rate="-5%"):
+    async def synthesize(self, segments, rate="+0%"):
         self.segments = segments
         return b"\xff\xf3" + b"\x00" * 100
 

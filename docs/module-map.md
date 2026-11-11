@@ -427,6 +427,17 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
   configured on its own (`AI_SERVICE_GENERATION_*`), apart from grading and the tutor.
   The author's brief is added to every prompt; the structural rules still apply, so a
   brief cannot produce a paper without its 40 + 40 marks and question types.
+- **Difficulty:** each part is written to a stated level, rising through the paper
+  (Listening Part 1 at B1-B2 up to Part 4 at C1-C2; Reading Passage 1 at upper B2 up to
+  Passage 3 at C1-C2), and the rules reject what makes a paper easier than the real one,
+  checked by string matching against the text rather than by the model's word for it:
+  every question quotes the `evidence` that settles it; a correct option, a statement
+  or the notes beside a gap may not repeat the text word for word; a recording runs
+  550-1100 words, answers its questions in order, and four questions in ten carry a
+  `trap` - the tempting wrong words, quoted from the recording. Evidence and trap
+  become each question's explanation, shown after marking. Recordings are made at the
+  voice's own speed. The level of a question stays a prior (`EASY`/`MEDIUM`/`HARD` by
+  part) until candidates' answers measure it.
 - **Why:** a generation run has its own lifecycle and language (request, step,
   attempt, brief) that is neither a paper's nor a task's, and more kinds of generated
   content are expected.

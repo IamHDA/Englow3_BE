@@ -119,10 +119,12 @@ class GenerationProvider:
 class EdgeSpeechSynthesizer:
     """Neural voices from Microsoft's free service (edge-tts).
 
-    MP3 frames of one format join by bytes, so no ffmpeg is needed.
+    MP3 frames of one format join by bytes, so no ffmpeg is needed. Recorded at the voice's own
+    speed: the real test is not slowed down for the candidate, and a slower recording is an
+    easier one.
     """
 
-    async def synthesize(self, segments: list[tuple[str, str]], rate: str = "-5%") -> bytes:
+    async def synthesize(self, segments: list[tuple[str, str]], rate: str = "+0%") -> bytes:
         import edge_tts
 
         audio = bytearray()

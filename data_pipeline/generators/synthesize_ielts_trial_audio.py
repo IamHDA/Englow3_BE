@@ -84,7 +84,7 @@ async def record(part: int, segments: list[Segment], out: Path, table: dict | No
 
     audio = bytearray()
     for segment in segments:
-        stream = edge_tts.Communicate(segment.text, voice_for(part, segment.speaker, table), rate="-5%").stream()
+        stream = edge_tts.Communicate(segment.text, voice_for(part, segment.speaker, table), rate="+0%").stream()
         async for chunk in stream:
             if chunk["type"] == "audio":
                 audio.extend(chunk["data"])

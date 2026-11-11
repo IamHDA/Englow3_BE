@@ -12,11 +12,23 @@ FILLER = (
 )
 
 
+# Words of FILLER, so they are in every text: what a question quotes as its evidence and trap.
+EVIDENCE = "add a few remarks that do not answer any question"
+TRAP = "The speakers talk about the arrangements"
+
+
 def text_with(answers: list[str], min_words: int) -> str:
     body = " ".join(f"{FILLER} The word to note is {a}." for a in answers)
     while rules.words(body) < min_words:
         body += " " + FILLER
     return body
+
+
+def chunks(text: str, count: int) -> list[str]:
+    """The text in `count` pieces cut between words, so a quote survives being joined again."""
+    found = text.split()
+    size = -(-len(found) // count)
+    return [" ".join(found[i : i + size]) for i in range(0, len(found), size)]
 
 
 def gap_set(answers: list[str]) -> dict:
@@ -26,7 +38,15 @@ def gap_set(answers: list[str]) -> dict:
         "instruction": "Complete the notes below.",
         "word_limit": 1,
         "content": content,
-        "questions": [{"prompt": f"Item {i}", "answers": [a]} for i, a in enumerate(answers, 1)],
+        "questions": [
+            {
+                "prompt": f"Item {i}",
+                "answers": [a],
+                "evidence": f"The word to note is {a}",
+                "trap": TRAP,
+            }
+            for i, a in enumerate(answers, 1)
+        ],
     }
 
 
@@ -39,6 +59,8 @@ def single_set(count: int, options: int) -> dict:
                 "prompt": f"Question {i}",
                 "options": [f"choice {i}{c}" for c in "abcd"[:options]],
                 "answer": i % options,
+                "evidence": EVIDENCE,
+                "trap": TRAP,
             }
             for i in range(count)
         ],
@@ -54,6 +76,8 @@ def multi_set(count: int) -> dict:
                 "prompt": f"Which TWO {i}?",
                 "options": [f"option {i}{c}" for c in "abcde"],
                 "answers": [0, 2],
+                "evidence": [EVIDENCE, EVIDENCE],
+                "trap": TRAP,
             }
             for i in range(count)
         ],
@@ -70,6 +94,8 @@ def matching_set(count: int, entries: int, prompts: list[str] | None = None, lab
             {
                 "prompt": (prompts or [f"Thing {i}" for i in range(count)])[i],
                 "answer": labels[i % entries],
+                "evidence": EVIDENCE,
+                "trap": TRAP,
             }
             for i in range(count)
         ],
@@ -82,7 +108,8 @@ def judgement_set(kind: str, count: int) -> dict:
         "kind": kind,
         "instruction": "Do the following statements agree?",
         "questions": [
-            {"statement": f"Statement {i}", "answer": allowed[i % 3]} for i in range(count)
+            {"statement": f"Statement {i}", "answer": allowed[i % 3], "evidence": EVIDENCE}
+            for i in range(count)
         ],
     }
 
@@ -102,11 +129,10 @@ def listening(part: int) -> dict:
         3: [multi_set(2), matching_set(6, 5)],
         4: [gap_set(answers)],
     }[part]
-    spoken = text_with(answers, 400)
-    half = len(spoken) // 2
+    spoken = text_with(answers, rules.MIN_RECORDING_WORDS[part])
     lines = [
-        {"speaker": speakers[0]["name"], "text": spoken[:half]},
-        {"speaker": speakers[-1]["name"], "text": spoken[half:]},
+        {"speaker": speakers[i % len(speakers)]["name"], "text": text}
+        for i, text in enumerate(chunks(spoken, 6))
     ]
     return {
         "topic": f"listening topic {part}",
@@ -118,9 +144,7 @@ def listening(part: int) -> dict:
 
 def reading(passage: int) -> dict:
     answers = [f"term{passage}{i}" for i in range(7)]
-    body = text_with(answers, 650)
-    chunk = len(body) // 6
-    paragraphs = [body[i * chunk : (i + 1) * chunk] for i in range(5)] + [body[5 * chunk :]]
+    paragraphs = chunks(text_with(answers, rules.MIN_PASSAGE_WORDS + 50), 6)
     headings = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii"]
     sets = {
         1: [judgement_set("tfng", 6), gap_set(answers)],
@@ -147,8 +171,11 @@ TASK1 = {
         "type": "bar",
         "title": "Cycling to work",
         "unit": "%",
-        "categories": ["A", "B", "C"],
-        "series": [{"name": "2005", "values": [3, 5, 8]}, {"name": "2025", "values": [9, 12, 10]}],
+        "categories": ["A", "B", "C", "D"],
+        "series": [
+            {"name": "2005", "values": [3, 5, 8, 6]},
+            {"name": "2025", "values": [9, 12, 10, 4]},
+        ],
     },
     "key_features": ["all rose", "B highest in 2025", "C rose least"],
 }
