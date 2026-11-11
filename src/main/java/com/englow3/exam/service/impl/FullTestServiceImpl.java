@@ -41,10 +41,14 @@ public class FullTestServiceImpl implements FullTestService {
     private final Clock clock;
     private final ExamGradingQuery grading;
     private final ScoreConversionRepository conversionRepo;
+    private final com.englow3.exam.query.ExamBlueprintQuery blueprint;
 
     @Override
     @Transactional
     public FullTestResult save(SaveFullTestCommand command) {
+        if (command.certificateVariant() != com.englow3.exam.entity.CertificateVariant.ACADEMIC)
+            throw new com.englow3.shared.error.BadRequestException("FULL_TEST_VARIANT_UNSUPPORTED",
+                    "General Training full tests are not available yet");
         if (examRepo.findById(command.examId()).isEmpty()) {
             throw new NotFoundException("EXAM_NOT_FOUND", "No exam with id %s".formatted(command.examId()));
         }
@@ -129,6 +133,8 @@ public class FullTestServiceImpl implements FullTestService {
 
     private FullTest.PaperFacts paperFacts(FullTest test) {
         return examRepo.findById(test.getExamId()).map(exam -> {
+            com.englow3.exam.helper.ExamBlueprint.validate(exam.getCertificateType(), exam.getDurationSeconds(),
+                    blueprint.load(exam.getId()));
             List<SectionType> sections = examSectionRepo.findSectionTypes(exam.getId());
             return new FullTest.PaperFacts(exam.getStatus(), exam.getExamType(), exam.getCertificateType(),
                     exam.getCertificateVariant(), sections.contains(SectionType.LISTENING),

@@ -80,6 +80,30 @@ public class AssessmentServiceImpl implements AssessmentService {
     }
 
     public AssessmentUploadResult start(UUID taskId, UUID clientKey, String contentType, Long contentLength) {
+        return start(taskId, clientKey, contentType, contentLength, false);
+    }
+
+    public AssessmentUploadResult startForFullTest(UUID taskId, UUID clientKey, String contentType,
+            Long contentLength) {
+        return start(taskId, clientKey, contentType, contentLength, true);
+    }
+
+    public AssessmentUploadResult resumeUpload(UUID id, String contentType, Long contentLength) {
+        UUID user = userDirectory.requireCurrentUserId();
+        AssessmentAttempt attempt = transactionTemplate.execute(tx -> owned(id, user, false));
+        if (attempt.getStatus() == AssessmentAttemptStatus.DRAFT && attempt.getSkill() == AssessmentSkill.SPEAKING
+                && (!java.util.Objects.equals(attempt.getAudioContentLength(), contentLength)
+                        || !java.util.Objects.equals(attempt.getAudioContentType(), contentType)))
+            throw new ConflictException("RECORDING_CHANGED", "Resume the original recording for this full-test part");
+        String url = attempt.getStatus() == AssessmentAttemptStatus.DRAFT && attempt.getAudioObjectKey() != null
+                ? storage.presignPut(bucket, attempt.getAudioObjectKey(), attempt.getAudioContentType(),
+                        attempt.getAudioContentLength(), Duration.ofMinutes(15)).toString()
+                : null;
+        return new AssessmentUploadResult(result(attempt, false), url);
+    }
+
+    private AssessmentUploadResult start(UUID taskId, UUID clientKey, String contentType, Long contentLength,
+            boolean fullTest) {
         UUID user = userDirectory.requireCurrentUserId();
         AssessmentAttempt attempt = transactionTemplate.execute(tx -> {
             attemptRepo.lockRequest("assessment:" + user + ":" + clientKey);
@@ -105,8 +129,11 @@ public class AssessmentServiceImpl implements AssessmentService {
             } else if (contentType != null || contentLength != null) {
                 throw new BadRequestException("WRITING_AUDIO_INVALID", "Writing attempts do not contain audio");
             }
-            return attemptRepo.saveAndFlush(AssessmentAttempt.draft(id, user, taskId, clientKey, task.getSkill(),
-                    json(AssessmentTaskResult.from(task, true)), key, contentType, contentLength));
+            var created = AssessmentAttempt.draft(id, user, taskId, clientKey, task.getSkill(),
+                    json(AssessmentTaskResult.from(task, true)), key, contentType, contentLength);
+            if (fullTest && task.getSkill() == AssessmentSkill.SPEAKING)
+                created.limitRecording("PART_2".equals(task.getTaskType()) ? 120 : 300);
+            return attemptRepo.saveAndFlush(created);
         });
         String uploadUrl = attempt.getStatus() == AssessmentAttemptStatus.DRAFT && attempt.getAudioObjectKey() != null
                 ? storage.presignPut(bucket, attempt.getAudioObjectKey(), attempt.getAudioContentType(),
@@ -152,6 +179,9 @@ public class AssessmentServiceImpl implements AssessmentService {
                         || !"audio/wav".equals(metadata.contentType())) {
                     throw new BadRequestException("RECORDING_INVALID", "The recording changed during submission");
                 }
+                if (candidate.getRecordingLimitSeconds() != null)
+                    com.englow3.assessment.helper.FullTestRecording.validate(storage.download(bucket, sealedKey),
+                            candidate.getRecordingLimitSeconds());
             } catch (RuntimeException failure) {
                 removeUnusedRecording(sealedKey);
                 return result(submittedMeanwhile(id, user).orElseThrow(() -> failure), false);

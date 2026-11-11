@@ -44,7 +44,10 @@ public class FullTestSitting extends BasePersistedEntity {
     public static final Duration GRADING_WINDOW = Duration.ofDays(7);
 
     /** An answer's submission time and grade's actual save time; reconciliation may happen after either deadline. */
-    public record Part(UUID attemptId, Instant submittedAt, BigDecimal band, Instant assessedAt) {
+    public record Part(UUID attemptId, Instant submittedAt, BigDecimal band, Instant assessedAt, long version) {
+        public Part(UUID attemptId, Instant submittedAt, BigDecimal band, Instant assessedAt) {
+            this(attemptId, submittedAt, band, assessedAt, 0L);
+        }
     }
 
     /**
@@ -119,6 +122,18 @@ public class FullTestSitting extends BasePersistedEntity {
 
     @Version
     private long version;
+    private int bandRevision;
+    private Instant revisedAt;
+    private Instant lastReconciledAt;
+    private long assessmentVersionSum = -1;
+
+    public void reconciledAt(Instant now) {
+        lastReconciledAt = now;
+    }
+
+    public java.util.List<BigDecimal> bandSnapshot() {
+        return java.util.Arrays.asList(listeningBand, readingBand, writingBand, speakingBand, overallBand);
+    }
 
     protected FullTestSitting() {
     }
@@ -154,9 +169,13 @@ public class FullTestSitting extends BasePersistedEntity {
      * findings: nothing already attached or decided changes.
      */
     public Change settle(Progress progress, Instant now) {
-        if (isSettled()) {
+        if (status == FullTestSittingStatus.EXPIRED) {
             return new Change(false, false);
         }
+        boolean wasCompleted = status == FullTestSittingStatus.COMPLETED;
+        var previous = bandSnapshot();
+        assessmentVersionSum = progress.parts().stream().filter(java.util.Objects::nonNull).mapToLong(Part::version)
+                .sum();
         attachPaper(progress);
         List<UUID> attached = partAttemptIds();
         UUID[] parts = attached.toArray(UUID[]::new);
@@ -170,7 +189,7 @@ public class FullTestSitting extends BasePersistedEntity {
                 parts[i] = found.attemptId();
             }
             if (Objects.equals(parts[i], found.attemptId()) && found.assessedAt() != null
-                    && !found.assessedAt().isAfter(gradesDueAt())) {
+                    && (wasCompleted || !found.assessedAt().isAfter(gradesDueAt()))) {
                 partBands[i] = found.band();
             }
         }
@@ -193,6 +212,13 @@ public class FullTestSitting extends BasePersistedEntity {
         }
         if (listeningBand != null && readingBand != null && writingBand != null && speakingBand != null) {
             overallBand = IeltsBand.mean(List.of(listeningBand, readingBand, writingBand, speakingBand));
+            if (wasCompleted) {
+                if (previous.equals(bandSnapshot()))
+                    return new Change(false, false);
+                bandRevision++;
+                revisedAt = now;
+                return new Change(false, true);
+            }
             status = FullTestSittingStatus.COMPLETED;
             completedAt = now;
             return new Change(provisionalSet, true);

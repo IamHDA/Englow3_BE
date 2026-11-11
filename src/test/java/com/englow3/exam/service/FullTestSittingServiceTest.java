@@ -59,15 +59,38 @@ class FullTestSittingServiceTest {
     private final PlacementRecorder placements = mock(PlacementRecorder.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final com.englow3.exam.repository.FullTestComponentAttemptRepository bindingRepo = mock(
+            com.englow3.exam.repository.FullTestComponentAttemptRepository.class);
     private final FullTestSittingService service = new FullTestSittingServiceImpl(fullTestRepo, sittingRepo,
             attemptRepo, sectionResultRepo, assessments, goals, placements, userDirectory, events, CLOCK,
-            mock(FullTestService.class));
+            mock(FullTestService.class), bindingRepo,
+            mock(com.englow3.exam.repository.FullTestBandRevisionRepository.class),
+            new com.fasterxml.jackson.databind.ObjectMapper());
 
     private final UUID userId = UUID.randomUUID();
     private FullTest test;
+    private final java.util.Map<UUID, java.util.List<com.englow3.exam.entity.FullTestComponentAttempt>> bindings = new java.util.HashMap<>();
+
+    private void bind(FullTestSitting sitting, String slot, UUID attempt) {
+        var binding = com.englow3.exam.entity.FullTestComponentAttempt.reserve(sitting.getId(), slot);
+        binding.bind(attempt);
+        bindings.computeIfAbsent(sitting.getId(), id -> new java.util.ArrayList<>()).add(binding);
+    }
+
+    private void bindPaper(FullTestSitting sitting, ExamAttempt paper) {
+        org.springframework.test.util.ReflectionTestUtils.setField(paper, "examId", test.getExamId());
+        bind(sitting, "PAPER", paper.getId());
+        when(attemptRepo.findById(paper.getId())).thenReturn(Optional.of(paper));
+    }
 
     @BeforeEach
     void anIeltsLearnerAndAPublishedFullTest() {
+        when(assessments.readAll(any(), any())).thenAnswer(call -> {
+            java.util.Collection<UUID> ids = call.getArgument(0);
+            return ids.stream().map(id -> assessments.read(id, call.getArgument(1))).flatMap(Optional::stream).toList();
+        });
+        when(bindingRepo.findBySittingId(any()))
+                .thenAnswer(call -> bindings.getOrDefault(call.getArgument(0), List.of()));
         when(userDirectory.requireCurrentUserId()).thenReturn(userId);
         when(sittingRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         test = FullTest.draft("IELTS Academic 1", "", CertificateVariant.ACADEMIC, UUID.randomUUID(),
@@ -127,18 +150,18 @@ class FullTestSittingServiceTest {
                 TargetLevel.B2, 3600, new BigDecimal("80"), null, UUID.randomUUID());
         ExamAttempt paper = ExamAttempt.start(exam, userId, 80, CLOCK.instant().minusSeconds(1800));
         paper.score(new BigDecimal("60"), 60, CLOCK.instant().minusSeconds(60));
-        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusAndStartedAtGreaterThanEqualOrderByStartedAtDesc(
-                userId, test.getExamId(), ExamAttemptMode.FULL, ExamAttemptStatus.SCORED, sitting.getStartedAt()))
-                        .thenReturn(Optional.of(paper));
+        bindPaper(sitting, paper);
         when(sectionResultRepo.findByExamAttemptId(paper.getId())).thenReturn(List.of(
                 AttemptSectionResult.of(paper.getId(), SectionType.LISTENING, BigDecimal.TEN, BigDecimal.TEN,
                         new BigDecimal("7.0"), 30, 40),
                 AttemptSectionResult.of(paper.getId(), SectionType.READING, BigDecimal.TEN, BigDecimal.TEN,
                         new BigDecimal("7.0"), 30, 40)));
         for (UUID taskId : test.taskIds()) {
-            when(assessments.latestAnswer(taskId, userId, sitting.getStartedAt())).thenReturn(Optional
-                    .of(new AssessmentBandReader.Answer(UUID.randomUUID(), taskId, CLOCK.instant().minusSeconds(30),
-                            true, new BigDecimal("6.0"), "COMPLETED", CLOCK.instant().minusSeconds(10))));
+            UUID answer = UUID.randomUUID();
+            bind(sitting, FullTest.Slot.values()[test.taskIds().indexOf(taskId)].name(), answer);
+            when(assessments.read(answer, userId)).thenReturn(
+                    Optional.of(new AssessmentBandReader.Answer(answer, taskId, CLOCK.instant().minusSeconds(30), true,
+                            new BigDecimal("6.0"), "COMPLETED", CLOCK.instant().minusSeconds(10))));
         }
 
         var result = service.view(sitting.getId());
@@ -157,8 +180,7 @@ class FullTestSittingServiceTest {
                 TargetLevel.B2, 3600, new BigDecimal("80"), null, UUID.randomUUID());
         ExamAttempt paper = ExamAttempt.start(exam, userId, 80, CLOCK.instant().minusSeconds(1800));
         paper.score(new BigDecimal("60"), 60, CLOCK.instant().minusSeconds(60));
-        when(attemptRepo.findFirstByUserIdAndExamIdAndModeAndStatusAndStartedAtGreaterThanEqualOrderByStartedAtDesc(
-                any(), any(), any(), any(), any())).thenReturn(Optional.of(paper));
+        bindPaper(sitting, paper);
         when(sectionResultRepo.findByExamAttemptId(paper.getId())).thenReturn(List.of(
                 AttemptSectionResult.of(paper.getId(), SectionType.LISTENING, BigDecimal.TEN, BigDecimal.TEN,
                         new BigDecimal("7.5"), 33, 40),
@@ -180,7 +202,7 @@ class FullTestSittingServiceTest {
         UUID failed = UUID.randomUUID();
         var answer = new AssessmentBandReader.Answer(failed, task2, CLOCK.instant().minusSeconds(30), false, null,
                 "FAILED", null);
-        when(assessments.latestAnswer(task2, userId, sitting.getStartedAt())).thenReturn(Optional.of(answer));
+        bind(sitting, "WRITING_TASK_2", failed);
         when(assessments.read(failed, userId)).thenReturn(Optional.of(answer));
 
         var parts = service.view(sitting.getId()).parts();

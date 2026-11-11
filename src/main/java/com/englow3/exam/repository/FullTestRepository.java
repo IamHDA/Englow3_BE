@@ -21,7 +21,7 @@ public interface FullTestRepository extends JpaRepository<FullTest, UUID> {
             join assessment_tasks s1 on s1.id=f.speaking_part1_id
             join assessment_tasks s2 on s2.id=f.speaking_part2_id
             join assessment_tasks s3 on s3.id=f.speaking_part3_id
-            where f.status='PUBLISHED' and e.status='PUBLISHED' and e.exam_type='MOCK'
+            where f.status='PUBLISHED' and f.certificate_variant='ACADEMIC' and e.status='PUBLISHED' and e.exam_type='MOCK'
               and e.certificate_type='IELTS' and e.certificate_variant=f.certificate_variant
               and w1.status='PUBLISHED' and w1.skill='WRITING' and w1.task_type='TASK_1' and w1.certificate_type='IELTS'
               and w2.status='PUBLISHED' and w2.skill='WRITING' and w2.task_type='TASK_2' and w2.certificate_type='IELTS'

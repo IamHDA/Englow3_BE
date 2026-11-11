@@ -13,6 +13,23 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class FullTestSittingTest {
+    @Test
+    void aCompletedSittingRevisesTheSameAnswersWithoutLosingItsOriginalCompletion() {
+        var sitting = started();
+        var ids = java.util.stream.IntStream.range(0, 5).mapToObj(i -> java.util.UUID.randomUUID()).toList();
+        java.util.function.Function<String, FullTestSitting.Progress> evidence = band -> new FullTestSitting.Progress(
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000123"), DURING, b("6.0"), b("6.0"),
+                ids.stream().map(id -> new FullTestSitting.Part(id, DURING, b(band), DURING)).toList());
+        sitting.settle(evidence.apply("6.0"), DURING);
+        sitting.settle(evidence.apply("9.0"), sitting.gradesDueAt().plusSeconds(1));
+        assertThat(sitting.getWritingBand()).isEqualByComparingTo("9.0");
+        assertThat(sitting.getSpeakingBand()).isEqualByComparingTo("9.0");
+        assertThat(sitting.getOverallBand()).isEqualByComparingTo("7.5");
+        assertThat(sitting.getBandRevision()).isEqualTo(1);
+        assertThat(sitting.getCompletedAt()).isEqualTo(DURING);
+        sitting.settle(evidence.apply("9.0"), sitting.gradesDueAt().plusSeconds(2));
+        assertThat(sitting.getBandRevision()).isEqualTo(1);
+    }
 
     private static final Instant START = Instant.parse("2026-11-06T10:00:00Z");
     private static final Instant DURING = START.plus(Duration.ofDays(2));

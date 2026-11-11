@@ -16,6 +16,8 @@ public interface FullTestSittingService {
 
     List<FullTestSittingResult> mine();
 
+    List<FullTestSittingResult> mine(int page, int size);
+
     /** Brings one sitting up to date. For the listener and the sweep; checks no caller. */
     void refresh(UUID sittingId);
 

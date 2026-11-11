@@ -87,6 +87,8 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private FullTestSittingService sittings;
+    @Autowired
+    private com.englow3.exam.service.FullTestComponentService components;
 
     @Autowired
     private ObjectMapper mapper;
@@ -196,7 +198,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         // 5. The learner starts the full test from onboarding and sits the paper in full.
         SignedIn.as(jdbc, learner);
         var sitting = sittings.start(fullTest.id());
-        var attempt = attempts.start(StartExamAttemptCommand.full(examId));
+        var attempt = components.startPaper(sitting.id(), null);
         LearnerExamPaperResult paper = attempts.paperForAttempt(attempt.id());
         List<Item> items = items(paper);
 
@@ -248,11 +250,9 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
                 .single()).isEqualTo("LEARNING_GOAL");
 
         // 7. Writing 6.5 + 6.5 (Task 2 counts double) and Speaking 6.0 x 3: mean 6.75 rounds up to 7.0.
-        graded(taskIds.get(0), "6.5");
-        graded(taskIds.get(1), "6.5");
-        graded(taskIds.get(2), "6.0");
-        graded(taskIds.get(3), "6.0");
-        graded(taskIds.get(4), "6.0");
+        for (int i = 0; i < 5; i++)
+            graded(taskIds.get(i), i < 2 ? "6.5" : "6.0", sitting.id(),
+                    com.englow3.exam.entity.FullTest.Slot.values()[i].name());
         var done = sittings.view(sitting.id());
         assertThat(done.status()).isEqualTo(FullTestSittingStatus.COMPLETED);
         assertThat(done.writingBand()).isEqualByComparingTo("6.5");
@@ -272,6 +272,11 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         SaveAuthoringRequest request = mapper.readValue(read(set + "paper.json"), SaveAuthoringRequest.class);
         assertThat(validator.validate(request)).isEmpty();
         UUID examId = exams.createAuthoring(request).getBody().id();
+        // Generation's separate audio steps are covered by GenerationFlowIntegrationTest.
+        // Simulate those stored assets before attempting publication of this unrecorded JSON fixture.
+        jdbc.sql(
+                "update section_parts p set audio_object_key='exams/' || cast(:id as text) || '/fixture.mp3' from exam_sections s where p.exam_section_id=s.id and s.exam_id=:id and s.section_type='LISTENING'")
+                .param("id", examId).update();
         reviews.submitForReview(new SubmitExamForReviewCommand(examId));
 
         SignedIn.as(jdbc, admin, "ADMIN");
@@ -297,8 +302,8 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         assertThat(fullTests.approve(fullTest.id()).status()).isEqualTo(ExamStatus.PUBLISHED);
 
         SignedIn.as(jdbc, learner);
-        sittings.start(fullTest.id());
-        var attempt = attempts.start(StartExamAttemptCommand.full(examId));
+        var sitting = sittings.start(fullTest.id());
+        var attempt = components.startPaper(sitting.id(), null);
         List<Item> items = items(attempts.paperForAttempt(attempt.id()), set + "paper.json");
         assertThat(numbers(items, SectionType.LISTENING)).startsWith("1").endsWith("40");
         assertThat(numbers(items, SectionType.READING)).startsWith("1").endsWith("40");
@@ -414,7 +419,8 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         return result.sections().stream().filter(s -> s.sectionType() == section).findFirst().orElseThrow().band();
     }
 
-    private void graded(UUID task, String band) {
+    private void graded(UUID task, String band, UUID sitting, String slot) {
+        UUID answer = UUID.randomUUID();
         String skill = jdbc.sql("select skill from assessment_tasks where id = :id").param("id", task)
                 .query(String.class).single();
         jdbc.sql("""
@@ -423,10 +429,12 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
                                                  assessed_at)
                 values (:id, :user, :task, :key, :skill, '{}'::jsonb, 'An answer', :audio, 'COMPLETED',
                         cast(:report as jsonb), now(), now(), now())
-                """).param("id", UUID.randomUUID()).param("user", learner).param("task", task)
-                .param("key", UUID.randomUUID()).param("skill", skill)
+                """).param("id", answer).param("user", learner).param("task", task).param("key", UUID.randomUUID())
+                .param("skill", skill)
                 .param("audio", "SPEAKING".equals(skill) ? "recordings/" + UUID.randomUUID() + ".wav" : null)
                 .param("report", "{\"overall\": " + band + "}").update();
+        jdbc.sql("insert into full_test_component_attempts(id,sitting_id,slot,attempt_id) values(:id,:s,:slot,:a)")
+                .param("id", UUID.randomUUID()).param("s", sitting).param("slot", slot).param("a", answer).update();
     }
 
     private long count(String joined, UUID examId) {

@@ -57,11 +57,21 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
     private UUID author;
     private UUID learner;
     private UUID examId;
+    @Autowired
+    private com.englow3.exam.repository.FullTestSittingRepository sittingRepo;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.englow3.shared.storage.ObjectStorageClient storage;
+    @Autowired
+    private FullTestComponentService components;
     private final List<UUID> questions = new ArrayList<>();
     private final List<UUID> tasks = new ArrayList<>();
 
     @BeforeEach
-    void anIeltsPaperFiveTasksAndAnIeltsLearner() {
+    void anIeltsPaperFiveTasksAndAnIeltsLearner() throws Exception {
+        org.mockito.Mockito
+                .when(storage.presignGet(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.net.URI.create("https://storage.test/fixture").toURL());
         LearnerFixture learners = new LearnerFixture(jdbc);
         author = learners.learner();
         learner = learners.learner();
@@ -77,28 +87,7 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
 
         ExamFixture exams = new ExamFixture(jdbc);
         examId = exams.publishedExam("IELTS Academic Listening and Reading", author);
-        jdbc.sql("""
-                update exams set certificate_type = 'IELTS', certificate_variant = 'ACADEMIC', max_raw_score = 80
-                 where id = :id
-                """).param("id", examId).update();
-        for (String section : List.of("LISTENING", "READING")) {
-            UUID set = exams.questionSet(exams.part(exams.section(examId, questions.size() + 1, section), 1, "Part"),
-                    1);
-            for (int number = 1; number <= 40; number++) {
-                UUID question = UUID.randomUUID();
-                jdbc.sql("""
-                        insert into questions (id, question_set_id, question_type, content, difficulty_level,
-                                               skill_type, order_no, max_raw_score)
-                        values (:id, :set, 'TEXT_ENTRY', 'Gap {{1}}', 'MEDIUM', :skill, :orderNo, 1)
-                        """).param("id", question).param("set", set).param("skill", section).param("orderNo", number)
-                        .update();
-                jdbc.sql("""
-                        insert into question_accepted_answers (id, question_id, answer_text, order_no)
-                        values (:id, :question, 'museum', 1)
-                        """).param("id", UUID.randomUUID()).param("question", question).update();
-                questions.add(question);
-            }
-        }
+        questions.addAll(com.englow3.support.IeltsExamFixture.populate(jdbc, examId));
 
         for (String[] task : List.of(new String[] { "WRITING", "TASK_1" }, new String[] { "WRITING", "TASK_2" },
                 new String[] { "SPEAKING", "PART_1" }, new String[] { "SPEAKING", "PART_2" },
@@ -133,9 +122,11 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
 
         SignedIn.as(jdbc, learner);
         FullTestSittingResult sitting = sittings.start(draft.id());
+        assertThat(sittingRepo.findUnsettled(org.springframework.data.domain.PageRequest.of(0, 100)))
+                .extracting(com.englow3.exam.entity.FullTestSitting::getId).contains(sitting.id());
         assertThat(sittings.start(draft.id()).id()).isEqualTo(sitting.id());
 
-        var paper = attempts.start(StartExamAttemptCommand.full(examId));
+        var paper = components.startPaper(sitting.id(), null);
         List<SubmittedAnswer> answers = new ArrayList<>();
         for (int i = 0; i < questions.size(); i++) {
             // 30 of 40 right in each section: band 7.0 in both.
@@ -152,7 +143,7 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
         assertThat(onboardingStep()).isEqualTo("LEARNING_GOAL");
 
         for (UUID task : tasks) {
-            gradedAnswer(task, "6.0");
+            gradedAnswer(task, "6.0", sitting.id());
         }
         FullTestSittingResult done = sittings.view(sitting.id());
 
@@ -168,11 +159,69 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
                 .query(String.class).single()).isEqualTo("PASSED");
         assertThat(jdbc.sql("select result_score from roadmap_milestones where id = :id").param("id", milestone)
                 .query(java.math.BigDecimal.class).single()).isEqualByComparingTo("6.5");
+        jdbc.sql(
+                "update assessment_attempts set report='{\"overall\":9.0}'::jsonb,version=version+1,assessed_at=clock_timestamp() where task_id in (:ids) and user_id=:u")
+                .param("ids", tasks.subList(0, 2)).param("u", learner).update();
+        assertThat(sittingRepo.findRefreshableForUser(learner))
+                .extracting(com.englow3.exam.entity.FullTestSitting::getId).contains(sitting.id());
+        sittings.refresh(sitting.id());
+        var corrected = sittings.view(sitting.id());
+        assertThat(corrected.overallBand()).isEqualByComparingTo("7.5");
+        assertThat(corrected.bandRevision()).isEqualTo(1);
+        assertThat(profileScore()).isEqualByComparingTo("7.5");
+        sittings.view(sitting.id());
+        assertThat(jdbc.sql("select count(*) from full_test_band_revisions where sitting_id=:id")
+                .param("id", sitting.id()).query(Integer.class).single()).isEqualTo(1);
+        // Milestones already passed retain their historical achievement; corrections do not erase progress.
+        assertThat(jdbc.sql("select result_score from roadmap_milestones where id=:id").param("id", milestone)
+                .query(java.math.BigDecimal.class).single()).isEqualByComparingTo("6.5");
     }
 
     private UUID draftFullTest() {
         return fullTests.save(new SaveFullTestCommand(null, "Full test safety", "", CertificateVariant.ACADEMIC, examId,
                 tasks.get(0), tasks.get(1), tasks.get(2), tasks.get(3), tasks.get(4))).id();
+    }
+
+    @Test
+    void fullTestsSharingTasksCreateDistinctDraftsAndDatabaseClaimsAreUnique() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID a = draftFullTest(), b = draftFullTest();
+        fullTests.submitForReview(a);
+        fullTests.approve(a);
+        fullTests.submitForReview(b);
+        fullTests.approve(b);
+        SignedIn.as(jdbc, learner);
+        var one = sittings.start(a);
+        var two = sittings.start(b);
+        var first = components.startAssessment(one.id(), com.englow3.exam.entity.FullTest.Slot.WRITING_TASK_1,
+                tasks.getFirst(), null, null);
+        var second = components.startAssessment(two.id(), com.englow3.exam.entity.FullTest.Slot.WRITING_TASK_1,
+                tasks.getFirst(), null, null);
+        assertThat(first.attemptId()).isNotEqualTo(second.attemptId());
+        assertThat(components.startAssessment(one.id(), com.englow3.exam.entity.FullTest.Slot.WRITING_TASK_1,
+                tasks.getFirst(), null, null).attemptId()).isEqualTo(first.attemptId());
+        assertThatThrownBy(() -> jdbc.sql(
+                "insert into full_test_component_attempts(id,sitting_id,slot,attempt_id) values(:id,:s,'WRITING_TASK_2',:a)")
+                .param("id", UUID.randomUUID()).param("s", two.id()).param("a", first.attemptId()).update())
+                        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void standaloneAnswersAreNeverInferredIntoAnOpenFullTest() {
+        SignedIn.as(jdbc, author, "ADMIN");
+        UUID test = draftFullTest();
+        fullTests.submitForReview(test);
+        fullTests.approve(test);
+        SignedIn.as(jdbc, learner);
+        var sitting = sittings.start(test);
+        jdbc.sql(
+                """
+                        insert into assessment_attempts(id,user_id,task_id,client_key,skill,task_snapshot,answer_text,status,report,submitted_at,assessed_at)
+                        values(:id,:u,:task,:key,'WRITING','{}'::jsonb,'An unrelated answer','COMPLETED','{"overall":9.0}'::jsonb,now(),now())
+                        """)
+                .param("id", UUID.randomUUID()).param("u", learner).param("task", tasks.getFirst())
+                .param("key", UUID.randomUUID()).update();
+        assertThat(sittings.view(sitting.id()).parts()).allSatisfy(p -> assertThat(p.attemptId()).isNull());
     }
 
     @Test
@@ -209,7 +258,7 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
         UUID fullTest = draftFullTest();
         jdbc.sql("update questions set max_raw_score=0.5 where id=:id").param("id", questions.getFirst()).update();
         assertThatThrownBy(() -> fullTests.submitForReview(fullTest)).hasFieldOrPropertyWithValue("code",
-                "FULL_TEST_PAPER_NOT_BANDABLE");
+                "EXAM_BLUEPRINT_INVALID");
         assertThat(fullTests.detail(fullTest).status()).isEqualTo(ExamStatus.DRAFT);
     }
 
@@ -287,7 +336,8 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
         return milestone;
     }
 
-    private void gradedAnswer(UUID task, String band) {
+    private void gradedAnswer(UUID task, String band, UUID sitting) {
+        UUID answer = UUID.randomUUID();
         String skill = jdbc.sql("select skill from assessment_tasks where id = :id").param("id", task)
                 .query(String.class).single();
         jdbc.sql("""
@@ -296,10 +346,14 @@ class IeltsFullTestIntegrationTest extends PostgresIntegrationTest {
                                                  assessed_at)
                 values (:id, :user, :task, :key, :skill, '{}'::jsonb, 'An answer', :audio, 'COMPLETED',
                         cast(:report as jsonb), now(), now(), now())
-                """).param("id", UUID.randomUUID()).param("user", learner).param("task", task)
-                .param("key", UUID.randomUUID()).param("skill", skill)
+                """).param("id", answer).param("user", learner).param("task", task).param("key", UUID.randomUUID())
+                .param("skill", skill)
                 .param("audio", "SPEAKING".equals(skill) ? "recordings/" + UUID.randomUUID() + ".wav" : null)
                 .param("report", "{\"overall\": " + band + "}").update();
+        jdbc.sql("insert into full_test_component_attempts(id,sitting_id,slot,attempt_id) values(:id,:s,:slot,:a)")
+                .param("id", UUID.randomUUID()).param("s", sitting)
+                .param("slot", com.englow3.exam.entity.FullTest.Slot.values()[tasks.indexOf(task)].name())
+                .param("a", answer).update();
     }
 
     private java.math.BigDecimal profileScore() {

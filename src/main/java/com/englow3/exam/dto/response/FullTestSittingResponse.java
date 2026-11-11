@@ -22,7 +22,7 @@ public record FullTestSittingResponse(UUID id, UUID fullTestId, String title, Fu
         @Schema(nullable = true) BigDecimal listeningBand, @Schema(nullable = true) BigDecimal readingBand,
         @Schema(nullable = true) BigDecimal writingBand, @Schema(nullable = true) BigDecimal speakingBand,
         @Schema(nullable = true, description = "Estimate from Listening and Reading until the overall band exists") BigDecimal provisionalBand,
-        @Schema(nullable = true) BigDecimal overallBand) {
+        @Schema(nullable = true) BigDecimal overallBand, int bandRevision, @Schema(nullable = true) Instant revisedAt) {
 
     public record PartResponse(FullTest.Slot slot, UUID taskId, @Schema(nullable = true) UUID attemptId,
             @Schema(nullable = true, description = "How grading of the attached answer stands; null with no answer, and in lists") FullTestPartGrading grading) {
@@ -36,6 +36,6 @@ public record FullTestSittingResponse(UUID id, UUID fullTestId, String title, Fu
                         .map(part -> new PartResponse(part.slot(), part.taskId(), part.attemptId(), part.grading()))
                         .toList(),
                 result.listeningBand(), result.readingBand(), result.writingBand(), result.speakingBand(),
-                result.provisionalBand(), result.overallBand());
+                result.provisionalBand(), result.overallBand(), result.bandRevision(), result.revisedAt());
     }
 }

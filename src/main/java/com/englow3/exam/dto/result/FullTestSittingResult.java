@@ -21,7 +21,8 @@ import com.englow3.exam.entity.FullTestSittingStatus;
 public record FullTestSittingResult(UUID id, UUID fullTestId, String title, FullTestSittingStatus status,
         Instant startedAt, Instant deadlineAt, Instant gradesDueAt, Instant completedAt, UUID examId,
         UUID examAttemptId, java.util.List<PartResult> parts, BigDecimal listeningBand, BigDecimal readingBand,
-        BigDecimal writingBand, BigDecimal speakingBand, BigDecimal provisionalBand, BigDecimal overallBand) {
+        BigDecimal writingBand, BigDecimal speakingBand, BigDecimal provisionalBand, BigDecimal overallBand,
+        int bandRevision, Instant revisedAt) {
 
     /**
      * One Writing or Speaking slot: the task to answer, the answer attached, if any, and how its grading stands - null
@@ -50,6 +51,7 @@ public record FullTestSittingResult(UUID id, UUID fullTestId, String title, Full
                 sitting.getStartedAt(), sitting.getDeadlineAt(), sitting.gradesDueAt(), sitting.getCompletedAt(),
                 test.getExamId(), sitting.getExamAttemptId(), parts, sitting.getListeningBand(),
                 sitting.getReadingBand(), sitting.getWritingBand(), sitting.getSpeakingBand(),
-                sitting.getProvisionalBand(), sitting.getOverallBand());
+                sitting.getProvisionalBand(), sitting.getOverallBand(), sitting.getBandRevision(),
+                sitting.getRevisedAt());
     }
 }

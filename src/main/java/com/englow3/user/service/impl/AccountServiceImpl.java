@@ -75,6 +75,10 @@ public class AccountServiceImpl implements AccountService {
         out.put("examSectionResults", rows("attempt_section_results",
                 "exam_attempt_id in (select id from exam_attempts where user_id = :u)", userId));
         out.put("fullTestSittings", rows("full_test_sittings", "user_id = :u", userId));
+        out.put("fullTestComponentBindings", rows("full_test_component_attempts",
+                "sitting_id in (select id from full_test_sittings where user_id=:u)", userId));
+        out.put("fullTestBandRevisions", rows("full_test_band_revisions",
+                "sitting_id in (select id from full_test_sittings where user_id=:u)", userId));
         out.put("roadmaps", rows("learning_roadmaps", "user_id = :u", userId));
         out.put("roadmapStages",
                 rows("roadmap_stages", "roadmap_id in (select id from learning_roadmaps where user_id = :u)", userId));

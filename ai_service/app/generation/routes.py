@@ -103,6 +103,16 @@ async def step(request: Request, body: StepRequest) -> StepResponse:
             **usage,
         )
     problems = steps.check(body.step, reply, body.used_topics)
+    try:
+        json.dumps(reply, allow_nan=False)
+    except ValueError:
+        return StepResponse(
+            reply=None,
+            raw=text[:MAX_RAW],
+            problems=problems or ["Use finite JSON numbers"],
+            model=provider.model,
+            **usage,
+        )
     topics = steps.topics_of(reply) if body.step == steps.PLAN and not problems else []
     return StepResponse(
         reply=reply, problems=problems, topics=topics, model=provider.model, **usage
@@ -116,6 +126,11 @@ async def assemble(body: AssembleRequest) -> AssembleResponse:
     if missing:
         raise ServiceError("GENERATION_COMPONENTS_MISSING", f"missing {', '.join(missing)}", 422)
     plan = parts[steps.PLAN]
+    invalid = [
+        problem for name in steps.WRITING_STEPS for problem in steps.check(name, parts[name], [])
+    ]
+    if invalid:
+        raise ServiceError("GENERATION_COMPONENTS_INVALID", "; ".join(invalid[:10]), 422)
     listening = {int(s[-1]): parts[s] for s in steps.LISTENING}
     reading = {int(s[-1]): parts[s] for s in steps.READING}
     problems = rules.check_paper_mix(listening, reading)

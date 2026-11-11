@@ -54,6 +54,13 @@ public class AssessmentAttempt {
     private Instant submittedAt;
     private Instant assessedAt;
     private UUID assignedReviewerId;
+    private Integer recordingLimitSeconds;
+
+    public void limitRecording(int seconds) {
+        if (status != AssessmentAttemptStatus.DRAFT || seconds < 1 || seconds > 300)
+            throw new IllegalArgumentException("Invalid recording limit");
+        recordingLimitSeconds = seconds;
+    }
 
     public void assignReviewer(UUID reviewer, long expectedVersion) {
         if (version != expectedVersion)

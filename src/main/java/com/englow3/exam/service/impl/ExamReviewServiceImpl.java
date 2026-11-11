@@ -34,6 +34,7 @@ public class ExamReviewServiceImpl implements ExamReviewService {
     private final UserDirectory userDirectory;
     private final Clock clock;
     private final FullTestRepository fullTestRepo;
+    private final com.englow3.exam.query.ExamBlueprintQuery blueprint;
 
     @Transactional
     public ExamResult publish(PublishExamCommand command) {
@@ -91,6 +92,9 @@ public class ExamReviewServiceImpl implements ExamReviewService {
             throw new ConflictException("EXAM_SECTION_SCORE_MISMATCH",
                     "The questions of section(s) %s do not add up to the points those sections declare".formatted(off));
         }
+        if (exam.getExamType() == com.englow3.exam.entity.ExamType.MOCK && exam.getCertificateType() != null)
+            com.englow3.exam.helper.ExamBlueprint.validate(exam.getCertificateType(), exam.getDurationSeconds(),
+                    blueprint.load(exam.getId()));
     }
 
     @Transactional

@@ -10,6 +10,7 @@ import re
 from difflib import SequenceMatcher
 
 from app.generation.ielts import prompts, rules
+from app.generation.ielts.schema import shape_problems
 
 PLAN = "plan"
 LISTENING = [f"listening-{n}" for n in range(1, 5)]
@@ -117,6 +118,9 @@ def messages(
 def check(
     step: str, reply: dict, used: list[str], min_words: int = rules.MIN_PASSAGE_WORDS
 ) -> list[str]:
+    problems = shape_problems(step, reply)
+    if problems:
+        return problems
     if step == PLAN:
         return check_plan(reply, used)
     if step in LISTENING:

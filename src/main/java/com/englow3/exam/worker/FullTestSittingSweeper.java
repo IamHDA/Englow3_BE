@@ -1,7 +1,5 @@
 package com.englow3.exam.worker;
 
-import java.time.Clock;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,11 +23,10 @@ public class FullTestSittingSweeper {
 
     private final FullTestSittingService sittings;
     private final FullTestSittingRepository sittingRepo;
-    private final Clock clock;
 
     @Scheduled(fixedDelayString = "${app.exam.full-test-sweep.interval:10m}", initialDelayString = "${app.exam.full-test-sweep.initial-delay:1m}")
     public void sweep() {
-        for (var sitting : sittingRepo.findUnsettled(clock.instant(), PageRequest.of(0, 50))) {
+        for (var sitting : sittingRepo.findUnsettled(PageRequest.of(0, 50))) {
             try {
                 sittings.refresh(sitting.getId());
             } catch (RuntimeException failure) {

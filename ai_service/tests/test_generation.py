@@ -1,6 +1,7 @@
 import base64
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -9,6 +10,43 @@ from app.main import create_app
 from tests.generation_fixtures import PLAN, components, listening
 
 HEADERS = {"X-Internal-API-Key": "test-internal-key"}
+
+
+@pytest.mark.parametrize(
+    "step,reply",
+    [
+        ("listening-1", {"speakers": ["Anna", "Ben"], "transcript": [], "sets": []}),
+        (
+            "speaking",
+            {
+                "part1": "abcd",
+                "part2": {"cue": "Describe a journey", "points": "abc", "explain": "Explain why"},
+                "part3": "abcd",
+            },
+        ),
+        (
+            "speaking",
+            {
+                "part1": ["", "", "", ""],
+                "part2": {
+                    "cue": "Describe a journey",
+                    "points": ["a", "b", "c"],
+                    "explain": "Explain why",
+                },
+                "part3": ["a", "b", "c", "d"],
+            },
+        ),
+    ],
+)
+def test_invalid_nested_shapes_return_fixable_problems_instead_of_accepting_or_crashing(
+    step, reply
+):
+    client = client_with(FakeWriter(json.dumps(reply)))
+    response = client.post(
+        "/internal/v1/generation/ielts/step", headers=HEADERS, json={"step": step, "plan": PLAN}
+    )
+    assert response.status_code == 200
+    assert response.json()["problems"]
 
 
 def settings(**overrides) -> Settings:

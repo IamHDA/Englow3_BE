@@ -138,6 +138,33 @@ answers, and section results.
   - **Revisit if:** the full test gains rules of its own (retake policy, pricing, a
     review workflow unlike a paper's), or `assessment` ever needs to read exam data.
 
+IELTS release hardening (V092–V094): `exam` additionally owns `full_test_component_attempts`
+and `full_test_band_revisions`. Component attempts are created through
+`FullTestComponentService`, under the owning sitting's lock, with a unique attempt claim.
+`assessment.api.FullTestAssessmentStarter` creates/resumes assessment-owned drafts and
+upload tickets; assessment never depends on exam. Standalone practice is not inferred into
+new full tests. V094 recovers only unambiguous pre-deployment submissions.
+
+Completed full tests may be amended after an administrator corrects an attached grade;
+the original completion time and before/after band audit are retained. Profile updates
+retain measurement-time ordering. Passed roadmap milestones retain their historical
+achievement; they are not silently revoked or reused to pass another stage.
+The sweep performs a declared read-only join to `assessment_attempts.version` to detect
+missed corrections independently of clocks, and rotates all open sittings by last
+reconciliation time. Assessment bands are batch-read through their owning API.
+History is paged (default 20, maximum 100) with one batched full-test lookup.
+Account export's declared reads include component bindings and band revisions scoped
+through the owner's `full_test_sittings` rows.
+
+Publication uses `ExamBlueprintQuery`/`ExamBlueprint` for complete IELTS/TOEIC mock
+structure, required audio/passage references and section times. Uploaded asset bytes
+remain validated by their upload owner. IELTS full-test availability rechecks the gate.
+Academic is the supported full-test variant; General Training remains unavailable until
+its content and conversion references are supplied. Flexible seven-day completion is
+retained; the UI does not claim a continuous timed mock. Full-test Speaking Part 2 has
+one minute of preparation and a two-minute recording limit. Assessment validates the
+sealed PCM WAV's actual duration before enqueueing; ordinary practice retains rerecording.
+
 ## `flashcard`
 
 Owns flashcard authoring, vocabulary sets and cards, spaced repetition, review

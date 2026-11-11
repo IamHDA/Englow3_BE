@@ -21,6 +21,10 @@ public interface AssessmentService {
 
     AssessmentUploadResult start(UUID taskId, UUID clientKey, String contentType, Long contentLength);
 
+    AssessmentUploadResult startForFullTest(UUID taskId, UUID clientKey, String contentType, Long contentLength);
+
+    AssessmentUploadResult resumeUpload(UUID attemptId, String contentType, Long contentLength);
+
     AssessmentAttemptResult saveDraft(UUID id, String text, long version);
 
     AssessmentAttemptResult submit(UUID id);

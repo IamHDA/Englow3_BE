@@ -255,3 +255,23 @@ kiến: bootstrap, Daily Path, danh mục đề, queue chấm và nộp bài. Gh
 lỗi, tải đồng thời, thời gian chờ Hikari và lock wait. Mục tiêu ban đầu cho API đọc nóng
 cùng vùng là p95 ≤ 300 ms; đây là ngân sách kiểm chứng, không phải số đo đã đạt trên
 hosting. Nếu chậm, kiểm tra vùng DB/BFF/BE, pool và query plan trước khi tăng concurrency.
+
+### IELTS component release (V092–V094)
+
+Deploy backend before web/BFF. The new component-start routes bind each LR/assessment
+attempt to one sitting and slot; standalone practice no longer supplies full-test results.
+V092 preserves existing attached IDs; V094 recovers only unambiguous older submissions.
+Do not infer an ambiguous legacy claim into multiple sittings. Existing result rows are
+retained for review. V093 reconciles grade changes using assessment versions, independently
+of clock skew. Corrections append before/after band revisions and update the current
+profile only when its measurement ordering permits. Already-passed roadmap milestones
+retain the achievement recorded at that time; regrading does not silently revoke progress.
+
+Smoke the new paper and assessment starts as a learner, retry a bound Writing draft,
+check that another learner cannot use its sitting, and check teacher correction after
+completion. Validate the sealed Speaking WAV limit (Part 2: 120 seconds, others: 300,
+with one second recorder-stop tolerance). Web Part 2 provides a preparation minute and
+keeps the original blob for upload retries. This remains a flexible seven-day practice
+assessment. General Training is unavailable pending its content/reference implementation.
+Complete mock publication now requires the certificate blueprint and audio/passage
+references; older incomplete content must be repaired before starting a new full test.

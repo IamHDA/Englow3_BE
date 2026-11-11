@@ -31,15 +31,26 @@ public interface FullTestSittingRepository extends JpaRepository<FullTestSitting
 
     List<FullTestSitting> findByUserIdOrderByStartedAtDesc(UUID userId);
 
+    List<FullTestSitting> findByUserIdOrderByStartedAtDesc(UUID userId, Pageable page);
+
     Optional<FullTestSitting> findFirstByUserIdAndFullTestIdAndStatusAndCompletedAtGreaterThanEqualOrderByCompletedAtDesc(
             UUID userId, UUID fullTestId, FullTestSittingStatus status, Instant since);
 
     /** Sittings the sweep should look at again: past their deadline, or waiting on a grade. */
-    @Query("""
-            select s from FullTestSitting s
-             where (s.status = com.englow3.exam.entity.FullTestSittingStatus.IN_PROGRESS and s.deadlineAt < :now)
-                or s.status = com.englow3.exam.entity.FullTestSittingStatus.AWAITING_GRADES
-             order by s.deadlineAt
-            """)
-    List<FullTestSitting> findUnsettled(@Param("now") Instant now, Pageable page);
+    @Query(value = """
+            select s.* from full_test_sittings s
+             where s.status in ('IN_PROGRESS','AWAITING_GRADES')
+                or (s.status='COMPLETED' and s.assessment_version_sum <> (select coalesce(sum(a.version),0) from assessment_attempts a
+                    where a.id in (s.writing1_attempt_id,s.writing2_attempt_id,s.speaking1_attempt_id,s.speaking2_attempt_id,s.speaking3_attempt_id)))
+             order by coalesce(s.last_reconciled_at,s.started_at),s.id
+            """, nativeQuery = true)
+    List<FullTestSitting> findUnsettled(Pageable page);
+
+    @Query(value = """
+            select s.* from full_test_sittings s where s.user_id=:user and
+            (s.status in ('IN_PROGRESS','AWAITING_GRADES') or
+              (s.status='COMPLETED' and s.assessment_version_sum <> (select coalesce(sum(a.version),0) from assessment_attempts a
+                 where a.id in (s.writing1_attempt_id,s.writing2_attempt_id,s.speaking1_attempt_id,s.speaking2_attempt_id,s.speaking3_attempt_id))))
+            """, nativeQuery = true)
+    List<FullTestSitting> findRefreshableForUser(@Param("user") UUID user);
 }

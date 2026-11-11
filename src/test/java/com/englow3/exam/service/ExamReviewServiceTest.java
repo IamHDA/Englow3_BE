@@ -36,12 +36,22 @@ class ExamReviewServiceTest {
 
     private final ExamRepository examRepo = mock(ExamRepository.class);
     private final QuestionRepository questionRepo = mock(QuestionRepository.class);
+    private final com.englow3.exam.query.ExamBlueprintQuery blueprint = mock(
+            com.englow3.exam.query.ExamBlueprintQuery.class);
     private final ExamReviewService service = new ExamReviewServiceImpl(examRepo, questionRepo,
-            mock(UserDirectory.class), CLOCK, mock(com.englow3.exam.repository.FullTestRepository.class));
+            mock(UserDirectory.class), CLOCK, mock(com.englow3.exam.repository.FullTestRepository.class), blueprint);
 
     @BeforeEach
     void completeQuestions() {
         when(questionRepo.findIncompleteQuestionOrderNos(any())).thenReturn(List.of());
+        var parts = new java.util.ArrayList<com.englow3.exam.query.ExamBlueprintQuery.Part>();
+        UUID listening = UUID.randomUUID(), reading = UUID.randomUUID();
+        int[] counts = { 6, 25, 39, 30, 30, 16, 54 };
+        for (int i = 0; i < 7; i++)
+            parts.add(new com.englow3.exam.query.ExamBlueprintQuery.Part(i < 4 ? listening : reading,
+                    i < 4 ? "LISTENING" : "READING", i < 4 ? 2700 : 4500, i + 1, counts[i],
+                    BigDecimal.valueOf(counts[i]), true, true));
+        when(blueprint.load(any())).thenReturn(parts);
     }
 
     @Test

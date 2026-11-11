@@ -37,6 +37,15 @@ public class AssessmentBandReaderImpl implements AssessmentBandReader {
 
     @Override
     @Transactional(readOnly = true)
+    public java.util.List<Answer> readAll(java.util.Collection<UUID> ids, UUID ownerId) {
+        if (ids.isEmpty())
+            return java.util.List.of();
+        return attemptRepo.findAllById(ids).stream().filter(a -> a.getUserId().equals(ownerId)).map(this::answerOf)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<Answer> latestAnswer(UUID taskId, UUID ownerId, Instant since) {
         return attemptRepo.findFirstByUserIdAndTaskIdAndStatusNotAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
                 ownerId, taskId, AssessmentAttemptStatus.DRAFT, since).map(this::answerOf);
@@ -59,7 +68,8 @@ public class AssessmentBandReaderImpl implements AssessmentBandReader {
         }
         Instant submittedAt = attempt.getSubmittedAt() != null ? attempt.getSubmittedAt() : attempt.getCreatedAt();
         return new Answer(attempt.getId(), attempt.getTaskId(), submittedAt, completed,
-                completed ? overall(attempt.getReport()) : null, attempt.getStatus().name(), attempt.getAssessedAt());
+                completed ? overall(attempt.getReport()) : null, attempt.getStatus().name(), attempt.getAssessedAt(),
+                attempt.getVersion());
     }
 
     private BigDecimal overall(String report) {

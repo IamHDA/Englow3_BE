@@ -53,9 +53,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FullTestSittingServiceImpl implements FullTestSittingService {
 
-    private static final EnumSet<FullTestSittingStatus> UNSETTLED = EnumSet.of(FullTestSittingStatus.IN_PROGRESS,
-            FullTestSittingStatus.AWAITING_GRADES);
-
     private final FullTestRepository fullTestRepo;
     private final FullTestSittingRepository sittingRepo;
     private final ExamAttemptRepository attemptRepo;
@@ -67,6 +64,9 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final FullTestService fullTests;
+    private final com.englow3.exam.repository.FullTestComponentAttemptRepository bindingRepo;
+    private final com.englow3.exam.repository.FullTestBandRevisionRepository revisionRepo;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
     @Override
     @Transactional
@@ -113,23 +113,36 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     @Override
     @Transactional(readOnly = true)
     public List<FullTestSittingResult> mine() {
+        return mine(0, 20);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FullTestSittingResult> mine(int page, int size) {
+        if (page < 0 || size < 1 || size > 100)
+            throw new com.englow3.shared.error.BadRequestException("PAGE_INVALID", "Choose a page size from 1 to 100");
         UUID userId = userDirectory.requireCurrentUserId();
-        return sittingRepo.findByUserIdOrderByStartedAtDesc(userId).stream().map(sitting -> FullTestSittingResult
-                .of(sitting, fullTestRepo.findById(sitting.getFullTestId()).orElseThrow())).toList();
+        var rows = sittingRepo.findByUserIdOrderByStartedAtDesc(userId,
+                org.springframework.data.domain.PageRequest.of(page, size));
+        var tests = fullTestRepo.findAllById(rows.stream().map(FullTestSitting::getFullTestId).distinct().toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(FullTest::getId, java.util.function.Function.identity()));
+        return rows.stream().map(s -> FullTestSittingResult.of(s, tests.get(s.getFullTestId()))).toList();
     }
 
     /** Its own transaction: it runs after the grade that triggered it has committed, and per sitting in the sweep. */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void refresh(UUID sittingId) {
-        sittingRepo.findByIdForUpdate(sittingId)
-                .ifPresent(sitting -> settle(sitting, fullTestRepo.findById(sitting.getFullTestId()).orElseThrow()));
+        sittingRepo.findByIdForUpdate(sittingId).ifPresent(sitting -> {
+            settle(sitting, fullTestRepo.findById(sitting.getFullTestId()).orElseThrow());
+            sitting.reconciledAt(clock.instant());
+        });
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void refreshFor(UUID userId) {
-        for (FullTestSitting candidate : sittingRepo.findByUserIdAndStatusIn(userId, UNSETTLED)) {
+        for (FullTestSitting candidate : sittingRepo.findRefreshableForUser(userId)) {
             sittingRepo.findByIdForUpdate(candidate.getId()).ifPresent(
                     sitting -> settle(sitting, fullTestRepo.findById(sitting.getFullTestId()).orElseThrow()));
         }
@@ -137,11 +150,15 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
 
     /** How grading stands for each attached answer, so the screen can say which part to resend. */
     private List<FullTestPartGrading> grading(FullTestSitting sitting) {
+        var answers = assessments
+                .readAll(sitting.partAttemptIds().stream().filter(java.util.Objects::nonNull).toList(),
+                        sitting.getUserId())
+                .stream().collect(java.util.stream.Collectors.toMap(AssessmentBandReader.Answer::attemptId,
+                        java.util.function.Function.identity()));
         List<FullTestPartGrading> states = new ArrayList<>();
         for (UUID attemptId : sitting.partAttemptIds()) {
-            states.add(attemptId == null ? null
-                    : assessments.read(attemptId, sitting.getUserId())
-                            .map(answer -> FullTestPartGrading.of(answer.status())).orElse(null));
+            states.add(attemptId == null || !answers.containsKey(attemptId) ? null
+                    : FullTestPartGrading.of(answers.get(attemptId).status()));
         }
         return states;
     }
@@ -151,12 +168,17 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     }
 
     private void settle(FullTestSitting sitting, FullTest test) {
-        if (sitting.isSettled()) {
+        if (sitting.getStatus() == FullTestSittingStatus.EXPIRED) {
             return;
         }
         Instant now = clock.instant();
+        boolean wasCompleted = sitting.getStatus() == FullTestSittingStatus.COMPLETED;
+        String previous = wasCompleted ? bandsJson(sitting) : null;
         FullTestSitting.Change change = sitting.settle(progress(sitting, test), now);
         if (change.completed()) {
+            if (wasCompleted)
+                revisionRepo.save(
+                        com.englow3.exam.entity.FullTestBandRevision.of(sitting, previous, bandsJson(sitting), now));
             placements.recordIeltsBand(sitting.getUserId(), sitting.getExamAttemptId(),
                     IeltsBand.cefr(sitting.getOverallBand()), sitting.getOverallBand(), sitting.getStartedAt(), true);
             events.publishEvent(new FullTestCompleted(sitting.getId(), sitting.getUserId(), test.getId(),
@@ -170,12 +192,14 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
 
     private FullTestSitting.Progress progress(FullTestSitting sitting, FullTest test) {
         UUID userId = sitting.getUserId();
-        Optional<ExamAttempt> paper = sitting.getExamAttemptId() != null
-                ? attemptRepo.findById(sitting.getExamAttemptId())
-                : attemptRepo
-                        .findFirstByUserIdAndExamIdAndModeAndStatusAndStartedAtGreaterThanEqualOrderByStartedAtDesc(
-                                userId, test.getExamId(), ExamAttemptMode.FULL, ExamAttemptStatus.SCORED,
-                                sitting.getStartedAt());
+        var bindings = bindingRepo.findBySittingId(sitting.getId()).stream().filter(b -> b.getAttemptId() != null)
+                .collect(java.util.stream.Collectors.toMap(com.englow3.exam.entity.FullTestComponentAttempt::getSlot,
+                        com.englow3.exam.entity.FullTestComponentAttempt::getAttemptId));
+        UUID paperId = sitting.getExamAttemptId() != null ? sitting.getExamAttemptId() : bindings.get("PAPER");
+        Optional<ExamAttempt> paper = paperId == null ? Optional.empty()
+                : attemptRepo.findById(paperId)
+                        .filter(a -> a.getUserId().equals(userId) && a.getExamId().equals(test.getExamId())
+                                && a.getMode() == ExamAttemptMode.FULL && a.getStatus() == ExamAttemptStatus.SCORED);
         BigDecimal listening = null;
         BigDecimal reading = null;
         if (paper.isPresent()) {
@@ -189,17 +213,31 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
         }
         List<FullTestSitting.Part> parts = new ArrayList<>();
         List<UUID> attached = sitting.partAttemptIds();
+        var answerIds = new java.util.HashSet<>(bindings.values());
+        answerIds.remove(bindings.get("PAPER"));
+        attached.stream().filter(java.util.Objects::nonNull).forEach(answerIds::add);
+        var answers = assessments.readAll(answerIds, userId).stream().collect(java.util.stream.Collectors
+                .toMap(AssessmentBandReader.Answer::attemptId, java.util.function.Function.identity()));
         for (FullTest.Slot slot : FullTest.Slot.values()) {
-            UUID attemptId = attached.get(slot.ordinal());
-            Optional<AssessmentBandReader.Answer> answer = attemptId != null ? assessments.read(attemptId, userId)
-                    : assessments.latestAnswer(test.taskId(slot), userId, sitting.getStartedAt());
+            UUID attemptId = attached.get(slot.ordinal()) != null ? attached.get(slot.ordinal())
+                    : bindings.get(slot.name());
+            Optional<AssessmentBandReader.Answer> answer = attemptId == null ? Optional.empty()
+                    : Optional.ofNullable(answers.get(attemptId)).filter(a -> a.taskId().equals(test.taskId(slot)));
             parts.add(answer.map(found -> new FullTestSitting.Part(found.attemptId(), found.submittedAt(), found.band(),
-                    found.assessedAt())).orElse(null));
+                    found.assessedAt(), found.version())).orElse(null));
         }
         Instant paperSubmitted = paper
                 .map(attempt -> attempt.getSubmittedAt() != null ? attempt.getSubmittedAt() : attempt.getScoredAt())
                 .orElse(null);
         return new FullTestSitting.Progress(paper.map(ExamAttempt::getId).orElse(null), paperSubmitted, listening,
                 reading, parts);
+    }
+
+    private String bandsJson(FullTestSitting sitting) {
+        try {
+            return mapper.writeValueAsString(sitting.bandSnapshot());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Cannot encode band audit", e);
+        }
     }
 }

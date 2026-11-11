@@ -15,6 +15,8 @@ public interface AssessmentBandReader {
     /** Empty when the attempt does not exist or belongs to someone else. */
     Optional<Answer> read(UUID attemptId, UUID ownerId);
 
+    java.util.List<Answer> readAll(java.util.Collection<UUID> attemptIds, UUID ownerId);
+
     /**
      * The learner's most recent submitted answer to {@code taskId} started at or after {@code since}, graded or not. A
      * draft is not an answer.
@@ -35,7 +37,11 @@ public interface AssessmentBandReader {
      *            when the grade was saved; full-test grading deadlines use this, not the time of a later read
      */
     record Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band, String status,
-            Instant assessedAt) {
+            Instant assessedAt, long version) {
+        public Answer(UUID attemptId, UUID taskId, Instant submittedAt, boolean completed, BigDecimal band,
+                String status, Instant assessedAt) {
+            this(attemptId, taskId, submittedAt, completed, band, status, assessedAt, 0L);
+        }
     }
 
     /**

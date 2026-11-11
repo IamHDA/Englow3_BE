@@ -41,8 +41,10 @@ public class FullTestController {
     }
 
     @GetMapping("/api/full-test-sittings")
-    public ResponseEntity<List<FullTestSittingResponse>> mine() {
-        return ResponseEntity.ok(sittings.mine().stream().map(FullTestSittingResponse::from).toList());
+    public ResponseEntity<List<FullTestSittingResponse>> mine(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(sittings.mine(page, size).stream().map(FullTestSittingResponse::from).toList());
     }
 
     @GetMapping("/api/full-test-sittings/{id}")
