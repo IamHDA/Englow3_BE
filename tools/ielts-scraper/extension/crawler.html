@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>IELTS scraper</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; color: #1c1c1c; }
+    h1 { font-size: 20px; }
+    fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 12px 0; padding: 10px 14px; }
+    label { margin-right: 14px; white-space: nowrap; }
+    #collections { max-height: 260px; overflow: auto; columns: 2; }
+    #collections label { display: block; }
+    #collections .done { color: #777; }
+    button { font: inherit; padding: 6px 14px; margin-right: 8px; }
+    input[type=number] { width: 70px; font: inherit; }
+    #log { background: #111; color: #ddd; padding: 10px; height: 280px; overflow: auto; white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; border-radius: 6px; }
+    #log .warn { color: #f5c04a; } #log .err { color: #ff7b72; }
+  </style>
+</head>
+<body>
+  <h1>IELTS Online Tests scraper</h1>
+  <p>Writes one JSON file per collection to <code>Downloads/ielts-scrape/</code>. Requests run one at a time with a pause between them.</p>
+
+  <fieldset>
+    <legend>Skills</legend>
+    <label><input type="checkbox" class="skill" value="listening" checked> Listening</label>
+    <label><input type="checkbox" class="skill" value="reading" checked> Reading</label>
+    <label><input type="checkbox" class="skill" value="writing" checked> Writing</label>
+    <label><input type="checkbox" class="skill" value="speaking" checked> Speaking</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Collections <span id="count"></span></legend>
+    <p>
+      <button id="load">Load list</button>
+      <button id="all" disabled>Select all</button>
+      <button id="none" disabled>Select none</button>
+      <button id="forget" disabled>Forget finished ones</button>
+    </p>
+    <div id="collections"></div>
+  </fieldset>
+
+  <p>
+    <label>Pause between requests (ms) <input type="number" id="delay" value="1500" min="500" step="100"></label>
+    <button id="start" disabled>Start</button>
+    <button id="stop" disabled>Stop</button>
+  </p>
+  <div id="log"></div>
+
+  <script src="parser.js"></script>
+  <script src="crawler.js"></script>
+</body>
+</html>

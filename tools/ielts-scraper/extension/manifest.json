@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "IELTS Online Tests scraper",
+  "version": "0.1.0",
+  "description": "Exports the free mock tests on ieltsonlinetests.com as JSON, one file per collection.",
+  "permissions": ["downloads", "storage"],
+  "host_permissions": ["https://ieltsonlinetests.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Open IELTS scraper" }
+}
