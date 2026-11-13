@@ -1,0 +1,6 @@
+{
+  "name": "ielts-scraper",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": { "jsdom": "^25.0.0" }
+}

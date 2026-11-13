@@ -372,7 +372,8 @@ def main() -> int:
                 "scraped_at": collection.get("scraped_at"),
                 "source_urls": {k: v["source_url"] for k, v in sections.items()},
                 "audio_urls": audio, "needs_review": problems,
-                **({"audio_split": old["audio_split"]} if "audio_split" in old else {}),
+                # What the later steps recorded: without "load" a second run would load the set twice.
+                **{key: old[key] for key in ("audio_split", "load") if key in old},
             }, ensure_ascii=False, indent=2), encoding="utf-8")
             written += 1
             # These two apply to nearly every set, so they are recorded in source.json but not repeated per line.
