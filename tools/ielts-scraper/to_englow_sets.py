@@ -8,6 +8,7 @@ One folder per test:
     tasks.json                Writing Task 1-2 and Speaking Part 1-3
     task1-chart.png           the Task 1 visual, when the task has one
     listening-transcript.md   the site's transcript, for the reviewer
+    audio/part-N.mp3          added afterwards by split_audio.py
     source.json               where it came from, the audio URLs, and everything that needs a human look
 
 Nothing is sent anywhere: load each folder with scripts/load_ielts_trial.py, which submits it for
@@ -317,8 +318,13 @@ def main() -> int:
             paper, problems = build_paper(name, collection["collection"]["url"], sections)
             tasks = build_tasks(name, sections, answers, args.band, folder, problems)
             audio = sections["listening"].get("audio_urls", [])
-            problems.append("Listening has no per-part audio: the source has one recording for the whole test "
-                            "(see audio_urls), and the loader needs audio/part-1.mp3 to part-4.mp3")
+            # Re-running this after split_audio.py must not forget what that script recorded.
+            old = json.loads((folder / "source.json").read_text(encoding="utf-8")) if (folder / "source.json").is_file() else {}
+            if "audio_split" in old:
+                problems += [n for n in old["needs_review"] if n.startswith("Listening audio")]
+            else:
+                problems.append("Listening has no per-part audio: the source has one recording for the whole test "
+                                "(see audio_urls); run split_audio.py to cut it into audio/part-1.mp3 to part-4.mp3")
             (folder / "paper.json").write_text(json.dumps(paper, ensure_ascii=False, indent=2), encoding="utf-8")
             (folder / "tasks.json").write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
             (folder / "listening-transcript.md").write_text("\n\n".join(
@@ -329,6 +335,7 @@ def main() -> int:
                 "scraped_at": collection.get("scraped_at"),
                 "source_urls": {k: v["source_url"] for k, v in sections.items()},
                 "audio_urls": audio, "needs_review": problems,
+                **({"audio_split": old["audio_split"]} if "audio_split" in old else {}),
             }, ensure_ascii=False, indent=2), encoding="utf-8")
             written += 1
             # These two apply to nearly every set, so they are recorded in source.json but not repeated per line.
