@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn the scraper's JSON into set folders that scripts/load_ielts_trial.py --set-dir can load.
+"""Turn the scraper's JSON into set folders in the layout of scripts/load_ielts_trial.py --set-dir.
 
     python to_englow_sets.py --input ~/Downloads/ielts-scrape --output sets [--answers answers --band 8.5]
 
@@ -7,17 +7,19 @@ One folder per test:
     paper.json                the Listening and Reading paper, in the admin authoring format
     tasks.json                Writing Task 1-2 and Speaking Part 1-3
     task1-chart.png           the Task 1 visual, when the task has one
+    images/ + images.json     maps, plans and diagrams of question sets, and which set each belongs to
     listening-transcript.md   the site's transcript, for the reviewer
     audio/part-N.mp3          added afterwards by split_audio.py
     source.json               where it came from, the audio URLs, and everything that needs a human look
 
-Nothing is sent anywhere: load each folder with scripts/load_ielts_trial.py, which submits it for
+Nothing is sent anywhere: load_sets.py loads the folders into a backend and submits them for
 review. With --answers, the AI sample answers from generate_answers.py become each task's sampleAnswer.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import io
 import json
 import re
@@ -106,9 +108,22 @@ def split_instruction(lines: list[str]) -> tuple[str, list[str]]:
 
 
 class Paper:
-    def __init__(self):
+    def __init__(self, folder: Path):
+        self.folder = folder
         self.order = 0
         self.problems: list[str] = []
+        self.images: list[dict] = []  # which file belongs to which part or question set, for the loader
+
+    def image(self, urls: list[str], section: str, part: int, set_no: int | None, what: str) -> None:
+        name = f"images/{section.lower()}-part{part}" + (f"-set{set_no}" if set_no else "") + ".png"
+        try:
+            data = fetch_png(urls)
+        except Exception as e:  # network, HTTP or an unreadable image
+            self.problems.append(f"{what}: could not fetch its image ({e}); it cannot be answered without it")
+            return
+        (self.folder / "images").mkdir(exist_ok=True)
+        (self.folder / name).write_bytes(data)
+        self.images.append({"file": name, "section": section, "part": part, "set": set_no})
 
     def question(self, kind, content, skill, score, explanation, where):
         self.order += 1
@@ -118,13 +133,11 @@ class Paper:
             "acceptedAnswers": [], "matchingLabels": [], "orderNo": self.order,
         }
 
-    def group(self, group: dict, skill: str, order_no: int) -> dict:
+    def group(self, group: dict, skill: str, part_no: int, order_no: int) -> dict:
         instruction, body = split_instruction(lines_of(group["html"]))
         out = {"title": group["label"], "instruction": instruction or None, "content": None,
                "questions": [], "setOptions": [], "orderNo": order_no}
         numbers = ", ".join(q["number"] for q in group["questions"])
-        if group["image_urls"]:
-            self.problems.append(f"Questions {numbers}: the set has an image (map, plan or diagram) that is not carried over")
         kind = group["type"]
 
         if kind == "completion":
@@ -175,19 +188,21 @@ class Paper:
         else:
             self.problems.append(f"Questions {numbers}: question type {kind!r} is not supported; the set is left out")
             return None
+        if group["image_urls"]:  # the map, plan or diagram the questions refer to
+            self.image(group["image_urls"], skill, part_no, order_no, f"Questions {numbers}")
         return out
 
     def section(self, scraped: dict, section_type: str, order_no: int, seconds: int) -> dict:
         parts = []
         for part in scraped["parts"]:
-            sets = [s for i, g in enumerate(part["question_groups"], 1) if (s := self.group(g, section_type, i))]
+            sets = [s for i, g in enumerate(part["question_groups"], 1) if (s := self.group(g, section_type, part["number"], i))]
             questions = part["title"].split(":", 1)[-1].strip()
             if section_type == "LISTENING":
                 head = {"title": f"Part {part['number']}", "instruction": questions, "content": None}
             else:
                 passage = part["passage"] or {}
                 if passage.get("image_urls"):
-                    self.problems.append(f"Reading Passage {part['number']}: the passage has an image that is not carried over")
+                    self.image(passage["image_urls"], section_type, part["number"], None, f"Reading Passage {part['number']}")
                 text = "\n\n".join(lines_of(passage.get("html", "")))
                 title = (passage.get("title") or "").strip()
                 head = {"title": f"Reading Passage {part['number']}", "instruction": passage.get("description") or questions,
@@ -202,8 +217,8 @@ class Paper:
                 "parts": parts, "orderNo": order_no, "maxRawScore": score}
 
 
-def build_paper(name: str, source: str, sections: dict) -> tuple[dict, list[str]]:
-    paper = Paper()
+def build_paper(name: str, source: str, sections: dict, folder: Path) -> tuple[dict, list[str], list[dict]]:
+    paper = Paper(folder)
     listening = paper.section(sections["listening"], "LISTENING", 1, 1920)
     reading = paper.section(sections["reading"], "READING", 2, 3600)
     letter = "letter" in " ".join(t["prompt"] for t in sections.get("writing", {}).get("tasks", []) if t["number"] == 1).lower()
@@ -219,17 +234,29 @@ def build_paper(name: str, source: str, sections: dict) -> tuple[dict, list[str]
             "maxRawScore": listening["maxRawScore"] + reading["maxRawScore"], "passScore": None,
         },
         "content": {"sections": [listening, reading]},
-    }, paper.problems
+    }, paper.problems, paper.images
 
 
-def fetch_png(url: str) -> bytes:
-    from PIL import Image  # only needed when a Task 1 has a visual
+def fetch_png(urls: list[str]) -> bytes:
+    """Download the images and return one PNG; several images are stacked top to bottom."""
+    from PIL import Image  # only needed when a test has images
 
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        image = Image.open(io.BytesIO(response.read()))
+    pictures = []
+    for url in urls:
+        if url.startswith("data:"):
+            data = base64.b64decode(url.split(",", 1)[1])
+        else:
+            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(request, timeout=60) as response:
+                data = response.read()
+        pictures.append(Image.open(io.BytesIO(data)).convert("RGB"))
+    sheet = Image.new("RGB", (max(p.width for p in pictures), sum(p.height for p in pictures)), "white")
+    top = 0
+    for picture in pictures:
+        sheet.paste(picture, (0, top))
+        top += picture.height
     out = io.BytesIO()
-    image.convert("RGB").save(out, "PNG")  # the loader uploads the chart as image/png
+    sheet.save(out, "PNG")  # the backend takes PNG or JPEG; one format keeps the loader simple
     return out.getvalue()
 
 
@@ -256,14 +283,12 @@ def build_tasks(name: str, sections: dict, answers: dict, band: str, folder: Pat
         }
         if task["image_urls"]:
             try:
-                (folder / f"task{n}-chart.png").write_bytes(fetch_png(task["image_urls"][0]))
+                (folder / f"task{n}-chart.png").write_bytes(fetch_png(task["image_urls"]))
             except Exception as e:  # network, HTTP or an unreadable image: the task is useless without its visual
                 problems.append(f"Writing Task {n}: could not fetch its image ({e}); the task is left out")
                 continue
             item["chart"] = f"task{n}-chart.png"
             problems.append(f"Writing Task {n}: rubricNotes is empty, so the grader has no chart data to check essays against")
-            if len(task["image_urls"]) > 1:
-                problems.append(f"Writing Task {n}: has {len(task['image_urls'])} images, only the first is kept")
         tasks.append(item)
 
     for part in sections.get("speaking", {}).get("parts", []):
@@ -315,7 +340,7 @@ def main() -> int:
                 continue
             folder = args.output / f"{path.stem}--{slug(test['name'])}"
             folder.mkdir(parents=True, exist_ok=True)
-            paper, problems = build_paper(name, collection["collection"]["url"], sections)
+            paper, problems, images = build_paper(name, collection["collection"]["url"], sections, folder)
             tasks = build_tasks(name, sections, answers, args.band, folder, problems)
             audio = sections["listening"].get("audio_urls", [])
             # Re-running this after split_audio.py must not forget what that script recorded.
@@ -326,6 +351,7 @@ def main() -> int:
                 problems.append("Listening has no per-part audio: the source has one recording for the whole test "
                                 "(see audio_urls); run split_audio.py to cut it into audio/part-1.mp3 to part-4.mp3")
             (folder / "paper.json").write_text(json.dumps(paper, ensure_ascii=False, indent=2), encoding="utf-8")
+            (folder / "images.json").write_text(json.dumps(images, indent=2), encoding="utf-8")
             (folder / "tasks.json").write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
             (folder / "listening-transcript.md").write_text("\n\n".join(
                 f"## Part {p['number']}\n\n" + "\n\n".join(lines_of((p["transcript"] or {}).get("html", "")))
