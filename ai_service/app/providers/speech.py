@@ -1,5 +1,8 @@
+import asyncio
 import base64
+import io
 import json
+import wave
 from typing import Any
 
 import httpx
@@ -21,6 +24,104 @@ class AzureSpeechProvider:
         locale: str,
         reference_text: str | None,
     ) -> SpeechAssessmentResponse:
+        # The short-audio REST provider assesses at most 30 seconds. Process
+        # every segment of a free response rather than silently losing its end.
+        if (
+            not self._settings.speech_enabled
+            or not self._settings.azure_speech_api_key.get_secret_value()
+        ):
+            return await self._assess_segment(audio, content_type, locale, reference_text)
+        if reference_text or content_type != "audio/wav":
+            return await self._assess_segment(audio, content_type, locale, reference_text)
+        try:
+            with wave.open(io.BytesIO(audio), "rb") as recording:
+                rate = recording.getframerate()
+                frames = recording.getnframes()
+                channels = recording.getnchannels()
+                width = recording.getsampwidth()
+                pcm = recording.readframes(frames)
+            if rate != 16000 or channels != 1 or width != 2 or frames / rate > 301:
+                raise ValueError("Expected mono 16kHz PCM WAV, up to five minutes")
+        except (wave.Error, EOFError, ValueError) as exc:
+            raise ProviderError(
+                code="SPEECH_AUDIO_INVALID", message="Invalid WAV recording", status_code=422
+            ) from exc
+        if frames / rate <= 29:
+            return await self._assess_segment(audio, content_type, locale, None)
+        segments: list[tuple[bytes, int, float]] = []
+        start = 0
+        while start < frames:
+            end = min(start + 29 * rate, frames)
+            if end < frames:
+                # Prefer a quiet boundary near the end of each provider window.
+                candidates = range(start + 24 * rate, end, rate // 10)
+                window = rate // 20
+                end = min(
+                    candidates,
+                    key=lambda frame: sum(
+                        abs(int.from_bytes(pcm[i : i + 2], "little", signed=True))
+                        for i in range(frame * 2, min((frame + window) * 2, len(pcm)), 2)
+                    ),
+                )
+            target = io.BytesIO()
+            with wave.open(target, "wb") as output:
+                output.setnchannels(channels)
+                output.setsampwidth(width)
+                output.setframerate(rate)
+                output.writeframes(pcm[start * 2 : end * 2])
+            segments.append((target.getvalue(), round(start / rate * 1000), (end - start) / rate))
+            start = end
+        semaphore = asyncio.Semaphore(3)
+
+        async def assess_one(segment: tuple[bytes, int, float]) -> SpeechAssessmentResponse:
+            async with semaphore:
+                return await self._assess_segment(segment[0], content_type, locale, None)
+
+        results = await asyncio.gather(*(assess_one(segment) for segment in segments))
+
+        def weighted(field: str) -> float | None:
+            values = [
+                (getattr(result, field), segment[2])
+                for result, segment in zip(results, segments, strict=True)
+                if getattr(result, field) is not None
+            ]
+            if not values:
+                return None
+            return sum(value * duration for value, duration in values) / sum(
+                duration for _, duration in values
+            )
+
+        return SpeechAssessmentResponse(
+            provider="azure-speech",
+            recognized_text=" ".join(result.recognized_text for result in results),
+            accuracy=weighted("accuracy"),
+            fluency=weighted("fluency"),
+            completeness=None,
+            prosody=weighted("prosody"),
+            pronunciation=weighted("pronunciation"),
+            words=[
+                word.model_copy(
+                    update={
+                        "offset_ms": None if word.offset_ms is None else word.offset_ms + segment[1]
+                    }
+                )
+                for result, segment in zip(results, segments, strict=True)
+                for word in result.words
+            ],
+            raw={
+                "segmented": True,
+                "segment_count": len(results),
+                "duration_seconds": frames / rate,
+            },
+        )
+
+    async def _assess_segment(
+        self,
+        audio: bytes,
+        content_type: str,
+        locale: str,
+        reference_text: str | None,
+    ) -> SpeechAssessmentResponse:
         api_key = self._settings.azure_speech_api_key.get_secret_value()
         if not self._settings.speech_enabled or not api_key:
             raise ProviderError(
@@ -33,7 +134,7 @@ class AzureSpeechProvider:
             "GradingSystem": "HundredMark",
             "Granularity": "Phoneme",
             "Dimension": "Comprehensive",
-            "EnableMiscue": True,
+            "EnableMiscue": bool(reference_text),
             "EnableProsodyAssessment": True,
         }
         if reference_text:

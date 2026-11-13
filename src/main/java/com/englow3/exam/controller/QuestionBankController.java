@@ -12,10 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.englow3.exam.dto.command.SearchQuestionBankCommand;
 import com.englow3.exam.dto.request.SearchQuestionBankRequest;
 import com.englow3.exam.dto.response.QuestionBankItemResponse;
-import com.englow3.exam.service.AdminExamService;
+import com.englow3.exam.service.QuestionBankService;
 import com.englow3.shared.page.PageResponse;
 
 import jakarta.validation.Valid;
+import com.englow3.shared.page.StablePage;
 
 /**
  * The bank is not a store of its own - it is every question ever authored, searchable, and "choosing" one is a copy
@@ -27,10 +28,10 @@ import jakarta.validation.Valid;
 @PreAuthorize("hasRole('ADMIN')")
 class QuestionBankController {
 
-    private final AdminExamService adminExamService;
+    private final QuestionBankService questionBankService;
 
-    QuestionBankController(AdminExamService adminExamService) {
-        this.adminExamService = adminExamService;
+    QuestionBankController(QuestionBankService questionBankService) {
+        this.questionBankService = questionBankService;
     }
 
     /** {@code orderNo} is the sort default, not {@code createdAt} - {@code Question} maps no timestamp. */
@@ -40,7 +41,7 @@ class QuestionBankController {
         SearchQuestionBankCommand command = new SearchQuestionBankCommand(request.skillType(),
                 request.difficultyLevel(), request.keyword());
 
-        return ResponseEntity.ok(PageResponse
-                .from(adminExamService.searchQuestionBank(command, pageable).map(QuestionBankItemResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(questionBankService
+                .searchQuestionBank(command, StablePage.of(pageable)).map(QuestionBankItemResponse::from)));
     }
 }

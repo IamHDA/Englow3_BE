@@ -1,4 +1,7 @@
+import asyncio
+import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -6,13 +9,16 @@ from typing import Annotated
 import httpx
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import Settings, get_settings
 from app.errors import ServiceError
+from app.generation.routes import router as generation_router
 from app.providers.embeddings import OpenAiCompatibleEmbeddingProvider
+from app.providers.generation import EdgeSpeechSynthesizer, GenerationProvider
 from app.providers.llm import OpenAiCompatibleProvider
 from app.providers.speech import AzureSpeechProvider
+from app.providers.whisper import WhisperSpeechProvider
 from app.schemas import (
     EmbeddingRequest,
     EmbeddingResponse,
@@ -35,25 +41,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             configured.read_timeout_seconds,
             connect=configured.connect_timeout_seconds,
         )
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        speech_timeout = httpx.Timeout(
+            configured.speech_timeout_seconds, connect=configured.connect_timeout_seconds
+        )
+        generation_timeout = httpx.Timeout(
+            configured.generation_timeout_seconds, connect=configured.connect_timeout_seconds
+        )
+        async with (
+            httpx.AsyncClient(timeout=timeout) as client,
+            httpx.AsyncClient(timeout=speech_timeout) as speech_client,
+            httpx.AsyncClient(timeout=generation_timeout) as generation_client,
+        ):
+            app.state.generation_provider = GenerationProvider(generation_client, configured)
+            app.state.speech_synthesizer = EdgeSpeechSynthesizer()
             app.state.llm_provider = OpenAiCompatibleProvider(client, configured)
             app.state.embedding_provider = OpenAiCompatibleEmbeddingProvider(client, configured)
-            app.state.speech_provider = AzureSpeechProvider(client, configured)
+            app.state.speech_provider = (
+                WhisperSpeechProvider(speech_client, configured)
+                if configured.speech_provider == "whisper"
+                else AzureSpeechProvider(speech_client, configured)
+            )
             yield
 
     app = FastAPI(
         title="Englow AI Service",
         version="1.0.0",
         docs_url=None if configured.environment == "production" else "/docs",
+        # The schema behind /docs: hidden with it, or production still lists every internal route.
+        openapi_url=None if configured.environment == "production" else "/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
     )
     app.dependency_overrides[get_settings] = lambda: configured
 
+    @app.middleware("http")
+    async def request_timing(request: Request, call_next):
+        start = time.monotonic()
+        response = await call_next(request)
+        duration = (time.monotonic() - start) * 1000
+        response.headers["Server-Timing"] = f"ai;dur={duration:.1f}"
+        logger.info(
+            "AI request path=%s status=%s duration_ms=%.1f",
+            request.url.path,
+            response.status_code,
+            duration,
+        )
+        return response
+
     @app.exception_handler(ServiceError)
     async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
+            headers={"Retry-After": str(exc.retry_after_seconds)}
+            if exc.retry_after_seconds
+            else None,
             content={
                 "code": exc.code,
                 "message": exc.message,
@@ -88,6 +129,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def live() -> dict[str, str]:
         return {"status": "up"}
 
+    @app.get("/version", include_in_schema=False)
+    async def version() -> dict[str, str]:
+        return {"release": configured.release_sha}
+
     @app.get("/health/ready", include_in_schema=False)
     async def ready() -> JSONResponse:
         checks = _readiness(configured)
@@ -98,6 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     internal = [Depends(require_internal_api_key)]
+    app.include_router(generation_router, dependencies=internal)
 
     @app.post(
         "/internal/v1/llm/generate",
@@ -106,7 +152,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=internal,
     )
     async def generate(request: Request, body: LlmGenerateRequest) -> LlmGenerateResponse:
-        return await request.app.state.llm_provider.generate(body)
+        try:
+            async with asyncio.timeout(configured.read_timeout_seconds):
+                return await request.app.state.llm_provider.generate(body)
+        except TimeoutError as exc:
+            raise ServiceError("AI_PROVIDER_TIMEOUT", "Generation timed out", 504, True) from exc
+
+    @app.post("/internal/v1/llm/stream", dependencies=internal)
+    async def stream_generation(request: Request, body: LlmGenerateRequest) -> StreamingResponse:
+        async def events():
+            try:
+                async with asyncio.timeout(configured.read_timeout_seconds):
+                    async for event in request.app.state.llm_provider.stream(body):
+                        yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+            except TimeoutError:
+                yield 'data: {"error":{"code":"AI_PROVIDER_TIMEOUT","retryable":true}}\n\n'
+            except ServiceError as exc:
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "error": {
+                                "code": exc.code,
+                                "retryable": exc.retryable,
+                                "retry_after_seconds": exc.retry_after_seconds,
+                            }
+                        }
+                    )
+                    + "\n\n"
+                )
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
 
     @app.post(
         "/internal/v1/embeddings",
@@ -115,7 +195,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=internal,
     )
     async def embed(request: Request, body: EmbeddingRequest) -> EmbeddingResponse:
-        return await request.app.state.embedding_provider.embed(body)
+        try:
+            async with asyncio.timeout(configured.read_timeout_seconds):
+                return await request.app.state.embedding_provider.embed(body)
+        except TimeoutError as exc:
+            raise ServiceError("AI_PROVIDER_TIMEOUT", "Embedding timed out", 504, True) from exc
 
     @app.post(
         "/internal/v1/speech/assess",
@@ -144,9 +228,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ServiceError("EMPTY_AUDIO", "Audio is empty", 422)
         if len(payload) > configured.max_audio_bytes:
             raise ServiceError("AUDIO_TOO_LARGE", "Audio exceeds the configured size limit", 413)
-        return await request.app.state.speech_provider.assess(
-            payload, content_type, locale, reference_text
-        )
+        try:
+            async with asyncio.timeout(configured.speech_timeout_seconds):
+                return await request.app.state.speech_provider.assess(
+                    payload, content_type, locale, reference_text
+                )
+        except TimeoutError as exc:
+            raise ServiceError("SPEECH_TIMEOUT", "Speech assessment timed out", 504, True) from exc
 
     return app
 
@@ -154,15 +242,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 def _readiness(settings: Settings) -> dict[str, bool]:
     internal_auth = bool(settings.internal_api_key.get_secret_value())
     llm = not settings.llm_enabled or bool(settings.llm_api_key.get_secret_value())
-    speech = not settings.speech_enabled or bool(settings.azure_speech_api_key.get_secret_value())
+    speech_key = (
+        settings.whisper_api_key.get_secret_value() or settings.llm_api_key.get_secret_value()
+        if settings.speech_provider == "whisper"
+        else settings.azure_speech_api_key.get_secret_value()
+    )
+    speech = not settings.speech_enabled or bool(speech_key)
     embedding = not settings.embedding_enabled or bool(
         settings.embedding_api_key.get_secret_value()
+    )
+    generation = not settings.generation_enabled or bool(
+        settings.generation_api_key.get_secret_value() and settings.generation_model
     )
     return {
         "internal_auth": internal_auth,
         "llm": llm,
         "embedding": embedding,
         "speech": speech,
+        "generation": generation,
     }
 
 

@@ -1,26 +1,37 @@
 name: Backend CI
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-
   pull_request:
     branches:
       - main
       - dev
+      - testing
+
+  # A push is validated by `cd.yml`, which calls this workflow first and builds
+  # the image only if it passes. A push trigger here as well would run the
+  # suite twice, and the two runs share a concurrency group - one would cancel
+  # the other.
+  workflow_call:
+
+concurrency:
+  # One run per branch. A validation run superseded by a newer commit is
+  # worthless, and these now start a database container each.
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   java:
     runs-on: ubuntu-latest
+    # The suite starts a PostgreSQL container. A container that never becomes
+    # ready would otherwise hold a runner for six hours, which is the default.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -29,18 +40,22 @@ jobs:
       - name: Check format
         run: mvn formatter:validate
 
+      # Testcontainers starts a real PostgreSQL and runs the migrations against
+      # it, so the integration tests need Docker. ubuntu-latest provides it;
+      # a self-hosted runner would have to as well.
       - name: Build and test
         run: mvn --batch-mode clean verify
 
   ai-service:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: pip
@@ -63,13 +78,14 @@ jobs:
 
   data-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: pip

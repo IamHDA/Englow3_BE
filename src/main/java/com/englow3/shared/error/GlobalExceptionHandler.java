@@ -3,9 +3,12 @@ package com.englow3.shared.error;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.hibernate.query.sqm.PathElementException;
+import org.hibernate.query.sqm.UnknownPathException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +22,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+import software.amazon.awssdk.core.exception.SdkException;
 
 import com.englow3.shared.logging.TraceIdFilter;
 
@@ -35,6 +40,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case ConflictException ignored -> HttpStatus.CONFLICT;
             case BadRequestException ignored -> HttpStatus.BAD_REQUEST;
             case ForbiddenException ignored -> HttpStatus.FORBIDDEN;
+            case TooManyRequestsException ignored -> HttpStatus.TOO_MANY_REQUESTS;
         };
         return ResponseEntity.status(status).body(error(ex.getCode(), ex.getMessage()));
     }
@@ -67,6 +73,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiErrorResponse> onUnknownSortProperty(PropertyReferenceException ex) {
         return ResponseEntity.badRequest()
                 .body(error("INVALID_SORT_PROPERTY", "Cannot sort by '%s'".formatted(ex.getPropertyName())));
+    }
+
+    /**
+     * The object store failed - an upload or a delete that never reached the bucket. Not the caller's fault and not a
+     * bug here either, and a 503 tells the client that trying again later is the right move.
+     */
+    @ExceptionHandler(SdkException.class)
+    public ResponseEntity<ApiErrorResponse> onStorageFailure(SdkException ex) {
+        log.error("Object storage failure", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(error("STORAGE_UNAVAILABLE", "File storage is unavailable, please try again later"));
+    }
+
+    /**
+     * The same mistyped {@code ?sort=} on an endpoint whose query is written by hand: Spring Data does not check the
+     * property there, Hibernate does when it builds the query, and Spring wraps its complaint. Anything else wrapped
+     * the same way is still a server fault.
+     */
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    public ResponseEntity<ApiErrorResponse> onInvalidDataAccess(InvalidDataAccessApiUsageException ex) {
+        // JPA wraps Hibernate's complaint in an IllegalArgumentException before Spring wraps that, so look down the
+        // chain.
+        for (Throwable cause = ex.getCause(); cause != null; cause = cause.getCause()) {
+            if (cause instanceof UnknownPathException || cause instanceof PathElementException) {
+                return ResponseEntity.badRequest().body(error("INVALID_SORT_PROPERTY", "Cannot sort by that property"));
+            }
+        }
+        return onUnhandled(ex);
     }
 
     @ExceptionHandler(Exception.class)

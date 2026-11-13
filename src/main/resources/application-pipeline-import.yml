@@ -1,0 +1,12 @@
+# Profile for PipelineImportRunner: load a pipeline output/ directory, then exit.
+#
+# No web server - this is a one-shot tool, not a second copy of the API - and no AI
+# worker, which would otherwise start draining the queue of whatever database this
+# is pointed at. Flyway still runs on startup as it always does, so pointing this at
+# a database that is behind brings its schema up to date first.
+spring:
+  main:
+    web-application-type: none
+app:
+  ai:
+    enabled: false

@@ -1,0 +1,2058 @@
+{
+  "version": null,
+  "metadata": {
+    "title": "IELTS Academic Trial Paper 1 - Listening and Reading",
+    "description": "Trial paper written for Englow3 to test the IELTS flow end to end. Listening audio is not recorded yet.",
+    "examType": "MOCK",
+    "certificateType": "IELTS",
+    "certificateVariant": "ACADEMIC",
+    "targetLevel": "B2",
+    "durationSeconds": 5520,
+    "maxRawScore": 80,
+    "passScore": null
+  },
+  "content": {
+    "sections": [
+      {
+        "sectionType": "LISTENING",
+        "scoredByCriteria": false,
+        "timeLimitSeconds": 1920,
+        "parts": [
+          {
+            "title": "Part 1",
+            "instruction": "Questions 1-10",
+            "content": null,
+            "questionSets": [
+              {
+                "title": "Questions 1-10",
+                "instruction": "Complete the form below. Write ONE WORD AND/OR A NUMBER for each answer.",
+                "content": "RIVERSIDE ARTS CENTRE - COURSE BOOKING FORM\n\nName: Maria {{1}}\nPhone: {{2}}\nCourse: Beginners' {{3}}\nDay: {{4}} evenings, 7-9 pm\nFirst class: {{5}} March\nCost: £{{6}} per term (materials included)\nPlease bring: an old {{7}} to protect clothes\nParking: use the car park behind the {{8}}\n10% discount available for: {{9}}\nHeard about the centre from: a {{10}}",
+                "questions": [
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Surname",
+                    "difficultyLevel": "EASY",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "Kowalski",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 1
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Phone number",
+                    "difficultyLevel": "EASY",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "07734 512908",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "07734512908",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 2
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Course",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "pottery",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 3
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Day",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "Thursday",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "Thursdays",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 4
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Start date (March)",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "14",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "14th",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      },
+                      {
+                        "text": "fourteenth",
+                        "caseSensitive": false,
+                        "orderNo": 3
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 5
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Cost per term (£)",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "85",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "£85",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 6
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "What to bring",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "shirt",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "old shirt",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 7
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Where to park",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "library",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "the library",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 8
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Who gets a discount",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "students",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 9
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "How she heard about the course",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "newspaper",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "local newspaper",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 10
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              }
+            ],
+            "orderNo": 1
+          },
+          {
+            "title": "Part 2",
+            "instruction": "Questions 11-20",
+            "content": null,
+            "questionSets": [
+              {
+                "title": "Questions 11-15",
+                "instruction": "Choose the correct letter, A, B or C.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Hollins Wood became a nature reserve because",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "a rare bird was found nesting there.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "local people raised money to buy it.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "a factory on the site closed down.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 11
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "The main entrance has moved because",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "the old road was too narrow for coaches.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "the river flooded the previous car park.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "a new railway station has opened nearby.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 12
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "What does the speaker say about the trails?",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "The red trail is suitable for wheelchairs.",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "The blue trail is the most popular in summer.",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "All trails are closed after heavy rain.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 13
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Visitors are asked not to",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "bring dogs into the bird hides.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "feed the ducks on the lake.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "cycle on any of the paths.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 14
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Volunteers are most needed on",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "weekday mornings.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "Saturday afternoons.",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "Sunday mornings.",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 15
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              },
+              {
+                "title": "Questions 16-20",
+                "instruction": "What can visitors do at each of the following places? Choose FIVE answers from the list, A-G.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Visitor centre",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "D"
+                    ],
+                    "orderNo": 16
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Lake",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "A"
+                    ],
+                    "orderNo": 17
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Old mill",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "F"
+                    ],
+                    "orderNo": 18
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Picnic meadow",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "B"
+                    ],
+                    "orderNo": 19
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "North gate",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "G"
+                    ],
+                    "orderNo": 20
+                  }
+                ],
+                "setOptions": [
+                  {
+                    "label": "A",
+                    "content": "hire a rowing boat",
+                    "orderNo": 1
+                  },
+                  {
+                    "label": "B",
+                    "content": "join a guided walk",
+                    "orderNo": 2
+                  },
+                  {
+                    "label": "C",
+                    "content": "buy plants",
+                    "orderNo": 3
+                  },
+                  {
+                    "label": "D",
+                    "content": "borrow binoculars",
+                    "orderNo": 4
+                  },
+                  {
+                    "label": "E",
+                    "content": "watch a film",
+                    "orderNo": 5
+                  },
+                  {
+                    "label": "F",
+                    "content": "see a display of old tools",
+                    "orderNo": 6
+                  },
+                  {
+                    "label": "G",
+                    "content": "collect a trail map",
+                    "orderNo": 7
+                  }
+                ],
+                "orderNo": 2
+              }
+            ],
+            "orderNo": 2
+          },
+          {
+            "title": "Part 3",
+            "instruction": "Questions 21-30",
+            "content": null,
+            "questionSets": [
+              {
+                "title": "Questions 21-24",
+                "instruction": "Choose TWO letters, A-E, for each question.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MULTIPLE_CHOICE",
+                    "content": "Which TWO problems do Tom and Aisha mention about their survey on food waste?",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 2,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "Too few people replied.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "Some questions were unclear.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "The survey took too long to complete.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "Most replies came from one age group.",
+                        "orderNo": 4,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "The results were lost.",
+                        "orderNo": 5,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 21
+                  },
+                  {
+                    "questionType": "MULTIPLE_CHOICE",
+                    "content": "Which TWO things does their tutor suggest they do next?",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 2,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "interview a local shop owner",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "repeat the survey online",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "compare their results with a national study",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "reduce the length of the report",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "visit a food bank",
+                        "orderNo": 5,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 22
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              },
+              {
+                "title": "Questions 25-30",
+                "instruction": "What do the students think about each source? Choose SIX answers from the list, A-E. You may use any letter more than once.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the government report",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "B"
+                    ],
+                    "orderNo": 23
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the supermarket's website",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "E"
+                    ],
+                    "orderNo": 24
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the documentary",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "C"
+                    ],
+                    "orderNo": 25
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the university study",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "A"
+                    ],
+                    "orderNo": 26
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the newspaper article",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "C"
+                    ],
+                    "orderNo": 27
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "the charity leaflet",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "D"
+                    ],
+                    "orderNo": 28
+                  }
+                ],
+                "setOptions": [
+                  {
+                    "label": "A",
+                    "content": "the most reliable",
+                    "orderNo": 1
+                  },
+                  {
+                    "label": "B",
+                    "content": "out of date",
+                    "orderNo": 2
+                  },
+                  {
+                    "label": "C",
+                    "content": "too general",
+                    "orderNo": 3
+                  },
+                  {
+                    "label": "D",
+                    "content": "useful for statistics",
+                    "orderNo": 4
+                  },
+                  {
+                    "label": "E",
+                    "content": "likely to be biased",
+                    "orderNo": 5
+                  }
+                ],
+                "orderNo": 2
+              }
+            ],
+            "orderNo": 3
+          },
+          {
+            "title": "Part 4",
+            "instruction": "Questions 31-40",
+            "content": null,
+            "questionSets": [
+              {
+                "title": "Questions 31-40",
+                "instruction": "Complete the notes below. Write ONE WORD ONLY for each answer.",
+                "content": "THE DEVELOPMENT OF LIGHTHOUSE LIGHTS\n\nEarly lights\n- fires of coal or {{1}} on high ground\n- {{2}} often hid the light from ships\n\nLamps and reflectors\n- from the 1780s, lamps burned {{3}}\n- curved reflectors of polished {{4}} made the beam stronger\n\nThe new lens\n- designed in 1822 by Augustin {{5}}\n- made from rings of {{6}} that bend light into one beam\n- each light had its own flash pattern, so sailors could work out their {{7}}\n- heavy lenses turned smoothly on a bath of {{8}}\n\nToday\n- {{9}} meant the last keepers left in the 1990s\n- many old lighthouses are now {{10}}",
+                "questions": [
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Early lights",
+                    "difficultyLevel": "EASY",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "wood",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 29
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Problem with early lights",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "smoke",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 30
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Lamps then burned",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "oil",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 31
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Reflectors made of polished",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "copper",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 32
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Lens invented by",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "Fresnel",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 33
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Lens made of rings of",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "glass",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 34
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Flash pattern helped sailors know their",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "position",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 35
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Lenses turned on a bath of",
+                    "difficultyLevel": "HARD",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "mercury",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 36
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Last keepers left because of",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "automation",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 37
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Many lighthouses are now",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "LISTENING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "museums",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 38
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              }
+            ],
+            "orderNo": 4
+          }
+        ],
+        "orderNo": 1,
+        "maxRawScore": 40
+      },
+      {
+        "sectionType": "READING",
+        "scoredByCriteria": false,
+        "timeLimitSeconds": 3600,
+        "parts": [
+          {
+            "title": "Reading Passage 1",
+            "instruction": "You should spend about 20 minutes on Questions 1-13.",
+            "content": "THE RETURN OF THE URBAN ORCHARD\n\nFor most of the twentieth century, fruit trees disappeared from the centres of European cities. Orchards that had once supplied town markets were sold for housing, and the few trees that survived in parks were often cut down because falling fruit was considered a nuisance. By 1980, a survey in the Dutch city of Utrecht found fewer than two hundred fruit trees on public land, most of them over fifty years old.\n\nThe change began quietly. In the late 1990s, a group of residents in Utrecht asked the council for permission to plant apple and pear trees on a strip of unused land beside a railway line. The council agreed, partly because the residents promised to look after the trees themselves. Within ten years the strip held more than sixty trees, and the idea had spread to other neighbourhoods.\n\nSupporters of urban orchards point to several benefits. Fruit trees provide food for bees and other insects at a time of year when few other plants are flowering. Their roots help rainwater soak into the ground instead of running into overloaded drains. And, according to a study by Wageningen University, people who live within three hundred metres of a community orchard report feeling more connected to their neighbours than those who do not.\n\nThere are difficulties, however. Fruit trees need pruning every winter, and many councils lack staff with the necessary skills. Some early projects failed because volunteers lost interest after the first harvest. Others ran into trouble when nobody had agreed who owned the fruit: in one case in Hamburg, a local restaurant began picking the cherries before residents could reach them, leading to a dispute that took two years to settle.\n\nTo avoid such problems, most successful projects now use a written agreement. This normally states who is responsible for pruning, how the harvest will be shared, and what happens if the group stops meeting. Several cities, including Ghent and Malmö, have published model agreements that new groups can adapt.\n\nThe choice of tree also matters. Old local varieties are often more resistant to disease than modern commercial ones, and they need fewer chemical sprays. Nurseries that specialise in these varieties have seen demand rise sharply; one in Belgium reports that sales to community groups have tripled since 2015. Experts also recommend planting a mix of early and late varieties, so that fruit is available from July to October rather than all at once.\n\nNot everyone is convinced. Critics argue that a few hundred trees can make no real difference to a city's food supply, and that the money would be better spent on larger parks. Supporters accept that orchards will never feed a city, but say that this was never the point. \"An orchard is a reason for people to meet,\" says Marieke de Vries, who helped plant the first Utrecht trees. \"The fruit is a bonus.\"\n",
+            "questionSets": [
+              {
+                "title": "Questions 1-6",
+                "instruction": "Do the following statements agree with the information given in Reading Passage 1? Choose TRUE if the statement agrees with the information, FALSE if it contradicts the information, or NOT GIVEN if there is no information on this.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "In 1980, most of the fruit trees on public land in Utrecht were young.",
+                    "difficultyLevel": "EASY",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 39
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "The Utrecht council paid for the first trees beside the railway.",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 40
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Fruit trees can reduce the amount of rainwater entering drains.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 41
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "The Hamburg dispute was settled in court.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 42
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Ghent and Malmö have made example agreements available to new groups.",
+                    "difficultyLevel": "EASY",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 43
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Old local varieties of fruit tree usually need more chemical sprays.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "TRUE",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "FALSE",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 44
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              },
+              {
+                "title": "Questions 7-13",
+                "instruction": "Complete the summary below. Choose ONE WORD ONLY from the passage for each answer.",
+                "content": "Urban orchards help wildlife, because {{1}} can feed on the flowers when little else is in bloom. People living close to an orchard say they feel more connected to their {{2}}. But orchards need care: {{3}} must be done every winter, and some projects failed when volunteers lost {{4}}. Most successful groups now sign a written {{5}} that sets out who does what. Interest in old varieties has grown, and one nursery's sales to community groups have {{6}}. Experts advise planting both early and {{7}} varieties to spread the harvest.",
+                "questions": [
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Insects that feed on fruit trees",
+                    "difficultyLevel": "EASY",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "bees",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 45
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Residents near an orchard feel connected to their",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "neighbours",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      },
+                      {
+                        "text": "neighbors",
+                        "caseSensitive": false,
+                        "orderNo": 2
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 46
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Skill many councils lack",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "pruning",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 47
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Some volunteers lost",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "interest",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 48
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Successful projects now use a written",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "agreement",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 49
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Nurseries' sales to community groups have",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "tripled",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 50
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Varieties to plant: a mix of early and",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "late",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 51
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 2
+              }
+            ],
+            "orderNo": 1
+          },
+          {
+            "title": "Reading Passage 2",
+            "instruction": "You should spend about 20 minutes on Questions 14-26.",
+            "content": "HOW BRIDGES LEARNED TO MOVE\n\nA. In 2000, thousands of people walked across London's new Millennium Bridge on its opening day. Within minutes the bridge began to sway from side to side, and walkers instinctively adjusted their steps to keep their balance. Their movement made the swaying worse. The bridge was closed two days later and did not reopen for almost two years.\n\nB. Engineers had known for a long time that soldiers should break step when crossing a bridge, because marching in time can make a structure vibrate. What surprised them in London was that ordinary walkers, who had no reason to move together, fell into step without meaning to. The bridge's sideways movement, although small at first, was enough to make hundreds of people shift their weight at the same moment.\n\nC. The solution was not to make the bridge heavier or stiffer, which would have spoiled its slim design. Instead, engineers fitted it with dampers - devices that absorb energy, working in a similar way to the shock absorbers in a car. Ninety-one dampers were installed under the deck and around the supports. Tests with up to two thousand volunteers showed that the bridge now stayed almost still.\n\nD. The London case changed how footbridges are designed around the world. Before 2000, most design codes considered only the vertical forces produced by walking. Today, engineers must also check how a bridge will respond to sideways forces, and many now run computer models of crowds before a design is approved. The cost of these checks is small compared with the cost of closing a bridge after it opens.\n\nE. Some engineers have gone further and designed bridges that are meant to move. In parts of Japan, bridges are built on bearings that allow them to slide during an earthquake, so that the ground can shake beneath them without tearing the structure apart. Similar ideas are used in tall buildings, where heavy weights near the top swing in the opposite direction to the wind.\n\nF. Despite these advances, engineers admit that crowds remain hard to predict. People walk differently when they are excited, when they are carrying bags, or when they are in a hurry. One researcher compares designing for crowds to forecasting the weather: models are improving every year, but there will always be some uncertainty. For this reason, most new footbridges are now tested with real crowds before they open to the public.\n",
+            "questionSets": [
+              {
+                "title": "Questions 14-19",
+                "instruction": "Reading Passage 2 has six paragraphs, A-F. Choose the correct heading for each paragraph from the list of headings below.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph A",
+                    "difficultyLevel": "EASY",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "iii"
+                    ],
+                    "orderNo": 52
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph B",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "vi"
+                    ],
+                    "orderNo": 53
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph C",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "i"
+                    ],
+                    "orderNo": 54
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph D",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "vii"
+                    ],
+                    "orderNo": 55
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph E",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "iv"
+                    ],
+                    "orderNo": 56
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Paragraph F",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "ii"
+                    ],
+                    "orderNo": 57
+                  }
+                ],
+                "setOptions": [
+                  {
+                    "label": "i",
+                    "content": "A fix that kept the original appearance",
+                    "orderNo": 1
+                  },
+                  {
+                    "label": "ii",
+                    "content": "The limits of prediction",
+                    "orderNo": 2
+                  },
+                  {
+                    "label": "iii",
+                    "content": "A troubled opening",
+                    "orderNo": 3
+                  },
+                  {
+                    "label": "iv",
+                    "content": "Structures that are allowed to move",
+                    "orderNo": 4
+                  },
+                  {
+                    "label": "v",
+                    "content": "The rising cost of new footbridges",
+                    "orderNo": 5
+                  },
+                  {
+                    "label": "vi",
+                    "content": "An unexpected human reaction",
+                    "orderNo": 6
+                  },
+                  {
+                    "label": "vii",
+                    "content": "New rules for designers",
+                    "orderNo": 7
+                  },
+                  {
+                    "label": "viii",
+                    "content": "Why soldiers march in step",
+                    "orderNo": 8
+                  }
+                ],
+                "orderNo": 1
+              },
+              {
+                "title": "Questions 20-23",
+                "instruction": "Choose the correct letter, A, B, C or D.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "The Millennium Bridge was closed because",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "too many people tried to cross it at once.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "its movement was made worse by the people walking on it.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "soldiers marched across it on the opening day.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "its supports were damaged during construction.",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 58
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Engineers did not make the bridge stiffer because this would have",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "cost too much money.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "taken too long to complete.",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "changed the way the bridge looked.",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "made the bridge too heavy to stand.",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 59
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Before 2000, design codes for footbridges",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "were the same in every country.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "ignored forces acting sideways.",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "required tests with real crowds.",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "applied only to large bridges.",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 60
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "The writer mentions the weather in paragraph F to show that",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "crowds behave differently in bad weather.",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "bridge models are based on weather models.",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "some uncertainty in crowd models cannot be removed.",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "engineers should work with weather forecasters.",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 61
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 2
+              },
+              {
+                "title": "Questions 24-26",
+                "instruction": null,
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MULTIPLE_CHOICE",
+                    "content": "Choose TWO letters, A-E. Which TWO methods of reducing movement are mentioned?",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 2,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "devices that absorb energy",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "adding extra supports in the river",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "bearings that let a structure slide",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "limiting the number of people allowed on",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "making the deck from lighter materials",
+                        "orderNo": 5,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 62
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Choose the correct letter, A, B, C or D. What is the main purpose of the passage?",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "to criticise the designers of the Millennium Bridge",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "to explain how one failure changed bridge design",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "to compare bridges in London and Japan",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "to argue that footbridges are unsafe",
+                        "orderNo": 4,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 63
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 3
+              }
+            ],
+            "orderNo": 2
+          },
+          {
+            "title": "Reading Passage 3",
+            "instruction": "You should spend about 20 minutes on Questions 27-40.",
+            "content": "THE VALUE OF BOREDOM\n\nBoredom has a poor reputation. Parents work hard to keep children entertained, employers worry about staff who seem uninterested, and many adults reach for their phones the moment they have nothing to do. Yet a growing number of psychologists argue that boredom is not simply an unpleasant feeling to be avoided, but a signal that serves a useful purpose.\n\nAccording to this view, boredom works rather like hunger. Hunger tells us that we need food; boredom tells us that what we are doing no longer meets our needs, and pushes us to look for something more rewarding. Dr Erin Westgate of the University of Florida describes it as \"a message that our attention is not being well used\". On this account, the problem is not boredom itself but what we do in response to it.\n\nSome research suggests that boredom can even encourage creative thinking. In a well-known experiment at the University of Central Lancashire, Sandi Mann asked one group of volunteers to copy numbers from a telephone directory for fifteen minutes, while a second group did nothing beforehand. Both groups were then asked to think of as many uses as possible for a pair of plastic cups. The volunteers who had first done the dull copying task produced more ideas, and their ideas were judged to be more original.\n\nMann's findings have been widely reported, but other researchers urge caution. The experiment was small, and later studies have produced mixed results. James Danckert, who studies boredom at the University of Waterloo, points out that boredom can also lead people to make poor choices, such as eating unhealthy snacks or taking unnecessary risks. In his view, boredom is useful only if people respond to it by finding something meaningful to do.\n\nThere is also disagreement about whether modern life is making people more bored. Some writers claim that smartphones have reduced our ability to cope with even a few minutes of inactivity. Danckert is less sure. He notes that people have always complained of boredom, and that there is little reliable data comparing levels of boredom today with those of fifty years ago. What does seem clear is that constant entertainment does not cure boredom; surveys suggest that heavy users of social media report feeling bored more often, not less.\n\nFor parents and teachers, the research offers some practical lessons. Children who are given time without planned activities may learn to invent their own games and to tolerate frustration. Several schools in Finland have experimented with short periods each week in which pupils choose freely what to do, and teachers report that pupils become better at organising themselves. However, the researchers stress that unstructured time is not the same as neglect: children still need adults who can suggest ideas when they get stuck.\n\nPerhaps the most important lesson is that boredom is a normal part of life. Rather than trying to eliminate it, we might do better to listen to what it is telling us.\n",
+            "questionSets": [
+              {
+                "title": "Questions 27-31",
+                "instruction": "Do the following statements agree with the claims of the writer in Reading Passage 3? Choose YES if the statement agrees with the claims of the writer, NO if it contradicts the claims of the writer, or NOT GIVEN if it is impossible to say what the writer thinks about this.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Boredom is generally thought of in a positive way.",
+                    "difficultyLevel": "EASY",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "YES",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NO",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 64
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Boredom can be compared to a physical need such as hunger.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "YES",
+                        "orderNo": 1,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NO",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 65
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Sandi Mann expected the copying task to reduce creativity.",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "YES",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NO",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 66
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Constant entertainment is an effective way to prevent boredom.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "YES",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NO",
+                        "orderNo": 2,
+                        "correct": true,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": false,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 67
+                  },
+                  {
+                    "questionType": "SINGLE_CHOICE",
+                    "content": "Finnish pupils perform better in exams after free periods.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [
+                      {
+                        "content": "YES",
+                        "orderNo": 1,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NO",
+                        "orderNo": 2,
+                        "correct": false,
+                        "explanation": null
+                      },
+                      {
+                        "content": "NOT GIVEN",
+                        "orderNo": 3,
+                        "correct": true,
+                        "explanation": null
+                      }
+                    ],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [],
+                    "orderNo": 68
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 1
+              },
+              {
+                "title": "Questions 32-36",
+                "instruction": "Look at the following statements and the list of people below. Match each statement with the correct person, A-C. You may use any letter more than once.",
+                "content": null,
+                "questions": [
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Boredom shows that our attention is being wasted.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "A"
+                    ],
+                    "orderNo": 69
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Dull activity beforehand led to more original ideas.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "B"
+                    ],
+                    "orderNo": 70
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Boredom may lead people to take risks.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "C"
+                    ],
+                    "orderNo": 71
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "There is not enough evidence that boredom has increased.",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "C"
+                    ],
+                    "orderNo": 72
+                  },
+                  {
+                    "questionType": "MATCHING",
+                    "content": "Boredom helps only if people respond with something meaningful.",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [],
+                    "matchingLabels": [
+                      "C"
+                    ],
+                    "orderNo": 73
+                  }
+                ],
+                "setOptions": [
+                  {
+                    "label": "A",
+                    "content": "Erin Westgate",
+                    "orderNo": 1
+                  },
+                  {
+                    "label": "B",
+                    "content": "Sandi Mann",
+                    "orderNo": 2
+                  },
+                  {
+                    "label": "C",
+                    "content": "James Danckert",
+                    "orderNo": 3
+                  }
+                ],
+                "orderNo": 2
+              },
+              {
+                "title": "Questions 37-40",
+                "instruction": "Complete the sentences below. Choose ONE WORD ONLY from the passage for each answer.",
+                "content": "In Mann's experiment, one group copied numbers from a telephone {{1}} before the task.\nSurveys suggest that heavy users of social media feel bored more {{2}}.\nChildren given free time may learn to invent games and tolerate {{3}}.\nResearchers warn that unstructured time should not become {{4}}.",
+                "questions": [
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Volunteers first copied numbers from a telephone",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "directory",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 74
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Heavy social media users report boredom more",
+                    "difficultyLevel": "HARD",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "often",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 75
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Children with free time may learn to tolerate",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "frustration",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 76
+                  },
+                  {
+                    "questionType": "TEXT_ENTRY",
+                    "content": "Unstructured time is not the same as",
+                    "difficultyLevel": "MEDIUM",
+                    "skillType": "READING",
+                    "maxRawScore": 1,
+                    "explanation": null,
+                    "options": [],
+                    "acceptedAnswers": [
+                      {
+                        "text": "neglect",
+                        "caseSensitive": false,
+                        "orderNo": 1
+                      }
+                    ],
+                    "matchingLabels": [],
+                    "orderNo": 77
+                  }
+                ],
+                "setOptions": [],
+                "orderNo": 3
+              }
+            ],
+            "orderNo": 3
+          }
+        ],
+        "orderNo": 2,
+        "maxRawScore": 40
+      }
+    ]
+  }
+}

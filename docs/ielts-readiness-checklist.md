@@ -1,0 +1,353 @@
+# Việc cần làm trước khi tạo dữ liệu đề IELTS
+
+**Cập nhật:** 2026-11-06 · **Đọc từ nhánh:** `testing` (`58308b3`)
+
+Dữ liệu IELTS nhập vào trước khi xong các mục dưới đây sẽ không lưu được, không chấm
+được, hoặc phải sinh lại. Thứ tự làm:
+
+1. Chốt quyết định (mục 0). Các quyết định này định hình từng câu hỏi sẽ viết.
+2. Migration DB (mục 1).
+3. Backend (mục 2) và BFF/FE (mục 3).
+4. Pipeline (mục 4).
+5. Chạy thử trọn vòng với **một** đề (mục 5), rồi mới sinh hàng loạt.
+
+---
+
+## 0. Quyết định phải chốt trước (Owner)
+
+Ghi từng quyết định vào [decisions.md](decisions.md).
+
+- [x] **D-IELTS-1. Nguồn nội dung.** Đã chốt: tự viết đề gốc, không cào. Xem
+  [decisions.md](decisions.md#d-ielts-1--tự-viết-đề-không-cào).
+- [x] **D-IELTS-2. Phạm vi.** Đã chốt: làm Academic trước. Xem
+  [decisions.md](decisions.md#d-ielts-2--làm-academic-trước).
+  - Đề mock chỉ gồm Listening và Reading. Writing và Speaking bị từ chối trong đề mock
+    (`ExamContentServiceImpl.java:189`, `ExamReviewServiceImpl.java:76`), nên đi qua
+    module `assessment`.
+- [x] **D-IELTS-3. Câu "Choose TWO/THREE letters".** Đã chốt: một câu N điểm, mỗi lựa
+  chọn đúng được 1 điểm. Hệ thống hiện chấm kiểu tất cả hoặc không
+  (`ExamAttemptServiceImpl.java:321`). DB thật chưa có câu `MULTIPLE_CHOICE` nào, nên đổi
+  thẳng cách chấm của loại này. Xem
+  [decisions.md](decisions.md#d-ielts-3--choose-twothree-letters-là-một-câu-nhiều-điểm).
+- [x] **D-IELTS-4. Quy tắc chấm câu điền từ.** Đã chốt: code chỉ bỏ phân biệt hoa thường
+  và khoảng trắng thừa; mọi biến thể khác người viết đề liệt kê thành nhiều đáp án. Xem
+  [decisions.md](decisions.md#d-ielts-4--chấm-câu-điền-từ-code-chỉ-chuẩn-hoá-tối-thiểu-biến-thể-nằm-ở-dữ-liệu).
+- [x] **D-IELTS-5. Ô trống và số câu.** Đã chốt: ô trống được đánh dấu `{{n}}` theo thứ
+  tự câu trong nhóm. Số câu hiển thị không lưu DB, mà BE tính rồi trả qua API. FE hiện
+  đánh số liên tục qua cả đề, nên Reading IELTS đang ra câu 41–80; phải sửa cùng lúc. Xem
+  [decisions.md](decisions.md#d-ielts-5--ô-trống-đánh-dấu-theo-thứ-tự-trong-nhóm-số-câu-do-be-tính).
+- [x] **D-IELTS-6. Band tổng.** Đã chốt: band tổng chỉ có từ full test 4 kỹ năng; band
+  tạm là band thấp hơn của L và R; band từng kỹ năng tính như IELTS.
+  Xem [decisions.md](decisions.md#d-ielts-6--band-tổng-chỉ-có-từ-full-test-4-kỹ-năng).
+- [x] **D-IELTS-10. Full test.** Đã chốt: full test là test đầu vào của người học IELTS,
+  đặt ở module `exam`, chỉ người học IELTS được làm, duyệt theo quy trình như đề, phải nộp
+  đủ các phần trong 7 ngày. Xem
+  [decisions.md](decisions.md#d-ielts-10--full-test-là-test-đầu-vào-của-người-học-ielts-đặt-ở-module-exam).
+- [x] **D-IELTS-7. Listening.** Đã chốt: chế độ FULL phát một lần, có 2 phút kiểm tra
+  cuối bài; chế độ PRACTICE tua thoải mái. Xem
+  [decisions.md](decisions.md#d-ielts-7--listening-full-phát-một-lần-practice-tua-thoải-mái).
+- [x] **D-IELTS-8. Speaking.** Đã chốt: mỗi part một lần ghi; Part 1 và Part 3 không quá
+  5 phút; FE đếm 60 giây chuẩn bị cho Part 2. Không phải đổi DB. Xem
+  [decisions.md](decisions.md#d-ielts-8--speaking-mỗi-part-một-lần-ghi).
+- [x] **D-IELTS-9. AI chấm Writing Task 1 Academic.** Đã chốt: số liệu biểu đồ ghi dạng
+  text trong `rubric_notes`, ảnh vẽ bằng code từ chính số liệu đó. Xem
+  [decisions.md](decisions.md#d-ielts-9--ai-chấm-writing-task-1-bằng-số-liệu-dạng-text).
+
+---
+
+## 1. Database
+
+Các bảng cho Listening và Reading **đã có sẵn**: V011, V014, V015, V017, V019, V020,
+V021. Theo [module-map.md](module-map.md), module `exam` sở hữu chúng. Chỉ có Java là
+chưa map. Những việc còn phải làm ở DB:
+
+- [x] **Nạp dữ liệu `score_conversions`** (bảng có từ V017 nhưng đang rỗng). Cần 3
+  bảng quy đổi:
+  - Listening, với `certificate_variant` để NULL vì Academic và GT dùng chung;
+  - Reading `ACADEMIC`;
+  - Reading `GENERAL`.
+
+  Đây là dữ liệu tham chiếu, cùng loại với `V079__level_check_weights.sql`, không phải
+  seed demo. Ghi nguồn của bảng quy đổi và ghi rõ đây là band **ước tính**.
+- [x] **(Nên làm) Sửa ràng buộc unique của `score_conversions`.** Hai cột
+  `certificate_variant` và `section_type` cho phép NULL, mà Postgres coi các NULL là
+  khác nhau, nên dòng trùng không bị chặn. DB chạy pg17, nên đổi được sang
+  `unique nulls not distinct (...)` ngay trong migration ở trên.
+- [x] **Writing Task 1 Academic (V084):** `assessment_tasks` chưa có cột ảnh.
+  - Thêm `image_object_key varchar(500)`.
+  - Thêm `certificate_variant` nếu cần tách Academic với GT. Task 1 bên GT là viết thư,
+    không có ảnh.
+  - Đã thêm cột ảnh. Không thêm `certificate_variant`: luật "Task 1 Academic phải có
+    biểu đồ" nằm ở full test, vì chính full test mới biết nó là Academic hay GT.
+- [x] **Full test (D-IELTS-10):** thêm 2 bảng (V082) trong `exam`, gồm định nghĩa full test và
+  lượt full test. Lượt full test cần cột `version`, và một ràng buộc để mỗi học viên chỉ
+  có một lượt đang mở cho mỗi full test. Lượt full test cũng phải lưu hạn nộp (lúc bắt
+  đầu cộng 7 ngày).
+- [x] **Roadmap (V083):** `roadmap_milestones` phải trỏ được tới full test và lượt full test.
+  Hiện bảng chỉ có `exam_id` và `result_exam_attempt_id`.
+
+**Những thứ không cần đổi DB:**
+
+- Loại câu hỏi mới: `questions.question_type varchar(20)` không có CHECK. Chỉ cần giữ
+  tên ≤ 20 ký tự.
+- Giới hạn số từ: để trong `questions.metadata jsonb`.
+- Bản nháp bài làm: `exam_attempt_drafts.answers` là jsonb.
+- Academic/GT của đề mock: `exams.certificate_variant` đã có, và
+  `Exam.java:316` đã kiểm tra cặp giá trị.
+
+**Đánh số migration:** số lớn nhất hiện tại là V080. Nhánh vừa phải đánh lại số
+(`58308b3`), nên kiểm tra lại số lớn nhất ngay trước khi đặt tên file.
+
+---
+
+## 2. Backend
+
+### 2.1 Loại câu hỏi và entity
+
+- [x] Thêm giá trị vào `exam/entity/QuestionType.java`, ví dụ `TEXT_ENTRY` và
+  `MATCHING`. True/False/Not Given và Yes/No/Not Given dùng `SINGLE_CHOICE` với 3 lựa
+  chọn cố định.
+  - Đã làm cả `TEXT_ENTRY` và `MATCHING`.
+- [x] Tạo entity và repository cho `question_accepted_answers`, `question_set_options`
+  và `question_matching_answers`.
+- [x] `AttemptAnswer`: map cột `text_answer`.
+- [x] `AttemptAnswerOption`: map `question_set_option_id`. Hiện entity chỉ có
+  `questionOptionId`, trong khi CHECK ở V021 yêu cầu đúng một trong hai cột có giá trị.
+- [ ] Map `questions.metadata` nếu giới hạn số từ để ở đó.
+
+### 2.2 Chấm điểm
+
+- [x] **Chuyển quy tắc chấm vào entity.** Hiện nó nằm trong service
+  (`ExamAttemptServiceImpl.java:316–331`) và chỉ so sánh tập option id.
+  - Quy tắc điền từ theo D-IELTS-4, quy tắc matching, và chấm từng phần theo D-IELTS-3.
+  - Viết entity test cho từng quy tắc, theo `CONTRIBUTING.md` mục *Tests*.
+  - Đã làm cho `SINGLE_CHOICE`, `MULTIPLE_CHOICE` (chấm từng phần) và `TEXT_ENTRY`, trong
+    `exam/helper/AnswerKey` kèm `AnswerKeyTest`. Đặt ở `helper/` chứ không ở một entity,
+    vì luật cần cả câu hỏi, các option và các đáp án được chấp nhận. `MATCHING` chấm như
+    chọn một đáp án, trên danh sách chung của nhóm câu.
+- [x] `ExamGradingQuery.GradingQuestion` hiện chỉ mang `options`. Thêm accepted answers
+  và đáp án matching.
+- [x] **Quy đổi band.**
+  - Tra `score_conversions` theo (IELTS, variant, section) rồi gán
+    `ExamAttempt.convertedScore`.
+  - Hiện không chỗ nào gán giá trị này, nên `RoadmapProgressionImpl.java:120` luôn bỏ
+    qua lần thi mock. **TOEIC cũng đang bị lỗi này.**
+  - Lưu band từng kỹ năng vào `attempt_section_results`. Bảng này chưa có entity.
+  - Đã làm: band từng section được ghi vào `attempt_section_results` (entity
+    `AttemptSectionResult`, helper `BandConversion`) và trả trong kết quả.
+    `ExamAttempt.convertedScore` vẫn để trống với đề L+R làm riêng, đúng D-IELTS-6: band
+    tổng chỉ có từ full test. Lỗi roadmap với TOEIC vẫn còn, vì TOEIC chưa có bảng quy
+    đổi.
+
+### 2.3 Xuất bản đề
+
+- [x] `QuestionRepository.findIncompleteQuestionOrderNos` (dòng 63) coi câu nào có
+  dưới 2 `question_options` là chưa hoàn chỉnh. Vì vậy **mọi câu điền từ và matching
+  đều chặn xuất bản**. Viết lại theo từng loại:
+  - `TEXT_ENTRY` cần ít nhất 1 accepted answer;
+  - `MATCHING` cần đúng 1 option của bộ lựa chọn chung.
+- [x] Sửa nội dung lỗi `EXAM_HAS_INCOMPLETE_QUESTION` (`Exam.java:269`) cho các loại
+  mới.
+- [x] `Exam.requireSittable` (`Exam.java:263`) bắt tổng điểm các section phải bằng
+  `exams.max_raw_score`. Vì vậy đề IELTS L+R khai **80** (40 + 40), không phải 9. Band
+  nằm ở `converted_score`.
+
+### 2.4 Soạn, sửa và copy nội dung
+
+- [x] `UpdateExamContentRequest` và `SaveAuthoringRequest`: thêm accepted answers, bộ
+  lựa chọn chung và đáp án matching.
+  - Đã làm. Nhóm câu có `setOptions` (nhãn, nội dung); câu matching ghi `matchingLabels`
+    theo nhãn, vì id được tạo lại mỗi lần lưu.
+- [x] `ExamContentServiceImpl.deleteContent` (dòng 130–135) xoá rồi lưu lại toàn bộ nội
+  dung đề. Mọi khoá ngoại đều là `on delete restrict`, nên phải xoá
+  `question_matching_answers`, `question_accepted_answers` và `question_set_options`
+  **trước** khi xoá câu hỏi và nhóm câu.
+- [x] `QuestionBankServiceImpl`: khi copy nhóm câu từ ngân hàng, phải copy cả 3 bảng
+  mới.
+  - `QuestionBankServiceImpl` chỉ tìm kiếm; bản copy là thứ client gửi lên khi lưu đề. Vì
+    vậy kết quả tìm kiếm giờ trả đủ cái trả lời câu: đáp án điền từ, nhãn đáp án câu ghép
+    và cả danh sách chung của nhóm câu ghép, để bản copy không mất đáp án.
+
+### 2.5 Làm bài, xem kết quả, tutor
+
+- [x] `SubmitExamAttemptRequest` và `SaveExamDraftRequest` chỉ có `selectedOptionIds`.
+  Thêm câu trả lời dạng chữ, và cho `validateSubmission` kiểm tra kiểu câu trả lời khớp
+  với loại câu.
+- [x] Tính số câu hiển thị ở một chỗ (D-IELTS-5), rồi trả nó trong đề cho học viên,
+  màn kết quả và ngữ cảnh tutor.
+- [x] Đề trả cho học viên (`LearnerExamPaperProjection`, `LearnerExamPaperQuery`):
+  - trả bộ lựa chọn chung cho câu matching;
+  - **không bao giờ** trả accepted answers;
+  - không gửi transcript trong lúc làm bài (giống TOEIC: transcript nằm ở
+    `question_sets.metadata`).
+- [x] Màn kết quả (`ExamAttemptServiceImpl.java:537`) hiện chỉ trả `correctOptionIds`.
+  Thêm đáp án dạng chữ.
+- [x] `SubmittedExamContextReaderImpl` (ngữ cảnh cho tutor) hiện chỉ đọc option. Thêm
+  câu trả lời dạng chữ.
+
+### 2.6 Writing và Speaking (module `assessment`)
+
+- [x] `AssessmentTask` đã hỗ trợ `TASK_1`/`TASK_2`, `PART_1`/`PART_2`/`PART_3` và
+  `certificateType = IELTS`. Còn phải:
+  - map cột ảnh cho Task 1 Academic (sau migration ở mục 1);
+  - xử lý D-IELTS-9 trong `AssessmentRubric`.
+  - Đã làm: admin tải ảnh qua `POST /api/admin/assessments/tasks/{id}/image` (PNG/JPEG,
+    kiểm tra theo nội dung file) và xoá qua `DELETE`. Chỉ Writing Task 1 còn sửa được
+    mới gắn được ảnh. Link ảnh được ký mới mỗi lần trả task, snapshot chỉ giữ key. Prompt
+    chấm Writing dặn AI đối chiếu bài Task 1 với số liệu trong `rubricNotes`.
+
+### 2.7 Full test (D-IELTS-10, module `exam`)
+
+- [x] Entity lượt full test giữ các luật sau, mỗi luật có entity test riêng:
+  - chỉ gắn được lượt làm bài đúng task và của đúng học viên;
+  - có band tạm khi đã có band L và R;
+  - chỉ có band tổng khi đủ 4 kỹ năng;
+  - các phần phải nộp trong 7 ngày kể từ lúc bắt đầu; bài nộp trước hạn vẫn được tính
+    khi chấm xong sau hạn.
+  - Đã làm trong `FullTest` và `FullTestSitting`, kèm `FullTestTest` và
+    `FullTestSittingTest`. Một bài đã gắn vào lượt thì không bao giờ bị thay.
+- [x] Chỉ người học có mục tiêu IELTS được bắt đầu full test. Kiểm tra qua
+  `user.api.LearnerGoalReader`.
+- [x] Tạo và duyệt full test theo cùng quy trình như đề. Luật trong entity: chỉ xuất bản
+  được khi đề L+R và cả 5 task đều đã xuất bản và đúng loại IELTS.
+- [x] Nghe `assessment.api.AssessmentAnswerGraded` và cập nhật lượt full test trong lúc
+  giữ khoá, vì hai bài có thể được chấm cùng lúc. Sự kiện không bền, nên việc đọc lượt
+  full test và một job định kỳ phải tự bắt kịp, giống level check. Job này cũng đóng
+  các lượt đã quá hạn 7 ngày.
+- [x] `assessment.api`: thêm reader trả band của một bài Writing.
+- [x] `user.api.PlacementRecorder`: thêm hàm ghi band IELTS vào
+  `learner_profiles.current_score`, kèm CEFR lấy từ `score_conversions.cefr_level`. Ghi
+  band tạm trước, band chính thức sau, không bắt làm lại onboarding.
+  - Đã làm (`recordIeltsBand`). CEFR lấy theo mốc Cambridge trong `helper.IeltsBand`,
+    không lấy từ `score_conversions.cefr_level`: cột đó gắn với điểm thô của một section,
+    còn ở đây là band tổng.
+- [x] `exam.api`: phát sự kiện khi một lượt full test có band chính thức. Roadmap nghe
+  sự kiện này để tính mốc thi thử IELTS.
+  - Đã làm: roadmap IELTS chỉ chọn full test làm mốc thi thử, nghe
+    `FullTestCompleted`, đọc band qua `exam.api.CompletedFullTestReader`, và job định kỳ
+    của roadmap cũng bắt kịp. Mốc TOEIC vẫn dùng đề như cũ.
+
+### 2.8 Tài liệu
+
+- [x] Cập nhật [module-map.md](module-map.md) khi các bảng trên bắt đầu có entity.
+- [x] Ghi các quyết định D-IELTS-* vào [decisions.md](decisions.md).
+
+---
+
+## 3. BFF và FE (repo `Englow3_FE`, nhánh `testing`)
+
+- [x] `apps/bff/src/modules/exam/exam.typeDefs.ts`: thêm field mới, rồi sinh lại
+  `apps/bff/src/generated/backend-openapi.ts` và `graphql.ts`.
+- [x] `apps/web/src/features/exam/components/blocks/QuestionCard`: hiện chỉ render radio
+  và checkbox. Thêm:
+  - ô nhập chữ;
+  - dropdown cho câu matching;
+  - ô trống nằm ngay trong đoạn văn hoặc bảng, theo quy ước D-IELTS-5.
+- [x] `ExamSittingView`, `hooks/useExamAutosave.ts` và `graphql/exam-attempt.graphql`:
+  gửi và lưu nháp câu trả lời dạng chữ.
+- [x] Bỏ việc tự đếm số câu trong `ExamSittingView` và `QuestionCard`; dùng `numberFrom`
+  và `numberTo` từ API (D-IELTS-5).
+- [x] `ExamResultView`: hiện đáp án dạng chữ.
+- [x] `features/content/components/blocks/ExamTreeEditor.tsx` và
+  `features/content/api/authoringValidation.ts`: admin phải **soạn và duyệt** được loại
+  câu mới.
+  - **Không nạp đề IELTS vào môi trường mà editor chưa hỗ trợ loại câu mới.** Nếu admin
+    mở đề rồi lưu lại, thao tác sẽ lỗi khoá ngoại hoặc làm mất đáp án.
+- [x] Writing Task 1: hiển thị ảnh biểu đồ.
+- [x] Màn full test: bắt đầu, tiến độ 4 kỹ năng, band tạm và band chính thức.
+- [x] Màn admin tạo, gửi duyệt và duyệt full test.
+- [x] Onboarding của người học IELTS: làm full test ở bước trình độ, rồi đi tiếp với
+  band tạm.
+
+---
+
+## 4. Data pipeline
+
+Đã làm: luồng AI viết cả bộ full test (`data_pipeline/generators/generate_ielts_set.py`, gói
+`data_pipeline/ielts/`). Một lần chạy: lên chủ đề mới → AI viết 4 part Listening, 3 bài Reading, Writing
+Task 1/2 và Speaking → kiểm tra từng phần, gửi lỗi lại cho AI viết lại (tối đa `--attempts`) → dựng đề
+đúng khuôn editor → vẽ biểu đồ Task 1 → thu audio (`--record`) → nạp dạng nháp bằng
+`scripts/load_ielts_trial.py --set-dir`. Model: bất kỳ nhà cung cấp chuẩn OpenAI (`IELTS_LLM_BASE_URL`,
+`IELTS_LLM_API_KEY`, `IELTS_LLM_MODEL`).
+
+- [x] Viết đề gốc theo D-IELTS-1: AI viết nội dung mới, prompt cấm chép đề đã xuất bản; admin vẫn duyệt
+  từng đề trước khi phát hành.
+- [x] **Schema IELTS riêng** (`ielts/rules.py`): Listening 4 part × 10 điểm, Reading 13/13/14 điểm,
+  các dạng câu gap / single / multi (chọn hai) / matching / TFNG / YNNG, giới hạn số từ.
+- [x] **Validator** (`ielts/rules.py`):
+  - đủ điểm từng part và cả đề;
+  - đáp án điền từ có nguyên văn trong bài đọc hoặc transcript và trong giới hạn số từ;
+  - `{{n}}` khớp số câu và đúng thứ tự;
+  - TFNG/YNNG dùng đủ cả ba đáp án;
+  - danh sách ghép dài hơn số câu;
+  - đề có đủ mọi dạng câu.
+  Còn thiếu: kiểm tra câu hỏi xếp theo thứ tự thông tin xuất hiện trong bài.
+- [ ] **Tiêu chuẩn chất lượng IELTS** dạng văn bản, tương đương [exam-quality-bar.md](exam-quality-bar.md).
+- [x] **Chống trùng chủ đề** (`seeds/ielts/topics.json`, `ielts/topics.py`): chủ đề gần giống chủ đề đã dùng
+  bị trả về ở bước lên kế hoạch; chủ đề chỉ được ghi khi cả bộ đạt.
+  Còn thiếu: so trùng nội dung bài đọc giữa các bộ.
+- [x] **Loader**: đi qua API admin (`load_ielts_trial.py --set-dir`) thay vì SQL trực tiếp, để mọi đề qua
+  đúng kiểm tra của backend và vào hàng chờ duyệt. Đổi lại, chạy lại sẽ tạo bản sao.
+- [x] **Audio** (`synthesize_ielts_trial_audio.py --set-dir`): mỗi người nói một giọng theo giọng vùng và giới
+  tính AI chọn, mỗi part một file.
+- [x] **Biểu đồ Writing Task 1** (`ielts/chart.py`) vẽ từ số liệu; số liệu ghi trong `rubric_notes`
+  (D-IELTS-9).
+- [ ] **Ảnh** cho câu gắn nhãn bản đồ/sơ đồ: chưa sinh; pipeline chưa ra dạng câu này.
+- [x] Kiểm tra: `tests/test_ielts_generation.py` chạy cả luồng với model giả (viết lại khi sai, loại khi
+  sai mãi, chủ đề lặp). `IeltsTrialPaperIntegrationTest.anAiWrittenSetLoadsPassesReviewAndCanBeSat` nạp
+  một bộ do pipeline dựng (`src/test/resources/ielts/ai-sample-set`) qua duyệt, full test và bài làm 40/40.
+
+---
+
+## 5. Chạy thử với một đề trước khi sinh hàng loạt
+
+- [x] Viết tay 1 đề Listening và 1 đề Reading, phủ đủ mọi loại câu ở bảng tham chiếu
+  bên dưới: `src/test/resources/ielts/academic-trial-paper-1.json` (77 câu, 80 điểm), transcript
+  Listening, 5 đề Writing/Speaking và biểu đồ Task 1. Nạp vào hệ thống thật bằng
+  `scripts/load_ielts_trial.py`. Bài đọc ngắn hơn đề thật (~450 từ mỗi bài) và chưa có audio.
+- [x] Nạp đề bằng loader. Admin mở editor, lưu lại, gửi duyệt, duyệt rồi xuất bản. Đề
+  phải đi qua cả vòng này mà không mất dữ liệu. (`IeltsTrialPaperIntegrationTest`, cùng
+  JSON editor gửi.)
+- [ ] Học viên làm bài ở cả chế độ FULL và PRACTICE, lưu nháp rồi nộp. Kiểm tra: điểm
+  thô, band từng kỹ năng, band tổng, màn kết quả, ngữ cảnh tutor.
+  - Đã chạy: FULL, lưu nháp, nộp, điểm thô từng kỹ năng, band L/R, nửa điểm câu chọn hai,
+    đáp án gõ và đáp án được chấp nhận ở màn kết quả.
+  - Chưa chạy: chế độ PRACTICE và ngữ cảnh tutor với đề này.
+- [x] Roadmap: milestone `CERTIFICATE_MOCK` phải ghi nhận được lần thi.
+  (`IeltsFullTestIntegrationTest`.)
+- [x] Full test: một học viên IELTS mới đăng ký làm trọn full test từ onboarding. Band
+  tạm hiện ngay sau phần L+R, và band chính thức thay vào khi Writing/Speaking chấm xong.
+- [x] Bỏ dở full test quá 7 ngày: lượt đóng lại, band tạm giữ nguyên, và học viên bắt đầu
+  được lượt mới. (`FullTestSittingTest`; thêm hạn chấm 7 ngày sau hạn nộp.)
+- [ ] Chạy các lệnh kiểm tra trong `CONTRIBUTING.md` mục *Verification*:
+  - `mvn formatter:validate`
+  - `mvn --batch-mode clean verify`
+  - `python -m pytest -q` trong `data_pipeline`
+
+---
+
+## Tham chiếu: cấu trúc đề IELTS
+
+| Kỹ năng | Cấu trúc | Số câu | Thời gian |
+|---|---|---:|---|
+| Listening (chung Academic và GT) | Part 1: hội thoại đời thường · Part 2: độc thoại đời thường · Part 3: hội thoại học thuật, tối đa 4 người · Part 4: bài giảng | 40 | ~30 phút |
+| Reading Academic | 3 bài dài, tổng 2 150–2 750 từ | 40 | 60 phút |
+| Reading GT | Section 1: 2–3 văn bản ngắn · Section 2: 2 văn bản về công việc · Section 3: 1 bài dài | 40 | 60 phút |
+| Writing | Task 1: ≥150 từ (Academic tả biểu đồ, GT viết thư) · Task 2: ≥250 từ | 2 bài | 60 phút |
+| Speaking | Part 1: 4–5 phút · Part 2: 1 phút chuẩn bị + 1–2 phút nói · Part 3: 4–5 phút | 3 part | 11–14 phút |
+
+Mỗi câu Listening và Reading được 1 điểm.
+
+## Tham chiếu: dạng câu IELTS và kiểu tương ứng trong hệ thống
+
+| Dạng câu IELTS | Kiểu trong hệ thống | Hiện chạy được? |
+|---|---|---|
+| Multiple choice, 1 đáp án | `SINGLE_CHOICE` | Có |
+| Choose TWO/THREE letters | `MULTIPLE_CHOICE`, hoặc tách câu (D-IELTS-3) | Một phần: đang chấm kiểu tất cả hoặc không |
+| True/False/Not Given, Yes/No/Not Given | `SINGLE_CHOICE`, 3 lựa chọn | Có |
+| Matching headings, information, features, sentence endings | `MATCHING` + `question_set_options` | Chưa |
+| Gắn nhãn bản đồ/sơ đồ bằng chữ cái | `MATCHING` + ảnh ở `question_sets` | Chưa |
+| Summary completion chọn từ trong hộp | `MATCHING` | Chưa |
+| Form, note, table, flow-chart, sentence, summary completion (tự điền) | `TEXT_ENTRY` + `question_accepted_answers` | Chưa |
+| Short-answer questions | `TEXT_ENTRY` | Chưa |
+| Điền nhãn sơ đồ (tự điền) | `TEXT_ENTRY` + ảnh | Chưa |

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,11 +14,13 @@ class Settings(BaseSettings):
     )
 
     environment: str = Field(default="development", pattern="^(development|test|production)$")
+    release_sha: str = "unknown"
     internal_api_key: SecretStr = SecretStr("")
 
     llm_enabled: bool = False
     llm_base_url: AnyHttpUrl = AnyHttpUrl("https://api.groq.com/openai/v1")
     llm_api_key: SecretStr = SecretStr("")
+    llm_reasoning_effort: Literal["low", "medium", "high"] = "medium"
 
     embedding_enabled: bool = False
     embedding_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
@@ -26,11 +29,33 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=1_024, ge=64, le=4_096)
 
     speech_enabled: bool = False
+    # "azure" scores pronunciation per phoneme. "whisper" transcribes through an
+    # OpenAI-compatible endpoint (Groq by default, reusing the LLM key) and
+    # estimates pronunciation and fluency - see providers/whisper.py.
+    speech_provider: str = Field(default="azure", pattern="^(azure|whisper)$")
+    whisper_base_url: AnyHttpUrl | None = None
+    whisper_api_key: SecretStr = SecretStr("")
+    whisper_model: str = "whisper-large-v3-turbo"
     azure_speech_base_url: AnyHttpUrl = AnyHttpUrl("https://example.cognitiveservices.azure.com")
     azure_speech_api_key: SecretStr = SecretStr("")
 
+    # Writing IELTS sets for the backend's generation module: its own provider, key and model,
+    # so a stronger (or cheaper) model can write content without touching grading or the tutor.
+    generation_enabled: bool = False
+    generation_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
+    generation_api_key: SecretStr = SecretStr("")
+    generation_model: str = ""
+    # Sent as reasoning_effort when set; empty leaves the model's own default. Which values a
+    # model accepts is the provider's (OpenAI's GPT-6.1 take low to max). Higher is slower:
+    # keep each step under generation_timeout_seconds.
+    generation_reasoning_effort: str | None = Field(
+        default=None, pattern="^(none|minimal|low|medium|high|xhigh|max)?$"
+    )
+    generation_timeout_seconds: float = Field(default=110.0, gt=0, le=300)
+
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     read_timeout_seconds: float = Field(default=45.0, gt=0, le=300)
+    speech_timeout_seconds: float = Field(default=60.0, gt=0, le=180)
     max_audio_bytes: int = Field(default=10_485_760, ge=1, le=52_428_800)
 
 

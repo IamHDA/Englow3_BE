@@ -1,7 +1,8 @@
 # data_pipeline
 
 Data pipeline cho hệ thống học tiếng Anh A1–C1 + luyện thi định dạng TOEIC.
-Nguồn chân lý: [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
+Đặc tả gốc: [`AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md`](AGENT_WORK_ORDER_ENGLISH_DATA_PIPELINE.md).
+Các quyết định hiện hành được ghi tại [`decisions.md`](decisions.md).
 Mã nguồn nằm ở [`data_pipeline/`](../data_pipeline/) ở gốc repo.
 
 ## Cấu trúc
@@ -53,6 +54,15 @@ make test                          # pytest
 ## Trạng thái
 
 Xem [TODO.md](TODO.md) — checklist từng phase và danh sách blocker đang chờ quyết.
+
+## Biên runtime backend
+
+Pipeline không ghi thẳng vào database. Flashcard batch đi qua
+`flashcard.helper.FlashcardImport` và `flashcard.service.AdminFlashcardService`;
+shadowing batch đi qua `dictation.helper.DictationImport` và
+`dictation.service.AdminDictationService`. CLI import nhiều loại nội dung nằm ở
+`tooling.pipeline.PipelineImportRunner`, chỉ điều phối các service contract và luôn
+tạo draft để review.
 
 ## Ràng buộc bất di bất dịch
 

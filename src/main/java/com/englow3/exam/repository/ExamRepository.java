@@ -3,6 +3,7 @@ package com.englow3.exam.repository;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -11,9 +12,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.englow3.exam.entity.CertificateType;
+import com.englow3.exam.entity.CertificateVariant;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
+import com.englow3.exam.entity.SectionType;
+import com.englow3.exam.entity.TargetLevel;
 
 public interface ExamRepository extends JpaRepository<Exam, UUID> {
 
@@ -35,6 +40,49 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     Page<Exam> search(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
             @Param("title") String title, Pageable pageable);
 
+    @Query("""
+            select e from Exam e
+            where (:status is null or e.status = :status)
+              and (:examType is null or e.examType = :examType)
+              and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
+              and (:certificateType is null or e.certificateType = :certificateType)
+              and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
+              and (:targetLevel is null or e.targetLevel = :targetLevel)
+              and (:title is null or lower(e.title) like lower(concat('%', cast(:title as String), '%')))
+            """)
+    Page<Exam> searchCatalogue(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
+            @Param("certificateType") CertificateType certificateType,
+            @Param("certificateVariant") CertificateVariant certificateVariant,
+            @Param("targetLevel") TargetLevel targetLevel, @Param("title") String title, Pageable pageable);
+
+    /**
+     * The catalogue ordered by the learner's own best score on each paper, highest first, papers they have not sat
+     * last, then by title the way a person counts. The order is in the query rather than in a {@code Sort}: it depends
+     * on who is asking, which a sort on a column cannot say. The page is read unsorted for the same reason.
+     */
+    @Query("""
+            select e from Exam e
+            where (:status is null or e.status = :status)
+              and (:examType is null or e.examType = :examType)
+              and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
+              and (:certificateType is null or e.certificateType = :certificateType)
+              and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
+              and (:targetLevel is null or e.targetLevel = :targetLevel)
+              and (:title is null or lower(e.title) like lower(concat('%', cast(:title as String), '%')))
+            order by (select max(a.scorePercentage) from ExamAttempt a
+                       where a.examId = e.id and a.userId = :userId
+                         and a.status = com.englow3.exam.entity.ExamAttemptStatus.SCORED
+                         and a.mode = com.englow3.exam.entity.ExamAttemptMode.FULL) desc nulls last,
+                     function('regexp_replace', e.title, '[0-9]+$', '') asc,
+                     cast(nullif(function('regexp_replace', e.title, '^.*[^0-9]', ''), '') as long) asc,
+                     e.id asc
+            """)
+    Page<Exam> searchCatalogueByBestScore(@Param("status") ExamStatus status, @Param("examType") ExamType examType,
+            @Param("certificateType") CertificateType certificateType,
+            @Param("certificateVariant") CertificateVariant certificateVariant,
+            @Param("targetLevel") TargetLevel targetLevel, @Param("title") String title, @Param("userId") UUID userId,
+            Pageable pageable);
+
     /**
      * The three figures {@code Exam.publish(...)} weighs, as three plain scalars. They were one projection record and
      * one round trip until the record turned out to be the only reason a persistence type crossed into the service, and
@@ -45,9 +93,17 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     long countSections(@Param("examId") UUID examId);
 
     /**
-     * A four-level descent, joined by id rather than by association because the content entities hold plain UUID keys.
-     * Every table is exam-owned, so no cross-module read exception is needed.
+     * Sections a mock exam cannot score: Writing and Speaking need an essay or a recording and a rubric, which live in
+     * the assessment module. A paper holding one would show them as multiple choice.
      */
+    @Query("""
+            select count(s) from ExamSection s
+             where s.examId = :examId
+               and s.sectionType in (SectionType.WRITING,
+                                     SectionType.SPEAKING)
+            """)
+    long countProductiveSections(@Param("examId") UUID examId);
+
     @Query("""
             select count(q) from Question q, QuestionSet qs, SectionPart sp, ExamSection s
              where q.questionSetId = qs.id and qs.sectionPartId = sp.id
@@ -55,11 +111,49 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             """)
     long countQuestions(@Param("examId") UUID examId);
 
+    /** What the paper's questions are worth in all - the real maximum of a full attempt. */
+    @Query("""
+            select coalesce(sum(q.maxRawScore), 0) from Question q, QuestionSet qs, SectionPart sp, ExamSection s
+             where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+               and sp.examSectionId = s.id and s.examId = :examId
+            """)
+    BigDecimal sumQuestionScores(@Param("examId") UUID examId);
+
     /**
-     * Its own query rather than a column of a join: joining sections to questions multiplies the section rows, so the
-     * sum comes back too large - and {@code sum(distinct ...)} is no fix either, since it would collapse a TOEIC
-     * paper's LISTENING 100 and READING 100 into 100. {@code coalesce} because a paper with no section sums to null.
+     * Batched count across all exams in a page to eliminate N+1 roundtrips.
      */
+    @Query("""
+            select s.examId, count(q)
+              from Question q, QuestionSet qs, SectionPart sp, ExamSection s
+             where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+               and sp.examSectionId = s.id and s.examId in :examIds
+             group by s.examId
+            """)
+    List<Object[]> countQuestionsForExams(@Param("examIds") Collection<UUID> examIds);
+
+    /**
+     * The placement paper to hand a learner who does not know their level. Ordered by publication so the newest
+     * published one wins, and {@code Optional} because a deployment with no placement paper is a normal state, not a
+     * broken one.
+     */
+    Optional<Exam> findFirstByExamTypeAndStatusOrderByPublishedAtDesc(ExamType examType, ExamStatus status);
+
+    /**
+     * Sections whose questions do not add up to the points the section declares, by order number. Scoring awards each
+     * question its own points, so a section that declares more than its questions carry can never be earned in full,
+     * and one that declares less lets the learner score above the paper's maximum.
+     */
+    @Query("""
+            select s.orderNo from ExamSection s
+             where s.examId = :examId
+               and s.maxRawScore <> (select coalesce(sum(q.maxRawScore), 0)
+                                       from Question q, QuestionSet qs, SectionPart sp
+                                      where q.questionSetId = qs.id and qs.sectionPartId = sp.id
+                                        and sp.examSectionId = s.id)
+             order by s.orderNo
+            """)
+    List<Integer> findSectionOrderNosOffTheirScale(@Param("examId") UUID examId);
+
     @Query("select coalesce(sum(s.maxRawScore), 0) from ExamSection s where s.examId = :examId")
     BigDecimal sumSectionScores(@Param("examId") UUID examId);
 }

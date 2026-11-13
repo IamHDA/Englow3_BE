@@ -388,7 +388,7 @@ def main() -> int:
     import collections
     pos = collections.Counter(
         next(o.label for o in g.questions[0].options if o.is_correct) for g in groups)
-    print(f"\n  Vị trí đáp án đúng: " +
+    print("\n  Vị trí đáp án đúng: " +
           "  ".join(f"{k}={pos[k]} ({pos[k]/len(groups)*100:.0f}%)" for k in LABELS))
 
     # Thiên lệch B-2: đáp án đúng có phải lựa chọn dài nhất không

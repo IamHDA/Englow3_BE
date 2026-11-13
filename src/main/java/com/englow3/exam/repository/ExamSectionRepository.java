@@ -24,4 +24,8 @@ public interface ExamSectionRepository extends JpaRepository<ExamSection, UUID> 
     @Modifying
     @Query("delete from ExamSection s where s.examId = :examId")
     void deleteAllForExam(@Param("examId") UUID examId);
+
+    @org.springframework.data.jpa.repository.Query("select distinct s.sectionType from ExamSection s where s.examId = :examId")
+    java.util.List<com.englow3.exam.entity.SectionType> findSectionTypes(
+            @org.springframework.data.repository.query.Param("examId") UUID examId);
 }

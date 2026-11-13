@@ -1,6 +1,7 @@
 package com.englow3.config;
 
 import java.net.URI;
+import java.time.Duration;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +26,9 @@ public class StorageConfig {
     @Bean
     S3Client s3Client(S3Properties properties) {
         StaticCredentialsProvider credentials = credentials(properties);
-        var builder = S3Client.builder().region(Region.of(properties.region())).credentialsProvider(credentials);
+        var builder = S3Client.builder().region(Region.of(properties.region())).credentialsProvider(credentials)
+                .overrideConfiguration(config -> config.apiCallTimeout(Duration.ofSeconds(15))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(10)));
         if (StringUtils.hasText(properties.endpoint())) {
             builder.endpointOverride(URI.create(properties.endpoint()))
                     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());

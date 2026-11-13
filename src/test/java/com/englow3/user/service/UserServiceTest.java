@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import com.englow3.user.dto.result.UserInformationResult;
 import com.englow3.user.entity.Gender;
 import com.englow3.user.entity.User;
 import com.englow3.user.repository.UserRepository;
+import com.englow3.user.service.impl.UserServiceImpl;
 
 class UserServiceTest {
     private static final String BUCKET = "images";
@@ -41,7 +43,7 @@ class UserServiceTest {
 
     private final ObjectStorageClient objectStorageClient = mock(ObjectStorageClient.class);
 
-    private final UserService service = new UserService(userRepo, currentUser, objectStorageClient, BUCKET);
+    private final UserService service = new UserServiceImpl(userRepo, currentUser, objectStorageClient, BUCKET);
 
     private final UUID userId = UUID.randomUUID();
 
@@ -56,13 +58,23 @@ class UserServiceTest {
         when(userRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    /** An image whose first bytes are those of the format it declares. */
     private MultipartFile mockImage(String contentType) {
+        byte[] header = switch (contentType) {
+            case "image/png" -> new byte[] { (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13 };
+            case "image/jpeg" -> new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16 };
+            default -> new byte[] { 1, 2, 3 };
+        };
+        return mockImage(contentType, header);
+    }
+
+    private MultipartFile mockImage(String contentType, byte[] content) {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getContentType()).thenReturn(contentType);
         when(file.getSize()).thenReturn(1024L);
         try {
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[] { 1, 2, 3 }));
+            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(content));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -96,13 +108,42 @@ class UserServiceTest {
         }
 
         @Test
-        void storesAnAvatarUnderAServerGeneratedKeyInTheDefaultBucket() {
-            service.changeAvatar(mockImage("image/png"));
+        void wearsAPresetPictureWithoutUploadingAnything() {
+            service.choosePresetAvatar("fox");
 
-            ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
-            verify(objectStorageClient).upload(eq(BUCKET), key.capture(), any(), anyLong(), eq("image/png"));
-            assertThat(key.getValue()).startsWith("users/" + userId + "/avatar/").endsWith(".png");
-            verify(user).changeAvatar(key.getValue());
+            verify(user).changeAvatar("preset:fox");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+        }
+
+        /** A picture uploaded before presets existed is a file in the bucket; switching away removes it. */
+        @Test
+        void deletesAnUploadedPictureItReplaces() {
+            when(user.getAvatarObjectKey()).thenReturn("users/old/avatar/previous.png");
+
+            service.choosePresetAvatar("owl");
+
+            verify(objectStorageClient).delete(BUCKET, "users/old/avatar/previous.png");
+        }
+
+        @Test
+        void leavesTheBucketAloneWhenSwitchingBetweenPresets() {
+            when(user.getAvatarObjectKey()).thenReturn("preset:fox");
+
+            service.choosePresetAvatar("owl");
+
+            verify(objectStorageClient, never()).delete(anyString(), anyString());
+        }
+
+        /** The change has happened by then; a stray file is no reason to report it as failed. */
+        @Test
+        void keepsTheChangeWhenTheOldPictureCannotBeDeleted() {
+            when(user.getAvatarObjectKey()).thenReturn("users/old/avatar/previous.png");
+            org.mockito.Mockito.doThrow(new RuntimeException("store down")).when(objectStorageClient)
+                    .delete(anyString(), anyString());
+
+            service.choosePresetAvatar("cat");
+
+            verify(user).changeAvatar("preset:cat");
         }
 
         @Test
@@ -128,11 +169,41 @@ class UserServiceTest {
                     .extracting(e -> ((NotFoundException) e).getCode()).isEqualTo("USER_NOT_FOUND");
         }
 
+        /** Nothing a user sends becomes their face: only an id from the list is accepted. */
+        @Test
+        void refusesAPresetThatDoesNotExist() {
+            assertThatThrownBy(() -> service.choosePresetAvatar("../../etc/passwd"))
+                    .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
+                    .isEqualTo("AVATAR_PRESET_UNKNOWN");
+            verify(user, never()).changeAvatar(anyString());
+        }
+
         @Test
         void refusesAContentTypeThatIsNotAnAllowedImage() {
-            assertThatThrownBy(() -> service.changeAvatar(mockImage("image/svg+xml")))
+            assertThatThrownBy(() -> service.changeBanner(mockImage("image/svg+xml")))
                     .isInstanceOf(BadRequestException.class).extracting(e -> ((BadRequestException) e).getCode())
                     .isEqualTo("IMAGE_TYPE_NOT_SUPPORTED");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+        }
+
+        /** The bucket is public: a page or script labelled image/png would be published as one. */
+        @Test
+        void refusesAFileThatIsNotTheImageItClaimsToBe() {
+            MultipartFile page = mockImage("image/png", "<html><script>".getBytes(StandardCharsets.US_ASCII));
+
+            assertThatThrownBy(() -> service.changeBanner(page)).isInstanceOf(BadRequestException.class)
+                    .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_CONTENT_MISMATCH");
+            verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
+            verify(user, never()).changeBanner(anyString());
+        }
+
+        @Test
+        void refusesAnImageOverFiveMegabytes() {
+            MultipartFile huge = mockImage("image/png");
+            when(huge.getSize()).thenReturn(6L * 1024 * 1024);
+
+            assertThatThrownBy(() -> service.changeBanner(huge)).isInstanceOf(BadRequestException.class)
+                    .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_TOO_LARGE");
             verify(objectStorageClient, never()).upload(anyString(), anyString(), any(), anyLong(), anyString());
         }
 
@@ -141,7 +212,7 @@ class UserServiceTest {
             MultipartFile empty = mock(MultipartFile.class);
             when(empty.isEmpty()).thenReturn(true);
 
-            assertThatThrownBy(() -> service.changeAvatar(empty)).isInstanceOf(BadRequestException.class)
+            assertThatThrownBy(() -> service.changeBanner(empty)).isInstanceOf(BadRequestException.class)
                     .extracting(e -> ((BadRequestException) e).getCode()).isEqualTo("IMAGE_REQUIRED");
         }
 

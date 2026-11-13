@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.Question;
+import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SkillType;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
@@ -44,11 +45,15 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
     void deleteAllForExam(@Param("examId") UUID examId);
 
     /**
-     * The {@code order_no} of every question under a paper that {@code Exam.publish(...)} would refuse: no option, no
-     * correct option, or - only for SINGLE_CHOICE, where MULTIPLE_CHOICE is allowed more than one - more than one
-     * correct option. Three correlated subqueries per row rather than one join, because joining brings the option rows
-     * in as a multiplier, which is exactly the fan-out bug {@code ExamRepository.sumSectionScores} already exists to
-     * avoid one level up. Publishing is a rare admin action, so the extra subqueries are the cheap side of that trade.
+     * The {@code order_no} of every question under a paper that {@code Exam.publish(...)} would refuse: fewer than two
+     * options (one option, and it correct, is a question that answers itself), no correct option, or - only for
+     * SINGLE_CHOICE, where MULTIPLE_CHOICE is allowed more than one - more than one correct option. A MULTIPLE_CHOICE
+     * question whose every option is correct is refused too: with "choose N" grading, ticking N boxes could not miss. A
+     * MATCHING question needs exactly one entry of its set's list as its answer. A TEXT_ENTRY question needs at least
+     * one accepted answer instead (options on one are refused when saving). Correlated subqueries per row rather than
+     * one join, because joining brings the option rows in as a multiplier, which is exactly the fan-out bug
+     * {@code ExamRepository.sumSectionScores} already exists to avoid one level up. Publishing is a rare admin action,
+     * so the extra subqueries are the cheap side of that trade.
      */
     @Query("""
             select q.orderNo from Question q
@@ -58,10 +63,18 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
                   and sp.examSectionId = s.id and s.examId = :examId
             )
             and (
-                (select count(o) from QuestionOption o where o.questionId = q.id) = 0
-                or (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) = 0
-                or (q.questionType = com.englow3.exam.entity.QuestionType.SINGLE_CHOICE
-                    and (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) > 1)
+                (q.questionType <> QuestionType.TEXT_ENTRY and q.questionType <> QuestionType.MATCHING and (
+                    (select count(o) from QuestionOption o where o.questionId = q.id) < 2
+                    or (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) = 0
+                    or (q.questionType = QuestionType.SINGLE_CHOICE
+                        and (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true) > 1)
+                    or (q.questionType = QuestionType.MULTIPLE_CHOICE
+                        and (select count(o) from QuestionOption o where o.questionId = q.id and o.correct = true)
+                            >= (select count(o) from QuestionOption o where o.questionId = q.id))))
+                or (q.questionType = QuestionType.TEXT_ENTRY
+                    and (select count(a) from QuestionAcceptedAnswer a where a.questionId = q.id) = 0)
+                or (q.questionType = QuestionType.MATCHING
+                    and (select count(m) from QuestionMatchingAnswer m where m.key.questionId = q.id) <> 1)
             )
             order by q.orderNo
             """)

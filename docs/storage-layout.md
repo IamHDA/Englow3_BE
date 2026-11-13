@@ -1,7 +1,8 @@
 # Bố cục lưu trữ trên đĩa
 
-Chưa dùng database. Dữ liệu nằm trên máy, chia thư mục sao cho lúc đưa vào Postgres
-(Phase 11) chỉ là đọc file và `INSERT`, không phải viết lại logic.
+Data pipeline không ghi trực tiếp vào database runtime. Dữ liệu trung gian nằm trên
+máy và được chia thư mục để bước ingest vào PostgreSQL chỉ cần đọc file và `INSERT`,
+không phải viết lại logic sinh dữ liệu.
 
 ---
 

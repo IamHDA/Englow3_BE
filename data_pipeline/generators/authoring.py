@@ -88,7 +88,7 @@ def report_bias(groups: list[ExamGroup]) -> list[str]:
 
     pos = collections.Counter(
         next(o.label for o in q.options if o.is_correct) for q in items)
-    print(f"  B-1 vị trí đáp án đúng: " +
+    print("  B-1 vị trí đáp án đúng: " +
           "  ".join(f"{k}={pos[k]} ({pos[k]/n*100:.0f}%)" for k in LABELS))
     for k in LABELS:
         share = pos[k] / n

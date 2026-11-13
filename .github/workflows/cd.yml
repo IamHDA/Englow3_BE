@@ -5,14 +5,33 @@ on:
     branches:
       - main
       - dev
+      # Its own image (:testing) and its own Render service, so the testing
+      # frontend can run against the backend it was built with - without
+      # touching dev, which the rest of the team works against.
+      - testing
   pull_request:
     branches:
       - main
       - dev
 
 jobs:
+  # A push to main, dev or testing deploys, so it must pass the same checks a
+  # pull request does first. Before this the two workflows ran side by side and
+  # a red build still went out. Pull requests run CI through its own trigger
+  # and only dry-run the image build here.
+  verify:
+    name: Verify
+    if: ${{ github.event_name == 'push' }}
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   build-and-push:
     name: Build & Push ${{ matrix.service }} Image
+    needs: verify
+    # `verify` is skipped on pull requests, which must still build; it must not
+    # have failed on a push.
+    if: ${{ !cancelled() && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,7 +49,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -61,6 +80,14 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          # Release images explicitly opt into their branch's queue. Local builds
+          # keep the Dockerfile's local/disabled defaults; Render env overrides
+          # remain authoritative when explicitly configured.
+          build-args: |
+            RELEASE_SHA=${{ github.sha }}
+            AI_QUEUE_SCOPE=${{ github.base_ref || github.ref_name }}
+            AI_WORKER_ENABLED=${{ github.event_name == 'push' }}
+            JVM_STARTUP_OPTIONS=${{ (github.base_ref || github.ref_name) == 'testing' && '-XX:TieredStopAtLevel=1' || '' }}
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -71,7 +98,8 @@ jobs:
     name: Trigger Render Deploy Hook
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    # testing has a hook of its own below; the shared one redeploys dev/main.
+    if: ${{ github.event_name == 'push' && github.ref_name != 'testing' }}
     steps:
       - name: Trigger backend deployment
         shell: bash
@@ -107,11 +135,75 @@ jobs:
           curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
           echo "AI service Render deployment triggered."
 
+  deploy-render-testing:
+    name: Trigger Render Testing Deploy Hook
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && github.ref_name == 'testing' }}
+    steps:
+      - name: Trigger testing backend deployment
+        shell: bash
+        env:
+          HOOK_SECRET: ${{ secrets.RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL }}
+          HOOK_VAR: ${{ vars.RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL }}
+        run: |
+          DEPLOY_HOOK="$HOOK_SECRET"
+          [ -n "$DEPLOY_HOOK" ] || DEPLOY_HOOK="$HOOK_VAR"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::Configure RENDER_BACKEND_TESTING_DEPLOY_HOOK_URL; the testing image was built but has not been deployed."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$DEPLOY_HOOK"
+          echo "Testing backend Render deployment triggered."
+
+      - name: Trigger testing AI deployment
+        shell: bash
+        env:
+          AI_HOOK: ${{ secrets.RENDER_AI_TESTING_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AI_HOOK" ]; then
+            echo "::error::Configure RENDER_AI_TESTING_DEPLOY_HOOK_URL for the testing AI service."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --request POST "$AI_HOOK" >/dev/null
+
+      - name: Verify testing services are ready
+        shell: bash
+        env:
+          AI_HEALTH_URL: ${{ vars.AI_TESTING_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AI_HEALTH_URL" ]; then
+            echo "::error::Configure AI_TESTING_HEALTH_URL (https://AI-testing-host/health/ready)."
+            exit 1
+          fi
+          check_ready() {
+            for attempt in $(seq 1 24); do
+              if curl --fail --silent --show-error --max-time 5 "$1" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("status", "").lower() == "up"' 2>/dev/null; then
+                if curl --fail --silent --show-error --max-time 5 "$2" | python3 -c 'import json,os,sys; data=json.load(sys.stdin); assert (data.get("release") or data.get("app",{}).get("release")) == os.environ["GITHUB_SHA"]' 2>/dev/null; then
+                  return 0
+                fi
+              fi
+              sleep 10
+            done
+            return 1
+          }
+          check_ready 'https://englow3-backend-testing.onrender.com/actuator/health/readiness' 'https://englow3-backend-testing.onrender.com/actuator/info' &
+          backend_check=$!
+          check_ready "$AI_HEALTH_URL" "${AI_HEALTH_URL%/health/ready}/version" &
+          ai_check=$!
+          wait "$backend_check"
+          wait "$ai_check"
+          echo "Testing services passed readiness checks." >> "$GITHUB_STEP_SUMMARY"
+
   deploy-vps:
     name: Deploy to VPS via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    # The VPS runs a single backend container. A testing push must never
+    # replace it.
+    if: ${{ github.event_name == 'push' && github.ref_name != 'testing' }}
     steps:
       - name: Check VPS deployment configuration
         id: vps

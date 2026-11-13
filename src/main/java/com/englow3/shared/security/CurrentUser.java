@@ -19,6 +19,16 @@ public class CurrentUser {
         return requireJwt().getClaimAsString("email");
     }
 
+    /**
+     * Whether the caller holds a role, for the rare rule that depends on who is asking rather than only on whether they
+     * may ask at all - that second question stays with {@code @PreAuthorize}. False when nobody is signed in.
+     */
+    public boolean hasRole(String role) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> ("ROLE_" + role).equals(authority.getAuthority()));
+    }
+
     private Jwt requireJwt() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken token)) {

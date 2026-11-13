@@ -4,21 +4,23 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import com.englow3.exam.dto.result.ExamDetailResult;
 import com.englow3.exam.entity.DifficultyLevel;
 import com.englow3.exam.entity.QuestionType;
 import com.englow3.exam.entity.SectionType;
 import com.englow3.exam.entity.SkillType;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 /**
  * The whole content tree of a paper, replacing everything below {@code exams} in one call - see
- * {@code AdminExamService.replaceContent}. Nested rather than five files, the same choice
- * {@link com.englow3.exam.dto.result.ExamDetailResult} already made: each level is only ever the field type of the
- * level above it.
+ * {@code AdminExamService.replaceContent}. Nested rather than five files, the same choice {@link ExamDetailResult}
+ * already made: each level is only ever the field type of the level above it.
  * <p>
  * This is also the wizard's autosave, so every list here is {@code @NotNull} but never {@code @NotEmpty} - a section
  * with no part yet, or a question with no option yet, is a normal mid-draft shape, not an error. Only fields the
@@ -27,26 +29,48 @@ import jakarta.validation.constraints.PositiveOrZero;
  * <em>complete</em> - every question graded, every set of options resolved - is answered once, at
  * {@code Exam.publish(...)}, not here.
  */
-public record UpdateExamContentRequest(@NotNull @Valid List<SectionRequest> sections) {
+public record UpdateExamContentRequest(@NotNull List<@NotNull @Valid SectionRequest> sections) {
 
     public record SectionRequest(@NotNull SectionType sectionType, @PositiveOrZero int orderNo,
             @NotNull BigDecimal maxRawScore, boolean scoredByCriteria, Integer timeLimitSeconds,
-            @NotNull @Valid List<PartRequest> parts) {
+            @NotNull List<@NotNull @Valid PartRequest> parts) {
     }
 
     public record PartRequest(@PositiveOrZero int orderNo, @NotBlank String title, String instruction, String content,
-            String audioObjectKey, String imageObjectKey, @NotNull @Valid List<QuestionSetRequest> questionSets) {
+            String audioObjectKey, String imageObjectKey,
+            @NotNull List<@NotNull @Valid QuestionSetRequest> questionSets) {
     }
 
     public record QuestionSetRequest(String title, String instruction, @PositiveOrZero int orderNo, String content,
             String audioObjectKey, String imageObjectKey, UUID sourceQuestionSetId,
-            @NotNull @Valid List<QuestionRequest> questions) {
+            @NotNull List<@NotNull @Valid QuestionRequest> questions,
+            @Schema(description = "The list every MATCHING question of this set chooses from; omit when it has none") List<@NotNull @Valid SetOptionRequest> setOptions) {
+
+        public QuestionSetRequest {
+            setOptions = setOptions == null ? List.of() : setOptions;
+        }
+    }
+
+    /** One entry of a set's shared list: a heading "iv", a person "B", a map label "F". */
+    public record SetOptionRequest(@NotBlank @Size(max = 10) String label, String content,
+            @PositiveOrZero int orderNo) {
     }
 
     public record QuestionRequest(@NotNull QuestionType questionType, @NotBlank String content,
             @NotNull DifficultyLevel difficultyLevel, @NotNull SkillType skillType, String questionCategory,
             @PositiveOrZero int orderNo, @NotNull BigDecimal maxRawScore, String explanation, UUID sourceQuestionId,
-            @NotNull @Valid List<OptionRequest> options) {
+            @NotNull List<@NotNull @Valid OptionRequest> options,
+            @Schema(description = "Spellings a TEXT_ENTRY question accepts; omit or leave empty on a choice question") List<@NotNull @Valid AcceptedAnswerRequest> acceptedAnswers,
+            @Schema(description = "On a MATCHING question, the label of the set's list entry that answers it") List<@NotBlank @Size(max = 10) String> matchingLabels) {
+
+        public QuestionRequest {
+            acceptedAnswers = acceptedAnswers == null ? List.of() : acceptedAnswers;
+            matchingLabels = matchingLabels == null ? List.of() : matchingLabels;
+        }
+    }
+
+    public record AcceptedAnswerRequest(@NotBlank @Size(max = 200) String text, boolean caseSensitive,
+            @PositiveOrZero int orderNo) {
     }
 
     public record OptionRequest(@NotBlank String content, @PositiveOrZero int orderNo, boolean correct,

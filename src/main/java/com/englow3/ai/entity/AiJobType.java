@@ -1,0 +1,28 @@
+package com.englow3.ai.entity;
+
+/**
+ * What kind of work a job carries. The queue is shared infrastructure and dispatches on this: a handler registers for
+ * one value and never sees the others, which is what lets a second kind of work be added without touching the first.
+ */
+public enum AiJobType {
+    PRODUCTIVE_ASSESSMENT,
+
+    /** Score a recording against a reference sentence. Target is a speaking attempt. */
+    SPEECH_ASSESSMENT,
+
+    /** Answer a learner's question in a tutor conversation. Target is the pending assistant message. */
+    TUTOR_REPLY,
+
+    /** Transcribe a private, bounded Tutor recording. No pronunciation score is produced. */
+    TUTOR_TRANSCRIPTION,
+
+    /** Propose a learning roadmap, or its remaining stages after an adjustment. Target is the learning roadmap. */
+    ROADMAP_GENERATION,
+    /** Grade a learner's English translation of a Vietnamese sentence. Target is a translation attempt. */
+    TRANSLATION_ASSESSMENT,
+    /**
+     * One step of an AI content generation request (write a component, assemble, record). Target is the generation
+     * request. Asked by staff, not learners: outside the learners' daily allowance, bounded by the generation module.
+     */
+    CONTENT_GENERATION
+}

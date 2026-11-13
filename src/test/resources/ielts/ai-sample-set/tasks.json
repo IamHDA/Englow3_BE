@@ -1,0 +1,68 @@
+[
+  {
+    "sampleAnswer": null,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "skill": "WRITING",
+    "taskType": "TASK_1",
+    "title": "Cities and movement: Task 1 - Cycling to work",
+    "instructions": "You should spend about 20 minutes on this task.\n\nThe chart below shows the share of commuters who cycle.\n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.\n\nWrite at least 150 words.",
+    "rubricNotes": "Chart data (bar chart, %):\nCategory | 2005 | 2025\nA | 3 | 9\nB | 5 | 12\nC | 8 | 10\n\nKey features: all rose; B highest in 2025; C rose least",
+    "minimumWords": 150,
+    "timeLimitSeconds": 1200,
+    "chart": "task1-chart.png"
+  },
+  {
+    "sampleAnswer": null,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "skill": "WRITING",
+    "taskType": "TASK_2",
+    "title": "Cities and movement: Task 2 - Public transport",
+    "instructions": "You should spend about 40 minutes on this task.\n\nSome people think public transport should be free for everyone, while others believe passengers should pay the full cost of every journey they make. Discuss both views and give your own opinion.\n\nGive reasons for your answer and include any relevant examples from your own knowledge or experience.\n\nWrite at least 250 words.",
+    "rubricNotes": "both views and an opinion",
+    "minimumWords": 250,
+    "timeLimitSeconds": 2400
+  },
+  {
+    "sampleAnswer": null,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "skill": "SPEAKING",
+    "taskType": "PART_1",
+    "title": "Cities and movement: Speaking Part 1",
+    "instructions": "The examiner asks you about yourself.\n\n- q1\n- q2\n- q3\n- q4",
+    "rubricNotes": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 300
+  },
+  {
+    "sampleAnswer": null,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "skill": "SPEAKING",
+    "taskType": "PART_2",
+    "title": "Cities and movement: Speaking Part 2",
+    "instructions": "Describe a journey.\n\nYou should say:\n- where\n- when\n- who\nand explain why you remember it.\n\nYou have one minute to prepare. Then speak for one to two minutes.",
+    "rubricNotes": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 120
+  },
+  {
+    "sampleAnswer": null,
+    "targetLevel": "B2",
+    "purpose": "PRACTICE",
+    "certificateType": "IELTS",
+    "skill": "SPEAKING",
+    "taskType": "PART_3",
+    "title": "Cities and movement: Speaking Part 3",
+    "instructions": "Discussion questions:\n\n- d1\n- d2\n- d3\n- d4",
+    "rubricNotes": null,
+    "minimumWords": 0,
+    "timeLimitSeconds": 300
+  }
+]

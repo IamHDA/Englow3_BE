@@ -1,0 +1,78 @@
+package com.englow3.exam.controller;
+
+import java.util.UUID;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.englow3.exam.dto.request.SaveExamDraftRequest;
+import com.englow3.exam.dto.request.SubmitExamAttemptRequest;
+import com.englow3.exam.dto.response.ExamAttemptResponse;
+import com.englow3.exam.dto.response.ExamDraftResponse;
+import com.englow3.exam.dto.response.LearnerExamPaperResponse;
+import com.englow3.exam.service.ExamAttemptService;
+import com.englow3.shared.page.PageResponse;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/exam-attempts")
+public class ExamAttemptController {
+
+    private final ExamAttemptService examAttemptService;
+
+    public ExamAttemptController(ExamAttemptService examAttemptService) {
+        this.examAttemptService = examAttemptService;
+    }
+
+    /** The learner's own history, newest first. No review data - that is the result endpoint's job. */
+    @GetMapping
+    public ResponseEntity<PageResponse<ExamAttemptResponse>> history(@PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity
+                .ok(PageResponse.from(examAttemptService.attemptHistory(pageable).map(ExamAttemptResponse::from)));
+    }
+
+    @GetMapping("/{id}/paper")
+    public ResponseEntity<LearnerExamPaperResponse> getPaper(@PathVariable UUID id) {
+        return ResponseEntity.ok(LearnerExamPaperResponse.from(examAttemptService.paperForAttempt(id)));
+    }
+
+    @GetMapping("/{id}/draft")
+    public ResponseEntity<ExamDraftResponse> draft(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamDraftResponse.from(examAttemptService.draft(id)));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{id}/draft")
+    public ResponseEntity<ExamDraftResponse> saveDraft(@PathVariable UUID id,
+            @Valid @RequestBody SaveExamDraftRequest request) {
+        return ResponseEntity.ok(ExamDraftResponse.from(examAttemptService.saveDraft(request.toCommand(id))));
+    }
+
+    /** The browser is still on this full sitting; a sitting it stops reporting on is ended after a grace period. */
+    @PostMapping("/{id}/heartbeat")
+    public ResponseEntity<HeartbeatResponse> heartbeat(@PathVariable UUID id) {
+        return ResponseEntity.ok(new HeartbeatResponse(examAttemptService.heartbeat(id)));
+    }
+
+    /** Whether the sitting is still open. */
+    public record HeartbeatResponse(boolean open) {
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ExamAttemptResponse> submit(@PathVariable UUID id,
+            @Valid @RequestBody SubmitExamAttemptRequest request) {
+        return ResponseEntity.ok(ExamAttemptResponse.from(examAttemptService.submit(request.toCommand(id))));
+    }
+
+    @GetMapping("/{id}/result")
+    public ResponseEntity<ExamAttemptResponse> result(@PathVariable UUID id) {
+        return ResponseEntity.ok(ExamAttemptResponse.from(examAttemptService.result(id)));
+    }
+}

@@ -1,4 +1,5 @@
 target/
+target-bugfix/
 .idea/
 *.iml
 .vscode/
@@ -10,10 +11,15 @@ env
 env.local
 .mcp.json
 
+# Local agent workspaces and recovery snapshots
+.codex-worktrees/
+.codex-backup*/
+
 # Python & Data Pipeline cache
 **/__pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
 .checkpoints/
 data_pipeline/output/audio/
 

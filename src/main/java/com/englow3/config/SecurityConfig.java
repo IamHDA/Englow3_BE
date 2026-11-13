@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
 
+// Only where there is a web server to protect. The filter chain and CORS are both about HTTP requests, and a one-shot
+// tool such as the pipeline importer runs without a server at all - where this would fail for want of an HttpSecurity
+// rather than being skipped. The running API is always a servlet application, so nothing about it changes.
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableMethodSecurity
 public class SecurityConfig {
 
@@ -40,11 +45,17 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http.cors(Customizer.withDefaults()).csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        auth -> auth
-                                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info",
-                                        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                                .permitAll().anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
+                                "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll()
+                        // The pricing page's data: public by design, and it names no one
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/plans").permitAll()
+                        .requestMatchers("/actuator/startup", "/actuator/metrics", "/actuator/metrics/**")
+                        .hasRole("ADMIN")
+                        // A second gate behind each admin controller's @PreAuthorize: a controller added under
+                        // /api/admin without one is closed to learners rather than open to every signed-in user.
+                        .requestMatchers("/api/admin/**").hasAnyRole("STAFF", "ADMIN").anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter()))
                         .authenticationEntryPoint((request, response, ex) -> writeError(objectMapper, response,
                                 HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "A valid access token is required"))

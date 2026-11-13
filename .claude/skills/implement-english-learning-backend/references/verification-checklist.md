@@ -8,6 +8,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 - Layers are respected: controller has no business logic and no repository access; repository holds no logic.
 - Admin and end-user features sit in the same module, differing only by controller.
 - `query/` and `worker/` exist only where actually used.
+- Query-side aggregate projections live in `dto/projection`, service outputs in `dto/result`, and HTTP records in `dto/request` or `dto/response`.
 - Nothing landed in `shared` that carries business meaning.
 
 ## Rules and entities
@@ -21,6 +22,9 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 
 - Cross-module references are `UUID` fields; no `@ManyToOne` crosses a module.
 - Other modules' data arrives through their service as a record, fetched for the whole ID set rather than per row.
+- Every `@Service` implements an explicit contract; consumers do not depend on `service.impl` classes.
+- Cross-module calls use the owning module's `api/` contract; no cross-module `service.impl` imports exist.
+- Public module APIs do not expose entities, repositories, or internal persistence enums/types.
 - No module writes another module's tables.
 - No new cycle between modules; if one was unavoidable, it goes through an event and is noted.
 - Any cross-module read query is recorded as a declared exception.
@@ -30,6 +34,7 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 - `@Transactional` is on the service, and no external call sits inside it.
 - Everything the response needs is loaded inside the transaction - nothing relies on lazy access afterwards.
 - Entities do not appear in any HTTP response.
+- Nullable HTTP response components are marked with `@Schema(nullable = true)`; OpenAPI customizers do not contain hardcoded schema refs.
 - Schema changes are a new migration; no already-applied migration was edited.
 - Seed or demo data stays out of versioned migrations.
 - New lookup columns are indexed; uniqueness rules have a unique index.
@@ -45,13 +50,14 @@ Walk this before reporting a slice as finished. Anything unchecked is either fix
 ## Async specifics
 
 - The record is persisted and committed before the job is enqueued.
+- Request-side AI callers use `ai.api.AiJobQueue`; worker internals use `ai.service.AiJobWorkerQueue`; handlers do not receive `AiJob` entities.
 - Redelivery of the same job is harmless.
 - Failures are terminal, visible, and time-bounded.
 
 ## Build and tests
 
 - The project compiles and the tests pass. Do not report done without running them.
-- Query metadata was regenerated if a migration changed.
+- Changed SQL/JPQL queries have the relevant integration test or verification run.
 - Entity rules are covered by tests that need no database.
 - Failure paths are tested, not only the happy path.
 

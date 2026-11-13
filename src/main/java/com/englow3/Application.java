@@ -9,6 +9,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class Application {
 
     public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
+        var application = new SpringApplication(Application.class);
+        application.setApplicationStartup(
+                new org.springframework.boot.context.metrics.buffering.BufferingApplicationStartup(2048));
+        application.run(args);
     }
 }
