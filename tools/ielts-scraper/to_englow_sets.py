@@ -13,7 +13,7 @@ One folder per test:
     source.json               where it came from, the audio URLs, and everything that needs a human look
 
 Nothing is sent anywhere: load_sets.py loads the folders into a backend and submits them for
-review. With --answers, the AI sample answers from generate_answers.py become each task's sampleAnswer.
+review. With --answers, the output of generate_answers.py fills each task's sampleAnswer and rubricNotes.
 """
 
 from __future__ import annotations
@@ -268,6 +268,11 @@ def sample(answers: dict, key: str, band: str) -> str | None:
     return clip(f"[AI-generated sample ({entry['model']}), target band {band}; not marked by an examiner]\n\n{body}", 12000)
 
 
+def rubric(answers: dict, key: str) -> str | None:
+    entry = answers.get(f"{key}|rubric")
+    return entry["rubric_notes"] if entry else None
+
+
 def build_tasks(name: str, sections: dict, answers: dict, band: str, folder: Path, problems: list[str]) -> list[dict]:
     base = {"targetLevel": "B2", "purpose": "PRACTICE", "certificateType": "IELTS"}
     tasks = []
@@ -278,7 +283,8 @@ def build_tasks(name: str, sections: dict, answers: dict, band: str, folder: Pat
             **base, "skill": "WRITING", "taskType": f"TASK_{n}", "title": clip(f"{name}: Writing Task {n}", 200),
             "instructions": f"You should spend about {minutes} minutes on this task.\n\n"
                             + task["prompt"].replace("\n", "\n\n") + f"\n\nWrite at least {words} words.",
-            "rubricNotes": None, "sampleAnswer": sample(answers, f"{name.split(' | ')[-1]}|writing|task{n}", band),
+            "rubricNotes": rubric(answers, f"{name.split(' | ')[-1]}|writing|task{n}"),
+            "sampleAnswer": sample(answers, f"{name.split(' | ')[-1]}|writing|task{n}", band),
             "minimumWords": words, "timeLimitSeconds": minutes * 60,
         }
         if task["image_urls"]:
@@ -288,7 +294,12 @@ def build_tasks(name: str, sections: dict, answers: dict, band: str, folder: Pat
                 problems.append(f"Writing Task {n}: could not fetch its image ({e}); the task is left out")
                 continue
             item["chart"] = f"task{n}-chart.png"
-            problems.append(f"Writing Task {n}: rubricNotes is empty, so the grader has no chart data to check essays against")
+            if item["rubricNotes"]:
+                problems.append(f"Writing Task {n}: rubricNotes were read from the image by an AI model; "
+                                f"check every figure against task{n}-chart.png, since essays are graded against them")
+            else:
+                problems.append(f"Writing Task {n}: rubricNotes is empty, so the grader has no chart data to check "
+                                "essays against (generate_answers.py writes them)")
         tasks.append(item)
 
     for part in sections.get("speaking", {}).get("parts", []):
@@ -326,7 +337,7 @@ def main() -> int:
     if not files:
         print(f"No collection JSON files in {args.input}", file=sys.stderr)
         return 2
-    written = flagged = skipped = 0
+    written = flagged = skipped = charts = 0
     for path in files:
         collection = json.loads(path.read_text(encoding="utf-8"))
         answers_file = args.answers / f"{path.stem}.answers.json" if args.answers else None
@@ -366,10 +377,12 @@ def main() -> int:
             written += 1
             # These two apply to nearly every set, so they are recorded in source.json but not repeated per line.
             blocking = [p for p in problems if not re.match(r"Listening has no per-part|Writing Task \d: rubricNotes", p)]
+            charts += sum(bool(re.match(r"Writing Task \d: rubricNotes", p)) for p in problems)
             flagged += bool(blocking)
             print(f"{'CHECK  ' if blocking else 'ok     '}  {folder.name}: {len(tasks)} tasks" + "".join(f"\n           - {p}" for p in blocking))
     print(f"\n{written} sets written ({flagged} need a look before loading), {skipped} skipped. "
-          "Every set also lists its open points in source.json.")
+          f"{charts} Writing tasks have a visual whose rubric notes need checking or writing. "
+          "Every set lists its open points in source.json.")
     return 1 if flagged or skipped else 0
 
 

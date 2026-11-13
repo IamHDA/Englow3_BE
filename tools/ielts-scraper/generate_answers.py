@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Generate AI sample answers for the Writing and Speaking prompts the extension exported.
+"""Generate AI sample answers and Writing rubric notes for the prompts the extension exported.
 
-The site publishes no model answers for these two skills, so this fills the gap with an OpenAI
+The site publishes no model answers for Writing and Speaking, so this fills the gap with an OpenAI
 model. Every answer is stored with the model name and target band and marked ai_generated; none
 of them has been marked by an examiner.
+
+It also writes the rubric notes the Englow3 Writing grader reads. That grader gets text only: for
+Task 1 it judges an essay against the figures in the notes, never against the picture, so the model
+reads each chart into a data table here. A misread figure would mark correct essays down, so every
+set of notes has to be checked against the chart by a person before the task is approved.
 
     export OPENAI_API_KEY=...
     python generate_answers.py --input ~/Downloads/ielts-scrape --output answers --model <model>
@@ -71,6 +76,25 @@ SPEAKING_SCHEMA = {
     },
 }
 
+RUBRIC_SCHEMA = {
+    "name": "rubric_notes",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["cannot_read", "reason", "visual_type", "unit", "data_table", "description", "key_features"],
+        "properties": {
+            "cannot_read": {"type": "boolean"},
+            "reason": {"type": "string"},
+            "visual_type": {"type": "string"},
+            "unit": {"type": "string"},
+            "data_table": {"type": "string"},
+            "description": {"type": "string"},
+            "key_features": {"type": "array", "items": {"type": "string"}},
+        },
+    },
+}
+
 SPEAKING_LENGTH = {
     1: "Part 1 (interview): 2-4 spoken sentences per question.",
     2: "Part 2 (long turn): one monologue of about 220-260 words covering every bullet on the cue card.",
@@ -127,6 +151,56 @@ def writing_answer(client, model, task: dict, band: str) -> dict:
     return {"essay": result["essay"], "word_count": words}
 
 
+def rubric_notes(client, model, task: dict, band: None) -> dict:
+    """Notes in the layout the Englow3 generator writes, so the grader reads both kinds the same way."""
+    if task["image_urls"]:
+        text = (
+            f"IELTS Writing Task 1:\n\n{task['prompt']}\n\n"
+            "Read the attached visual for a marker who will never see it and must check essays against your notes.\n"
+            "- visual_type: e.g. bar chart, line graph, pie chart, table, map, process diagram.\n"
+            "- For a chart, graph or table: unit is the unit of the figures; data_table has one header line and "
+            "one line per category or series, cells separated by ' | ', with every figure shown. Give a figure "
+            "read off an axis as an approximation (about 45). Leave description empty.\n"
+            "- For a map, plan or process: leave unit and data_table empty and describe in description what is "
+            "shown, in order, completely enough to check an essay against.\n"
+            "- key_features: the 3-6 main trends, comparisons or changes a good overview would report.\n"
+            "Write only what the visual shows. If any part cannot be read reliably, set cannot_read to true and "
+            "say what in reason; otherwise set it to false and leave reason empty."
+        )
+        content = [{"type": "text", "text": text}] + [image_part(u) for u in task["image_urls"]]
+    else:
+        text = (
+            f"IELTS Writing Task {task['number']}:\n\n{task['prompt']}\n\n"
+            "Write marker's notes for this task. There is no visual: set visual_type to 'none', leave unit and "
+            "data_table empty, and set cannot_read to false with an empty reason. In description say in one or two "
+            "sentences what a response must do to answer the task fully (for example discuss both views and give "
+            "an opinion, or cover every bullet of the letter). In key_features list 3-6 points a strong answer "
+            "could raise."
+        )
+        content = [{"type": "text", "text": text}]
+    result = ask(client, model, content, RUBRIC_SCHEMA)
+    if result["cannot_read"]:
+        raise Unusable(f"model could not read the visual: {result['reason']}")
+    features = [f.strip() for f in result["key_features"] if f.strip()]
+    table, description = result["data_table"].strip(), result["description"].strip()
+    if len(features) < 2 or not (table or description):
+        raise Unusable("the notes came back without data or key features")
+    if table and len(table.splitlines()) < 2:
+        raise Unusable("the data table has a header but no rows")
+    if table:
+        unit = f", {result['unit'].strip()}" if result["unit"].strip() else ""
+        head = f"Chart data ({result['visual_type'].strip()}{unit}):\n{table}"
+    elif task["image_urls"]:
+        head = f"What the {result['visual_type'].strip()} shows: {description}"
+    else:
+        head = description
+    label = "Key features" if task["image_urls"] else "Points a strong answer could raise"
+    notes = f"{head}\n\n{label}: " + "; ".join(features)
+    if len(notes) > 8000:
+        raise Unusable(f"the notes are {len(notes)} characters, over the backend's 8000 limit")
+    return {"rubric_notes": notes}
+
+
 def speaking_answers(client, model, part: dict, band: str) -> dict:
     lines = []
     for i, q in enumerate(part["questions"], 1):
@@ -145,10 +219,13 @@ def speaking_answers(client, model, part: dict, band: str) -> dict:
     return {"answers": [{"question": q["text"], "answer": by_number[i]} for i, q in enumerate(part["questions"], 1)]}
 
 
-def jobs(collection: dict, skills: set[str], bands: list[str]):
+def jobs(collection: dict, skills: set[str], bands: list[str], rubrics: bool):
     """Yield (key, callable) for every answer this collection should have."""
     for test in collection["tests"]:
         sections = test["sections"]
+        if rubrics and "writing" in sections:
+            for task in sections["writing"]["tasks"]:
+                yield f"{test['name']}|writing|task{task['number']}|rubric", (rubric_notes, task, None)
         if "writing" in skills and "writing" in sections:
             for task in sections["writing"]["tasks"]:
                 for band in bands:
@@ -168,6 +245,7 @@ def main() -> int:
     parser.add_argument("--model", required=True, help="OpenAI model id; it must accept image input for Writing Task 1")
     parser.add_argument("--bands", nargs="+", default=["7.0", "8.5"], help="target bands (default: 7.0 8.5)")
     parser.add_argument("--skills", nargs="+", choices=["writing", "speaking"], default=["writing", "speaking"])
+    parser.add_argument("--skip-rubric", action="store_true", help="do not write Writing rubric notes")
     parser.add_argument("--limit", type=int, help="stop after this many new answers (for a trial run)")
     args = parser.parse_args()
 
@@ -186,7 +264,7 @@ def main() -> int:
         out = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {
             "collection": collection["collection"], "answers": {},
         }
-        for key, (make, item, band) in jobs(collection, set(args.skills), args.bands):
+        for key, (make, item, band) in jobs(collection, set(args.skills), args.bands, not args.skip_rubric):
             if key in out["answers"]:
                 skipped += 1
                 continue
@@ -207,7 +285,7 @@ def main() -> int:
             out["answers"][key] = {
                 "ai_generated": True,
                 "model": args.model,
-                "target_band": band,
+                **({"target_band": band} if band else {}),
                 "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 **answer,
             }
