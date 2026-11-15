@@ -49,10 +49,10 @@ class BlockServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
     private final FriendshipRepository friendshipRepo = mock(FriendshipRepository.class);
-    private final UserBlockRepository blockRepo = mock(UserBlockRepository.class);
+    private final UserBlockRepository userBlockRepo = mock(UserBlockRepository.class);
     private final Instant now = Instant.parse("2026-11-15T10:00:00Z");
     private final BlockService service = new BlockServiceImpl(userDirectory, publicProfileReader, friendshipRepo,
-            blockRepo, Clock.fixed(now, ZoneOffset.UTC));
+            userBlockRepo, Clock.fixed(now, ZoneOffset.UTC));
 
     private final UUID me = UUID.randomUUID();
     private final UUID other = UUID.randomUUID();
@@ -68,9 +68,9 @@ class BlockServiceTest {
     void blockingTakesThePairLockThenRecordsTheBlockThenEndsTheFriendship() {
         service.block(other);
 
-        InOrder order = inOrder(friendshipRepo, blockRepo);
+        InOrder order = inOrder(friendshipRepo, userBlockRepo);
         order.verify(friendshipRepo).lockPair(Friendship.pairKey(me, other));
-        order.verify(blockRepo).insertIfAbsent(me, other, now);
+        order.verify(userBlockRepo).insertIfAbsent(me, other, now);
         order.verify(friendshipRepo).deletePair(me, other);
     }
 
@@ -78,7 +78,7 @@ class BlockServiceTest {
     void blockingYourselfIsRefusedWithoutTouchingARepository() {
         assertThatThrownBy(() -> service.block(me)).isInstanceOfSatisfying(BadRequestException.class,
                 e -> assertThat(e.getCode()).isEqualTo("BLOCK_SELF"));
-        verifyNoInteractions(friendshipRepo, blockRepo);
+        verifyNoInteractions(friendshipRepo, userBlockRepo);
     }
 
     @Test
@@ -87,7 +87,7 @@ class BlockServiceTest {
 
         assertThatThrownBy(() -> service.block(other)).isInstanceOfSatisfying(ForbiddenException.class,
                 e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_LEARNERS_ONLY"));
-        verifyNoInteractions(friendshipRepo, blockRepo);
+        verifyNoInteractions(friendshipRepo, userBlockRepo);
     }
 
     @Test
@@ -96,14 +96,14 @@ class BlockServiceTest {
 
         assertThatThrownBy(() -> service.block(other)).isInstanceOfSatisfying(NotFoundException.class,
                 e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
-        verifyNoInteractions(friendshipRepo, blockRepo);
+        verifyNoInteractions(friendshipRepo, userBlockRepo);
     }
 
     @Test
     void unblockingOnlyRemovesTheBlockAndNeverRestoresAFriendship() {
         service.unblock(other);
 
-        verify(blockRepo).deleteBlock(me, other);
+        verify(userBlockRepo).deleteBlock(me, other);
         verifyNoInteractions(friendshipRepo);
     }
 
@@ -112,7 +112,7 @@ class BlockServiceTest {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         Instant blockedAt = Instant.parse("2026-11-10T00:00:00Z");
-        when(blockRepo.findByIdBlockerId(org.mockito.ArgumentMatchers.eq(me), any(Pageable.class)))
+        when(userBlockRepo.findByIdBlockerId(org.mockito.ArgumentMatchers.eq(me), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(UserBlock.of(me, first, blockedAt), UserBlock.of(me, second, now))));
         when(publicProfileReader.profiles(Set.of(first, second))).thenReturn(Map.of(first,
                 new PublicProfile(first, "An", null), second, new PublicProfile(second, "Binh", "/avatars/fox.svg")));
@@ -125,7 +125,7 @@ class BlockServiceTest {
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(first, "An", blockedAt),
                         org.assertj.core.groups.Tuple.tuple(second, "Binh", now));
         ArgumentCaptor<Pageable> asked = ArgumentCaptor.forClass(Pageable.class);
-        verify(blockRepo).findByIdBlockerId(org.mockito.ArgumentMatchers.eq(me), asked.capture());
+        verify(userBlockRepo).findByIdBlockerId(org.mockito.ArgumentMatchers.eq(me), asked.capture());
         assertThat(asked.getValue().getPageNumber()).isEqualTo(1);
         assertThat(asked.getValue().getPageSize()).isEqualTo(5);
         assertThat(asked.getValue().getSort()).containsExactly(Sort.Order.desc("createdAt"),

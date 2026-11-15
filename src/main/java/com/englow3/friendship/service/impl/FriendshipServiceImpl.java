@@ -58,7 +58,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     private final UserDirectory userDirectory;
     private final PublicProfileReader publicProfileReader;
     private final FriendshipRepository friendshipRepo;
-    private final UserBlockRepository blockRepo;
+    private final UserBlockRepository userBlockRepo;
     private final Clock clock;
 
     @Override
@@ -70,7 +70,7 @@ public class FriendshipServiceImpl implements FriendshipService {
         requireLearnerTarget(other);
 
         friendshipRepo.lockPair(Friendship.pairKey(me, other));
-        if (blockRepo.existsEitherWay(me, other)) {
+        if (userBlockRepo.existsEitherWay(me, other)) {
             // Deliberately silent on who blocked whom.
             throw new ForbiddenException("FRIEND_REQUEST_NOT_ALLOWED", "This learner cannot be invited");
         }
@@ -177,8 +177,8 @@ public class FriendshipServiceImpl implements FriendshipService {
         // Always holds the caller, so the "not in" the search builds from it is never given an empty list.
         Set<UUID> excluded = new HashSet<>();
         excluded.add(me);
-        excluded.addAll(blockRepo.blockedBy(me));
-        excluded.addAll(blockRepo.blockersOf(me));
+        excluded.addAll(userBlockRepo.blockedBy(me));
+        excluded.addAll(userBlockRepo.blockersOf(me));
 
         Page<PublicProfile> found = publicProfileReader.searchLearners(trimmed, excluded, ordered(page, "displayName"));
         if (found.isEmpty()) {
@@ -205,10 +205,10 @@ public class FriendshipServiceImpl implements FriendshipService {
         }
         requireLearnerCaller(me);
 
-        if (blockRepo.existsByIdBlockerIdAndIdBlockedId(me, otherUserId)) {
+        if (userBlockRepo.existsByIdBlockerIdAndIdBlockedId(me, otherUserId)) {
             return new RelationshipResult(otherUserId, RelationshipStatus.BLOCKED_BY_ME, null);
         }
-        if (blockRepo.existsByIdBlockerIdAndIdBlockedId(otherUserId, me)) {
+        if (userBlockRepo.existsByIdBlockerIdAndIdBlockedId(otherUserId, me)) {
             return new RelationshipResult(otherUserId, RelationshipStatus.UNAVAILABLE, null);
         }
         Friendship friendship = friendshipRepo.findPair(me, otherUserId).orElse(null);

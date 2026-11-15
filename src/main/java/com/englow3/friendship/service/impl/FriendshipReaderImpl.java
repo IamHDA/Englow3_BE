@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 public class FriendshipReaderImpl implements FriendshipReader {
 
     private final FriendshipRepository friendshipRepo;
-    private final UserBlockRepository blockRepo;
+    private final UserBlockRepository userBlockRepo;
 
     @Override
     @Transactional(readOnly = true)
@@ -32,14 +32,14 @@ public class FriendshipReaderImpl implements FriendshipReader {
     @Override
     @Transactional(readOnly = true)
     public boolean isBlockedEitherWay(UUID a, UUID b) {
-        return blockRepo.existsEitherWay(a, b);
+        return userBlockRepo.existsEitherWay(a, b);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Set<UUID> blockedEitherWay(UUID userId) {
-        Set<UUID> either = new HashSet<>(blockRepo.blockedBy(userId));
-        either.addAll(blockRepo.blockersOf(userId));
+        Set<UUID> either = new HashSet<>(userBlockRepo.blockedBy(userId));
+        either.addAll(userBlockRepo.blockersOf(userId));
         return either;
     }
 }

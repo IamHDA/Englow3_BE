@@ -40,7 +40,7 @@ public class BlockServiceImpl implements BlockService {
     private final UserDirectory userDirectory;
     private final PublicProfileReader publicProfileReader;
     private final FriendshipRepository friendshipRepo;
-    private final UserBlockRepository blockRepo;
+    private final UserBlockRepository userBlockRepo;
     private final Clock clock;
 
     @Override
@@ -58,14 +58,14 @@ public class BlockServiceImpl implements BlockService {
         }
 
         friendshipRepo.lockPair(Friendship.pairKey(me, blockedId));
-        blockRepo.insertIfAbsent(me, blockedId, Instant.now(clock));
+        userBlockRepo.insertIfAbsent(me, blockedId, Instant.now(clock));
         friendshipRepo.deletePair(me, blockedId);
     }
 
     @Override
     @Transactional
     public void unblock(UUID blockedId) {
-        blockRepo.deleteBlock(userDirectory.requireCurrentUserId(), blockedId);
+        userBlockRepo.deleteBlock(userDirectory.requireCurrentUserId(), blockedId);
     }
 
     @Override
@@ -75,7 +75,7 @@ public class BlockServiceImpl implements BlockService {
         // The key is composite, so the tie-break names its column rather than going through StablePage's "id".
         Pageable ordered = PageRequest.of(page.getPageNumber(), page.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id.blockedId")));
-        Page<UserBlock> rows = blockRepo.findByIdBlockerId(me, ordered);
+        Page<UserBlock> rows = userBlockRepo.findByIdBlockerId(me, ordered);
 
         Set<UUID> blockedIds = rows.getContent().stream().map(block -> block.getId().getBlockedId())
                 .collect(Collectors.toSet());

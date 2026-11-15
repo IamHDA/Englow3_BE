@@ -65,11 +65,11 @@ class FriendshipServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
     private final FriendshipRepository friendshipRepo = mock(FriendshipRepository.class);
-    private final UserBlockRepository blockRepo = mock(UserBlockRepository.class);
+    private final UserBlockRepository userBlockRepo = mock(UserBlockRepository.class);
     private final Instant now = Instant.parse("2026-11-15T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final FriendshipService service = new FriendshipServiceImpl(userDirectory, publicProfileReader,
-            friendshipRepo, blockRepo, clock);
+            friendshipRepo, userBlockRepo, clock);
 
     private final UUID me = UUID.randomUUID();
     private final UUID other = UUID.randomUUID();
@@ -127,7 +127,7 @@ class FriendshipServiceTest {
 
         @Test
         void isRefusedWhenEitherSideHasBlockedTheOtherWithoutSaying() {
-            when(blockRepo.existsEitherWay(me, other)).thenReturn(true);
+            when(userBlockRepo.existsEitherWay(me, other)).thenReturn(true);
 
             assertThatThrownBy(() -> service.sendRequest(new SendFriendRequestCommand(other))).isInstanceOfSatisfying(
                     ForbiddenException.class, e -> assertThat(e.getCode()).isEqualTo("FRIEND_REQUEST_NOT_ALLOWED"));
@@ -142,7 +142,7 @@ class FriendshipServiceTest {
             assertThatThrownBy(() -> service.sendRequest(new SendFriendRequestCommand(other))).isInstanceOfSatisfying(
                     ForbiddenException.class, e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_LEARNERS_ONLY"));
             verify(friendshipRepo, never()).lockPair(anyString());
-            verifyNoInteractions(blockRepo);
+            verifyNoInteractions(userBlockRepo);
         }
 
         @Test
@@ -151,7 +151,7 @@ class FriendshipServiceTest {
 
             assertThatThrownBy(() -> service.sendRequest(new SendFriendRequestCommand(other))).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
-            verifyNoInteractions(friendshipRepo, blockRepo);
+            verifyNoInteractions(friendshipRepo, userBlockRepo);
         }
 
         @Test
@@ -400,8 +400,8 @@ class FriendshipServiceTest {
         void leavesOutTheCallerAndEveryoneBlockedEitherWay() {
             UUID iBlocked = UUID.randomUUID();
             UUID blockedMe = UUID.randomUUID();
-            when(blockRepo.blockedBy(me)).thenReturn(Set.of(iBlocked));
-            when(blockRepo.blockersOf(me)).thenReturn(Set.of(blockedMe));
+            when(userBlockRepo.blockedBy(me)).thenReturn(Set.of(iBlocked));
+            when(userBlockRepo.blockersOf(me)).thenReturn(Set.of(blockedMe));
             when(publicProfileReader.searchLearners(anyString(), anyCollection(), any(Pageable.class)))
                     .thenReturn(Page.empty());
 
@@ -471,7 +471,7 @@ class FriendshipServiceTest {
 
         @Test
         void aLearnerYouBlockedIsBlockedByMe() {
-            when(blockRepo.existsByIdBlockerIdAndIdBlockedId(me, other)).thenReturn(true);
+            when(userBlockRepo.existsByIdBlockerIdAndIdBlockedId(me, other)).thenReturn(true);
 
             assertThat(service.relationshipWith(other).relationship()).isEqualTo(RelationshipStatus.BLOCKED_BY_ME);
             verify(friendshipRepo, never()).findPair(any(), any());
@@ -479,7 +479,7 @@ class FriendshipServiceTest {
 
         @Test
         void aLearnerWhoBlockedYouIsOnlyUnavailable() {
-            when(blockRepo.existsByIdBlockerIdAndIdBlockedId(other, me)).thenReturn(true);
+            when(userBlockRepo.existsByIdBlockerIdAndIdBlockedId(other, me)).thenReturn(true);
 
             RelationshipResult result = service.relationshipWith(other);
 
