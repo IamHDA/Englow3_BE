@@ -28,12 +28,27 @@ public final class LearnerFixture {
 
     /** A learner and nothing else. Every count for them starts at zero, which is itself worth testing. */
     public UUID learner() {
+        return learner("Test");
+    }
+
+    /** A learner other learners can find by {@code displayName}. */
+    public UUID learner(String displayName) {
+        return user("LEARNER", displayName);
+    }
+
+    /** A staff account: signed in like anyone, but not a learner. */
+    public UUID staff(String displayName) {
+        return user("STAFF", displayName);
+    }
+
+    private UUID user(String role, String displayName) {
         UUID id = UUID.randomUUID();
-        String email = "learner-%s@example.com".formatted(id);
+        String email = "%s-%s@example.com".formatted(role.toLowerCase(java.util.Locale.ROOT), id);
         jdbc.sql("""
                 insert into users (id, auth_provider_id, email, role, full_name, display_name, onboarding_step)
-                values (:id, :authId, :email, 'LEARNER', 'Test Learner', 'Test', 'COMPLETED')
-                """).param("id", id).param("authId", UUID.randomUUID()).param("email", email).update();
+                values (:id, :authId, :email, :role, 'Test Learner', :displayName, 'COMPLETED')
+                """).param("id", id).param("authId", UUID.randomUUID()).param("email", email).param("role", role)
+                .param("displayName", displayName).update();
 
         return id;
     }

@@ -41,6 +41,9 @@ skills, and onboarding.
   attempt UUID. It is not a JPA relationship to the exam module.
 - **Public API:** `user.api.UserDirectory` and `user.api.PlacementRecorder` are the
   contracts for cross-module identity lookup and placement recording.
+  `user.api.PublicProfileReader` hands other modules what other learners may see of an
+  account - display name and avatar URL, never email - for a set of ids in one query,
+  whether an id is a learner, and the learner search by display name (`friendship` uses it).
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
   level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
   daily study minutes and purposes as plain values. User entities,
@@ -510,10 +513,10 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
 - **Left open:** cancelling a running request; regenerating one part of a finished
   set; similarity checks between passages of different sets.
 
-## `friendship` (planned)
+## `friendship`
 
-Designed 2026-11-15, not implemented yet. Owns who is connected to whom among
-learners: friend requests, friendships and blocks.
+Implemented: friend requests, friendships, blocks and the learner search, behind
+`/api/friends`. Owns who is connected to whom among learners.
 
 - **Subdomain:** supporting. It keeps learners coming back; the product wins on
   practice and AI feedback, not on the social graph.
@@ -522,7 +525,11 @@ learners: friend requests, friendships and blocks.
   `blocked_id`). Declining, cancelling and unfriending delete the row; no request
   history is kept. Columns are named for the roles rather than for a sorting trick.
 - **Who:** learners only. Staff and Admin neither send nor receive requests, checked
-  through `UserDirectory.isBackOfficeUser`.
+  through `PublicProfileReader.isLearner` (a role of exactly `LEARNER`), not
+  `UserDirectory.isBackOfficeUser`. Sending, accepting, blocking, searching and
+  asking for a relationship require the caller to be a learner; withdrawing, unfriending,
+  unblocking and reading one's own lists do not, so an account whose role changed can still
+  clean up what it already has.
 - **Entities with rules:** `Friendship` - nobody befriends themselves, only the
   addressee accepts, only a pending request can be accepted. A request from B while
   A's request to B is pending accepts it rather than creating a second row. Blocks are
@@ -534,12 +541,17 @@ learners: friend requests, friendships and blocks.
   second row for one pair impossible, whichever side asked.
   Every write for a pair (request, accept, block, unfriend) takes a transaction
   advisory lock on the pair, so a block cannot race an accept.
-- **Talks to:** `user` via `UserDirectory` (role, display names). Publishes
+- **Talks to:** `user` via `user.api.PublicProfileReader` (name and picture for a whole
+  page of people in one call, whether an id is a learner, and the learner search by
+  display name - never by email) and `UserDirectory` (the caller's id). Publishes
   `friendship.api.FriendshipReader` - are two learners friends, is either blocked,
   which ids has a learner blocked or been blocked by - for `chat` and `blog`. It
   depends on neither of them.
 - **Erasure:** both tables cascade from `users`.
-- **Read path:** repository only.
+- **Read path:** repository only; the search itself runs in `user`, behind
+  `PublicProfileReader`, because it reads `users`.
+- **Entry points:** `/api/friends` (friends, requests, search, relationships) and
+  `/api/friends/blocks`.
 - **Why:** request, accept and block are a different vocabulary and lifecycle from a
   conversation's, and `blog` needs blocks without needing chat.
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a

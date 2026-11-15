@@ -34,4 +34,21 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     java.util.List<User> backOfficeUsers();
 
     Optional<User> findByAuthProviderId(UUID authProviderId);
+
+    /**
+     * Learners by display name, for the friend search. Never staff, and never an email match: an address is not
+     * something another learner may probe for. {@code excluded} must not be empty.
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            select u from User u
+            where u.role = com.englow3.user.entity.Role.LEARNER
+              and lower(u.displayName) like :pattern escape '!'
+              and u.id not in :excluded
+            """)
+    org.springframework.data.domain.Page<User> searchLearners(
+            @org.springframework.data.repository.query.Param("pattern") String pattern,
+            @org.springframework.data.repository.query.Param("excluded") java.util.Collection<UUID> excluded,
+            org.springframework.data.domain.Pageable page);
+
+    boolean existsByIdAndRole(UUID id, com.englow3.user.entity.Role role);
 }
