@@ -510,6 +510,131 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
 - **Left open:** cancelling a running request; regenerating one part of a finished
   set; similarity checks between passages of different sets.
 
+## `friendship` (planned)
+
+Designed 2026-11-15, not implemented yet. Owns who is connected to whom among
+learners: friend requests, friendships and blocks.
+
+- **Subdomain:** supporting. It keeps learners coming back; the product wins on
+  practice and AI feedback, not on the social graph.
+- **Owns writes to:** `friendships` - one row per pair, stored as
+  `(user_low_id, user_high_id)` with `requester_id`, `status` (`PENDING`, `ACCEPTED`)
+  and the request/accept times - and `user_blocks` (`blocker_id`, `blocked_id`).
+  Declining, cancelling and unfriending delete the row; no request history is kept.
+- **Who:** learners only. Staff and Admin neither send nor receive requests, checked
+  through `UserDirectory.isBackOfficeUser`.
+- **Entities with rules:** `Friendship` - nobody befriends themselves, only the
+  addressee accepts, only a pending request can be accepted. A request from B while
+  A's request to B is pending accepts it rather than creating a second row. Blocks are
+  plain rows; their rule spans both tables and lives in the service: blocking deletes
+  the pair's friendship or pending request, and no request is created or accepted
+  while a block exists either way.
+- **Concurrency:** the pair primary key makes a second row for one pair impossible.
+  Every write for a pair (request, accept, block, unfriend) takes a transaction
+  advisory lock on the pair, so a block cannot race an accept.
+- **Talks to:** `user` via `UserDirectory` (role, display names). Publishes
+  `friendship.api.FriendshipReader` - are two learners friends, is either blocked,
+  which ids has a learner blocked or been blocked by - for `chat` and `blog`. It
+  depends on neither of them.
+- **Erasure:** both tables cascade from `users`.
+- **Read path:** repository only.
+- **Why:** request, accept and block are a different vocabulary and lifecycle from a
+  conversation's, and `blog` needs blocks without needing chat.
+- **Revisit if:** group chat or following without friendship arrives, or blocks need a
+  reason and a report trail.
+
+## `chat` (planned)
+
+Designed 2026-11-15, not implemented yet. Owns one-to-one conversations between
+friends.
+
+- **Subdomain:** supporting.
+- **Owns writes to:** `chat_conversations` (one per pair, `user_low_id`,
+  `user_high_id`, `last_seq`); `chat_messages` (`id` bigint identity - the cursor
+  across all of a learner's conversations - `seq` within the conversation,
+  `sender_id`, `client_id`, text, an optional image object key, `recalled_at`,
+  `sent_at`); `chat_read_states` (`conversation_id`, `user_id`, `last_read_seq`);
+  `chat_socket_tickets`.
+- **Entities with rules:** `ChatConversation` hands out the next `seq`.
+  `ChatMessage` - text, one image, or both, never empty; only the sender recalls it,
+  once; a recalled message loses its text and image and shows as recalled; no
+  editing. `ChatReadState` - the read mark never moves backwards.
+- **Who may send:** the two must be friends with no block either way, asked through
+  `FriendshipReader` on every send and never cached, so unfriending or blocking stops
+  the next message. History stays readable after unfriending.
+- **Concurrency:** `seq` comes from one atomic
+  `UPDATE ... SET last_seq = last_seq + 1 ... RETURNING`, backed by unique
+  `(conversation_id, seq)`. Unique `(sender_id, client_id)` makes a retried send
+  return the first message. The read mark is written with `greatest(...)`.
+- **Delivery:** sending, reading, recalling and history are REST through the
+  existing proxy and BFF. Receiving is a receive-only WebSocket at `/ws/chat`, straight
+  to Spring. The web asks the proxy for a ticket - random, stored hashed, valid 30
+  seconds, single use, redeemed by one conditional `UPDATE` so it works on any
+  instance; mobile may send `Authorization: Bearer` instead. The handshake checks
+  `Origin` against `app.cors.allowed-origins`. The only client frame is
+  `{conversationId, active}` for typing, which is relayed and never stored. The
+  client passes its last cursor when it connects and the server replays what it
+  missed. Pushes happen after commit.
+- **Images:** presigned PUT through the shared storage client into a private
+  location; read through short-lived presigned GETs issued only to the two
+  participants. Object-key meaning stays in `chat`. Recalling deletes the object.
+- **Erasure:** messages stay and show as from a deleted user: the foreign keys set
+  `sender_id` and the conversation's user columns to null, read states cascade.
+  Images the erased learner sent stay with their messages. The privacy policy has to
+  say so.
+- **Moderation:** none in this version. No reporting; a learner protects themselves by
+  blocking, and staff never read private messages.
+- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
+- **Read path:** repository; the conversation list (last message, unread count) moves
+  to `chat/query` if one repository query cannot carry it.
+- **Why WebSocket, receive-only:** web and BFF run as Vercel functions - 60 seconds at
+  most, no WebSocket - and the browser never holds the token (HttpOnly session
+  cookie). SSE through them would keep two functions running for every learner with
+  the app open and cannot carry typing cheaply. Sends stay on REST so a dropped socket
+  never loses a message, and validation, errors and rate limits stay the existing ones.
+- **Revisit if:** group chat, presence, or send latency starts to matter (send over the
+  socket too); abuse in chat is reported (a report flow that shows staff only the
+  reported message); the backend runs more than one instance (see Still open).
+
+## `blog` (planned)
+
+Designed 2026-11-15, not implemented yet. Owns knowledge-sharing posts, their
+comments, likes, reports and moderation.
+
+- **Subdomain:** supporting.
+- **Owns writes to:** `blog_posts` (title, Markdown body, author, status, like and
+  comment counts, version), `blog_post_tags`, `blog_post_images`, `blog_comments`,
+  `blog_post_likes`, `blog_reports`, `blog_moderation_actions`.
+- **Who:** every signed-in account posts, comments and likes. Staff and Admin
+  moderate through `/api/admin/blog`, a separate controller in this module.
+- **Publishing:** a post is visible as soon as it is posted; moderation follows
+  reports. Moderators hide (reversible) or remove (permanent) a post or comment,
+  always with a reason, recorded in `blog_moderation_actions`.
+- **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
+  `user`'s - used for filtering. Attaching a specific exam or deck is not in this
+  version.
+- **Entities with rules:** `BlogPost` - only the author edits or deletes it; a hidden
+  or removed post cannot be edited by its author or commented on. `BlogComment` -
+  the same author rule. `BlogReport` - one per reporter and target, resolved once.
+  Likes and tags are plain rows.
+- **Blocks:** posts and comments by anyone blocked either way are left out of a
+  learner's lists, and neither side can comment on the other's posts, via
+  `FriendshipReader`.
+- **Concurrency:** `@Version` on `blog_posts`, so an author's edit cannot silently
+  undo a moderator's hide. Like primary key `(post_id, user_id)`, counters changed by
+  atomic updates. Unique `(reporter_id, target_type, target_id)`.
+- **Images:** presigned PUT through shared storage; keys recorded in
+  `blog_post_images` so deleting a post can remove them.
+- **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
+  set to null); likes cascade; the erased user's reports are deleted.
+- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
+- **Read path:** the post list - optional tag, author and sort filters with paging -
+  lives in `blog/query`, read-only; everything else is repository.
+- **Why:** posts, comments and moderation have their own lifecycle and reviewers;
+  nothing here shares tables or vocabulary with the learning modules.
+- **Revisit if:** learners need search beyond tags and title, attaching learning
+  content, pre-moderation for new accounts, or saved posts.
+
 ## `shared` and `config`
 
 These are technical packages, not business modules, and own no business tables.
@@ -607,3 +732,13 @@ gone rather than kept: all three describe a state that no longer exists.
   recommendation is consumed during onboarding, so later reclassification is
   harmless today. Revisit when per-skill progress over time has to keep its
   meaning.
+- **Chat across instances.** A push reaches only sockets on the instance that
+  committed the message. Before the backend runs two instances, chat needs Postgres
+  `LISTEN/NOTIFY` (or equivalent) between them. `LISTEN` holds a dedicated connection,
+  which the session-mode pooler allows and transaction mode does not.
+- **Notifications** for friend requests, new messages while offline and comments on
+  one's posts. No module owns notifications yet; decide when the first one is built.
+- **Account export** does not yet cover `friendship`, `chat` or `blog`.
+- **Blog erasure** keeping posts and comments as by a deleted user follows the choice
+  made for chat; confirm it with the product owner and the privacy policy before the
+  first migration.
