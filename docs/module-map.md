@@ -550,11 +550,11 @@ friends.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `chat_conversations` (one per pair, `user_low_id`,
-  `user_high_id`, `last_seq`); `chat_messages` (`id` bigint identity - the cursor
-  across all of a learner's conversations - `seq` within the conversation,
-  `sender_id`, `client_id`, text, an optional image object key, `recalled_at`,
-  `sent_at`); `chat_read_states` (`conversation_id`, `user_id`, `last_read_seq`);
-  `chat_socket_tickets`.
+  `user_high_id`, `last_seq`, `last_message_at`); `chat_messages` (`id`, `seq`
+  within the conversation, `sender_id`, `client_id`, text, an optional image object
+  key, `recalled_at`, `sent_at`); `chat_read_states` (`conversation_id`, `user_id`,
+  `last_read_seq`); `chat_socket_tickets`. Sending moves the sender's own read mark,
+  so unread is `last_seq - last_read_seq` without counting rows.
 - **Entities with rules:** `ChatConversation` hands out the next `seq`.
   `ChatMessage` - text, one image, or both, never empty; only the sender recalls it,
   once; a recalled message loses its text and image and shows as recalled; no
@@ -572,9 +572,13 @@ friends.
   seconds, single use, redeemed by one conditional `UPDATE` so it works on any
   instance; mobile may send `Authorization: Bearer` instead. The handshake checks
   `Origin` against `app.cors.allowed-origins`. The only client frame is
-  `{conversationId, active}` for typing, which is relayed and never stored. The
-  client passes its last cursor when it connects and the server replays what it
-  missed. Pushes happen after commit.
+  `{conversationId, active}` for typing, which is relayed and never stored. Pushes
+  happen after commit. After every (re)connect the client catches up over REST: the
+  conversation list carries each conversation's `last_seq`, and an open conversation
+  fetches messages after its own `seq`. There is deliberately no single cursor across
+  conversations: an id or sequence is handed out before commit, so a later one can
+  commit first and a reconnect would skip the earlier message. Within one
+  conversation `seq` is safe, because the `last_seq` row lock is held to commit.
 - **Images:** presigned PUT through the shared storage client into a private
   location; read through short-lived presigned GETs issued only to the two
   participants. Object-key meaning stays in `chat`. Recalling deletes the object.
@@ -602,9 +606,9 @@ Designed 2026-11-15, not implemented yet. Owns knowledge-sharing posts, their
 comments, likes, reports and moderation.
 
 - **Subdomain:** supporting.
-- **Owns writes to:** `blog_posts` (title, Markdown body, author, status, like and
-  comment counts, version), `blog_post_tags`, `blog_post_images`, `blog_comments`,
-  `blog_post_likes`, `blog_reports`, `blog_moderation_actions`.
+- **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
+  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`,
+  `blog_reports`, `blog_moderation_actions`. Comments are flat - no replies.
 - **Who:** every signed-in account posts, comments and likes. Staff and Admin
   moderate through `/api/admin/blog`, a separate controller in this module.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
@@ -621,8 +625,10 @@ comments, likes, reports and moderation.
   learner's lists, and neither side can comment on the other's posts, via
   `FriendshipReader`.
 - **Concurrency:** `@Version` on `blog_posts`, so an author's edit cannot silently
-  undo a moderator's hide. Like primary key `(post_id, user_id)`, counters changed by
-  atomic updates. Unique `(reporter_id, target_type, target_id)`.
+  undo a moderator's hide. Like primary key `(post_id, user_id)`. Like and comment
+  counts are counted for each page of posts, not stored: erasure removes likes by
+  cascade, and a stored counter would drift. Unique
+  `(reporter_id, target_type, target_id)`.
 - **Images:** presigned PUT through shared storage; keys recorded in
   `blog_post_images` so deleting a post can remove them.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
