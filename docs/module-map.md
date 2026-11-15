@@ -10,7 +10,11 @@ skills, and onboarding.
 
 - **Tables:** `users`, `learner_profiles`, `learning_purposes`,
   `user_learning_purposes`, `user_target_skills`, `user_tour_completions`, `user_role_changes`.
-- **Entry points:** profile, onboarding, and role-specific website tour APIs.
+- **Entry points:** profile, onboarding, and role-specific website tour APIs, and
+  `GET /api/user/{userId}/public-profile` - display name, avatar, banner, whether the
+  account is staff, and join date for the wall; never email, goals or scores. It knows
+  nothing about blocks: `user` does not depend on `friendship`, so the page that shows the
+  wall applies that rule.
 - **Bootstrap read:** `/api/user/me/bootstrap` returns the caller's account and
   learner onboarding snapshot in one transaction. It does not create missing
   profiles, cache another account's data, or load learner state for Staff/Admin.
@@ -551,8 +555,21 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Erasure:** both tables cascade from `users`.
 - **Read path:** repository only; the search itself runs in `user`, behind
   `PublicProfileReader`, because it reads `users`.
-- **Entry points:** `/api/friends` (friends, requests, search, relationships) and
-  `/api/friends/blocks`.
+- **Entry points:** `/api/friends` (friends, requests, search, relationships, and
+  `/users/{userId}/count` for a learner's friend count) and `/api/friends/blocks`.
+- **Relationship as seen by a viewer:** `NONE`, `FRIENDS`, `REQUEST_SENT`,
+  `REQUEST_RECEIVED`, `BLOCKED_BY_ME`, `UNAVAILABLE` (the other side blocked the viewer;
+  the reason is never stated), `SELF`, and `NOT_APPLICABLE` (viewer or target is not a
+  learner, so no friend actions apply).
+- **Visibility:** anyone may read how many friends a learner has; only the owner reads
+  the list itself. Both are refused as not found when the two block each other.
+- **Wall (a screen, not a module):** each account's page is composed in the BFF from
+  three independent calls made in parallel - the public profile (`user`), the
+  relationship and friend count (`friendship`), and posts by author (`blog`). Staff and
+  Admin have walls with posts and no friend actions. When the relationship says
+  `UNAVAILABLE` or `BLOCKED_BY_ME`, the BFF shows the wall as unavailable; the posts
+  themselves are already withheld by `blog`, so the only thing the BFF rule hides on its
+  own is the public name and picture.
 - **Why:** request, accept and block are a different vocabulary and lifecycle from a
   conversation's, and `blog` needs blocks without needing chat.
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a
