@@ -517,10 +517,10 @@ learners: friend requests, friendships and blocks.
 
 - **Subdomain:** supporting. It keeps learners coming back; the product wins on
   practice and AI feedback, not on the social graph.
-- **Owns writes to:** `friendships` - one row per pair, stored as
-  `(user_low_id, user_high_id)` with `requester_id`, `status` (`PENDING`, `ACCEPTED`)
-  and the request/accept times - and `user_blocks` (`blocker_id`, `blocked_id`).
-  Declining, cancelling and unfriending delete the row; no request history is kept.
+- **Owns writes to:** `friendships` (`id`, `requester_id`, `addressee_id`, `status`
+  `PENDING` or `ACCEPTED`, the request/accept times) and `user_blocks` (`blocker_id`,
+  `blocked_id`). Declining, cancelling and unfriending delete the row; no request
+  history is kept. Columns are named for the roles rather than for a sorting trick.
 - **Who:** learners only. Staff and Admin neither send nor receive requests, checked
   through `UserDirectory.isBackOfficeUser`.
 - **Entities with rules:** `Friendship` - nobody befriends themselves, only the
@@ -529,7 +529,9 @@ learners: friend requests, friendships and blocks.
   plain rows; their rule spans both tables and lives in the service: blocking deletes
   the pair's friendship or pending request, and no request is created or accepted
   while a block exists either way.
-- **Concurrency:** the pair primary key makes a second row for one pair impossible.
+- **Concurrency:** a unique index on
+  `(least(requester_id, addressee_id), greatest(requester_id, addressee_id))` makes a
+  second row for one pair impossible, whichever side asked.
   Every write for a pair (request, accept, block, unfriend) takes a transaction
   advisory lock on the pair, so a block cannot race an accept.
 - **Talks to:** `user` via `UserDirectory` (role, display names). Publishes
@@ -549,16 +551,21 @@ Designed 2026-11-15, not implemented yet. Owns one-to-one conversations between
 friends.
 
 - **Subdomain:** supporting.
-- **Owns writes to:** `chat_conversations` (one per pair, `user_low_id`,
-  `user_high_id`, `last_seq`, `last_message_at`); `chat_messages` (`id`, `seq`
-  within the conversation, `sender_id`, `client_id`, text, an optional image object
-  key, `recalled_at`, `sent_at`); `chat_read_states` (`conversation_id`, `user_id`,
-  `last_read_seq`); `chat_socket_tickets`. Sending moves the sender's own read mark,
-  so unread is `last_seq - last_read_seq` without counting rows.
+- **Owns writes to:** `chat_conversations` (`id`, `direct_key`, `last_seq`,
+  `last_message_at`); `chat_participants` (`conversation_id`, `user_id`,
+  `last_read_seq`, `joined_at`); `chat_messages` (`id`, `seq` within the
+  conversation, `sender_id`, `client_id`, text, an optional image object key,
+  `recalled_at`, `sent_at`); `chat_socket_tickets`. A conversation holds no user
+  columns: who is in it, and how far each has read, are participant rows. Sending
+  moves the sender's own read mark, so unread is `last_seq - last_read_seq` without
+  counting rows.
+- **One conversation per pair:** `direct_key` is `"<smaller uuid>:<larger uuid>"`,
+  unique, so two friends opening a chat at the same moment get one conversation. It
+  is the only place the pair is sorted.
 - **Entities with rules:** `ChatConversation` hands out the next `seq`.
   `ChatMessage` - text, one image, or both, never empty; only the sender recalls it,
   once; a recalled message loses its text and image and shows as recalled; no
-  editing. `ChatReadState` - the read mark never moves backwards.
+  editing. `ChatParticipant` - the read mark never moves backwards.
 - **Who may send:** the two must be friends with no block either way, asked through
   `FriendshipReader` on every send and never cached, so unfriending or blocking stops
   the next message. History stays readable after unfriending.
@@ -582,10 +589,11 @@ friends.
 - **Images:** presigned PUT through the shared storage client into a private
   location; read through short-lived presigned GETs issued only to the two
   participants. Object-key meaning stays in `chat`. Recalling deletes the object.
-- **Erasure:** messages stay and show as from a deleted user: the foreign keys set
-  `sender_id` and the conversation's user columns to null, read states cascade.
-  Images the erased learner sent stay with their messages. The privacy policy has to
-  say so.
+- **Erasure:** messages stay and show as from a deleted user: `sender_id` is set to
+  null and the erased learner's participant row cascades. A direct conversation left
+  with one participant shows the other side as a deleted user; one left with none is
+  cleaned up. Images the erased learner sent stay with their messages. The privacy
+  policy has to say so.
 - **Moderation:** none in this version. No reporting; a learner protects themselves by
   blocking, and staff never read private messages.
 - **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
@@ -596,7 +604,8 @@ friends.
   cookie). SSE through them would keep two functions running for every learner with
   the app open and cannot carry typing cheaply. Sends stay on REST so a dropped socket
   never loses a message, and validation, errors and rate limits stay the existing ones.
-- **Revisit if:** group chat, presence, or send latency starts to matter (send over the
+- **Revisit if:** group chat (participant rows already allow it; `direct_key` becomes
+  nullable for groups), presence, or send latency starts to matter (send over the
   socket too); abuse in chat is reported (a report flow that shows staff only the
   reported message); the backend runs more than one instance (see Still open).
 
