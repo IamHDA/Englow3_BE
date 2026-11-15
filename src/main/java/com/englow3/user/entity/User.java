@@ -1,5 +1,6 @@
 package com.englow3.user.entity;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,6 +33,10 @@ public class User {
 
     @Id
     private UUID id;
+
+    /** Read-only: the database stamps it when the Supabase trigger creates the row. It is the wall's "joined" date. */
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private Instant createdAt;
 
     @Column(name = "auth_provider_id", nullable = false, updatable = false)
     private UUID authProviderId;

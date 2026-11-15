@@ -464,9 +464,12 @@ class FriendshipServiceTest {
     class RelationshipWithOneLearner {
 
         @Test
-        void yourselfIsRefused() {
-            assertThatThrownBy(() -> service.relationshipWith(me)).isInstanceOfSatisfying(BadRequestException.class,
-                    e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_SELF"));
+        void yourselfIsSelfAndNothingIsQueried() {
+            RelationshipResult result = service.relationshipWith(me);
+
+            assertThat(result.relationship()).isEqualTo(RelationshipStatus.SELF);
+            assertThat(result.requestId()).isNull();
+            verifyNoInteractions(friendshipRepo, userBlockRepo, publicProfileReader);
         }
 
         @Test
@@ -488,6 +491,27 @@ class FriendshipServiceTest {
         }
 
         @Test
+        void staffOrAnUnknownIdIsNotApplicableAndNeverAnError() {
+            when(publicProfileReader.isLearner(other)).thenReturn(false);
+
+            RelationshipResult result = service.relationshipWith(other);
+
+            assertThat(result.relationship()).isEqualTo(RelationshipStatus.NOT_APPLICABLE);
+            assertThat(result.requestId()).isNull();
+            verifyNoInteractions(friendshipRepo, userBlockRepo);
+        }
+
+        @Test
+        void aCallerWhoIsStaffGetsNotApplicableForEveryone() {
+            when(publicProfileReader.isLearner(me)).thenReturn(false);
+
+            RelationshipResult result = service.relationshipWith(other);
+
+            assertThat(result.relationship()).isEqualTo(RelationshipStatus.NOT_APPLICABLE);
+            verifyNoInteractions(friendshipRepo, userBlockRepo);
+        }
+
+        @Test
         void aRequestWaitingForYouCarriesItsId() {
             Friendship received = requestWith(other, FriendshipStatus.PENDING);
             when(received.isRequestedBy(me)).thenReturn(false);
@@ -504,6 +528,43 @@ class FriendshipServiceTest {
             when(friendshipRepo.findPair(me, other)).thenReturn(Optional.empty());
 
             assertThat(service.relationshipWith(other).relationship()).isEqualTo(RelationshipStatus.NONE);
+        }
+    }
+
+    @Nested
+    class FriendCountOfALearner {
+
+        @Test
+        void countsAnotherLearnersFriendsWhenNobodyBlockedAnybody() {
+            when(userBlockRepo.existsEitherWay(me, other)).thenReturn(false);
+            when(friendshipRepo.countFriendsOf(other)).thenReturn(7L);
+
+            assertThat(service.friendCountOf(other)).isEqualTo(7L);
+        }
+
+        @Test
+        void aBlockEitherWayHidesTheLearnerAsIfTheyWereMissing() {
+            when(userBlockRepo.existsEitherWay(me, other)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.friendCountOf(other)).isInstanceOfSatisfying(NotFoundException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
+            verify(friendshipRepo, never()).countFriendsOf(any());
+        }
+
+        @Test
+        void yourOwnCountNeverChecksForBlocks() {
+            when(friendshipRepo.countFriendsOf(me)).thenReturn(3L);
+
+            assertThat(service.friendCountOf(me)).isEqualTo(3L);
+            verifyNoInteractions(userBlockRepo);
+        }
+
+        @Test
+        void aCallerWhoIsStaffMayStillSeeTheNumber() {
+            when(publicProfileReader.isLearner(me)).thenReturn(false);
+            when(friendshipRepo.countFriendsOf(other)).thenReturn(2L);
+
+            assertThat(service.friendCountOf(other)).isEqualTo(2L);
         }
     }
 }

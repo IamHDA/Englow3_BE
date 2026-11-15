@@ -201,10 +201,13 @@ public class FriendshipServiceImpl implements FriendshipService {
     public RelationshipResult relationshipWith(UUID otherUserId) {
         UUID me = userDirectory.requireCurrentUserId();
         if (otherUserId.equals(me)) {
-            throw new BadRequestException("FRIENDSHIP_SELF", "You cannot befriend yourself");
+            return new RelationshipResult(otherUserId, RelationshipStatus.SELF, null);
         }
-        requireLearnerCaller(me);
-
+        // A wall can be opened by anyone and for anyone, so this answers with a state rather than an error: staff, and
+        // an id that names no account, simply have no friend actions.
+        if (!publicProfileReader.isLearner(me) || !publicProfileReader.isLearner(otherUserId)) {
+            return new RelationshipResult(otherUserId, RelationshipStatus.NOT_APPLICABLE, null);
+        }
         if (userBlockRepo.existsByIdBlockerIdAndIdBlockedId(me, otherUserId)) {
             return new RelationshipResult(otherUserId, RelationshipStatus.BLOCKED_BY_ME, null);
         }
@@ -215,6 +218,18 @@ public class FriendshipServiceImpl implements FriendshipService {
         RelationshipStatus relationship = relationshipOf(friendship, me);
         UUID requestId = relationship == RelationshipStatus.REQUEST_RECEIVED ? friendship.getId() : null;
         return new RelationshipResult(otherUserId, relationship, requestId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long friendCountOf(UUID userId) {
+        UUID me = userDirectory.requireCurrentUserId();
+        // Only the number is public. Two learners who blocked each other do not see each other's page at all, and the
+        // answer says the learner is missing rather than that a block exists.
+        if (!userId.equals(me) && userBlockRepo.existsEitherWay(me, userId)) {
+            throw new NotFoundException("LEARNER_NOT_FOUND", "No such learner");
+        }
+        return friendshipRepo.countFriendsOf(userId);
     }
 
     /**

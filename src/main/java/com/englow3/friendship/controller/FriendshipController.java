@@ -56,10 +56,20 @@ public class FriendshipController {
                 .from(friendshipService.searchLearners(q, clamp(pageable)).map(LearnerSearchResponse::from)));
     }
 
-    /** How the caller stands with one learner, for a "Add friend" button on a page about that learner. */
+    /**
+     * How the caller stands with one person, for an "Add friend" button on a page about them. Always answers with a
+     * state, never an error for the relationship. {@code SELF}, {@code NOT_APPLICABLE} (a staff author, say) and
+     * {@code UNAVAILABLE} show no button.
+     */
     @GetMapping("/relationships/{userId}")
     public ResponseEntity<RelationshipResponse> relationship(@PathVariable UUID userId) {
         return ResponseEntity.ok(RelationshipResponse.from(friendshipService.relationshipWith(userId)));
+    }
+
+    /** The number of friends a learner has: public on a wall, unlike the list. 404 when the two blocked each other. */
+    @GetMapping("/users/{userId}/count")
+    public ResponseEntity<CountResponse> friendCount(@PathVariable UUID userId) {
+        return ResponseEntity.ok(new CountResponse(friendshipService.friendCountOf(userId)));
     }
 
     @GetMapping("/requests/incoming")

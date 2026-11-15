@@ -360,6 +360,66 @@ class FriendshipIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void relationshipAnswersWithAStateForEveryoneAndNeverAnError() {
+        UUID me = fixture.learner();
+        UUID staffAuthor = fixture.staff("Staff author " + tag());
+        UUID blockedMe = fixture.learner();
+        UUID iBlocked = fixture.learner();
+        UUID stranger = fixture.learner();
+        SignedIn.as(jdbc, blockedMe);
+        blockService.block(me);
+        SignedIn.as(jdbc, me);
+        blockService.block(iBlocked);
+
+        assertThat(friendshipService.relationshipWith(me).relationship()).isEqualTo(RelationshipStatus.SELF);
+        assertThat(friendshipService.relationshipWith(staffAuthor).relationship())
+                .isEqualTo(RelationshipStatus.NOT_APPLICABLE);
+        assertThat(friendshipService.relationshipWith(UUID.randomUUID()).relationship())
+                .isEqualTo(RelationshipStatus.NOT_APPLICABLE);
+        assertThat(friendshipService.relationshipWith(blockedMe).relationship())
+                .isEqualTo(RelationshipStatus.UNAVAILABLE);
+        assertThat(friendshipService.relationshipWith(iBlocked).relationship())
+                .isEqualTo(RelationshipStatus.BLOCKED_BY_ME);
+        assertThat(friendshipService.relationshipWith(stranger).relationship()).isEqualTo(RelationshipStatus.NONE);
+
+        SignedIn.as(jdbc, staffAuthor);
+        assertThat(friendshipService.relationshipWith(stranger).relationship())
+                .isEqualTo(RelationshipStatus.NOT_APPLICABLE);
+    }
+
+    @Test
+    void friendCountCountsBothSidesIgnoresPendingAndHidesBlockedLearners() {
+        UUID me = fixture.learner();
+        UUID asked = fixture.learner();
+        UUID askedMe = fixture.learner();
+        UUID pending = fixture.learner();
+        UUID blocker = fixture.learner();
+        UUID target = fixture.learner();
+        insertFriendship(target, asked, FriendshipStatus.ACCEPTED);
+        insertFriendship(askedMe, target, FriendshipStatus.ACCEPTED);
+        insertFriendship(target, pending, FriendshipStatus.PENDING);
+        insertFriendship(blocker, target, FriendshipStatus.ACCEPTED);
+
+        SignedIn.as(jdbc, me);
+        assertThat(friendshipService.friendCountOf(target)).as("both directions, never the pending one").isEqualTo(3);
+        assertThat(friendshipService.friendCountOf(UUID.randomUUID())).isZero();
+
+        SignedIn.as(jdbc, target);
+        assertThat(friendshipService.friendCountOf(target)).isEqualTo(3);
+        blockService.block(me);
+
+        SignedIn.as(jdbc, me);
+        assertThatThrownBy(() -> friendshipService.friendCountOf(target)).isInstanceOfSatisfying(
+                com.englow3.shared.error.NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
+        SignedIn.as(jdbc, target);
+        assertThatThrownBy(() -> friendshipService.friendCountOf(me)).isInstanceOfSatisfying(
+                com.englow3.shared.error.NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
+        assertThat(friendshipService.friendCountOf(target)).as("one's own count ignores blocks").isEqualTo(3);
+    }
+
+    @Test
     void staffCannotSearchOrBefriend() {
         UUID staff = fixture.staff("Staff " + tag());
         UUID learner = fixture.learner();

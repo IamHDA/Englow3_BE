@@ -526,10 +526,11 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
   history is kept. Columns are named for the roles rather than for a sorting trick.
 - **Who:** learners only. Staff and Admin neither send nor receive requests, checked
   through `PublicProfileReader.isLearner` (a role of exactly `LEARNER`), not
-  `UserDirectory.isBackOfficeUser`. Sending, accepting, blocking, searching and
-  asking for a relationship require the caller to be a learner; withdrawing, unfriending,
-  unblocking and reading one's own lists do not, so an account whose role changed can still
-  clean up what it already has.
+  `UserDirectory.isBackOfficeUser`. Sending, accepting, blocking and searching require the
+  caller to be a learner; withdrawing, unfriending, unblocking and reading one's own lists
+  do not, so an account whose role changed can still clean up what it already has. The
+  relationship and friend-count reads never refuse on role: they answer `NOT_APPLICABLE`
+  or a count, so a wall can always ask.
 - **Entities with rules:** `Friendship` - nobody befriends themselves, only the
   addressee accepts, only a pending request can be accepted. A request from B while
   A's request to B is pending accepts it rather than creating a second row. Blocks are

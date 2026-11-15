@@ -41,5 +41,15 @@ public interface FriendshipService {
 
     Page<LearnerSearchResult> searchLearners(String term, Pageable page);
 
+    /**
+     * How the caller stands with {@code otherUserId}. Never fails for a relationship reason: the caller themselves is
+     * {@code SELF}, and staff or an unknown id is {@code NOT_APPLICABLE}.
+     */
     RelationshipResult relationshipWith(UUID otherUserId);
+
+    /**
+     * How many friends a learner has, for their wall. The number is public; the list is not. Staff and unknown ids
+     * count zero. Learners who blocked each other get {@code LEARNER_NOT_FOUND}, except for one's own count.
+     */
+    long friendCountOf(UUID userId);
 }

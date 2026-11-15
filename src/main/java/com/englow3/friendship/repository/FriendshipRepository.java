@@ -71,4 +71,12 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     List<Friendship> findPairsWith(@Param("me") UUID me, @Param("others") Collection<UUID> others);
 
     boolean existsByStatusAndRequesterIdAndAddresseeId(FriendshipStatus status, UUID requesterId, UUID addresseeId);
+
+    /** Accepted friendships on either side; a pending request is not a friend yet. */
+    @Query("""
+            select count(f) from Friendship f
+            where f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
+              and (f.requesterId = :user or f.addresseeId = :user)
+            """)
+    long countFriendsOf(@Param("user") UUID userId);
 }
