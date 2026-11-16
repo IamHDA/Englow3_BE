@@ -71,9 +71,9 @@ import com.englow3.support.SignedIn;
  * What a mock cannot show: the hand-written list query against real rows, the cascades and {@code set null} of erasure,
  * the conditional image attach, the check constraints, and Hibernate's {@code @Version} on a post with a tag
  * collection. Object storage is a mock - nothing here has a bucket - so the tests assert which keys would be signed,
- * checked and deleted. Rows are made with SQL where the test needs a state the services cannot reach yet (a hidden
- * post: moderation does not exist), and every test searches by a title marker of its own, so tests sharing one database
- * never see each other's posts.
+ * checked and deleted. Rows are made with SQL where the test needs a state that is simpler to set than to reach (a
+ * hidden post; moderation has its own test, {@code BlogModerationIntegrationTest}), and every test searches by a title
+ * marker of its own, so tests sharing one database never see each other's posts.
  */
 class BlogIntegrationTest extends PostgresIntegrationTest {
 

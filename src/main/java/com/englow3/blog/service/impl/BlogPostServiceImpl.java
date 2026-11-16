@@ -30,7 +30,6 @@ import com.englow3.blog.dto.projection.PostListFilter;
 import com.englow3.blog.dto.projection.PostSummaryRow;
 import com.englow3.blog.dto.projection.PostTagRow;
 import com.englow3.blog.dto.result.BlogAuthorResult;
-import com.englow3.blog.dto.result.BlogImageResult;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
 import com.englow3.blog.dto.result.BlogTagCatalogue;
@@ -38,15 +37,20 @@ import com.englow3.blog.dto.result.BlogTagResult;
 import com.englow3.blog.entity.BlogCertificate;
 import com.englow3.blog.entity.BlogCommentStatus;
 import com.englow3.blog.entity.BlogLevel;
+import com.englow3.blog.entity.BlogModerationAction;
+import com.englow3.blog.entity.BlogModerationActionType;
 import com.englow3.blog.entity.BlogPost;
 import com.englow3.blog.entity.BlogPostImage;
 import com.englow3.blog.entity.BlogPostSort;
+import com.englow3.blog.entity.BlogPostStatus;
 import com.englow3.blog.entity.BlogSkill;
 import com.englow3.blog.entity.BlogTag;
+import com.englow3.blog.entity.BlogTargetType;
 import com.englow3.blog.helper.BlogImages;
 import com.englow3.blog.helper.BlogMarkdown;
 import com.englow3.blog.query.BlogPostListQuery;
 import com.englow3.blog.repository.BlogCommentRepository;
+import com.englow3.blog.repository.BlogModerationActionRepository;
 import com.englow3.blog.repository.BlogPostImageRepository;
 import com.englow3.blog.repository.BlogPostLikeRepository;
 import com.englow3.blog.repository.BlogPostRepository;
@@ -58,7 +62,6 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.shared.storage.ObjectStorageClient.StoredObjectMetadata;
-import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.PublicProfileReader;
 import com.englow3.user.api.PublicProfileReader.PublicProfile;
 import com.englow3.user.api.UserDirectory;
@@ -103,18 +106,16 @@ public class BlogPostServiceImpl implements BlogPostService {
     private final BlogCommentRepository commentRepo;
     private final BlogPostImageRepository imageRepo;
     private final BlogPostLikeRepository likeRepo;
+    private final BlogModerationActionRepository actionRepo;
     private final BlogPostListQuery listQuery;
     private final ObjectStorageClient objectStorage;
-    private final PresignedUrlResolver presignedUrls;
+    private final BlogImageLinks imageLinks;
     private final UserRateLimiter rateLimiter;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
     @Value("${app.storage.blog-bucket}")
     private String blogBucket;
-
-    @Value("${app.storage.blog-image-url-ttl:PT3H}")
-    private Duration imageUrlTtl;
 
     @Override
     public BlogPostDetailResult create(SavePostCommand command) {
@@ -247,27 +248,28 @@ public class BlogPostServiceImpl implements BlogPostService {
                 : publicProfileReader.profiles(Set.of(post.getAuthorId()));
         List<BlogTagResult> tags = sorted(
                 post.getTags().stream().map(tag -> new BlogTagResult(tag.getKind(), tag.getValue())).toList());
-        return new BlogPostDetailResult(post.getId(), post.getTitle(), post.getBody(), imagesOf(post),
-                authorOf(post.getAuthorId(), profiles), tags, post.getStatus(), post.getVersion(),
-                likeRepo.countByIdPostId(postId), commentRepo.countByPostIdAndStatus(postId, BlogCommentStatus.VISIBLE),
+        return new BlogPostDetailResult(post.getId(), post.getTitle(), post.getBody(),
+                imageLinks.of(post.getId(), post.getBody()), authorOf(post.getAuthorId(), profiles), tags,
+                post.getStatus(), post.getVersion(), likeRepo.countByIdPostId(postId),
+                commentRepo.countByPostIdAndStatus(postId, BlogCommentStatus.VISIBLE),
                 likeRepo.existsByIdPostIdAndIdUserId(postId, me), post.isEditableBy(me),
                 // A block would have made the post unreadable above, so what is left to ask is whether it is open.
-                post.isOpenForInteraction(), post.getCreatedAt(), post.getEditedAt());
+                post.isOpenForInteraction(), post.getCreatedAt(), post.getEditedAt(), moderationNote(post, me));
     }
 
-    /** The post's images with a link to read each, in the order the text first shows them. */
-    private List<BlogImageResult> imagesOf(BlogPost post) {
-        List<UUID> order = BlogMarkdown.imageReferences(post.getBody());
-        return imageRepo.findByPostId(post.getId()).stream()
-                .sorted((a, b) -> Integer.compare(position(order, a.getId()), position(order, b.getId())))
-                .map(image -> new BlogImageResult(image.getId(),
-                        presignedUrls.resolve(blogBucket, image.getObjectKey(), imageUrlTtl)))
-                .toList();
-    }
-
-    private static int position(List<UUID> order, UUID id) {
-        int index = order.indexOf(id);
-        return index < 0 ? Integer.MAX_VALUE : index;
+    /**
+     * Why a moderator hid or removed the post, for its author and only while it is not published - the one case in
+     * which this use case returns a post that is not. The last hide or removal counts: a dismissal or a restore after
+     * it is not a reason the post is down. Null when there is none, e.g. a status set by hand.
+     */
+    private String moderationNote(BlogPost post, UUID me) {
+        if (post.getStatus() == BlogPostStatus.PUBLISHED || !post.isAuthor(me)) {
+            return null;
+        }
+        return actionRepo
+                .findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(BlogTargetType.POST, post.getId(),
+                        List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE))
+                .map(BlogModerationAction::getReason).orElse(null);
     }
 
     private static BlogAuthorResult authorOf(UUID authorId, Map<UUID, PublicProfile> profiles) {

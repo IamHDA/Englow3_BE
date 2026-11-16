@@ -50,14 +50,18 @@ import com.englow3.blog.dto.projection.PostTagRow;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
 import com.englow3.blog.dto.result.BlogTagResult;
+import com.englow3.blog.entity.BlogModerationAction;
+import com.englow3.blog.entity.BlogModerationActionType;
 import com.englow3.blog.entity.BlogPost;
 import com.englow3.blog.entity.BlogPostImage;
 import com.englow3.blog.entity.BlogPostSort;
 import com.englow3.blog.entity.BlogPostStatus;
 import com.englow3.blog.entity.BlogSkill;
 import com.englow3.blog.entity.BlogTagKind;
+import com.englow3.blog.entity.BlogTargetType;
 import com.englow3.blog.query.BlogPostListQuery;
 import com.englow3.blog.repository.BlogCommentRepository;
+import com.englow3.blog.repository.BlogModerationActionRepository;
 import com.englow3.blog.repository.BlogPostImageRepository;
 import com.englow3.blog.repository.BlogPostLikeRepository;
 import com.englow3.blog.repository.BlogPostRepository;
@@ -90,16 +94,19 @@ class BlogPostServiceTest {
     private final BlogCommentRepository commentRepo = mock(BlogCommentRepository.class);
     private final BlogPostImageRepository imageRepo = mock(BlogPostImageRepository.class);
     private final BlogPostLikeRepository likeRepo = mock(BlogPostLikeRepository.class);
+    private final BlogModerationActionRepository actionRepo = mock(BlogModerationActionRepository.class);
     private final BlogPostListQuery listQuery = mock(BlogPostListQuery.class);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
+    /** Real: it only turns the image rows into links, through the mocks above. Its own test covers the details. */
+    private final BlogImageLinks imageLinks = new BlogImageLinks(imageRepo, presignedUrls);
     private final UserRateLimiter rateLimiter = mock(UserRateLimiter.class);
     private final TransactionTemplate transactions = mock(TransactionTemplate.class);
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final BlogPostService service = new BlogPostServiceImpl(userDirectory, friendshipReader,
-            publicProfileReader, readRule, postRepo, commentRepo, imageRepo, likeRepo, listQuery, objectStorage,
-            presignedUrls, rateLimiter, transactions, clock);
+            publicProfileReader, readRule, postRepo, commentRepo, imageRepo, likeRepo, actionRepo, listQuery,
+            objectStorage, imageLinks, rateLimiter, transactions, clock);
 
     /** True only while a callback given to the transaction template is running. */
     private final AtomicBoolean inTransaction = new AtomicBoolean();
@@ -113,7 +120,8 @@ class BlogPostServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         ReflectionTestUtils.setField(service, "blogBucket", "blog");
-        ReflectionTestUtils.setField(service, "imageUrlTtl", Duration.ofHours(3));
+        ReflectionTestUtils.setField(imageLinks, "blogBucket", "blog");
+        ReflectionTestUtils.setField(imageLinks, "imageUrlTtl", Duration.ofHours(3));
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
         // Whether a post may be read is BlogReadRule's to answer and has its own test; here it is open unless a test
         // says the rule refuses.
@@ -737,20 +745,69 @@ class BlogPostServiceTest {
         }
 
         @Test
-        void theBodyIsReturnedAsWrittenAndImagesAreInTheOrderTheTextShowsThem() {
+        void theBodyIsReturnedAsWrittenWithALinkForEachImage() {
             BlogPost post = existingPost(other, 0);
             BlogPostImage first = image(other, post.getId());
-            BlogPostImage second = image(other, post.getId());
-            ReflectionTestUtils.setField(post, "body", markdownWith(first, second));
+            ReflectionTestUtils.setField(post, "body", markdownWith(first));
             postIsLoadable(post);
-            // The database returns them in no particular order.
-            when(imageRepo.findByPostId(post.getId())).thenReturn(List.of(second, first));
+            when(imageRepo.findByPostId(post.getId())).thenReturn(List.of(first));
 
             BlogPostDetailResult result = service.get(post.getId());
 
-            assertThat(result.body()).isEqualTo(markdownWith(first, second));
-            assertThat(result.images()).extracting(image -> image.id()).containsExactly(first.getId(), second.getId());
+            assertThat(result.body()).isEqualTo(markdownWith(first));
+            assertThat(result.images()).extracting(image -> image.id()).containsExactly(first.getId());
             verify(presignedUrls).resolve("blog", first.getObjectKey(), Duration.ofHours(3));
+        }
+
+        @Test
+        void theAuthorOfAHiddenPostSeesTheReasonOfTheLastHideOrRemoval() {
+            BlogPost post = existingPost(me, 4);
+            hide(post);
+            postIsLoadable(post);
+            UUID moderator = UUID.randomUUID();
+            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(any(), any(), any()))
+                    .thenReturn(Optional.of(BlogModerationAction.record(BlogTargetType.POST, post.getId(),
+                            BlogModerationActionType.HIDE, "Links to a shop", moderator, null, now)));
+
+            BlogPostDetailResult result = service.get(post.getId());
+
+            assertThat(result.moderationNote()).isEqualTo("Links to a shop");
+            // Only hiding and removing are reasons a post is down: not a dismissal, not a restore.
+            verify(actionRepo).findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(BlogTargetType.POST,
+                    post.getId(), List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE));
+        }
+
+        @Test
+        void aHiddenPostWithNoRecordedActionHasNoNote() {
+            BlogPost post = existingPost(me, 4);
+            hide(post);
+            postIsLoadable(post);
+            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(any(), any(), any()))
+                    .thenReturn(Optional.empty());
+
+            assertThat(service.get(post.getId()).moderationNote()).isNull();
+        }
+
+        @Test
+        void aPublishedPostHasNoNoteAndNobodyIsAskedForOne() {
+            BlogPost post = existingPost(me, 0);
+            postIsLoadable(post);
+
+            assertThat(service.get(post.getId()).moderationNote()).isNull();
+
+            verifyNoInteractions(actionRepo);
+        }
+
+        /** Only the author gets a post that is not published; the note is theirs alone, whatever the rule would say. */
+        @Test
+        void aReaderWhoIsNotTheAuthorIsNeverGivenTheNote() {
+            BlogPost post = existingPost(other, 0);
+            hide(post);
+            postIsLoadable(post);
+
+            assertThat(service.get(post.getId()).moderationNote()).isNull();
+
+            verifyNoInteractions(actionRepo);
         }
     }
 

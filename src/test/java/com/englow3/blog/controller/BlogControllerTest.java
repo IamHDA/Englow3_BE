@@ -34,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.englow3.blog.dto.command.ListPostsCommand;
+import com.englow3.blog.dto.command.ReportContentCommand;
 import com.englow3.blog.dto.command.SavePostCommand;
 import com.englow3.blog.dto.result.BlogAuthorResult;
 import com.englow3.blog.dto.result.BlogCommentResult;
@@ -41,18 +42,24 @@ import com.englow3.blog.dto.result.BlogImageResult;
 import com.englow3.blog.dto.result.BlogImageUploadTicket;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
+import com.englow3.blog.dto.result.BlogReportResult;
 import com.englow3.blog.dto.result.BlogTagCatalogue;
 import com.englow3.blog.dto.result.BlogTagResult;
 import com.englow3.blog.dto.result.LikeStateResult;
+import com.englow3.blog.dto.result.ReportOutcome;
 import com.englow3.blog.entity.BlogCommentStatus;
 import com.englow3.blog.entity.BlogPostSort;
 import com.englow3.blog.entity.BlogPostStatus;
+import com.englow3.blog.entity.BlogReportReason;
+import com.englow3.blog.entity.BlogReportStatus;
 import com.englow3.blog.entity.BlogSkill;
 import com.englow3.blog.entity.BlogTagKind;
+import com.englow3.blog.entity.BlogTargetType;
 import com.englow3.blog.service.BlogCommentService;
 import com.englow3.blog.service.BlogImageService;
 import com.englow3.blog.service.BlogLikeService;
 import com.englow3.blog.service.BlogPostService;
+import com.englow3.blog.service.BlogReportService;
 import com.englow3.config.SecurityConfig;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
@@ -63,8 +70,8 @@ import com.englow3.user.api.UserDirectory;
  * answers, the field names of every response, what a request is refused for before any service runs, how a domain
  * failure becomes a status, and that nothing here is open without signing in.
  */
-@WebMvcTest(controllers = { BlogPostController.class, BlogCommentController.class,
-        BlogImageController.class }, properties = { "SUPABASE_ISSUER_URI=https://issuer.example.test/auth/v1",
+@WebMvcTest(controllers = { BlogPostController.class, BlogCommentController.class, BlogImageController.class,
+        BlogReportController.class }, properties = { "SUPABASE_ISSUER_URI=https://issuer.example.test/auth/v1",
                 "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class BlogControllerTest {
@@ -90,10 +97,16 @@ class BlogControllerTest {
     @MockitoBean
     private BlogImageService imageService;
 
+    @MockitoBean
+    private BlogReportService reportService;
+
     private final UUID postId = UUID.randomUUID();
     private final UUID commentId = UUID.randomUUID();
     private final UUID authorId = UUID.randomUUID();
+    private final UUID reportId = UUID.randomUUID();
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
+
+    private static final String VALID_REPORT = "{\"reason\":\"SPAM\",\"detail\":\"an advert\"}";
 
     private static final String VALID_POST = """
             {"title":"A title","body":"Some **Markdown**","tags":[{"kind":"SKILL","value":"WRITING"}]}""";
@@ -110,7 +123,7 @@ class BlogControllerTest {
         return new BlogPostDetailResult(postId, "A title", "Some **Markdown**",
                 List.of(new BlogImageResult(UUID.randomUUID(), "https://storage.example/a.png")),
                 new BlogAuthorResult(authorId, "Lan", null), List.of(new BlogTagResult(BlogTagKind.SKILL, "WRITING")),
-                BlogPostStatus.PUBLISHED, 3, 4, 2, true, true, true, now, null);
+                BlogPostStatus.PUBLISHED, 3, 4, 2, true, true, true, now, null, null);
     }
 
     private BlogPostSummaryResult summary() {
@@ -137,7 +150,12 @@ class BlogControllerTest {
         mockMvc.perform(post("/api/blog/images").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"contentType\":\"image/png\",\"contentLength\":10}")).andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(postService, commentService, likeService, imageService);
+        mockMvc.perform(post("/api/blog/posts/{id}/reports", postId).contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REPORT)).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/blog/comments/{id}/reports", commentId).contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REPORT)).andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(postService, commentService, likeService, imageService, reportService);
     }
 
     @Test
@@ -228,10 +246,29 @@ class BlogControllerTest {
         BlogPostDetailResult d = detail();
         when(postService.get(postId)).thenReturn(new BlogPostDetailResult(d.id(), d.title(), d.body(), d.images(), null,
                 d.tags(), d.status(), d.version(), d.likeCount(), d.commentCount(), d.likedByMe(), false, true,
-                d.createdAt(), d.editedAt()));
+                d.createdAt(), d.editedAt(), null));
 
         mockMvc.perform(asLearner(get("/api/blog/posts/{id}", postId))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.author").isEmpty());
+    }
+
+    @Test
+    void theModerationNoteIsInTheDetailAndIsNullWhenThereIsNone() throws Exception {
+        BlogPostDetailResult d = detail();
+        when(postService.get(postId)).thenReturn(new BlogPostDetailResult(d.id(), d.title(), d.body(), d.images(),
+                d.author(), d.tags(), BlogPostStatus.HIDDEN, d.version(), d.likeCount(), d.commentCount(),
+                d.likedByMe(), false, false, d.createdAt(), d.editedAt(), "Links to a shop"));
+        UUID plain = UUID.randomUUID();
+        when(postService.get(plain)).thenReturn(d);
+
+        mockMvc.perform(asLearner(get("/api/blog/posts/{id}", postId))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("HIDDEN"))
+                .andExpect(jsonPath("$.moderationNote").value("Links to a shop"))
+                // The fields that were already there are all still there under their own names.
+                .andExpect(jsonPath("$.canEdit").value(false)).andExpect(jsonPath("$.canInteract").value(false))
+                .andExpect(jsonPath("$.version").value(3)).andExpect(jsonPath("$.likeCount").value(4));
+        mockMvc.perform(asLearner(get("/api/blog/posts/{id}", plain))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.moderationNote").isEmpty());
     }
 
     @Test
@@ -438,6 +475,74 @@ class BlogControllerTest {
         mockMvc.perform(asLearner(delete("/api/blog/comments/{id}", commentId))).andExpect(status().isNoContent());
 
         verify(commentService).delete(commentId);
+    }
+
+    // --- reports ---------------------------------------------------------------------------------------------------
+
+    private BlogReportResult report() {
+        return new BlogReportResult(reportId, BlogTargetType.POST, postId, BlogReportReason.SPAM, "an advert",
+                BlogReportStatus.OPEN, now);
+    }
+
+    @Test
+    void aNewReportAnswers201AndAnExistingOneAnswers200WithTheSameShape() throws Exception {
+        when(reportService.reportPost(any(), any())).thenReturn(new ReportOutcome(report(), true))
+                .thenReturn(new ReportOutcome(report(), false));
+        when(reportService.reportComment(any(), any())).thenReturn(new ReportOutcome(report(), true))
+                .thenReturn(new ReportOutcome(report(), false));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var expected = attempt == 0 ? status().isCreated() : status().isOk();
+            mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), VALID_REPORT)).andExpect(expected)
+                    .andExpect(jsonPath("$.id").value(reportId.toString()))
+                    .andExpect(jsonPath("$.targetType").value("POST"))
+                    .andExpect(jsonPath("$.targetId").value(postId.toString()))
+                    .andExpect(jsonPath("$.reason").value("SPAM")).andExpect(jsonPath("$.detail").value("an advert"))
+                    .andExpect(jsonPath("$.status").value("OPEN")).andExpect(jsonPath("$.createdAt").exists());
+            mockMvc.perform(json(post("/api/blog/comments/{id}/reports", commentId), VALID_REPORT)).andExpect(expected)
+                    .andExpect(jsonPath("$.id").value(reportId.toString()));
+        }
+    }
+
+    @Test
+    void theReasonAndTheNoteArePassedOnAndTheNoteMayBeLeftOut() throws Exception {
+        when(reportService.reportPost(any(), any())).thenReturn(new ReportOutcome(report(), true));
+
+        mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), "{\"reason\":\"MISINFORMATION\"}"))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<ReportContentCommand> command = ArgumentCaptor.forClass(ReportContentCommand.class);
+        verify(reportService).reportPost(org.mockito.ArgumentMatchers.eq(postId), command.capture());
+        assertThat(command.getValue().reason()).isEqualTo(BlogReportReason.MISINFORMATION);
+        assertThat(command.getValue().detail()).isNull();
+    }
+
+    @Test
+    void aReportWithoutAReasonOrWithAWrongOneOrAnOverlongNoteIsRefusedBeforeAnyServiceRuns() throws Exception {
+        for (String body : new String[] { "{}", "{\"detail\":\"no reason\"}", "{\"reason\":null}",
+                "{\"reason\":\"THEFT\"}", "{\"reason\":\"spam\"}",
+                "{\"reason\":\"SPAM\",\"detail\":\"%s\"}".formatted("x".repeat(501)) }) {
+            mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), body))
+                    .andExpect(status().isBadRequest());
+            mockMvc.perform(json(post("/api/blog/comments/{id}/reports", commentId), body))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(reportService);
+    }
+
+    @Test
+    void theServicesRefusalsOfAReportKeepTheirStatusAndCode() throws Exception {
+        when(reportService.reportPost(any(), any())).thenThrow(new NotFoundException("BLOG_POST_NOT_FOUND", "No post"))
+                .thenThrow(new com.englow3.shared.error.BadRequestException("BLOG_REPORT_OWN_CONTENT", "Your own"))
+                .thenThrow(new com.englow3.shared.error.TooManyRequestsException("RATE_LIMITED", "Slow down"));
+
+        mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), VALID_REPORT))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("BLOG_POST_NOT_FOUND"));
+        mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), VALID_REPORT))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BLOG_REPORT_OWN_CONTENT"));
+        mockMvc.perform(json(post("/api/blog/posts/{id}/reports", postId), VALID_REPORT))
+                .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("RATE_LIMITED"));
     }
 
     // --- images ----------------------------------------------------------------------------------------------------
