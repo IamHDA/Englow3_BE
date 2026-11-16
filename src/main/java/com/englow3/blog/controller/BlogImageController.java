@@ -11,6 +11,7 @@ import com.englow3.blog.dto.request.StartImageUploadRequest;
 import com.englow3.blog.dto.response.BlogImageUploadResponse;
 import com.englow3.blog.service.BlogImageService;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 
 /** Image uploads for posts that are not saved yet. */
@@ -28,6 +29,7 @@ public class BlogImageController {
      * A URL to PUT one image to. Put the returned {@code reference} in the post's Markdown where the image goes, once
      * the PUT has finished, and save the post.
      */
+    @ApiResponse(responseCode = "201", description = "An upload URL was issued")
     @PostMapping
     public ResponseEntity<BlogImageUploadResponse> startUpload(@Valid @RequestBody StartImageUploadRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)

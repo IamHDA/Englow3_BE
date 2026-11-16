@@ -30,6 +30,7 @@ import com.englow3.blog.service.BlogLikeService;
 import com.englow3.blog.service.BlogPostService;
 import com.englow3.shared.page.PageResponse;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 
 /**
@@ -68,6 +69,7 @@ public class BlogPostController {
                 .ok(PageResponse.from(postService.list(command, paging).map(BlogPostSummaryResponse::from)));
     }
 
+    @ApiResponse(responseCode = "201", description = "The post was created")
     @PostMapping("/posts")
     public ResponseEntity<BlogPostDetailResponse> create(@Valid @RequestBody SavePostRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)

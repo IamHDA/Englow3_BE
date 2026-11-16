@@ -20,6 +20,7 @@ import com.englow3.blog.dto.response.BlogCommentResponse;
 import com.englow3.blog.service.BlogCommentService;
 import com.englow3.shared.page.PageResponse;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 
 /** Flat comments: listed and written under a post, edited and deleted by their own id. */
@@ -40,6 +41,7 @@ public class BlogCommentController {
         return ResponseEntity.ok(PageResponse.from(commentService.list(id, pageable).map(BlogCommentResponse::from)));
     }
 
+    @ApiResponse(responseCode = "201", description = "The comment was written")
     @PostMapping("/posts/{id}/comments")
     public ResponseEntity<BlogCommentResponse> create(@PathVariable UUID id,
             @Valid @RequestBody SaveCommentRequest request) {
