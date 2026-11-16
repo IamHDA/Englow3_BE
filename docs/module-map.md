@@ -47,7 +47,7 @@ skills, and onboarding.
   contracts for cross-module identity lookup and placement recording.
   `user.api.PublicProfileReader` hands other modules what other learners may see of an
   account - display name and avatar URL, never email - for a set of ids in one query,
-  whether an id is a learner, and the learner search by display name (`friendship` and `chat` use it).
+  whether an id is a learner, and the learner search by display name (`friendship`, `chat` and `blog` use it).
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
   level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
   daily study minutes and purposes as plain values. User entities,
@@ -685,54 +685,104 @@ new messages, recalls, read marks and typing. Owns one-to-one conversations betw
   socket too); abuse in chat is reported (a report flow that shows staff only the
   reported message); the backend runs more than one instance (see Still open).
 
-## `blog` (planned)
+## `blog` (moderation pending)
 
-Designed 2026-11-15, not implemented yet. Owns knowledge-sharing posts, their
-comments, likes, reports and moderation.
+Implemented: posts with Markdown, images and tags, flat comments, likes and the post list,
+behind `/api/blog`. Reports and moderation (`/api/admin/blog`) are not built yet; the
+`status` columns exist and every read and write already respects them. Owns knowledge-sharing
+posts, their comments, likes, reports and moderation.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
-  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`,
-  `blog_reports`, `blog_moderation_actions`. Comments are flat - no replies.
+  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`. Comments are
+  flat - no replies. `blog_reports` and `blog_moderation_actions` are created with
+  moderation, not before.
 - **Who:** every signed-in account posts, comments and likes; nothing is readable
-  without signing in. Staff and Admin moderate through `/api/admin/blog`, a separate
-  controller in this module - never content they wrote themselves.
+  without signing in (no route under `/api/blog` is public). Staff and Admin moderate through
+  `/api/admin/blog`, a separate controller in this module - never content they wrote themselves.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
   reports. Moderators hide (reversible) or remove (permanent) a post or comment, or
-  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`.
+  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`. Until
+  moderation exists nothing sets `HIDDEN` or `REMOVED`; the code only reads them.
 - **What an author sees:** their own posts and comments in every status, with the
   status shown, so a hidden or removed post is found in their own list rather than
-  only by its link. Everyone else sees published posts and visible comments.
+  only by its link. Everyone else sees published posts and visible comments. In the API this
+  is `GET /api/blog/posts?authorId=<the caller>`: the one list that includes every status
+  (the query decides it from `authorId == viewer`, so no other filter combination can reach
+  hidden posts), and the comment list returns the caller's own hidden or removed comments
+  with their `status`. A hidden or removed post is opened only by its author, and then
+  `canEdit` and `canInteract` are false.
+- **One read rule:** a post that does not exist, is hidden from the caller, or is by someone
+  the caller has a block with is the same `BLOG_POST_NOT_FOUND`, so neither moderation state
+  nor a block is revealed. It applies to reading, editing, listing and writing comments, editing
+  a comment and liking; unliking, deleting one's own post and deleting one's own comment are allowed in
+  every status.
 - **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
-  `user`'s - used for filtering. Attaching a specific exam or deck is not in this
-  version.
+  `user`'s - used for filtering (a filter that is given must match; tags combine with AND).
+  Attaching a specific exam or deck is not in this version.
 - **Entities with rules:** `BlogPost` - only the author edits or deletes it; a hidden
-  or removed post cannot be edited by its author or commented on. `BlogComment` -
-  the same author rule. `BlogReport` - one open report per reporter and target,
+  or removed post cannot be edited by its author or commented on; title 1-200 characters,
+  body 1-20 000, at most 8 tags. `BlogComment` - the same author rule, 1-2000 characters, no
+  edit once hidden or removed. `BlogTag` is an immutable embeddable checked against the
+  kind's own enum. `BlogReport` (with moderation) - one open report per reporter and target,
   resolved once; after it is closed the same reader may report that content again,
   because an edit can make dismissed content a problem later. Likes and tags are
-  plain rows.
+  plain rows; images are plain rows whose `post_id` is written only by a conditional update.
 - **Blocks:** posts and comments by anyone blocked either way are left out of a
-  learner's lists, and neither side can comment on the other's posts, via
-  `FriendshipReader`.
+  learner's lists, and neither side can comment on, like or open the other's posts, via
+  `FriendshipReader`. Blocking is learner-only, so for Staff and Admin the blocked set is
+  normally empty. A block never hides a person's own posts from their own list. A post whose
+  author is erased (null) is nobody's to hide and stays in every list, whatever blocks the viewer has.
 - **Concurrency:** `@Version` on `blog_posts`, so an author's edit cannot silently
-  undo a moderator's hide. Like primary key `(post_id, user_id)`. Like and comment
-  counts are counted for each page of posts, not stored: erasure removes likes by
-  cascade, and a stored counter would drift. Unique
-  `(reporter_id, target_type, target_id)` among open reports only.
-- **Images:** presigned PUT through shared storage; keys recorded in
-  `blog_post_images` so deleting a post can remove them.
+  undo a moderator's hide: the editor sends back the version it opened and a post that has
+  changed since is refused as `BLOG_POST_STALE`; Hibernate's check on the write turns two saves that
+  both passed it into `CONCURRENT_UPDATE`. Like primary key `(post_id, user_id)` with an
+  `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
+  not stored: erasure removes likes by cascade, and a stored counter would drift. Unique
+  `(reporter_id, target_type, target_id)` among open reports only (with moderation).
+- **Images:** the Markdown refers to an image as `blog-image:<id>`, never by URL, so the
+  `blog` bucket stays private, a link that expires cannot break a saved post, and moving the
+  storage domain changes no data. The read API returns the body as written plus
+  `images: [{id, url}]` with presigned GETs (`app.storage.blog-image-url-ttl`, 3 hours) and the
+  page swaps each reference for its URL. An upload is a presigned PUT
+  (`POST /api/blog/images`, bound to the declared type - JPEG, PNG, WebP - and size - at most
+  5 MB - and valid 10 minutes) into `app.storage.blog-bucket`, keyed `posts/{uploaderId}/{imageId}.{ext}`;
+  the row is written with `post_id` null. At most 10 images per post. Saving a post names
+  its images in the text: each must exist, be the caller's and be unattached or already this
+  post's; the object's existence is checked with a HEAD outside any transaction; and the write
+  attaches them with a conditional update whose row count must equal the number it expected, so a
+  post is never saved pointing at an image it did not get (another post took it, or the sweep
+  removed it) - that rolls the write back. An image taken out of the text on edit is deleted
+  (row, then object after commit). Deleting a post removes its image rows by cascade but not their
+  objects, so every path that deletes a post reads the keys first and deletes the objects after
+  the commit. A cleanup job (`app.blog.cleanup-enabled`, hourly) removes images no post took
+  within a day, with their objects, by conditional delete.
+- **Excerpt:** the list reads the first 1200 characters of each body and `BlogMarkdown.excerpt`
+  makes a plain-text excerpt of at most 200 characters (the ellipsis counts) at a word boundary.
+  Text that ends inside an image or a link never reaches the excerpt, so no truncated
+  `blog-image:` fragment leaks.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
   set to null) - confirmed by the product owner on 2026-11-16, the same choice as
-  chat; likes cascade; the erased user's reports are deleted. The privacy policy has
-  to say so.
-- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
-- **Read path:** the post list - optional tag, author and sort filters with paging -
-  lives in `blog/query`, read-only; everything else is repository.
+  chat; likes cascade; images stay with their post (an upload nobody used keeps a null
+  `uploader_id` and is swept after a day); the erased user's reports are deleted (with
+  moderation). The privacy policy has to say so.
+- **Talks to:** `friendship` via `FriendshipReader` (the blocked set for a list, whether two
+  accounts are blocked for one post); `user` via `UserDirectory` (the caller's id) and
+  `PublicProfileReader` (name and picture for a whole page of authors in one call).
+- **Entry points:** `/api/blog` - `posts` (list, create, one, edit, delete), `posts/{id}/like`,
+  `posts/{id}/comments`, `comments/{id}`, `images` and `tags`.
+- **Read path:** the post list - optional tag, title, author and sort filters with paging -
+  lives in `blog/query/BlogPostListQuery`, read-only, `JdbcClient`, every value bound and no empty
+  collection ever given to `in`; everything else is repository. The comment list is a repository
+  query that always passes at least one id to `not in`.
 - **Why:** posts, comments and moderation have their own lifecycle and reviewers;
   nothing here shares tables or vocabulary with the learning modules.
 - **Revisit if:** learners need search beyond tags and title, attaching learning
-  content, pre-moderation for new accounts, or saved posts.
+  content, pre-moderation for new accounts, or saved posts. Sorting by likes is slow - it
+  counts the likes of every matching post on each call: store a reconciled counter or a
+  statistics table. The comment count on a post card counts every visible comment whatever the
+  viewer has blocked, so a block can leave it a little high; make it per viewer only if that is
+  noticed.
 
 ## `shared` and `config`
 
