@@ -685,25 +685,27 @@ new messages, recalls, read marks and typing. Owns one-to-one conversations betw
   socket too); abuse in chat is reported (a report flow that shows staff only the
   reported message); the backend runs more than one instance (see Still open).
 
-## `blog` (moderation pending)
+## `blog`
 
 Implemented: posts with Markdown, images and tags, flat comments, likes and the post list,
-behind `/api/blog`. Reports and moderation (`/api/admin/blog`) are not built yet; the
-`status` columns exist and every read and write already respects them. Owns knowledge-sharing
-posts, their comments, likes, reports and moderation.
+behind `/api/blog`; reports of posts and comments (`/api/blog/.../reports`) and their moderation by
+Staff and Admin (`/api/admin/blog`). Owns knowledge-sharing posts, their comments, likes, reports
+and moderation.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
-  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`. Comments are
-  flat - no replies. `blog_reports` and `blog_moderation_actions` are created with
-  moderation, not before.
+  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`, `blog_reports`
+  (a reader's report of a post or a comment) and `blog_moderation_actions` (the append-only history
+  of what moderators did). Comments are flat - no replies. A report and an action name their
+  target by `(target_type, target_id)` with no foreign key, because the target is a post or a
+  comment and its author may delete it.
 - **Who:** every signed-in account posts, comments and likes; nothing is readable
   without signing in (no route under `/api/blog` is public). Staff and Admin moderate through
   `/api/admin/blog`, a separate controller in this module - never content they wrote themselves.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
   reports. Moderators hide (reversible) or remove (permanent) a post or comment, or
-  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`. Until
-  moderation exists nothing sets `HIDDEN` or `REMOVED`; the code only reads them.
+  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`: all four
+  actions are recorded, a dismissal included. Only moderation sets `HIDDEN` or `REMOVED`.
 - **What an author sees:** their own posts and comments in every status, with the
   status shown, so a hidden or removed post is found in their own list rather than
   only by its link. Everyone else sees published posts and visible comments. In the API this
@@ -726,10 +728,15 @@ posts, their comments, likes, reports and moderation.
   or removed post cannot be edited by its author or commented on; title 1-200 characters,
   body 1-20 000, at most 8 tags. `BlogComment` - the same author rule, 1-2000 characters, no
   edit once hidden or removed. `BlogTag` is an immutable embeddable checked against the
-  kind's own enum. `BlogReport` (with moderation) - one open report per reporter and target,
-  resolved once; after it is closed the same reader may report that content again,
-  because an edit can make dismissed content a problem later. Likes and tags are
-  plain rows; images are plain rows whose `post_id` is written only by a conditional update.
+  kind's own enum. `BlogPost` and `BlogComment` also own the moves of moderation: hide (only
+  from published or visible), restore (only from hidden - a removed one stays removed) and remove
+  (from anything but removed), anything else `BLOG_MODERATION_INVALID_TRANSITION`; a post's move
+  sets `updated_at` and never `edited_at`, which is the author's. `BlogReport` - one open report
+  per reporter and target, closed once (resolved or dismissed); after it is closed the same
+  reader may report that content again, because an edit can make dismissed content a problem
+  later; the note is at most 500 characters. `BlogModerationAction` - recorded, never changed;
+  the reason is 1-500 characters. Likes and tags are plain rows; images are plain rows whose
+  `post_id` is written only by a conditional update.
 - **Blocks:** posts and comments by anyone blocked either way are left out of a
   learner's lists, and neither side can comment on, like or open the other's posts, via
   `FriendshipReader`. Blocking is learner-only, so for Staff and Admin the blocked set is
@@ -738,10 +745,13 @@ posts, their comments, likes, reports and moderation.
 - **Concurrency:** `@Version` on `blog_posts`, so an author's edit cannot silently
   undo a moderator's hide: the editor sends back the version it opened and a post that has
   changed since is refused as `BLOG_POST_STALE`; Hibernate's check on the write turns two saves that
-  both passed it into `CONCURRENT_UPDATE`. Like primary key `(post_id, user_id)` with an
-  `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
+  both passed it into `CONCURRENT_UPDATE`. A moderator's action locks the post or comment row
+  (`select ... for update`) and reads it fresh, so two moderators acting at once are serialised
+  and the second is told the content is already hidden. Like primary key `(post_id, user_id)` with
+  an `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
   not stored: erasure removes likes by cascade, and a stored counter would drift. Unique
-  `(reporter_id, target_type, target_id)` among open reports only (with moderation).
+  `(reporter_id, target_type, target_id)` among open reports only (a partial unique index),
+  filed with `on conflict ... where status = 'OPEN' do nothing`, so reporting twice is one report.
 - **Images:** the Markdown refers to an image as `blog-image:<id>`, never by URL, so the
   `blog` bucket stays private, a link that expires cannot break a saved post, and moving the
   storage domain changes no data. The read API returns the body as written plus
@@ -766,16 +776,38 @@ posts, their comments, likes, reports and moderation.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
   set to null) - confirmed by the product owner on 2026-11-16, the same choice as
   chat; likes cascade; images stay with their post (an upload nobody used keeps a null
-  `uploader_id` and is swept after a day); the erased user's reports are deleted (with
-  moderation). The privacy policy has to say so.
+  `uploader_id` and is swept after a day); the erased user's reports are deleted by cascade,
+  while the moderation history stays (an action then points at no report). `moderator_id` and
+  `resolved_by_user_id` are `on delete restrict`: Staff accounts are removed by an Admin and cannot
+  erase themselves (`AccountServiceImpl` refuses), so they never block a learner's erasure. The
+  privacy policy has to say so.
+- **Reports and moderation:** a reader reports a post they can read (published) or a visible
+  comment on one, with a reason and an optional note, at most 10 an hour; never their own, and
+  reporting again while their report is open returns that report (`200`, a new one is `201`).
+  The queue is grouped by content: a post reported by five people is one row, with the number of
+  open reports and their reasons, oldest first or most reported first. An action applies to the
+  content and closes every open report of it at once with one `update`: hide and remove resolve
+  them, dismiss dismisses them and leaves the content alone, restore leaves them. Every action
+  records the most recent open report it closed. A moderator never acts on content they wrote -
+  `BLOG_MODERATION_OWN_CONTENT`, checked before anything is locked or written, for all four
+  actions - and another moderator does. Content its author deleted after it was reported stays in
+  the queue as `DELETED` until someone dismisses it. The author of a hidden or removed post is
+  given the reason of the last hide or removal as `moderationNote` on the post (no one else
+  is: Staff read content through the admin routes, which show every status).
 - **Talks to:** `friendship` via `FriendshipReader` (the blocked set for a list, whether two
   accounts are blocked for one post); `user` via `UserDirectory` (the caller's id) and
   `PublicProfileReader` (name and picture for a whole page of authors in one call).
 - **Entry points:** `/api/blog` - `posts` (list, create, one, edit, delete), `posts/{id}/like`,
-  `posts/{id}/comments`, `comments/{id}`, `images` and `tags`.
+  `posts/{id}/comments`, `comments/{id}`, `images`, `tags`, and the reports
+  `posts/{id}/reports` and `comments/{id}/reports`. `/api/admin/blog` (Staff and Admin, in
+  `AdminBlogModerationController`) - `queue`, `targets/{post|comment}/{id}` (the content in any
+  status with every report and the history), `targets/{post|comment}/{id}/actions` and `actions`
+  (what moderators did).
 - **Read path:** the post list - optional tag, title, author and sort filters with paging -
   lives in `blog/query/BlogPostListQuery`, read-only, `JdbcClient`, every value bound and no empty
-  collection ever given to `in`; everything else is repository. The comment list is a repository
+  collection ever given to `in`; the moderation queue (open reports grouped by content, then the
+  start of each post and comment in one query each) lives in `blog/query/BlogModerationQueueQuery`
+  on the same terms; everything else is repository. The comment list is a repository
   query that always passes at least one id to `not in`.
 - **Why:** posts, comments and moderation have their own lifecycle and reviewers;
   nothing here shares tables or vocabulary with the learning modules.
@@ -891,8 +923,10 @@ gone rather than kept: all three describe a state that no longer exists.
   committed the change and a ping on Boot's single scheduler thread; a half-open socket
   can block either for Tomcat's blocking-send timeout. Move push and ping to a dedicated
   executor (or lower the timeout) before chat traffic grows.
-- **Notifications** for friend requests, new messages while offline and comments on
-  one's posts. No module owns notifications yet; decide when the first one is built.
+- **Notifications** for friend requests, new messages while offline, comments on
+  one's posts, and what moderators decided about a blog report or a post (the author finds
+  the reason on the post, the reporter is not told). No module owns notifications yet; decide
+  when the first one is built.
 - **Account export** does not yet cover `friendship`, `chat` or `blog`.
 - **Privacy policy text** for erasure: chat messages, their images, blog posts and
   comments stay after an account is erased, shown as by a deleted user. Decided; the
