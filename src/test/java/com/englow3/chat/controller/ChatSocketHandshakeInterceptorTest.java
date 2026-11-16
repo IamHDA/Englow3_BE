@@ -26,14 +26,16 @@ import org.springframework.web.socket.WebSocketHandler;
 
 import com.englow3.chat.service.ChatSocketTicketService;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.user.api.PublicProfileReader;
 import com.englow3.user.api.UserDirectory;
 
 class ChatSocketHandshakeInterceptorTest {
 
     private final ChatSocketTicketService ticketService = mock(ChatSocketTicketService.class);
     private final UserDirectory userDirectory = mock(UserDirectory.class);
+    private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
     private final ChatSocketHandshakeInterceptor interceptor = new ChatSocketHandshakeInterceptor(ticketService,
-            userDirectory);
+            userDirectory, publicProfileReader);
     private final ServerHttpResponse response = mock(ServerHttpResponse.class);
     private final WebSocketHandler handler = mock(WebSocketHandler.class);
     private final Map<String, Object> attributes = new HashMap<>();
@@ -91,6 +93,7 @@ class ChatSocketHandshakeInterceptorTest {
     void aBearerTokenIsUsedAndTheTicketIsNeverTouched() {
         bearerSignedIn();
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
+        when(publicProfileReader.isLearner(me)).thenReturn(true);
 
         boolean accepted = interceptor.beforeHandshake(request("?ticket=ignored"), response, handler, attributes);
 
@@ -109,5 +112,34 @@ class ChatSocketHandshakeInterceptorTest {
 
         assertThat(accepted).isFalse();
         verify(response).setStatusCode(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void aBearerTokenOfSomeoneWhoIsNotALearnerIsNoOneAndFallsBackToTheTicket() {
+        bearerSignedIn();
+        when(userDirectory.requireCurrentUserId()).thenReturn(me);
+        when(publicProfileReader.isLearner(me)).thenReturn(false);
+        UUID ticketOwner = UUID.randomUUID();
+        when(ticketService.redeem("learner-ticket")).thenReturn(Optional.of(ticketOwner));
+
+        boolean accepted = interceptor.beforeHandshake(request("?ticket=learner-ticket"), response, handler,
+                attributes);
+
+        assertThat(accepted).isTrue();
+        assertThat(attributes).containsEntry(ChatSocketHandshakeInterceptor.USER_ID, ticketOwner);
+    }
+
+    @Test
+    void aBearerTokenOfSomeoneWhoIsNotALearnerAndNoTicketIsRefusedWith401() {
+        bearerSignedIn();
+        when(userDirectory.requireCurrentUserId()).thenReturn(me);
+        when(publicProfileReader.isLearner(me)).thenReturn(false);
+
+        boolean accepted = interceptor.beforeHandshake(request(""), response, handler, attributes);
+
+        assertThat(accepted).isFalse();
+        verify(response).setStatusCode(HttpStatus.UNAUTHORIZED);
+        assertThat(attributes).isEmpty();
+        verifyNoInteractions(ticketService);
     }
 }

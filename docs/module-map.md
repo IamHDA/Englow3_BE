@@ -835,6 +835,10 @@ gone rather than kept: all three describe a state that no longer exists.
   committed the message. Before the backend runs two instances, chat needs Postgres
   `LISTEN/NOTIFY` (or equivalent) between them. `LISTEN` holds a dedicated connection,
   which the session-mode pooler allows and transaction mode does not.
+- **Chat socket sends run on shared threads.** A push runs on the request thread that
+  committed the change and a ping on Boot's single scheduler thread; a half-open socket
+  can block either for Tomcat's blocking-send timeout. Move push and ping to a dedicated
+  executor (or lower the timeout) before chat traffic grows.
 - **Notifications** for friend requests, new messages while offline and comments on
   one's posts. No module owns notifications yet; decide when the first one is built.
 - **Account export** does not yet cover `friendship`, `chat` or `blog`.

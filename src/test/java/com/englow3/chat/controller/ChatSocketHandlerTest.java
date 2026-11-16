@@ -32,6 +32,7 @@ import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 class ChatSocketHandlerTest {
 
@@ -95,12 +96,25 @@ class ChatSocketHandlerTest {
 
     @Test
     void brokenOrIncompleteFramesAreDroppedSilently() {
-        for (String payload : new String[] { "not json", "", "[]", "\"text\"", "{}", "{\"active\":true}",
+        for (String payload : new String[] { "not json", "", "null", "[]", "\"text\"", "{}", "{\"active\":true}",
                 "{\"conversationId\":\"not-a-uuid\",\"active\":true}", "{\"conversationId\":null}" }) {
             receive(payload);
         }
 
         verifyNoInteractions(registry);
+        verify(conversationService, never()).typingRecipient(any(), any());
+    }
+
+    @Test
+    void aJsonNullFrameIsDroppedBeforeItIsValidated() {
+        // Validating null throws, and the failure would be logged for every such frame before the rate limiter ran.
+        Validator validator = mock(Validator.class);
+        ChatSocketHandler strict = new ChatSocketHandler(registry, conversationService, rateLimiter, new ObjectMapper(),
+                validator);
+
+        assertThatCode(() -> strict.handleTextMessage(session, new TextMessage("null"))).doesNotThrowAnyException();
+
+        verifyNoInteractions(validator, rateLimiter, registry);
         verify(conversationService, never()).typingRecipient(any(), any());
     }
 

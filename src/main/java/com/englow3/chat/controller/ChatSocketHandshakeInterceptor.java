@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.englow3.chat.service.ChatSocketTicketService;
 import com.englow3.shared.error.NotFoundException;
+import com.englow3.user.api.PublicProfileReader;
 import com.englow3.user.api.UserDirectory;
 
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Decides who a chat socket belongs to, before it opens. Two ways in, and nothing else:
  * <ul>
- * <li>a Bearer token the security filters have already validated (a mobile app), or</li>
+ * <li>a Bearer token the security filters have already validated, belonging to a learner (a mobile app), or</li>
  * <li>a single-use ticket in the query string (a browser, which never holds its token).</li>
  * </ul>
  * Neither: 401, and no socket. Neither the URL nor the ticket is logged. The {@code Origin} check is the handshake
@@ -39,6 +40,7 @@ public class ChatSocketHandshakeInterceptor implements HandshakeInterceptor {
 
     private final ChatSocketTicketService ticketService;
     private final UserDirectory userDirectory;
+    private final PublicProfileReader publicProfileReader;
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler handler,
@@ -65,7 +67,9 @@ public class ChatSocketHandshakeInterceptor implements HandshakeInterceptor {
             return Optional.empty();
         }
         try {
-            return Optional.of(userDirectory.requireCurrentUserId());
+            // Chat is for learners, and a ticket is only ever issued to one: a Bearer token for anyone else is treated
+            // like no token at all, so the ticket path still applies.
+            return Optional.of(userDirectory.requireCurrentUserId()).filter(publicProfileReader::isLearner);
         } catch (NotFoundException noAccount) {
             // A valid token for an account that no longer exists is no one.
             return Optional.empty();

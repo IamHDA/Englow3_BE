@@ -65,7 +65,9 @@ public class ChatSocketHandler extends TextWebSocketHandler {
         UUID me = userId(session);
         try {
             TypingFrame frame = objectMapper.readValue(message.getPayload(), TypingFrame.class);
-            if (!validator.validate(frame).isEmpty()) {
+            // A JSON null frame deserialises to null, and validating null throws - which would log a warning for every
+            // such frame before the rate limiter has run.
+            if (frame == null || !validator.validate(frame).isEmpty()) {
                 return;
             }
             rateLimiter.check(me, "chat-typing", MAX_TYPING_FRAMES_PER_WINDOW, TYPING_WINDOW);
