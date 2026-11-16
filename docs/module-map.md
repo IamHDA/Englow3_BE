@@ -676,6 +676,10 @@ new messages, recalls, read marks and typing. Owns one-to-one conversations betw
   cookie). SSE through them would keep two functions running for every learner with
   the app open and cannot carry typing cheaply. Sends stay on REST so a dropped socket
   never loses a message, and validation, errors and rate limits stay the existing ones.
+- **Where the web listens:** the socket is opened only on the chat screens. Everywhere
+  else the header shows a new-message indicator fed by `GET /api/chat/unread-count`,
+  asked again on navigation, on returning to the tab and about once a minute - so a
+  learner who is not chatting holds no connection to the backend.
 - **Revisit if:** group chat (participant rows already allow it; `direct_key` becomes
   nullable for groups), presence, or send latency starts to matter (send over the
   socket too); abuse in chat is reported (a report flow that shows staff only the
@@ -690,18 +694,24 @@ comments, likes, reports and moderation.
 - **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
   `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`,
   `blog_reports`, `blog_moderation_actions`. Comments are flat - no replies.
-- **Who:** every signed-in account posts, comments and likes. Staff and Admin
-  moderate through `/api/admin/blog`, a separate controller in this module.
+- **Who:** every signed-in account posts, comments and likes; nothing is readable
+  without signing in. Staff and Admin moderate through `/api/admin/blog`, a separate
+  controller in this module - never content they wrote themselves.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
-  reports. Moderators hide (reversible) or remove (permanent) a post or comment,
-  always with a reason, recorded in `blog_moderation_actions`.
+  reports. Moderators hide (reversible) or remove (permanent) a post or comment, or
+  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`.
+- **What an author sees:** their own posts and comments in every status, with the
+  status shown, so a hidden or removed post is found in their own list rather than
+  only by its link. Everyone else sees published posts and visible comments.
 - **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
   `user`'s - used for filtering. Attaching a specific exam or deck is not in this
   version.
 - **Entities with rules:** `BlogPost` - only the author edits or deletes it; a hidden
   or removed post cannot be edited by its author or commented on. `BlogComment` -
-  the same author rule. `BlogReport` - one per reporter and target, resolved once.
-  Likes and tags are plain rows.
+  the same author rule. `BlogReport` - one open report per reporter and target,
+  resolved once; after it is closed the same reader may report that content again,
+  because an edit can make dismissed content a problem later. Likes and tags are
+  plain rows.
 - **Blocks:** posts and comments by anyone blocked either way are left out of a
   learner's lists, and neither side can comment on the other's posts, via
   `FriendshipReader`.
@@ -709,11 +719,13 @@ comments, likes, reports and moderation.
   undo a moderator's hide. Like primary key `(post_id, user_id)`. Like and comment
   counts are counted for each page of posts, not stored: erasure removes likes by
   cascade, and a stored counter would drift. Unique
-  `(reporter_id, target_type, target_id)`.
+  `(reporter_id, target_type, target_id)` among open reports only.
 - **Images:** presigned PUT through shared storage; keys recorded in
   `blog_post_images` so deleting a post can remove them.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
-  set to null); likes cascade; the erased user's reports are deleted.
+  set to null) - confirmed by the product owner on 2026-11-16, the same choice as
+  chat; likes cascade; the erased user's reports are deleted. The privacy policy has
+  to say so.
 - **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
 - **Read path:** the post list - optional tag, author and sort filters with paging -
   lives in `blog/query`, read-only; everything else is repository.
@@ -826,6 +838,6 @@ gone rather than kept: all three describe a state that no longer exists.
 - **Notifications** for friend requests, new messages while offline and comments on
   one's posts. No module owns notifications yet; decide when the first one is built.
 - **Account export** does not yet cover `friendship`, `chat` or `blog`.
-- **Blog erasure** keeping posts and comments as by a deleted user follows the choice
-  made for chat; confirm it with the product owner and the privacy policy before the
-  first migration.
+- **Privacy policy text** for erasure: chat messages, their images, blog posts and
+  comments stay after an account is erased, shown as by a deleted user. Decided; the
+  policy page still has to state it.
