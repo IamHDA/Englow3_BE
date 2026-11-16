@@ -87,7 +87,8 @@ Một bản sao lưu chưa từng khôi phục thử chưa phải là bản sao 
    - Settings → Instance Type: chọn gói trả phí **luôn bật** (không ngủ). Chọn RAM tối thiểu 1 GB; Spring Boot trên 512 MB dễ hết bộ nhớ khi tải cao.
    - Health Check Path: `/actuator/health/readiness` (đã mở không cần đăng nhập, xem `SecurityConfig`). Render chỉ chuyển lưu lượng sang bản mới khi đường này trả 200 → deploy không gián đoạn.
    - Auto-Deploy: giữ qua deploy hook như `cd.yml` đang làm.
-   - Khi cần chịu tải, đặt số instance = 2. Kiểm tra: gọi `/actuator/info`, `release` phải trùng commit.
+   - Chat realtime: Render phải cho phép WebSocket tới `/ws/chat`; `CORS_ALLOWED_ORIGINS` phải chứa đúng origin của web, vì handshake WebSocket kiểm `Origin` theo danh sách này. Socket chỉ nhận đẩy từ instance đang giữ nó, nên chạy **một instance** cho tới khi chat có `LISTEN/NOTIFY` (module map, mục *Still open*).
+   - Khi cần chịu tải, đặt số instance = 2 (chỉ sau khi chat đã có `LISTEN/NOTIFY`, xem dòng trên). Kiểm tra: gọi `/actuator/info`, `release` phải trùng commit.
 2. **Render — `ai_service`:** cùng quy tắc luôn bật. Nó là điểm duy nhất nói chuyện với nhà cung cấp AI; khi nó ngủ, chấm bài sẽ chờ khởi động.
 3. **Cùng vùng địa lý:** đặt Render, Supabase và Vercel Functions trong cùng khu vực (hoặc gần nhất có thể). Mỗi lệnh gọi DB qua vùng khác tốn khoảng 100–200 ms, nhân lên theo số truy vấn của mỗi trang.
 4. **DB — pooler và kết nối:** dùng chuỗi kết nối pooler (Supavisor, chế độ session) cho BE. Giữ `hikari.maximum-pool-size` × số instance nhỏ hơn giới hạn kết nối của gói Supabase. Thêm `reWriteBatchedInserts=true` vào `DB_URL` (đã bật batch insert trong code; tham số này gom nhiều INSERT thành một lệnh).
@@ -199,7 +200,7 @@ Log của Render và Vercel được giữ ngắn. Tạo log drain tới một d
 - [ ] Log drain tới dịch vụ lưu log
 - [ ] Staging và production dùng **Supabase project khác nhau** và khoá khác nhau
 - [ ] Khoá Groq cũ đã xoay; `Englow3_BE.zip` đã xoá và mọi khoá trong đó đã xoay
-- [ ] `CORS_ALLOWED_ORIGINS` đúng tên miền thật
+- [ ] `CORS_ALLOWED_ORIGINS` đúng tên miền thật (cả handshake WebSocket `/ws/chat` kiểm `Origin` theo danh sách này)
 - [ ] `AI_PLATFORM_DAILY_REQUEST_LIMIT` và giới hạn chi tiêu hàng tháng ở nhà cung cấp đã đặt
 - [ ] `NEXT_PUBLIC_CONTACT_EMAIL` và `NEXT_PUBLIC_OPERATOR_NAME` đã đặt (trang pháp lý)
 - [ ] Trang Điều khoản/Bảo mật đã được người có chuyên môn pháp lý rà soát

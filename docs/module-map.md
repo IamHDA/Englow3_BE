@@ -575,14 +575,12 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a
   reason and a report trail.
 
-## `chat` (realtime pending)
+## `chat`
 
-Owns one-to-one conversations between friends. Implemented: the REST side - open a
-conversation, send text and/or one image, history by `seq`, read marks, recall, the
-conversation list with unread counts - behind `/api/chat`, and the events
-(`ChatMessageSent`, `ChatMessageRecalled`, `ChatReadAdvanced`, ids only, published inside
-the writing transaction) the realtime step will listen to after commit. Not built yet: the
-receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
+Implemented: one-to-one conversations between friends - open a conversation, send text
+and/or one image, history by `seq`, read marks, recall, the conversation list with unread
+counts - over REST behind `/api/chat`, and a receive-only WebSocket at `/ws/chat` that pushes
+new messages, recalls, read marks and typing. Owns one-to-one conversations between friends.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `chat_conversations` (`id`, `direct_key`, `last_seq`,
@@ -593,10 +591,11 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   `object_key`, `content_type`, `content_length`, `created_at`: an image a participant was
   given an upload URL for and has not yet attached to a message - sending consumes the row,
   and without it a learner could upload any number of images that are never sent and no job
-  could find them); `chat_socket_tickets` (not created yet; the realtime step). A
-  conversation holds no user columns: who is in it, and how far each has read, are
-  participant rows. Sending moves the sender's own read mark, so unread is
-  `last_seq - last_read_seq` without counting rows.
+  could find them); `chat_socket_tickets` (`token_hash`, `user_id`, `expires_at`,
+  `used_at`, `created_at`: the single-use tickets a browser opens the socket with; only the
+  SHA-256 of a ticket is stored). A conversation holds no user columns: who is in it, and
+  how far each has read, are participant rows. Sending moves the sender's own read mark, so
+  unread is `last_seq - last_read_seq` without counting rows.
 - **One conversation per pair:** `direct_key` is `"<smaller uuid>:<larger uuid>"`,
   unique, so two friends opening a chat at the same moment get one conversation. It
   is the only place the pair is sorted.
@@ -621,13 +620,22 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   recalls at once take turns and the second is refused as already recalled. Two friends
   opening a chat at once meet in `insert ... on conflict (direct_key) do nothing`.
 - **Delivery:** sending, reading, recalling and history are REST through the
-  existing proxy and BFF (implemented). Receiving is a receive-only WebSocket at
-  `/ws/chat`, straight to Spring (designed, not implemented). The web asks the proxy for a ticket - random, stored hashed, valid 30
-  seconds, single use, redeemed by one conditional `UPDATE` so it works on any
-  instance; mobile may send `Authorization: Bearer` instead. The handshake checks
-  `Origin` against `app.cors.allowed-origins`. The only client frame is
-  `{conversationId, active}` for typing, which is relayed and never stored. Pushes
-  happen after commit. After every (re)connect the client catches up over REST: the
+  existing proxy and BFF. Receiving is a receive-only WebSocket at `/ws/chat`, straight
+  to Spring. The HTTP layer lets the handshake through (`permitAll` - the only route
+  opened for it) and `ChatSocketHandshakeInterceptor` decides who the socket belongs to.
+  The web asks the proxy (`POST /api/chat/socket-tickets`) for a ticket - random, stored
+  hashed, valid 30 seconds, single use, redeemed by one conditional `UPDATE` so it works on
+  any instance; mobile may send `Authorization: Bearer` instead. Neither is a 401. The
+  handshake checks `Origin` against `app.cors.allowed-origins` (a 403). The only client
+  frame is `{conversationId, active}` for typing, which is relayed to the other person
+  while the two are still friends and never stored; any other frame, broken or unknown, is
+  dropped without closing the socket. Pushes happen after commit (`AFTER_COMMIT`
+  listeners; a failure is logged and never fails the request that committed): a new
+  message, a recall and a read mark go to the other person and to the actor's own other
+  sockets, to participants only. Sockets are held in memory - five per person at most, the
+  oldest closed with a policy violation past that - each behind a decorator that
+  serialises sends, with a ping every 25 seconds so an idle chat is not cut by a proxy.
+  After every (re)connect the client catches up over REST: the
   conversation list carries each conversation's `last_seq`, and an open conversation
   fetches messages after its own `seq`. There is deliberately no single cursor across
   conversations: an id or sequence is handed out before commit, so a later one can
@@ -641,7 +649,7 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   with a HEAD outside any transaction, then the upload row is consumed in the write
   transaction. Recalling deletes the object after commit. A cleanup job
   (`app.chat.cleanup-enabled`, hourly) removes uploads nobody sent within a day, with
-  their objects, and conversations nobody is in; every removal is a conditional delete
+  their objects, conversations nobody is in, and socket tickets that expired long ago; every removal is a conditional delete
   (the conversation delete re-checks that nobody is in it and says which it removed), and
   only the sweep whose delete took effect removes the objects, so it is safe on several
   instances. A sweep that fails is logged and does not stop the others.
@@ -658,7 +666,8 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   conversations in one call).
 - **Entry points:** `/api/chat` - `conversations` (list, open, one, `messages` history and
   send, `read`, `image-uploads`), `messages/{id}/recall`, `unread-count` (conversations
-  with something unread, not a message count).
+  with something unread, not a message count) and `POST /api/chat/socket-tickets`; and the
+  WebSocket `/ws/chat`.
 - **Read path:** repository for everything but the conversation list; the list (last
   message, unread, newest first, only conversations that have a message) is
   `chat/query` because it is one join across three tables.
@@ -723,7 +732,7 @@ These are technical packages, not business modules, and own no business tables.
 - `shared/storage` provides generic object-storage operations without business key
   conventions.
 - `shared/page` and `shared/logging` contain transport-level infrastructure.
-- `config` wires security, OpenAPI, and storage clients.
+- `config` wires security, OpenAPI, storage clients, and the chat WebSocket registration.
 
 Business enums, business DTOs, authorization decisions, and table writes do not
 belong in `shared`.
