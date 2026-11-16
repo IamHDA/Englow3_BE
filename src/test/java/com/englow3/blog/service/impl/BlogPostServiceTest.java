@@ -1,4 +1,4 @@
-package com.englow3.blog.service;
+package com.englow3.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,7 +61,7 @@ import com.englow3.blog.repository.BlogCommentRepository;
 import com.englow3.blog.repository.BlogPostImageRepository;
 import com.englow3.blog.repository.BlogPostLikeRepository;
 import com.englow3.blog.repository.BlogPostRepository;
-import com.englow3.blog.service.impl.BlogPostServiceImpl;
+import com.englow3.blog.service.BlogPostService;
 import com.englow3.friendship.api.FriendshipReader;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
@@ -76,14 +76,16 @@ import com.englow3.user.api.UserDirectory;
 
 /**
  * Orchestration only: what is asked in which order, what runs inside a transaction and what must not, what is deleted
- * after the commit. The rules inside {@link BlogPost} have their own test, so nothing here stubs the entity to refuse
- * something; where a refusal comes from the real entity the test is about what the service then does not do.
+ * after the commit. The rules inside {@link BlogPost} have their own test, and so has the read rule
+ * ({@link BlogReadRule}, mocked here), so nothing here stubs the entity to refuse something; where a refusal comes from
+ * the real entity the test is about what the service then does not do.
  */
 class BlogPostServiceTest {
 
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final FriendshipReader friendshipReader = mock(FriendshipReader.class);
     private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
+    private final BlogReadRule readRule = mock(BlogReadRule.class);
     private final BlogPostRepository postRepo = mock(BlogPostRepository.class);
     private final BlogCommentRepository commentRepo = mock(BlogCommentRepository.class);
     private final BlogPostImageRepository imageRepo = mock(BlogPostImageRepository.class);
@@ -96,8 +98,8 @@ class BlogPostServiceTest {
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final BlogPostService service = new BlogPostServiceImpl(userDirectory, friendshipReader,
-            publicProfileReader, postRepo, commentRepo, imageRepo, likeRepo, listQuery, objectStorage, presignedUrls,
-            rateLimiter, transactions, clock);
+            publicProfileReader, readRule, postRepo, commentRepo, imageRepo, likeRepo, listQuery, objectStorage,
+            presignedUrls, rateLimiter, transactions, clock);
 
     /** True only while a callback given to the transaction template is running. */
     private final AtomicBoolean inTransaction = new AtomicBoolean();
@@ -113,6 +115,9 @@ class BlogPostServiceTest {
         ReflectionTestUtils.setField(service, "blogBucket", "blog");
         ReflectionTestUtils.setField(service, "imageUrlTtl", Duration.ofHours(3));
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
+        // Whether a post may be read is BlogReadRule's to answer and has its own test; here it is open unless a test
+        // says the rule refuses.
+        when(readRule.canRead(any(), eq(me))).thenReturn(true);
         when(transactions.execute(any())).thenAnswer(invocation -> {
             inTransaction.set(true);
             try {
@@ -382,6 +387,34 @@ class BlogPostServiceTest {
     class Updating {
 
         @Test
+        void everySaveCountsAgainstTheUpdateRateLimitBeforeAnythingIsRead() {
+            BlogPost post = existingPost(me, 3);
+            postIsLoadable(post);
+
+            service.update(post.getId(), command("New body", 3L));
+
+            InOrder order = inOrder(rateLimiter, postRepo);
+            order.verify(rateLimiter).check(me, "blog-post-update", 20, Duration.ofMinutes(10));
+            order.verify(postRepo, org.mockito.Mockito.atLeastOnce()).findWithTagsById(post.getId());
+        }
+
+        @Test
+        void aSaveOverTheRateLimitIsRefusedAndNothingIsRead() {
+            BlogPost post = existingPost(me, 3);
+            postIsLoadable(post);
+            org.mockito.Mockito
+                    .doThrow(new com.englow3.shared.error.TooManyRequestsException("RATE_LIMITED", "slow down"))
+                    .when(rateLimiter).check(me, "blog-post-update", 20, Duration.ofMinutes(10));
+
+            assertThatThrownBy(() -> service.update(post.getId(), command("New body", 3L))).isInstanceOfSatisfying(
+                    com.englow3.shared.error.TooManyRequestsException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("RATE_LIMITED"));
+
+            verifyNoInteractions(transactions, postRepo, imageRepo);
+            assertThat(post.getBody()).isEqualTo("Old body");
+        }
+
+        @Test
         void aVersionThatIsOldIsRefusedAndNothingIsWritten() {
             BlogPost post = existingPost(me, 3);
             postIsLoadable(post);
@@ -416,10 +449,10 @@ class BlogPostServiceTest {
         }
 
         @Test
-        void aPostTheCallerCannotReadIsNotFound() {
-            BlogPost post = existingPost(other, 0);
+        void aPostTheReadRuleRefusesIsNotFoundAndNotChanged() {
+            BlogPost post = existingPost(me, 0);
             postIsLoadable(post);
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.update(post.getId(), command("New body", 0L))).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
@@ -594,28 +627,32 @@ class BlogPostServiceTest {
             verify(postRepo, never()).delete(any());
         }
 
+        /** Not a 403: that would tell the caller the post exists, which the read rule says they must not learn. */
         @Test
-        void someoneElsesPostIsLeftAloneAndItsObjectsToo() {
+        void aPostTheReadRuleRefusesIsNotFoundAndLeftAloneAndItsObjectsToo() {
             BlogPost post = existingPost(other, 0);
             postIsLoadable(post);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
-            assertThatThrownBy(() -> service.delete(post.getId()))
-                    .isInstanceOf(com.englow3.shared.error.ForbiddenException.class);
+            assertThatThrownBy(() -> service.delete(post.getId())).isInstanceOfSatisfying(NotFoundException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
 
+            verify(imageRepo, never()).findKeysByPostId(any());
             verify(postRepo, never()).delete(any());
             verifyNoInteractions(objectStorage);
         }
 
         @Test
-        void aHiddenPostCanStillBeDeletedByItsAuthor() {
-            BlogPost post = existingPost(me, 0);
-            hide(post);
+        void someoneElsesPostTheCallerCanReadIsRefusedAsNotTheirsAndLeftAloneAndItsObjectsToo() {
+            BlogPost post = existingPost(other, 0);
             postIsLoadable(post);
-            when(imageRepo.findKeysByPostId(post.getId())).thenReturn(List.of());
 
-            service.delete(post.getId());
+            assertThatThrownBy(() -> service.delete(post.getId())).isInstanceOfSatisfying(
+                    com.englow3.shared.error.ForbiddenException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_AUTHOR"));
 
-            verify(postRepo).delete(post);
+            verify(postRepo, never()).delete(any());
+            verifyNoInteractions(objectStorage);
         }
     }
 
@@ -634,25 +671,15 @@ class BlogPostServiceTest {
         }
 
         @Test
-        void aPostByAnAuthorWithABlockEitherWayIsNotFound() {
+        void aPostTheReadRuleRefusesIsNotFoundAndNothingElseIsRead() {
             BlogPost post = existingPost(other, 0);
             postIsLoadable(post);
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.get(post.getId())).isInstanceOfSatisfying(NotFoundException.class,
                     e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
 
-            verifyNoInteractions(likeRepo, commentRepo);
-        }
-
-        @Test
-        void aHiddenPostIsNotFoundForSomeoneWhoIsNotItsAuthor() {
-            BlogPost post = existingPost(other, 0);
-            hide(post);
-            postIsLoadable(post);
-
-            assertThatThrownBy(() -> service.get(post.getId())).isInstanceOfSatisfying(NotFoundException.class,
-                    e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
+            verifyNoInteractions(likeRepo, commentRepo, publicProfileReader);
         }
 
         @Test
@@ -699,7 +726,7 @@ class BlogPostServiceTest {
         }
 
         @Test
-        void aPostWhoseAuthorIsErasedHasNoAuthorAndAsksNobodyAboutOne() {
+        void aPostWhoseAuthorIsErasedHasNoAuthorAndNobodyIsAskedForTheirProfile() {
             BlogPost orphan = BlogPost.publish(null, "Title", "body", Set.of(), now);
             postIsLoadable(orphan);
 
@@ -707,7 +734,6 @@ class BlogPostServiceTest {
 
             assertThat(result.author()).isNull();
             verifyNoInteractions(publicProfileReader);
-            verify(friendshipReader, never()).isBlockedEitherWay(any(), any());
         }
 
         @Test

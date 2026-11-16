@@ -714,9 +714,11 @@ posts, their comments, likes, reports and moderation.
   `canEdit` and `canInteract` are false.
 - **One read rule:** a post that does not exist, is hidden from the caller, or is by someone
   the caller has a block with is the same `BLOG_POST_NOT_FOUND`, so neither moderation state
-  nor a block is revealed. It applies to reading, editing, listing and writing comments, editing
-  a comment and liking; unliking, deleting one's own post and deleting one's own comment are allowed in
-  every status.
+  nor a block is revealed. It applies to reading, editing, deleting (someone else's post the caller
+  cannot read is `BLOG_POST_NOT_FOUND`, not a refusal that would show it exists), listing and writing
+  comments, editing a comment and liking; unliking, deleting one's own post and deleting one's own
+  comment are allowed in every status (an unlike of a post the caller cannot read reports a like count
+  of 0). One package-private collaborator, `BlogReadRule`, answers the question for every service.
 - **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
   `user`'s - used for filtering (a filter that is given must match; tags combine with AND).
   Attaching a specific exam or deck is not in this version.

@@ -35,14 +35,21 @@ public final class BlogMarkdown {
      */
     private static final Pattern IMAGE = Pattern.compile("!\\[[^\\]\\n]*\\]?(?:\\([^)\\n]*\\)?)?");
 
-    /** A link, also with its address cut off; the text of the link is what stays. */
-    private static final Pattern LINK = Pattern.compile("\\[([^\\]\\n]*)\\]\\([^)\\n]*\\)?");
+    /**
+     * A link, also with its address cut off; the text of the link is what stays. The text may not contain {@code [}:
+     * with it allowed, a long run of opening brackets is tried from every one of them to the end of the line, which
+     * takes time quadratic in the length of the run. Without it each attempt stops at the next bracket.
+     */
+    private static final Pattern LINK = Pattern.compile("\\[([^\\[\\]\\n]*)\\]\\([^)\\n]*\\)?");
 
-    /** A link whose text is cut off by the end of the input. */
-    private static final Pattern OPEN_LINK_AT_END = Pattern.compile("\\[([^\\]\\n]*)$");
+    /** A link whose text is cut off by the end of the input; {@code [} is excluded for the reason given above. */
+    private static final Pattern OPEN_LINK_AT_END = Pattern.compile("\\[([^\\[\\]\\n]*)$");
 
-    /** Whatever is left of a reference: in link text, in code, or typed by hand. */
-    private static final Pattern IMAGE_FRAGMENT = Pattern.compile("blog-image:[0-9a-fA-F-]*");
+    /**
+     * Whatever is left of a reference: in link text, in code, or typed by hand. The hexadecimal digits that follow stop
+     * where another {@code blog-image:} begins, since {@code b} is a digit too and would otherwise be taken from it.
+     */
+    private static final Pattern IMAGE_FRAGMENT = Pattern.compile("blog-image:(?:(?!blog-image:)[0-9a-fA-F-])*");
 
     private static final Pattern HEADING_MARK = Pattern.compile("(?m)^[ \\t]{0,3}#{1,6}[ \\t]+");
     private static final Pattern QUOTE_MARK = Pattern.compile("(?m)^[ \\t]*>+[ \\t]?");

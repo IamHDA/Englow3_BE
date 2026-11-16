@@ -1,7 +1,9 @@
 package com.englow3.blog.helper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -188,6 +190,71 @@ class BlogMarkdownTest {
         @Test
         void aReferenceTypedAsPlainTextIsNotShownEither() {
             assertThat(BlogMarkdown.excerpt("look at blog-image:%s here".formatted(FIRST))).isEqualTo("look at here");
+        }
+
+        /** {@code b} is a hexadecimal digit: the fragment of one reference must not eat the start of the next. */
+        @Test
+        void aReferenceRightAfterAnotherLeavesNothingOfEither() {
+            assertThat(BlogMarkdown.excerpt("blog-image:blog-image:")).isEmpty();
+            assertThat(BlogMarkdown.excerpt("a blog-image:blog-image:%s z".formatted(FIRST))).isEqualTo("a z");
+            assertThat(BlogMarkdown.excerpt("a blog-image:6f1c-blog-image:blog-image: z")).isEqualTo("a z");
+            assertThat(BlogMarkdown.excerpt("blog-image:abcblog-image:abc")).isEmpty();
+        }
+
+        /**
+         * From the second {@code blog-image:} on, wherever the text stops, none of the id and neither keyword with its
+         * colon is left. (A cut inside the word of the second reference leaves letters of a word, not of an id.)
+         */
+        @Test
+        void textThatEndsAnywhereInTheIdOfTwoReferencesInARowNeverShowsEither() {
+            String text = "Intro. blog-image:blog-image:%s".formatted(FIRST);
+            int firstId = text.indexOf("blog-image:blog-image:") + "blog-image:blog-image:".length();
+
+            for (int end = firstId; end <= text.length(); end++) {
+                String head = text.substring(0, end);
+
+                assertThat(BlogMarkdown.excerpt(head)).as("ends at %d: '%s'", end, head).isEqualTo("Intro.");
+            }
+        }
+
+        @Test
+        void textAfterAReferenceThatIsNotMadeOfIdCharactersIsKept() {
+            assertThat(BlogMarkdown.excerpt("blog-image:%s so on".formatted(FIRST))).isEqualTo("so on");
+            assertThat(BlogMarkdown.excerpt("blog-image: and then")).isEqualTo("and then");
+            assertThat(BlogMarkdown.excerpt("blog-image:%s, then".formatted(FIRST))).isEqualTo(", then");
+        }
+
+        /**
+         * A run of opening brackets was tried from each one to the end of the line: 20 000 of them took about two
+         * seconds. The excerpt of a post is made from at most 1200 characters, but a comment or a future caller is not
+         * bound by that, and a request must not be able to burn a thread by what it types.
+         */
+        @Test
+        void aLongRunOfOpeningBracketsIsLinear() {
+            String body = "[".repeat(20_000);
+
+            assertTimeoutPreemptively(Duration.ofSeconds(1), () -> BlogMarkdown.excerpt(body));
+            assertThat(BlogMarkdown.excerpt("[".repeat(20_000))).hasSizeLessThanOrEqualTo(200);
+        }
+
+        @Test
+        void openingBracketsFollowedByClosingOnesAreLinearToo() {
+            String body = "[".repeat(10_000) + "]".repeat(10_000);
+
+            assertTimeoutPreemptively(Duration.ofSeconds(1), () -> BlogMarkdown.excerpt(body));
+        }
+
+        @Test
+        void aLongRunOfOpeningBracketsBeforeALineBreakIsLinear() {
+            String body = "[".repeat(20_000) + "\nend";
+
+            assertTimeoutPreemptively(Duration.ofSeconds(1), () -> BlogMarkdown.excerpt(body));
+        }
+
+        @Test
+        void aLinkAfterAStrayBracketKeepsItsText() {
+            assertThat(BlogMarkdown.excerpt("see [a [real link](https://example.com) now"))
+                    .isEqualTo("see a real link now");
         }
     }
 }

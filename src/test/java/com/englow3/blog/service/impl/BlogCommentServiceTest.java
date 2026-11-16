@@ -1,8 +1,9 @@
-package com.englow3.blog.service;
+package com.englow3.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -41,7 +42,7 @@ import com.englow3.blog.entity.BlogPost;
 import com.englow3.blog.entity.BlogPostStatus;
 import com.englow3.blog.repository.BlogCommentRepository;
 import com.englow3.blog.repository.BlogPostRepository;
-import com.englow3.blog.service.impl.BlogCommentServiceImpl;
+import com.englow3.blog.service.BlogCommentService;
 import com.englow3.friendship.api.FriendshipReader;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.ForbiddenException;
@@ -52,22 +53,23 @@ import com.englow3.user.api.PublicProfileReader.PublicProfile;
 import com.englow3.user.api.UserDirectory;
 
 /**
- * Orchestration only. The rules inside {@link BlogPost} and {@link BlogComment} have their own tests: where a post is
- * hidden here it is the real entity, put in that state by hand, and the test is about what the service then does not
- * do.
+ * Orchestration only. The rules inside {@link BlogPost} and {@link BlogComment} have their own tests, and so has the
+ * read rule ({@link BlogReadRule}, mocked here): where a post is hidden here it is the real entity, put in that state
+ * by hand, and the test is about what the service then does not do.
  */
 class BlogCommentServiceTest {
 
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final FriendshipReader friendshipReader = mock(FriendshipReader.class);
     private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
+    private final BlogReadRule readRule = mock(BlogReadRule.class);
     private final BlogPostRepository postRepo = mock(BlogPostRepository.class);
     private final BlogCommentRepository commentRepo = mock(BlogCommentRepository.class);
     private final UserRateLimiter rateLimiter = mock(UserRateLimiter.class);
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final BlogCommentService service = new BlogCommentServiceImpl(userDirectory, friendshipReader,
-            publicProfileReader, postRepo, commentRepo, rateLimiter, clock);
+            publicProfileReader, readRule, postRepo, commentRepo, rateLimiter, clock);
 
     private final UUID me = UUID.randomUUID();
     private final UUID other = UUID.randomUUID();
@@ -76,6 +78,9 @@ class BlogCommentServiceTest {
     void setUp() {
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
         when(friendshipReader.blockedEitherWay(any())).thenReturn(Set.of());
+        // Whether a post may be read is BlogReadRule's to answer and has its own test; here it is open unless a test
+        // says the rule refuses, and no one is blocked from commenting unless a test says so.
+        when(readRule.canRead(any(), eq(me))).thenReturn(true);
         when(commentRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(publicProfileReader.profiles(any())).thenAnswer(invocation -> {
             Map<UUID, PublicProfile> profiles = new java.util.HashMap<>();
@@ -108,20 +113,9 @@ class BlogCommentServiceTest {
         private final Pageable firstPage = PageRequest.of(0, 20);
 
         @Test
-        void thePostsReadRuleAppliesAndNothingIsQueriedWhenItRefuses() {
+        void aPostTheReadRuleRefusesHasNoCommentsToListAndNothingIsQueried() {
             BlogPost post = postBy(other);
-            hide(post);
-
-            assertThatThrownBy(() -> service.list(post.getId(), firstPage)).isInstanceOfSatisfying(
-                    NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
-
-            verifyNoInteractions(commentRepo);
-        }
-
-        @Test
-        void aPostByAnAuthorWithABlockEitherWayHasNoCommentsToList() {
-            BlogPost post = postBy(other);
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.list(post.getId(), firstPage)).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
@@ -249,9 +243,9 @@ class BlogCommentServiceTest {
         }
 
         @Test
-        void aPostTheCallerCannotReadGetsNoComment() {
+        void aPostTheReadRuleRefusesGetsNoComment() {
             BlogPost post = postBy(other);
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.create(post.getId(), command)).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
@@ -271,24 +265,14 @@ class BlogCommentServiceTest {
         @Test
         void aBlockPlacedAfterTheReadRuleStillStopsTheComment() {
             BlogPost post = postBy(other);
-            // Not blocked when the post is read, blocked a moment later when the comment is about to be written.
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(false, true);
+            // Readable when the post is read, a block placed a moment later is found when the comment is about to be
+            // written.
+            when(readRule.isBlockedWith(other, me)).thenReturn(true);
 
             assertThatThrownBy(() -> service.create(post.getId(), command)).isInstanceOfSatisfying(
                     ForbiddenException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_INTERACTION_NOT_ALLOWED"));
 
             verify(commentRepo, never()).save(any());
-        }
-
-        @Test
-        void aPostWhoseAuthorIsErasedCanStillBeCommentedOnWithoutAskingAboutBlocks() {
-            BlogPost orphan = BlogPost.publish(null, "Title", "body", Set.of(), now.minusSeconds(60));
-            when(postRepo.findById(orphan.getId())).thenReturn(Optional.of(orphan));
-
-            service.create(orphan.getId(), command);
-
-            verify(commentRepo).save(any());
-            verify(friendshipReader, never()).isBlockedEitherWay(any(), any());
         }
     }
 
@@ -320,11 +304,11 @@ class BlogCommentServiceTest {
         }
 
         @Test
-        void aCommentOnAPostTheCallerCanNoLongerReadIsNotFoundAndStaysAsItWas() {
-            // The caller commented, and was blocked by the post's author afterwards.
+        void aCommentOnAPostTheReadRuleNowRefusesIsNotFoundAndStaysAsItWas() {
+            // The caller commented, and the post's read rule has since refused them (a block, or the post hidden).
             BlogPost post = postBy(other);
             BlogComment comment = commentBy(me, post.getId());
-            when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+            when(readRule.canRead(post, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.update(comment.getId(), command)).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_COMMENT_NOT_FOUND"));

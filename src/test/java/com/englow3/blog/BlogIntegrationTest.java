@@ -481,10 +481,14 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
         UUID published = insertPost(author, marker + " published");
 
         SignedIn.as(jdbc, stranger);
-        assertThatThrownBy(() -> postService.delete(published))
-                .isInstanceOf(com.englow3.shared.error.ForbiddenException.class);
-        assertThatThrownBy(() -> postService.delete(hidden))
-                .isInstanceOf(com.englow3.shared.error.ForbiddenException.class);
+        // Another person's post they can read: refused as not theirs. One they cannot read does not exist for them.
+        assertThatThrownBy(() -> postService.delete(published)).isInstanceOfSatisfying(
+                com.englow3.shared.error.ForbiddenException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_AUTHOR"));
+        assertThatThrownBy(() -> postService.delete(hidden)).isInstanceOfSatisfying(NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
+        assertThatThrownBy(() -> postService.delete(UUID.randomUUID())).isInstanceOfSatisfying(NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
         assertThat(count("select count(*) from blog_posts where title like :t", "t", marker + "%")).isEqualTo(2);
 
         SignedIn.as(jdbc, author);
@@ -750,19 +754,39 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aLikeCanBeTakenBackFromAPostThatWasHiddenAfterwards() {
+    void aLikeCanBeTakenBackFromAPostThatWasHiddenAfterwardsButTheCountReportedIsZero() {
         UUID author = fixture.learner();
         UUID fan = fixture.learner();
+        UUID anotherFan = fixture.learner();
         UUID post = insertPost(author, marker + " liked then hidden");
         like(post, fan);
+        like(post, anotherFan);
         setStatus(post, "HIDDEN");
 
         SignedIn.as(jdbc, fan);
         var state = likeService.unlike(post);
 
         assertThat(state.liked()).isFalse();
+        // Nothing of a post the caller cannot read is told to them, the count included: one like is still there.
         assertThat(state.likeCount()).isZero();
-        assertThat(count("select count(*) from blog_post_likes where post_id = :p", "p", post)).isZero();
+        assertThat(
+                count("select count(*) from blog_post_likes where post_id = :p and user_id = :u", "p", post, "u", fan))
+                        .isZero();
+        assertThat(count("select count(*) from blog_post_likes where post_id = :p", "p", post)).isEqualTo(1);
+    }
+
+    @Test
+    void anAuthorWhoseOwnPostWasHiddenSeesTheRealCountWhenTheyUnlikeIt() {
+        UUID author = fixture.learner();
+        UUID fan = fixture.learner();
+        UUID post = insertPost(author, marker + " mine, hidden");
+        like(post, author);
+        like(post, fan);
+        setStatus(post, "HIDDEN");
+
+        SignedIn.as(jdbc, author);
+
+        assertThat(likeService.unlike(post).likeCount()).isEqualTo(1);
     }
 
     @Test
@@ -879,6 +903,10 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
                     .isInstanceOf(NotFoundException.class);
             assertThatThrownBy(() -> postService.update(pair[1], command("t", "b", 0L)))
                     .isInstanceOf(NotFoundException.class);
+            assertThatThrownBy(() -> postService.delete(pair[1])).isInstanceOfSatisfying(NotFoundException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
+            // Taking a like back is always allowed and says nothing about the post: the count is 0.
+            assertThat(likeService.unlike(pair[1]).likeCount()).isZero();
             // The author's own list answers with nothing rather than refusing, so it reveals no block either.
             assertThat(
                     postService

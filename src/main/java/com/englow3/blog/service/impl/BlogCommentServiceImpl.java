@@ -59,6 +59,7 @@ public class BlogCommentServiceImpl implements BlogCommentService {
     private final UserDirectory userDirectory;
     private final FriendshipReader friendshipReader;
     private final PublicProfileReader publicProfileReader;
+    private final BlogReadRule readRule;
     private final BlogPostRepository postRepo;
     private final BlogCommentRepository commentRepo;
     private final UserRateLimiter rateLimiter;
@@ -68,7 +69,7 @@ public class BlogCommentServiceImpl implements BlogCommentService {
     @Transactional(readOnly = true)
     public Page<BlogCommentResult> list(UUID postId, Pageable page) {
         UUID me = userDirectory.requireCurrentUserId();
-        postRepo.findById(postId).filter(post -> canRead(post, me)).orElseThrow(() -> postNotFound(postId));
+        postRepo.findById(postId).filter(post -> readRule.canRead(post, me)).orElseThrow(() -> postNotFound(postId));
 
         Set<UUID> hidden = friendshipReader.blockedEitherWay(me);
         Collection<UUID> hiddenOrNobody = hidden.isEmpty() ? Set.of(NOBODY) : hidden;
@@ -89,12 +90,12 @@ public class BlogCommentServiceImpl implements BlogCommentService {
         UUID me = userDirectory.requireCurrentUserId();
         rateLimiter.check(me, "blog-comment", MAX_COMMENTS_PER_WINDOW, COMMENT_WINDOW);
 
-        BlogPost post = postRepo.findById(postId).filter(found -> canRead(found, me))
+        BlogPost post = postRepo.findById(postId).filter(found -> readRule.canRead(found, me))
                 .orElseThrow(() -> postNotFound(postId));
         post.ensureOpenForInteraction();
         // The read rule above already answers "not found" for a block, so this is for a block placed a moment later;
         // it is asked again, not remembered, because the comment is about to be written.
-        if (post.getAuthorId() != null && friendshipReader.isBlockedEitherWay(me, post.getAuthorId())) {
+        if (readRule.isBlockedWith(post.getAuthorId(), me)) {
             throw new ForbiddenException("BLOG_INTERACTION_NOT_ALLOWED", "You cannot comment on this post");
         }
 
@@ -111,7 +112,7 @@ public class BlogCommentServiceImpl implements BlogCommentService {
         // whose
         // post was hidden, cannot keep editing in a place they can no longer see. The answer is the comment's, not the
         // post's: the comment is what was asked for.
-        BlogPost post = postRepo.findById(comment.getPostId()).filter(found -> canRead(found, me))
+        BlogPost post = postRepo.findById(comment.getPostId()).filter(found -> readRule.canRead(found, me))
                 .orElseThrow(() -> commentNotFound(commentId));
         post.ensureOpenForInteraction();
 
@@ -126,12 +127,6 @@ public class BlogCommentServiceImpl implements BlogCommentService {
         BlogComment comment = commentRepo.findById(commentId).orElseThrow(() -> commentNotFound(commentId));
         comment.ensureDeletableBy(me);
         commentRepo.delete(comment);
-    }
-
-    /** The read rule every blog use case shares; see {@code BlogLikeServiceImpl#canRead}. */
-    private boolean canRead(BlogPost post, UUID me) {
-        return post.isReadableBy(me) && (post.getAuthorId() == null || post.isAuthor(me)
-                || !friendshipReader.isBlockedEitherWay(me, post.getAuthorId()));
     }
 
     private static BlogCommentResult result(BlogComment comment, Map<UUID, PublicProfile> profiles, UUID me) {

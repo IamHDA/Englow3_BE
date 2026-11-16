@@ -85,6 +85,12 @@ public class BlogPostServiceImpl implements BlogPostService {
     static final int MAX_POSTS_PER_WINDOW = 5;
     static final Duration POST_WINDOW = Duration.ofMinutes(10);
 
+    /**
+     * Twenty saves in ten minutes is more than anyone edits by hand; more is a script, or an editor stuck in a loop.
+     */
+    static final int MAX_UPDATES_PER_WINDOW = 20;
+    static final Duration UPDATE_WINDOW = Duration.ofMinutes(10);
+
     static final int MAX_IMAGES_PER_POST = 10;
     static final int MIN_SEARCH_TERM_LENGTH = 2;
     static final int MAX_PAGE_SIZE = 50;
@@ -92,6 +98,7 @@ public class BlogPostServiceImpl implements BlogPostService {
     private final UserDirectory userDirectory;
     private final FriendshipReader friendshipReader;
     private final PublicProfileReader publicProfileReader;
+    private final BlogReadRule readRule;
     private final BlogPostRepository postRepo;
     private final BlogCommentRepository commentRepo;
     private final BlogPostImageRepository imageRepo;
@@ -132,6 +139,7 @@ public class BlogPostServiceImpl implements BlogPostService {
     @Override
     public BlogPostDetailResult update(UUID postId, SavePostCommand command) {
         UUID me = userDirectory.requireCurrentUserId();
+        rateLimiter.check(me, "blog-post-update", MAX_UPDATES_PER_WINDOW, UPDATE_WINDOW);
 
         Set<BlogTag> tags = tagsOf(command);
         List<UUID> referenced = referencedImages(command.body());
@@ -164,7 +172,11 @@ public class BlogPostServiceImpl implements BlogPostService {
         UUID me = userDirectory.requireCurrentUserId();
 
         List<String> keys = transactions.execute(tx -> {
-            BlogPost post = postRepo.findById(postId).orElseThrow(() -> postNotFound(postId));
+            // The read rule first: a post the caller cannot read does not exist for them, so it is not a 403 that would
+            // tell them it does. Another person's post they can read is the entity's to refuse; their own goes in any
+            // status.
+            BlogPost post = postRepo.findById(postId).filter(found -> readRule.canRead(found, me))
+                    .orElseThrow(() -> postNotFound(postId));
             post.ensureDeletableBy(me);
             // Read before the post goes: its images' rows go with it, by cascade, and the keys with them.
             List<String> imageKeys = imageRepo.findKeysByPostId(postId);
@@ -222,22 +234,10 @@ public class BlogPostServiceImpl implements BlogPostService {
 
     // --- reading ---------------------------------------------------------------------------------------------------
 
-    /**
-     * The read rule every blog use case shares: a post the caller may not read does not exist for them - the same
-     * answer for one that is missing, one that is hidden or removed and not theirs, and one by someone they have a
-     * block with, so neither the moderation state nor a block is ever revealed.
-     */
+    /** The post if {@link BlogReadRule} lets the caller read it; otherwise it is not there for them. */
     private BlogPost readablePost(UUID postId, UUID me) {
-        BlogPost post = postRepo.findWithTagsById(postId).orElseThrow(() -> postNotFound(postId));
-        if (!post.isReadableBy(me) || isBlockedWithAuthor(post, me)) {
-            throw postNotFound(postId);
-        }
-        return post;
-    }
-
-    private boolean isBlockedWithAuthor(BlogPost post, UUID me) {
-        return post.getAuthorId() != null && !post.isAuthor(me)
-                && friendshipReader.isBlockedEitherWay(me, post.getAuthorId());
+        return postRepo.findWithTagsById(postId).filter(found -> readRule.canRead(found, me))
+                .orElseThrow(() -> postNotFound(postId));
     }
 
     /** One post in full, loaded inside the caller's transaction: the response needs nothing that is lazy. */

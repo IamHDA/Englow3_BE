@@ -13,8 +13,8 @@ import com.englow3.blog.dto.result.BlogTagCatalogue;
 
 /**
  * Posts: write, edit, delete, read one, list. A post that cannot be read by the caller - missing, hidden from them, or
- * by someone they have a block with - is the same {@code BLOG_POST_NOT_FOUND}, so neither the moderation state nor a
- * block is ever revealed.
+ * by someone they have a block with - is the same {@code BLOG_POST_NOT_FOUND} for every one of these, so neither the
+ * moderation state nor a block is ever revealed. Saving an edit is rate limited.
  */
 public interface BlogPostService {
 
@@ -23,7 +23,11 @@ public interface BlogPostService {
     /** Needs the version the editor opened; a post that has changed since is refused as stale. */
     BlogPostDetailResult update(UUID postId, SavePostCommand command);
 
-    /** The author's, in every status. Removes the post, its images' rows and, after the commit, their objects. */
+    /**
+     * The author's, in every status. A post the caller cannot read - missing, hidden from them, or by someone they have
+     * a block with - is {@code BLOG_POST_NOT_FOUND}, and only another person's post they can read is refused as
+     * {@code BLOG_POST_NOT_AUTHOR}. Removes the post, its images' rows and, after the commit, their objects.
+     */
     void delete(UUID postId);
 
     BlogPostDetailResult get(UUID postId);

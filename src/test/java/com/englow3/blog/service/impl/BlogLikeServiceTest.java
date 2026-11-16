@@ -1,8 +1,9 @@
-package com.englow3.blog.service;
+package com.englow3.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,8 +26,7 @@ import com.englow3.blog.entity.BlogPost;
 import com.englow3.blog.entity.BlogPostStatus;
 import com.englow3.blog.repository.BlogPostLikeRepository;
 import com.englow3.blog.repository.BlogPostRepository;
-import com.englow3.blog.service.impl.BlogLikeServiceImpl;
-import com.englow3.friendship.api.FriendshipReader;
+import com.englow3.blog.service.BlogLikeService;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
@@ -35,13 +35,13 @@ import com.englow3.user.api.UserDirectory;
 class BlogLikeServiceTest {
 
     private final UserDirectory userDirectory = mock(UserDirectory.class);
-    private final FriendshipReader friendshipReader = mock(FriendshipReader.class);
+    private final BlogReadRule readRule = mock(BlogReadRule.class);
     private final BlogPostRepository postRepo = mock(BlogPostRepository.class);
     private final BlogPostLikeRepository likeRepo = mock(BlogPostLikeRepository.class);
     private final UserRateLimiter rateLimiter = mock(UserRateLimiter.class);
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
-    private final BlogLikeService service = new BlogLikeServiceImpl(userDirectory, friendshipReader, postRepo, likeRepo,
+    private final BlogLikeService service = new BlogLikeServiceImpl(userDirectory, readRule, postRepo, likeRepo,
             rateLimiter, clock);
 
     private final UUID me = UUID.randomUUID();
@@ -50,12 +50,14 @@ class BlogLikeServiceTest {
     @BeforeEach
     void setUp() {
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
+        // Whether a post may be read is BlogReadRule's to answer and has its own test; here it is open unless a test
+        // says the rule refuses.
+        when(readRule.canRead(any(), eq(me))).thenReturn(true);
     }
 
     private BlogPost postBy(UUID author) {
         BlogPost post = BlogPost.publish(author, "Title", "body", Set.of(), now.minusSeconds(3600));
         when(postRepo.findById(post.getId())).thenReturn(Optional.of(post));
-        when(postRepo.existsById(post.getId())).thenReturn(true);
         return post;
     }
 
@@ -87,23 +89,14 @@ class BlogLikeServiceTest {
     }
 
     @Test
-    void aPostByAnAuthorWithABlockEitherWayCannotBeLiked() {
+    void aPostTheReadRuleRefusesIsNotFoundAndGetsNoLike() {
         BlogPost post = postBy(other);
-        when(friendshipReader.isBlockedEitherWay(me, other)).thenReturn(true);
+        when(readRule.canRead(post, me)).thenReturn(false);
 
         assertThatThrownBy(() -> service.like(post.getId())).isInstanceOfSatisfying(NotFoundException.class,
                 e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
 
         verify(likeRepo, never()).insertIfAbsent(any(), any(), any());
-    }
-
-    @Test
-    void aHiddenPostOfSomeoneElseIsNotFoundWhenLiked() {
-        BlogPost post = postBy(other);
-        hide(post);
-
-        assertThatThrownBy(() -> service.like(post.getId())).isInstanceOfSatisfying(NotFoundException.class,
-                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
     }
 
     @Test
@@ -126,21 +119,27 @@ class BlogLikeServiceTest {
         assertThat(result).isEqualTo(new LikeStateResult(false, 7));
     }
 
+    /**
+     * The like goes whatever the post has become; what the caller is told is 0, because the count of a post they cannot
+     * read is not theirs to see.
+     */
     @Test
-    void aLikeCanBeTakenBackFromAPostThatHasSinceBeenHidden() {
+    void aLikeIsTakenBackFromAPostTheCallerCanNoLongerReadAndTheCountReportedIsZero() {
         BlogPost post = postBy(other);
-        hide(post);
+        when(readRule.canRead(post, me)).thenReturn(false);
+        when(likeRepo.countByIdPostId(post.getId())).thenReturn(41L);
 
         LikeStateResult result = service.unlike(post.getId());
 
         verify(likeRepo).deleteLike(post.getId(), me);
-        assertThat(result.liked()).isFalse();
+        verify(likeRepo, never()).countByIdPostId(any());
+        assertThat(result).isEqualTo(new LikeStateResult(false, 0));
     }
 
     @Test
     void unlikingAPostThatDoesNotExistIsNotFound() {
         UUID missing = UUID.randomUUID();
-        when(postRepo.existsById(missing)).thenReturn(false);
+        when(postRepo.findById(missing)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.unlike(missing)).isInstanceOfSatisfying(NotFoundException.class,
                 e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
