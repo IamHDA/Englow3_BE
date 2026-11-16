@@ -124,7 +124,7 @@ class BlogModerationServiceTest {
 
     private BlogReport openReport(BlogTargetType type, UUID target) {
         BlogReport report = BlogReport.open(reporter, type, target, BlogReportReason.SPAM, null, now.minusSeconds(600));
-        when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(type, target,
+        when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(type, target,
                 BlogReportStatus.OPEN)).thenReturn(Optional.of(report));
         return report;
     }
@@ -163,8 +163,8 @@ class BlogModerationServiceTest {
             InOrder order = inOrder(postRepo, reportRepo, actionRepo);
             order.verify(postRepo).existsByIdAndAuthorId(post.getId(), me);
             order.verify(postRepo).findByIdForUpdate(post.getId());
-            order.verify(reportRepo).findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(BlogTargetType.POST,
-                    post.getId(), BlogReportStatus.OPEN);
+            order.verify(reportRepo).findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(
+                    BlogTargetType.POST, post.getId(), BlogReportStatus.OPEN);
             order.verify(actionRepo).save(any(BlogModerationAction.class));
             order.verify(reportRepo).closeOpen(BlogTargetType.POST, post.getId(), BlogReportStatus.RESOLVED, me,
                     "Because I said so", now);
@@ -205,7 +205,7 @@ class BlogModerationServiceTest {
         @Test
         void aModeratorMayActOnContentThatWasNeverReportedAndTheActionPointsAtNoReport() {
             BlogPost post = postBy(author);
-            when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(any(), any(), any()))
+            when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(any(), any(), any()))
                     .thenReturn(Optional.empty());
 
             service.act(BlogTargetType.POST, post.getId(), command(BlogModerationActionType.HIDE));
@@ -316,7 +316,7 @@ class BlogModerationServiceTest {
         @Test
         void noOpenReportToStartWithIsRefusedBeforeAnythingIsClosed() {
             BlogPost post = postBy(author);
-            when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(any(), any(), any()))
+            when(reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(any(), any(), any()))
                     .thenReturn(Optional.empty());
 
             assertThatThrownBy(
@@ -335,7 +335,7 @@ class BlogModerationServiceTest {
             openReport(BlogTargetType.POST, gone);
             when(reportRepo.closeOpen(any(), any(), any(), any(), any(), any())).thenReturn(2);
             when(postRepo.findWithTagsById(gone)).thenReturn(Optional.empty());
-            when(actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType.POST, gone))
+            when(actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType.POST, gone))
                     .thenReturn(List.of(BlogModerationAction.record(BlogTargetType.POST, gone,
                             BlogModerationActionType.DISMISS, "Gone", me, null, now)));
 
@@ -365,8 +365,8 @@ class BlogModerationServiceTest {
             }
 
             nothingIsLockedClosedOrRecorded();
-            verify(reportRepo, never()).findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(any(), any(),
-                    any());
+            verify(reportRepo, never()).findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(any(),
+                    any(), any());
             assertThat(post.getStatus()).isEqualTo(BlogPostStatus.PUBLISHED);
         }
 
@@ -534,9 +534,9 @@ class BlogModerationServiceTest {
             BlogPost post = postBy(author);
             BlogReport report = BlogReport.open(reporter, BlogTargetType.POST, post.getId(), BlogReportReason.SPAM,
                     "an advert", now.minusSeconds(60));
-            when(reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType.POST, post.getId()))
+            when(reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType.POST, post.getId()))
                     .thenReturn(List.of(report));
-            when(actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType.POST, post.getId()))
+            when(actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType.POST, post.getId()))
                     .thenReturn(List.of(BlogModerationAction.record(BlogTargetType.POST, post.getId(),
                             BlogModerationActionType.DISMISS, "Fine", me, report.getId(), now)));
 
@@ -587,8 +587,9 @@ class BlogModerationServiceTest {
         void contentThatIsGoneIsDescribedByWhatRemainsOfIt() {
             UUID gone = UUID.randomUUID();
             when(postRepo.findWithTagsById(gone)).thenReturn(Optional.empty());
-            when(reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType.POST, gone)).thenReturn(
-                    List.of(BlogReport.open(reporter, BlogTargetType.POST, gone, BlogReportReason.OTHER, null, now)));
+            when(reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType.POST, gone))
+                    .thenReturn(List.of(
+                            BlogReport.open(reporter, BlogTargetType.POST, gone, BlogReportReason.OTHER, null, now)));
 
             ModerationTargetResult result = service.target(BlogTargetType.POST, gone);
 
@@ -634,7 +635,7 @@ class BlogModerationServiceTest {
                     BlogModerationActionType.DISMISS, "Fine", otherModerator, null, now);
             ArgumentCaptor<org.springframework.data.domain.Pageable> paging = ArgumentCaptor
                     .forClass(org.springframework.data.domain.Pageable.class);
-            when(actionRepo.findAllByOrderByCreatedAtDesc(paging.capture()))
+            when(actionRepo.findAllByOrderByCreatedAtDescIdDesc(paging.capture()))
                     .thenReturn(new PageImpl<>(List.of(first, second)));
 
             List<ModerationActionResult> actions = service.recentActions(PageRequest.of(3, 500)).getContent();
@@ -656,12 +657,12 @@ class BlogModerationServiceTest {
 
             assertThat(page.getContent()).isEmpty();
             assertThat(page.getTotalElements()).isEqualTo(7);
-            verify(actionRepo, never()).findAllByOrderByCreatedAtDesc(any());
+            verify(actionRepo, never()).findAllByOrderByCreatedAtDescIdDesc(any());
         }
 
         @Test
         void anEmptyHistoryAsksNobodyForProfiles() {
-            when(actionRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new PageImpl<>(List.of()));
+            when(actionRepo.findAllByOrderByCreatedAtDescIdDesc(any())).thenReturn(new PageImpl<>(List.of()));
 
             assertThat(service.recentActions(PageRequest.of(0, 20)).getContent()).isEmpty();
 

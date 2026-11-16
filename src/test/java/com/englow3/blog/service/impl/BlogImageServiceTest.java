@@ -1,4 +1,4 @@
-package com.englow3.blog.service;
+package com.englow3.blog.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +34,7 @@ import com.englow3.blog.dto.command.StartImageUploadCommand;
 import com.englow3.blog.dto.result.BlogImageUploadTicket;
 import com.englow3.blog.entity.BlogPostImage;
 import com.englow3.blog.repository.BlogPostImageRepository;
-import com.englow3.blog.service.impl.BlogImageServiceImpl;
+import com.englow3.blog.service.BlogImageService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;

@@ -10,6 +10,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -26,6 +34,7 @@ import com.englow3.blog.dto.command.ListPostsCommand;
 import com.englow3.blog.dto.command.ModerationActionCommand;
 import com.englow3.blog.dto.command.ModerationQueueFilter;
 import com.englow3.blog.dto.command.ReportContentCommand;
+import com.englow3.blog.dto.command.SaveCommentCommand;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
 import com.englow3.blog.dto.result.ModerationActionResult;
@@ -832,6 +841,75 @@ class BlogModerationIntegrationTest extends PostgresIntegrationTest {
         assertThat(moderationService.recentActions(PageRequest.of(0, 5_000)).getSize()).isEqualTo(50);
     }
 
+    // --- a stable order --------------------------------------------------------------------------------------------
+
+    /** Newest first, and rows made in the same instant by id, so a page never repeats or skips one. */
+    private static List<UUID> byIdDescending(List<UUID> ids) {
+        // The text of a UUID is its bytes in hex, in order: the way the database compares them.
+        return ids.stream().sorted(java.util.Comparator.comparing(UUID::toString).reversed()).toList();
+    }
+
+    private UUID insertActionAt(UUID target, UUID moderator, Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql(
+                """
+                        insert into blog_moderation_actions (id, target_type, target_id, action, reason, moderator_id, created_at)
+                        values (:id, 'POST', :target, 'HIDE', 'same instant', :moderator, :at)
+                        """)
+                .param("id", id).param("target", target).param("moderator", moderator).param("at", SqlTime.at(at))
+                .update();
+        return id;
+    }
+
+    @Test
+    void reportsAndActionsMadeInTheSameInstantAreShownInAFixedOrder() {
+        UUID staff = fixture.staff("Mod");
+        UUID post = insertPost(fixture.learner());
+        Instant same = Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(5);
+        List<UUID> reportIds = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            UUID id = UUID.randomUUID();
+            jdbc.sql("""
+                    insert into blog_reports (id, reporter_id, target_type, target_id, reason, created_at)
+                    values (:id, :reporter, 'POST', :target, 'SPAM', :at)
+                    """).param("id", id).param("reporter", fixture.learner()).param("target", post)
+                    .param("at", SqlTime.at(same)).update();
+            reportIds.add(id);
+        }
+        List<UUID> actionIds = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            actionIds.add(insertActionAt(post, staff, same));
+        }
+
+        SignedIn.as(jdbc, staff);
+        ModerationTargetResult target = moderationService.target(BlogTargetType.POST, post);
+
+        assertThat(target.reports()).extracting(ModerationTargetResult.Report::id)
+                .containsExactlyElementsOf(byIdDescending(reportIds));
+        assertThat(target.actions()).extracting(ModerationTargetResult.Action::id)
+                .containsExactlyElementsOf(byIdDescending(actionIds));
+    }
+
+    @Test
+    void theHistoryPagesNeverRepeatOrSkipActionsMadeInTheSameInstant() {
+        UUID staff = fixture.staff("Mod");
+        // Newer than anything any other test recorded, so these are the top of the history.
+        Instant same = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        List<UUID> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            ids.add(insertActionAt(UUID.randomUUID(), staff, same));
+        }
+
+        SignedIn.as(jdbc, staff);
+        List<UUID> pagedTwoAtATime = new java.util.ArrayList<>();
+        for (int page = 0; page < 3; page++) {
+            moderationService.recentActions(PageRequest.of(page, 2)).getContent()
+                    .forEach(action -> pagedTwoAtATime.add(action.id()));
+        }
+
+        assertThat(pagedTwoAtATime).containsExactlyElementsOf(byIdDescending(ids));
+    }
+
     // --- erasure ---------------------------------------------------------------------------------------------------
 
     @Test
@@ -1067,6 +1145,189 @@ class BlogModerationIntegrationTest extends PostgresIntegrationTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    // --- an author's edit or delete against a moderator's action ---------------------------------------------------
+
+    /**
+     * Hibernate writes every column of a comment it updates, and a comment has no version. An edit that had read the
+     * comment as visible, then waited for a moderator's transaction, would write 'VISIBLE' back over the hide. The race
+     * is arranged, not hoped for: a moderator's hide is held open inside a transaction (the row stays locked), the edit
+     * is submitted and shown to be waiting, and only then is the hide committed.
+     */
+    @Test
+    void anEditSubmittedWhileAHideIsInProgressCannotLeaveTheCommentVisible() throws Exception {
+        UUID commenter = fixture.learner("Commenter");
+        UUID staff = fixture.staff("Mod");
+        UUID post = insertPost(fixture.learner());
+        UUID comment = insertComment(post, commenter, "original", "VISIBLE");
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Held hide = holdWhile(pool, staff, () -> moderationService.act(BlogTargetType.COMMENT, comment,
+                    new ModerationActionCommand(BlogModerationActionType.HIDE, "Rude")));
+
+            Future<?> edit = inThread(pool, commenter,
+                    () -> commentService.update(comment, new SaveCommentCommand("edited by the author")));
+
+            assertThatThrownBy(() -> edit.get(750, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            hide.release();
+
+            assertThat(hide.done().get(30, TimeUnit.SECONDS)).isNull();
+            assertThatThrownBy(() -> edit.get(30, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(ConflictException.class).cause()
+                    .satisfies(refusal -> assertThat(((ConflictException) refusal).getCode())
+                            .isEqualTo("BLOG_COMMENT_NOT_EDITABLE"));
+            assertThat(statusOf("blog_comments", comment)).isEqualTo("HIDDEN");
+            assertThat(jdbc.sql("select body from blog_comments where id = :id").param("id", comment)
+                    .query(String.class).single()).isEqualTo("original");
+            assertThat(
+                    count("select count(*) from blog_comments where id = :id and edited_at is not null", "id", comment))
+                            .isZero();
+            assertThat(count("select count(*) from blog_moderation_actions where target_id = :t", "t", comment))
+                    .isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void aHideSubmittedWhileAnEditIsInProgressHidesTheEditedText() throws Exception {
+        UUID commenter = fixture.learner("Commenter");
+        UUID staff = fixture.staff("Mod");
+        UUID post = insertPost(fixture.learner());
+        UUID comment = insertComment(post, commenter, "original", "VISIBLE");
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Held edit = holdWhile(pool, commenter,
+                    () -> commentService.update(comment, new SaveCommentCommand("edited by the author")));
+
+            Future<?> hide = inThread(pool, staff, () -> moderationService.act(BlogTargetType.COMMENT, comment,
+                    new ModerationActionCommand(BlogModerationActionType.HIDE, "Rude")));
+
+            assertThatThrownBy(() -> hide.get(750, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            edit.release();
+
+            assertThat(edit.done().get(30, TimeUnit.SECONDS)).isNull();
+            assertThat(hide.get(30, TimeUnit.SECONDS)).isNotNull();
+            assertThat(statusOf("blog_comments", comment)).isEqualTo("HIDDEN");
+            assertThat(jdbc.sql("select body from blog_comments where id = :id").param("id", comment)
+                    .query(String.class).single()).isEqualTo("edited by the author");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void aCommentDeleteSubmittedWhileAHideIsInProgressWaitsAndThenWinsWithoutAnError() throws Exception {
+        UUID commenter = fixture.learner("Commenter");
+        UUID staff = fixture.staff("Mod");
+        UUID post = insertPost(fixture.learner());
+        UUID comment = insertComment(post, commenter, "original", "VISIBLE");
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Held hide = holdWhile(pool, staff, () -> moderationService.act(BlogTargetType.COMMENT, comment,
+                    new ModerationActionCommand(BlogModerationActionType.HIDE, "Rude")));
+
+            Future<?> delete = inThread(pool, commenter, () -> {
+                commentService.delete(comment);
+                return "deleted";
+            });
+
+            assertThatThrownBy(() -> delete.get(750, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            hide.release();
+
+            assertThat(hide.done().get(30, TimeUnit.SECONDS)).isNull();
+            assertThat(delete.get(30, TimeUnit.SECONDS)).isEqualTo("deleted");
+            assertThat(count("select count(*) from blog_comments where id = :id", "id", comment)).isZero();
+            // What the moderator did stays on record.
+            assertThat(count("select count(*) from blog_moderation_actions where target_id = :t", "t", comment))
+                    .isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * A post has a version, so an edit cannot undo a hide; but a delete that had read the post before the hide was
+     * committed would then fail on the version check as CONCURRENT_UPDATE. Locked, it waits and removes the post.
+     */
+    @Test
+    void aPostDeleteSubmittedWhileAHideIsInProgressWaitsAndThenWinsWithoutAnError() throws Exception {
+        UUID author = fixture.learner("Writer");
+        UUID staff = fixture.staff("Mod");
+        UUID post = insertPost(author);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Held hide = holdWhile(pool, staff, () -> moderationService.act(BlogTargetType.POST, post,
+                    new ModerationActionCommand(BlogModerationActionType.HIDE, "Advertising")));
+
+            Future<?> delete = inThread(pool, author, () -> {
+                postService.delete(post);
+                return "deleted";
+            });
+
+            assertThatThrownBy(() -> delete.get(750, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            hide.release();
+
+            assertThat(hide.done().get(30, TimeUnit.SECONDS)).isNull();
+            assertThat(delete.get(30, TimeUnit.SECONDS)).isEqualTo("deleted");
+            assertThat(count("select count(*) from blog_posts where id = :id", "id", post)).isZero();
+            assertThat(count("select count(*) from blog_moderation_actions where target_id = :t", "t", post))
+                    .isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** A moderator's transaction held open, so that whatever it locked stays locked until {@link #release()}. */
+    private record Held(Future<Object> done, CountDownLatch released) {
+
+        void release() {
+            released.countDown();
+        }
+    }
+
+    /**
+     * Runs {@code work} as {@code user} inside a transaction that is not committed until {@link Held#release()}. The
+     * service called inside joins it, so the rows it locked stay locked. Returns once the work has been done.
+     */
+    private Held holdWhile(ExecutorService pool, UUID user, Runnable work) throws InterruptedException {
+        CountDownLatch worked = new CountDownLatch(1);
+        CountDownLatch released = new CountDownLatch(1);
+        Future<Object> done = pool.submit(() -> {
+            SignedIn.as(jdbc, user);
+            try {
+                transactions.executeWithoutResult(tx -> {
+                    try {
+                        work.run();
+                    } finally {
+                        worked.countDown();
+                    }
+                    try {
+                        released.await(60, TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+                return null;
+            } finally {
+                SignedIn.out();
+            }
+        });
+        assertThat(worked.await(30, TimeUnit.SECONDS)).as("the held work ran").isTrue();
+        return new Held(done, released);
+    }
+
+    /** Runs {@code work} as {@code user} on a pool thread, signed in there: the security context is per thread. */
+    private <T> Future<T> inThread(ExecutorService pool, UUID user, Callable<T> work) {
+        return pool.submit(() -> {
+            SignedIn.as(jdbc, user);
+            try {
+                return work.call();
+            } finally {
+                SignedIn.out();
+            }
+        });
     }
 
     // --- an author's save against a moderator's decision -----------------------------------------------------------

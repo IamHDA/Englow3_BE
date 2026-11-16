@@ -35,9 +35,10 @@ public interface BlogReportRepository extends JpaRepository<BlogReport, UUID> {
     Optional<BlogReport> findByReporterIdAndTargetTypeAndTargetIdAndStatus(UUID reporterId, BlogTargetType type,
             UUID targetId, BlogReportStatus status);
 
-    List<BlogReport> findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType type, UUID targetId);
+    /** Newest first; two reports in the same instant are ordered by id, so the order never changes between calls. */
+    List<BlogReport> findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType type, UUID targetId);
 
-    Optional<BlogReport> findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(BlogTargetType type,
+    Optional<BlogReport> findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(BlogTargetType type,
             UUID targetId, BlogReportStatus status);
 
     /**

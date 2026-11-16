@@ -173,10 +173,14 @@ public class BlogPostServiceImpl implements BlogPostService {
         UUID me = userDirectory.requireCurrentUserId();
 
         List<String> keys = transactions.execute(tx -> {
-            // The read rule first: a post the caller cannot read does not exist for them, so it is not a 403 that would
-            // tell them it does. Another person's post they can read is the entity's to refuse; their own goes in any
-            // status.
-            BlogPost post = postRepo.findById(postId).filter(found -> readRule.canRead(found, me))
+            // The first and only read of the post, and it locks the row like a moderator's action does: the delete
+            // then waits for an action in progress and removes the post as it is. Left to the version check alone, a
+            // delete that had read the post before a hide was committed would fail on it as CONCURRENT_UPDATE, for the
+            // author to repeat.
+            // The read rule decides what a caller who may not read the post is told: a post that does not exist for
+            // them is not a 403 that would say it does. Another person's post they can read is the entity's to refuse;
+            // their own goes in any status.
+            BlogPost post = postRepo.findByIdForUpdate(postId).filter(found -> readRule.canRead(found, me))
                     .orElseThrow(() -> postNotFound(postId));
             post.ensureDeletableBy(me);
             // Read before the post goes: its images' rows go with it, by cascade, and the keys with them.
@@ -267,8 +271,8 @@ public class BlogPostServiceImpl implements BlogPostService {
             return null;
         }
         return actionRepo
-                .findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(BlogTargetType.POST, post.getId(),
-                        List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE))
+                .findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(BlogTargetType.POST,
+                        post.getId(), List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE))
                 .map(BlogModerationAction::getReason).orElse(null);
     }
 

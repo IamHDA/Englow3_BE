@@ -36,7 +36,11 @@ public interface BlogCommentRepository extends JpaRepository<BlogComment, UUID> 
     /** The number shown on a post: visible comments only, whoever is asking. */
     long countByPostIdAndStatus(UUID postId, BlogCommentStatus status);
 
-    /** The comment with its row locked until the transaction ends, read fresh: see {@code BlogPostRepository}. */
+    /**
+     * The comment with its row locked until the transaction ends, read fresh: see {@code BlogPostRepository}. The way
+     * to read a comment that is about to be changed or deleted, by a moderator or by its author: a comment has no
+     * version, so this lock is all that stops an edit from writing an old status back over a hide.
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from BlogComment c where c.id = :id")
     Optional<BlogComment> findByIdForUpdate(@Param("id") UUID id);

@@ -15,11 +15,14 @@ import com.englow3.blog.entity.BlogTargetType;
 
 public interface BlogModerationActionRepository extends JpaRepository<BlogModerationAction, UUID> {
 
-    List<BlogModerationAction> findByTargetTypeAndTargetIdOrderByCreatedAtDesc(BlogTargetType type, UUID targetId);
+    /** Newest first; two actions in the same instant are ordered by id, so the order never changes between calls. */
+    List<BlogModerationAction> findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(BlogTargetType type,
+            UUID targetId);
 
     /** The last thing done to the target, of any of these kinds. */
-    Optional<BlogModerationAction> findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(BlogTargetType type,
-            UUID targetId, Collection<BlogModerationActionType> actions);
+    Optional<BlogModerationAction> findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(
+            BlogTargetType type, UUID targetId, Collection<BlogModerationActionType> actions);
 
-    Page<BlogModerationAction> findAllByOrderByCreatedAtDesc(Pageable page);
+    /** Newest first, ties by id: a page never repeats or skips an action that was recorded in the same instant. */
+    Page<BlogModerationAction> findAllByOrderByCreatedAtDescIdDesc(Pageable page);
 }

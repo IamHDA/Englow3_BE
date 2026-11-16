@@ -107,11 +107,14 @@ public class BlogCommentServiceImpl implements BlogCommentService {
     @Transactional
     public BlogCommentResult update(UUID commentId, SaveCommentCommand command) {
         UUID me = userDirectory.requireCurrentUserId();
-        BlogComment comment = commentRepo.findById(commentId).orElseThrow(() -> commentNotFound(commentId));
+        // The first and only read of the comment, and it locks the row the way a moderator's action does.
+        // Hibernate writes every column of a comment it updates, so an edit that had read the comment as
+        // visible would write 'VISIBLE' back over a hide committed in between. Serialised, an edit after a
+        // hide reads HIDDEN and is refused, and a hide after an edit hides the text as edited.
+        BlogComment comment = commentRepo.findByIdForUpdate(commentId).orElseThrow(() -> commentNotFound(commentId));
         // The post's read rule applies to editing too: someone who has since been blocked by the post's author, or
-        // whose
-        // post was hidden, cannot keep editing in a place they can no longer see. The answer is the comment's, not the
-        // post's: the comment is what was asked for.
+        // whose post was hidden, cannot keep editing in a place they can no longer see. The answer is the comment's,
+        // not the post's: the comment is what was asked for.
         BlogPost post = postRepo.findById(comment.getPostId()).filter(found -> readRule.canRead(found, me))
                 .orElseThrow(() -> commentNotFound(commentId));
         post.ensureOpenForInteraction();
@@ -120,11 +123,15 @@ public class BlogCommentServiceImpl implements BlogCommentService {
         return result(comment, publicProfileReader.profiles(Set.of(me)), me);
     }
 
+    /**
+     * Locked like an edit: a delete that raced a moderator's action waits for it and then removes the row, whatever the
+     * action was, and never fails on a row that changed under it. A moderator who comes after finds nothing to act on.
+     */
     @Override
     @Transactional
     public void delete(UUID commentId) {
         UUID me = userDirectory.requireCurrentUserId();
-        BlogComment comment = commentRepo.findById(commentId).orElseThrow(() -> commentNotFound(commentId));
+        BlogComment comment = commentRepo.findByIdForUpdate(commentId).orElseThrow(() -> commentNotFound(commentId));
         comment.ensureDeletableBy(me);
         commentRepo.delete(comment);
     }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -103,7 +105,8 @@ class BlogCommentServiceTest {
 
     private BlogComment commentBy(UUID author, UUID postId) {
         BlogComment comment = BlogComment.write(postId, author, "A comment", now.minusSeconds(60));
-        when(commentRepo.findById(comment.getId())).thenReturn(Optional.of(comment));
+        // Only the locking finder: a service that read the comment any other way would find nothing here.
+        when(commentRepo.findByIdForUpdate(comment.getId())).thenReturn(Optional.of(comment));
         return comment;
     }
 
@@ -294,10 +297,28 @@ class BlogCommentServiceTest {
             assertThat(result.canEdit()).isTrue();
         }
 
+        /**
+         * What keeps an edit from writing 'VISIBLE' back over a moderator's hide: the first and only read of the
+         * comment takes its row lock, before the post is asked about. The integration test shows it against a real
+         * lock.
+         */
+        @Test
+        void theCommentIsReadOnlyThroughTheLockingFinderAndBeforeThePost() {
+            BlogPost post = postBy(other);
+            BlogComment comment = commentBy(me, post.getId());
+
+            service.update(comment.getId(), command);
+
+            InOrder order = inOrder(commentRepo, postRepo);
+            order.verify(commentRepo).findByIdForUpdate(comment.getId());
+            order.verify(postRepo).findById(post.getId());
+            verify(commentRepo, never()).findById(any());
+        }
+
         @Test
         void aCommentThatDoesNotExistIsNotFound() {
             UUID missing = UUID.randomUUID();
-            when(commentRepo.findById(missing)).thenReturn(Optional.empty());
+            when(commentRepo.findByIdForUpdate(missing)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.update(missing, command)).isInstanceOfSatisfying(NotFoundException.class,
                     e -> assertThat(e.getCode()).isEqualTo("BLOG_COMMENT_NOT_FOUND"));
@@ -351,6 +372,17 @@ class BlogCommentServiceTest {
     @Nested
     class Deleting {
 
+        /** A delete that raced a moderator's action waits for it instead of failing on a row that changed under it. */
+        @Test
+        void theCommentIsReadOnlyThroughTheLockingFinder() {
+            BlogComment comment = commentBy(me, UUID.randomUUID());
+
+            service.delete(comment.getId());
+
+            verify(commentRepo).findByIdForUpdate(comment.getId());
+            verify(commentRepo, never()).findById(any());
+        }
+
         @Test
         void theAuthorsCommentIsDeleted() {
             BlogComment comment = commentBy(me, UUID.randomUUID());
@@ -381,7 +413,7 @@ class BlogCommentServiceTest {
         @Test
         void aCommentThatDoesNotExistIsNotFound() {
             UUID missing = UUID.randomUUID();
-            doReturn(Optional.empty()).when(commentRepo).findById(missing);
+            doReturn(Optional.empty()).when(commentRepo).findByIdForUpdate(missing);
 
             assertThatThrownBy(() -> service.delete(missing)).isInstanceOfSatisfying(NotFoundException.class,
                     e -> assertThat(e.getCode()).isEqualTo("BLOG_COMMENT_NOT_FOUND"));

@@ -208,7 +208,7 @@ class BlogPostServiceTest {
 
     private void postIsLoadable(BlogPost post) {
         when(postRepo.findWithTagsById(post.getId())).thenReturn(Optional.of(post));
-        when(postRepo.findById(post.getId())).thenReturn(Optional.of(post));
+        when(postRepo.findByIdForUpdate(post.getId())).thenReturn(Optional.of(post));
     }
 
     // --- create ----------------------------------------------------------------------------------------------------
@@ -596,6 +596,26 @@ class BlogPostServiceTest {
             order.verify(objectStorage).delete("blog", "posts/b.png");
         }
 
+        /**
+         * A delete that had read the post before a moderator's hide was committed would fail on the version check; the
+         * locking read makes it wait for the action and remove the post as it then is. The integration test shows it
+         * against a real lock.
+         */
+        @Test
+        void thePostIsReadOnlyThroughTheLockingFinder() {
+            BlogPost post = existingPost(me, 0);
+            postIsLoadable(post);
+            when(imageRepo.findKeysByPostId(post.getId())).thenReturn(List.of());
+
+            service.delete(post.getId());
+
+            InOrder order = inOrder(postRepo, imageRepo);
+            order.verify(postRepo).findByIdForUpdate(post.getId());
+            order.verify(imageRepo).findKeysByPostId(post.getId());
+            order.verify(postRepo).delete(post);
+            verify(postRepo, never()).findById(any());
+        }
+
         @Test
         void aPostWithoutImagesDeletesNoObjects() {
             BlogPost post = existingPost(me, 0);
@@ -626,7 +646,7 @@ class BlogPostServiceTest {
         @Test
         void aPostThatDoesNotExistIsNotFoundAndNothingIsRead() {
             UUID missing = UUID.randomUUID();
-            when(postRepo.findById(missing)).thenReturn(Optional.empty());
+            when(postRepo.findByIdForUpdate(missing)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.delete(missing)).isInstanceOfSatisfying(NotFoundException.class,
                     e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
@@ -765,7 +785,7 @@ class BlogPostServiceTest {
             hide(post);
             postIsLoadable(post);
             UUID moderator = UUID.randomUUID();
-            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(any(), any(), any()))
+            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(any(), any(), any()))
                     .thenReturn(Optional.of(BlogModerationAction.record(BlogTargetType.POST, post.getId(),
                             BlogModerationActionType.HIDE, "Links to a shop", moderator, null, now)));
 
@@ -773,8 +793,9 @@ class BlogPostServiceTest {
 
             assertThat(result.moderationNote()).isEqualTo("Links to a shop");
             // Only hiding and removing are reasons a post is down: not a dismissal, not a restore.
-            verify(actionRepo).findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(BlogTargetType.POST,
-                    post.getId(), List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE));
+            verify(actionRepo).findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(
+                    BlogTargetType.POST, post.getId(),
+                    List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE));
         }
 
         @Test
@@ -782,7 +803,7 @@ class BlogPostServiceTest {
             BlogPost post = existingPost(me, 4);
             hide(post);
             postIsLoadable(post);
-            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDesc(any(), any(), any()))
+            when(actionRepo.findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(any(), any(), any()))
                     .thenReturn(Optional.empty());
 
             assertThat(service.get(post.getId()).moderationNote()).isNull();

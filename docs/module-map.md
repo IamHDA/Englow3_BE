@@ -747,7 +747,17 @@ and moderation.
   changed since is refused as `BLOG_POST_STALE`; Hibernate's check on the write turns two saves that
   both passed it into `CONCURRENT_UPDATE`. A moderator's action locks the post or comment row
   (`select ... for update`) and reads it fresh, so two moderators acting at once are serialised
-  and the second is told the content is already hidden. Like primary key `(post_id, user_id)` with
+  and the second is told the content is already hidden. A comment has no version and Hibernate
+  writes every column of a row it updates, so the author's side of a comment takes the same lock:
+  an edit and a delete read the comment through `findByIdForUpdate` as their first and only read.
+  An edit after a hide reads `HIDDEN` and is refused (`BLOG_COMMENT_NOT_EDITABLE`), a hide after
+  an edit hides the text as edited, and a delete waits for an action in progress and then removes
+  the row - an edit can never write `VISIBLE` back over a hide. A post is protected against an
+  author's edit by `@Version` and the moderator's lock together (a post changed since the editor
+  opened it is `BLOG_POST_STALE` or `CONCURRENT_UPDATE`); the author's delete reads it with the
+  lock too, so it waits for a hide in progress and removes the post as it then is, where the
+  version check alone would have failed it. Writing a comment or a like while a post is being hidden
+  is a benign race and is not serialised. Like primary key `(post_id, user_id)` with
   an `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
   not stored: erasure removes likes by cascade, and a stored counter would drift. Unique
   `(reporter_id, target_type, target_id)` among open reports only (a partial unique index),

@@ -170,8 +170,9 @@ public class BlogModerationServiceImpl implements BlogModerationService {
      */
     private ModerationTargetResult describe(BlogTargetType type, UUID targetId) {
         Optional<Loaded> loaded = load(type, targetId);
-        List<BlogReport> reports = reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(type, targetId);
-        List<BlogModerationAction> actions = actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(type, targetId);
+        List<BlogReport> reports = reportRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(type, targetId);
+        List<BlogModerationAction> actions = actionRepo.findByTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(type,
+                targetId);
         if (loaded.isEmpty() && reports.isEmpty() && actions.isEmpty()) {
             throw targetNotFound(type, targetId);
         }
@@ -308,7 +309,7 @@ public class BlogModerationServiceImpl implements BlogModerationService {
     }
 
     private Optional<BlogReport> lastOpenReport(BlogTargetType type, UUID targetId) {
-        return reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDesc(type, targetId,
+        return reportRepo.findFirstByTargetTypeAndTargetIdAndStatusOrderByCreatedAtDescIdDesc(type, targetId,
                 BlogReportStatus.OPEN);
     }
 
@@ -323,7 +324,7 @@ public class BlogModerationServiceImpl implements BlogModerationService {
             // still the real one.
             return new PageImpl<>(List.of(), pageable, actionRepo.count());
         }
-        Page<BlogModerationAction> actions = actionRepo.findAllByOrderByCreatedAtDesc(pageable);
+        Page<BlogModerationAction> actions = actionRepo.findAllByOrderByCreatedAtDescIdDesc(pageable);
         Set<UUID> moderatorIds = actions.stream().map(BlogModerationAction::getModeratorId).collect(Collectors.toSet());
         Map<UUID, PublicProfile> profiles = profilesOf(moderatorIds);
         return actions.map(action -> new ModerationActionResult(action.getId(), action.getTargetType(),

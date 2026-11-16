@@ -22,7 +22,8 @@ public interface BlogPostRepository extends JpaRepository<BlogPost, UUID> {
     /**
      * The post with its row locked until the transaction ends, read fresh from the database: a moderator's decision is
      * made on the state the post has now, and an author's save that is in flight either finishes first or finds the
-     * version changed.
+     * version changed. Also how an author's delete reads the post, so that it waits for an action in progress instead
+     * of failing on the version it had read.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from BlogPost p where p.id = :id")
