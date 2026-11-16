@@ -19,7 +19,7 @@ Mục lục: [2.1 Backup](#21-backup-và-khôi-phục) · [2.2 Hosting](#22-host
 | Thứ | Chứa gì | Mất thì sao |
 |---|---|---|
 | Cơ sở dữ liệu Postgres (schema `englow3`) | tài khoản, kết quả thi, tiến độ, gói dịch vụ | mất lịch sử học của mọi người |
-| Đối tượng trong Storage (bucket `avatars`, `exams`, `learning`, `speaking`) | ảnh, audio đề thi, bản ghi âm người học | đề thi nghe không còn tiếng; mất bản ghi âm |
+| Đối tượng trong Storage (bucket `avatars`, `exams`, `learning`, `speaking`, `chat`) | ảnh, audio đề thi, bản ghi âm người học, ảnh trong tin nhắn | đề thi nghe không còn tiếng; mất bản ghi âm và ảnh chat |
 | Tài khoản đăng nhập (`auth.users`) | email, mật khẩu băm | không ai đăng nhập được |
 
 Mục tiêu đề xuất: **RPO ≤ 24 giờ** (mất tối đa một ngày dữ liệu), **RTO ≤ 4 giờ** (dựng lại dịch vụ). Nếu không chấp nhận mất tới 24 giờ kết quả thi, bật PITR (bước 2).
@@ -58,7 +58,9 @@ Sao lưu cơ sở dữ liệu **không** chứa file. Đồng bộ định kỳ 
 aws s3 sync s3://speaking s3://<bucket-sao-luu-rieng>/storage/speaking/ \
   --endpoint-url <supabase-s3-endpoint>
 ```
-Lặp cho `exams`, `learning`, `avatars`. `exams` và `learning` có thể dựng lại từ `data_pipeline` nên ưu tiên thấp hơn `speaking`.
+Lặp cho `exams`, `learning`, `avatars`, `chat`. `exams` và `learning` có thể dựng lại từ `data_pipeline` nên ưu tiên thấp hơn `speaking` và `chat` (ảnh người học gửi nhau, không dựng lại được).
+
+Bucket `chat`: **bucket private**, tạo trên Supabase Storage **trước khi deploy** bản có tính năng chat, và đặt `STORAGE_CHAT_BUCKET` trên Render nếu tên khác `chat`. Ảnh chỉ được đọc qua URL presigned ngắn hạn cấp cho hai người trong hội thoại; không bật quyền đọc công khai.
 
 ### Bước 5 — Thử khôi phục (bắt buộc, mỗi quý một lần)
 Một bản sao lưu chưa từng khôi phục thử chưa phải là bản sao lưu.

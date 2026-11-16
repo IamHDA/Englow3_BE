@@ -13,13 +13,14 @@ biến môi trường.
 Khối lượng hiện tại (đã đo): `exams` 686 file / 87 MB, `learning` 6.075 file / 84 MB (6.000 audio flashcard +
 75 audio bài nghe). Tổng 173 MB, vừa gói miễn phí của cả Supabase (1 GB) lẫn R2 (10 GB).
 
-Bucket `speaking` chứa bản ghi riêng tư của người học; bản mới bắt đầu rỗng, script không chép nó trừ khi được
-chỉ định.
+Bucket `speaking` chứa bản ghi riêng tư của người học và bucket `chat` chứa ảnh người học gửi nhau; bản mới bắt đầu
+rỗng, script không chép chúng trừ khi được chỉ định.
 
 ### Cách ít việc nhất: Supabase Storage (dự án đã dùng Supabase)
 
-1. Dashboard Supabase, **Storage**, tạo 4 bucket **private**: `exams`, `learning`, `speaking`, `avatars`
-   (`avatars` đặt **public**). Có thể thêm tiền tố nếu muốn, ví dụ `englow3-exams`.
+1. Dashboard Supabase, **Storage**, tạo 5 bucket **private**: `exams`, `learning`, `speaking`, `avatars`, `chat`
+   (`avatars` đặt **public**; `chat` luôn **private**, ảnh chỉ đọc qua URL presigned). Có thể thêm tiền tố nếu muốn,
+   ví dụ `englow3-exams`.
 2. **Storage, S3 Connection**: bật S3 protocol, tạo **Access key** (lấy Access key ID và Secret).
    Endpoint có dạng `https://<project-ref>.supabase.co/storage/v1/s3`, region là region của dự án.
 3. Chép file (chạy trên máy có MinIO local; khoá nhập qua biến môi trường, không dán vào chat hay commit):
@@ -44,11 +45,11 @@ chỉ định.
    | `S3_ENDPOINT` | endpoint ở bước 2 |
    | `S3_REGION` | region của dự án |
    | `S3_ACCESS_KEY`, `S3_SECRET_KEY` | khoá ở bước 2 (đặt là *secret*) |
-   | `STORAGE_EXAM_BUCKET`, `STORAGE_LEARNING_BUCKET`, `STORAGE_SPEAKING_BUCKET`, `STORAGE_AVATAR_BUCKET` | tên bucket (bỏ qua nếu dùng đúng tên mặc định) |
+   | `STORAGE_EXAM_BUCKET`, `STORAGE_LEARNING_BUCKET`, `STORAGE_SPEAKING_BUCKET`, `STORAGE_AVATAR_BUCKET`, `STORAGE_CHAT_BUCKET` | tên bucket (bỏ qua nếu dùng đúng tên mặc định) |
    | `STORAGE_PUBLIC_BASE_URL` | địa chỉ công khai của bucket `avatars`, dạng `https://<ref>.supabase.co/storage/v1/object/public/avatars` |
 
-5. **CORS cho bucket**: trình duyệt PUT bản ghi Speaking thẳng lên địa chỉ presigned và phát audio từ đó, nên
-   bucket phải cho phép origin của web (`https://englow3-web.vercel.app` và hai alias dev/test) với phương thức
+5. **CORS cho bucket**: trình duyệt PUT bản ghi Speaking (và ảnh chat) thẳng lên địa chỉ presigned và phát audio
+   từ đó, nên bucket phải cho phép origin của web (`https://englow3-web.vercel.app` và hai alias dev/test) với phương thức
    `GET, PUT, HEAD` và header `*`. Với R2 đây là mục *CORS policy* của bucket; Supabase Storage không chặn theo
    origin cho địa chỉ presigned, nhưng vẫn nên thử một lần ghi âm thật.
 6. Kiểm: đăng nhập learner, mở một bài nghe và bấm phát; mở một đề TOEIC có audio; ghi âm một câu Speaking.

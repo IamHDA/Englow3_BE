@@ -47,7 +47,7 @@ skills, and onboarding.
   contracts for cross-module identity lookup and placement recording.
   `user.api.PublicProfileReader` hands other modules what other learners may see of an
   account - display name and avatar URL, never email - for a set of ids in one query,
-  whether an id is a learner, and the learner search by display name (`friendship` uses it).
+  whether an id is a learner, and the learner search by display name (`friendship` and `chat` use it).
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
   level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
   daily study minutes and purposes as plain values. User entities,
@@ -575,37 +575,53 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a
   reason and a report trail.
 
-## `chat` (planned)
+## `chat` (realtime pending)
 
-Designed 2026-11-15, not implemented yet. Owns one-to-one conversations between
-friends.
+Owns one-to-one conversations between friends. Implemented: the REST side - open a
+conversation, send text and/or one image, history by `seq`, read marks, recall, the
+conversation list with unread counts - behind `/api/chat`, and the events
+(`ChatMessageSent`, `ChatMessageRecalled`, `ChatReadAdvanced`, ids only, published inside
+the writing transaction) the realtime step will listen to after commit. Not built yet: the
+receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `chat_conversations` (`id`, `direct_key`, `last_seq`,
   `last_message_at`); `chat_participants` (`conversation_id`, `user_id`,
   `last_read_seq`, `joined_at`); `chat_messages` (`id`, `seq` within the
   conversation, `sender_id`, `client_id`, text, an optional image object key,
-  `recalled_at`, `sent_at`); `chat_socket_tickets`. A conversation holds no user
-  columns: who is in it, and how far each has read, are participant rows. Sending
-  moves the sender's own read mark, so unread is `last_seq - last_read_seq` without
-  counting rows.
+  `recalled_at`, `sent_at`); `chat_image_uploads` (`id`, `conversation_id`, `uploader_id`,
+  `object_key`, `content_type`, `content_length`, `created_at`: an image a participant was
+  given an upload URL for and has not yet attached to a message - sending consumes the row,
+  and without it a learner could upload any number of images that are never sent and no job
+  could find them); `chat_socket_tickets` (not created yet; the realtime step). A
+  conversation holds no user columns: who is in it, and how far each has read, are
+  participant rows. Sending moves the sender's own read mark, so unread is
+  `last_seq - last_read_seq` without counting rows.
 - **One conversation per pair:** `direct_key` is `"<smaller uuid>:<larger uuid>"`,
   unique, so two friends opening a chat at the same moment get one conversation. It
   is the only place the pair is sorted.
 - **Entities with rules:** `ChatConversation` hands out the next `seq`.
-  `ChatMessage` - text, one image, or both, never empty; only the sender recalls it,
-  once; a recalled message loses its text and image and shows as recalled; no
-  editing. `ChatParticipant` - the read mark never moves backwards.
+  `ChatMessage` - text (at most 4000 characters), one image, or both, never empty; only
+  the sender recalls it, once; a recalled message loses its text and image and shows as
+  recalled; no editing. `ChatParticipant` is plain: the read mark has no setter and is
+  written only by `greatest(...)` in `ChatParticipantRepository.advanceReadMark`, which
+  keeps it from moving backwards or past `last_seq` even when two tabs write at once.
+  `ChatImageUpload` is a plain row.
 - **Who may send:** the two must be friends with no block either way, asked through
   `FriendshipReader` on every send and never cached, so unfriending or blocking stops
   the next message. History stays readable after unfriending.
-- **Concurrency:** `seq` comes from one atomic
-  `UPDATE ... SET last_seq = last_seq + 1 ... RETURNING`, backed by unique
-  `(conversation_id, seq)`. Unique `(sender_id, client_id)` makes a retried send
-  return the first message. The read mark is written with `greatest(...)`.
+- **Concurrency:** a send takes the conversation row `FOR UPDATE`
+  (`@Lock(PESSIMISTIC_WRITE)`) and `ChatConversation.nextSeq` increments `last_seq` in
+  the entity; the lock is held to commit, so `seq` order is commit order. This replaces
+  the single `UPDATE ... RETURNING` the first design named: the guarantee is the same,
+  but the rule now lives in the entity and is tested without a database. Unique
+  `(conversation_id, seq)` backs it. Unique `(sender_id, client_id)` makes a retried
+  send return the first message (checked before and again under the lock). The read mark
+  is written with `greatest(...)`. Two friends opening a chat at once meet in
+  `insert ... on conflict (direct_key) do nothing`.
 - **Delivery:** sending, reading, recalling and history are REST through the
-  existing proxy and BFF. Receiving is a receive-only WebSocket at `/ws/chat`, straight
-  to Spring. The web asks the proxy for a ticket - random, stored hashed, valid 30
+  existing proxy and BFF (implemented). Receiving is a receive-only WebSocket at
+  `/ws/chat`, straight to Spring (designed, not implemented). The web asks the proxy for a ticket - random, stored hashed, valid 30
   seconds, single use, redeemed by one conditional `UPDATE` so it works on any
   instance; mobile may send `Authorization: Bearer` instead. The handshake checks
   `Origin` against `app.cors.allowed-origins`. The only client frame is
@@ -616,19 +632,33 @@ friends.
   conversations: an id or sequence is handed out before commit, so a later one can
   commit first and a reconnect would skip the earlier message. Within one
   conversation `seq` is safe, because the `last_seq` row lock is held to commit.
-- **Images:** presigned PUT through the shared storage client into a private
-  location; read through short-lived presigned GETs issued only to the two
-  participants. Object-key meaning stays in `chat`. Recalling deletes the object.
+- **Images:** presigned PUT through the shared storage client into the private `chat`
+  bucket (`app.storage.chat-bucket`), bound to the declared type (JPEG, PNG, WebP) and
+  size (at most 5 MB), keyed `conversations/{conversationId}/{uploadId}.{ext}`; read
+  through short-lived presigned GETs issued only to the two participants. Object-key
+  meaning stays in `chat`. Sending names the upload id: the object's existence is checked
+  with a HEAD outside any transaction, then the upload row is consumed in the write
+  transaction. Recalling deletes the object after commit. A cleanup job
+  (`app.chat.cleanup-enabled`, hourly) removes uploads nobody sent within a day, with
+  their objects, and conversations nobody is in; every removal is a conditional delete, so
+  it is safe on several instances.
 - **Erasure:** messages stay and show as from a deleted user: `sender_id` is set to
   null and the erased learner's participant row cascades. A direct conversation left
   with one participant shows the other side as a deleted user; one left with none is
-  cleaned up. Images the erased learner sent stay with their messages. The privacy
-  policy has to say so.
+  cleaned up. Images the erased learner sent stay with their messages. An upload URL
+  issued but never used goes with the account (its row cascades); if the file had already
+  been PUT it stays in the bucket as a stray. The privacy policy has to say so.
 - **Moderation:** none in this version. No reporting; a learner protects themselves by
   blocking, and staff never read private messages.
-- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
-- **Read path:** repository; the conversation list (last message, unread count) moves
-  to `chat/query` if one repository query cannot carry it.
+- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory` and
+  `PublicProfileReader` (the other person's name and picture for a whole page of
+  conversations in one call).
+- **Entry points:** `/api/chat` - `conversations` (list, open, one, `messages` history and
+  send, `read`, `image-uploads`), `messages/{id}/recall`, `unread-count` (conversations
+  with something unread, not a message count).
+- **Read path:** repository for everything but the conversation list; the list (last
+  message, unread, newest first, only conversations that have a message) is
+  `chat/query` because it is one join across three tables.
 - **Why WebSocket, receive-only:** web and BFF run as Vercel functions - 60 seconds at
   most, no WebSocket - and the browser never holds the token (HttpOnly session
   cookie). SSE through them would keep two functions running for every learner with
