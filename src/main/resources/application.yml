@@ -102,6 +102,11 @@ app:
     # Long enough to finish one upload, short enough that a leaked URL is worth little.
     speaking-upload-url-ttl: ${STORAGE_SPEAKING_UPLOAD_URL_TTL:PT15M}
     speaking-media-url-ttl: ${STORAGE_SPEAKING_MEDIA_URL_TTL:PT3H}
+    # Private: chat images are read only through short-lived presigned URLs handed to the two people in the chat.
+    chat-bucket: ${STORAGE_CHAT_BUCKET:chat}
+    # Long enough to finish one upload, short enough that a leaked URL is worth little.
+    chat-upload-url-ttl: ${STORAGE_CHAT_UPLOAD_URL_TTL:PT10M}
+    chat-image-url-ttl: ${STORAGE_CHAT_IMAGE_URL_TTL:PT1H}
 
     # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
     # against. On Supabase the two differ in path shape, not just in host.
@@ -151,6 +156,11 @@ app:
 
   speech:
     locale: ${SPEECH_LOCALE:en-US}
+
+  chat:
+    # Removes images nobody sent and conversations nobody is left in.
+    cleanup-enabled: ${CHAT_CLEANUP_ENABLED:true}
+    cleanup-delay: ${CHAT_CLEANUP_DELAY:1h}
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}

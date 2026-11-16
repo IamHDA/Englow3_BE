@@ -94,6 +94,7 @@ services:
       mc mb --ignore-existing local/exams;
       mc mb --ignore-existing local/learning;
       mc mb --ignore-existing local/speaking;
+      mc mb --ignore-existing local/chat;
       mc anonymous set download local/images;
       mc anonymous set download local/audio;
       mc anonymous set download local/avatars;
