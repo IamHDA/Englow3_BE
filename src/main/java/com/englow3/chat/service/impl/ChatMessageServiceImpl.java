@@ -144,7 +144,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         UUID me = userDirectory.requireCurrentUserId();
 
         Recalled recalled = transactions.execute(tx -> {
-            ChatMessage message = messageRepo.findById(messageId).orElseThrow(() -> messageNotFound(messageId));
+            // Locked from the first read: a second recall of the same message waits here and is then refused.
+            ChatMessage message = messageRepo.findByIdForUpdate(messageId)
+                    .orElseThrow(() -> messageNotFound(messageId));
             UUID conversationId = message.getConversationId();
             if (!participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)) {
                 // Someone else's message looks exactly like one that does not exist.

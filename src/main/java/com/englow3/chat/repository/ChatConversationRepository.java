@@ -1,6 +1,7 @@
 package com.englow3.chat.repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,4 +40,18 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
             limit 100
             """, nativeQuery = true)
     List<UUID> findEmpty();
+
+    /**
+     * Removes those of {@code ids} that still have no participant, and returns which it removed (messages and uploads
+     * go by cascade). Conditional: two sweeps at once cannot both claim a conversation - the second waits for the
+     * first's delete to commit, finds the row gone and removes nothing - so neither fails and only the one that removed
+     * it deletes its images. Writes, so it must run inside the caller's read-write transaction.
+     */
+    @Query(value = """
+            delete from chat_conversations c
+            where c.id in (:ids)
+              and not exists (select 1 from chat_participants p where p.conversation_id = c.id)
+            returning c.id
+            """, nativeQuery = true)
+    List<UUID> deleteIfEmpty(@Param("ids") Collection<UUID> ids);
 }

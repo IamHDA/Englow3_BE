@@ -1,5 +1,7 @@
 package com.englow3.chat.worker;
 
+import java.util.function.IntSupplier;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,13 +27,22 @@ public class ChatCleanup {
 
     @Scheduled(fixedDelayString = "${app.chat.cleanup-delay:1h}", initialDelayString = "${app.chat.cleanup-delay:1h}")
     public void sweep() {
-        int uploads = imageService.removeAbandonedUploads();
-        if (uploads > 0) {
-            log.info("Removed {} chat image uploads nobody sent", uploads);
-        }
-        int conversations = conversationService.removeEmptyConversations();
-        if (conversations > 0) {
-            log.info("Removed {} chat conversations nobody is left in", conversations);
+        run("chat image uploads nobody sent", imageService::removeAbandonedUploads);
+        run("chat conversations nobody is left in", conversationService::removeEmptyConversations);
+    }
+
+    /**
+     * Each sweep stands alone: one that fails (the store is down, a row is locked) is logged and left to the next
+     * cycle, and does not stop the sweeps after it.
+     */
+    private void run(String what, IntSupplier sweep) {
+        try {
+            int removed = sweep.getAsInt();
+            if (removed > 0) {
+                log.info("Removed {} {}", removed, what);
+            }
+        } catch (RuntimeException failure) {
+            log.warn("Sweep of {} failed; the next cycle will try again", what, failure);
         }
     }
 }

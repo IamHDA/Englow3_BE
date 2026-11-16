@@ -2,6 +2,7 @@ package com.englow3.chat.service.impl;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import com.englow3.chat.entity.ChatMessage;
 import com.englow3.chat.query.ChatConversationListQuery;
 import com.englow3.chat.repository.ChatConversationRepository;
 import com.englow3.chat.repository.ChatMessageRepository;
+import com.englow3.chat.repository.ChatMessageRepository.ImageKeyRow;
 import com.englow3.chat.repository.ChatParticipantRepository;
 import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatReadAdvanced;
@@ -151,7 +153,9 @@ public class ChatConversationServiceImpl implements ChatConversationService {
 
     /**
      * A conversation nobody is left in is unreachable, and so are its messages and images. Each batch is one
-     * transaction; the objects are deleted after it commits, because the row is what anyone reads and a file left
+     * transaction in which the delete is conditional ("still has nobody in it") and says which conversations it
+     * removed, so two sweeps at once never fail on one another and only the sweep whose delete took effect removes the
+     * images. The objects are deleted after the batch commits, because the row is what anyone reads and a file left
      * behind is only a stray in the bucket.
      */
     @Override
@@ -159,15 +163,19 @@ public class ChatConversationServiceImpl implements ChatConversationService {
         int removed = 0;
         while (true) {
             RemovedBatch batch = transactions.execute(tx -> {
-                List<UUID> ids = conversationRepo.findEmpty();
-                if (ids.isEmpty()) {
+                List<UUID> candidates = conversationRepo.findEmpty();
+                if (candidates.isEmpty()) {
                     return new RemovedBatch(0, List.of());
                 }
-                List<String> imageKeys = messageRepo.findImageKeys(ids);
-                conversationRepo.deleteAllById(ids);
-                return new RemovedBatch(ids.size(), imageKeys);
+                // Read before the delete: the messages go with the conversation, and their keys with them.
+                List<ImageKeyRow> images = messageRepo.findImageKeys(candidates);
+                Set<UUID> deleted = new HashSet<>(conversationRepo.deleteIfEmpty(candidates));
+                List<String> imageKeys = images.stream().filter(image -> deleted.contains(image.getConversationId()))
+                        .map(ImageKeyRow::getImageObjectKey).toList();
+                return new RemovedBatch(deleted.size(), imageKeys);
             });
             if (batch.conversations() == 0) {
+                // Nothing left, or another instance took what was left; the next sweep looks again.
                 return removed;
             }
             removed += batch.conversations();

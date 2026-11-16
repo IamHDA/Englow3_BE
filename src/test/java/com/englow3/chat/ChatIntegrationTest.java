@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,8 +20,10 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +44,9 @@ import com.englow3.chat.dto.result.ChatMessageResult;
 import com.englow3.chat.dto.result.ConversationSummaryResult;
 import com.englow3.chat.dto.result.OpenConversationOutcome;
 import com.englow3.chat.dto.result.SendMessageOutcome;
+import com.englow3.chat.entity.ChatMessage;
+import com.englow3.chat.repository.ChatConversationRepository;
+import com.englow3.chat.repository.ChatMessageRepository;
 import com.englow3.chat.repository.ChatParticipantRepository;
 import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatImageService;
@@ -78,6 +85,10 @@ class ChatIntegrationTest extends PostgresIntegrationTest {
     ChatImageService imageService;
     @Autowired
     ChatParticipantRepository participantRepo;
+    @Autowired
+    ChatConversationRepository conversationRepo;
+    @Autowired
+    ChatMessageRepository messageRepo;
     @Autowired
     TransactionTemplate transactions;
     @Autowired
@@ -457,6 +468,91 @@ class ChatIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aSecondRecallWaitsForTheFirstAndIsThenRefused() throws Exception {
+        UUID a = fixture.learner();
+        UUID b = fixture.learner();
+        befriend(a, b);
+        UUID conversation = conversationOf(a, b);
+        UUID messageId = send(a, conversation, "oops").message().id();
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<ChatMessageResult>> second = new AtomicReference<>();
+        try {
+            // A recall in flight: it holds the message's row lock until its transaction commits.
+            transactions.executeWithoutResult(tx -> {
+                ChatMessage message = messageRepo.findByIdForUpdate(messageId).orElseThrow();
+                message.recall(a, Instant.now());
+                second.set(pool.submit(() -> {
+                    SignedIn.as(jdbc, a);
+                    try {
+                        return messageService.recall(messageId);
+                    } finally {
+                        SignedIn.out();
+                    }
+                }));
+                try {
+                    Thread.sleep(1_000);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                assertThat(second.get().isDone()).as("the second recall waits for the lock").isFalse();
+            });
+
+            assertThatThrownBy(() -> second.get().get(30, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+                    .cause().isInstanceOfSatisfying(ConflictException.class,
+                            e -> assertThat(e.getCode()).isEqualTo("CHAT_MESSAGE_ALREADY_RECALLED"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void twoRecallsAtOnceSucceedOnceAndRemoveTheImageOnce() throws Exception {
+        UUID a = fixture.learner();
+        UUID b = fixture.learner();
+        befriend(a, b);
+        UUID conversation = conversationOf(a, b);
+        ChatImageUploadTicket ticket = startUpload(a, conversation);
+        String key = keyOf(ticket.uploadId());
+        doReturn(new StoredObjectMetadata(1_000, "image/png")).when(objectStorage).metadata("chat", key);
+        UUID messageId = sendImage(a, conversation, ticket.uploadId(), "look").message().id();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            List<Future<ChatMessageResult>> both = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                both.add(pool.submit(() -> {
+                    go.await();
+                    SignedIn.as(jdbc, a);
+                    try {
+                        return messageService.recall(messageId);
+                    } finally {
+                        SignedIn.out();
+                    }
+                }));
+            }
+            go.countDown();
+
+            int succeeded = 0;
+            int refused = 0;
+            for (Future<ChatMessageResult> outcome : both) {
+                try {
+                    outcome.get(30, TimeUnit.SECONDS);
+                    succeeded++;
+                } catch (ExecutionException failure) {
+                    assertThat(failure.getCause()).isInstanceOfSatisfying(ConflictException.class,
+                            e -> assertThat(e.getCode()).isEqualTo("CHAT_MESSAGE_ALREADY_RECALLED"));
+                    refused++;
+                }
+            }
+            assertThat(succeeded).isEqualTo(1);
+            assertThat(refused).isEqualTo(1);
+            verify(objectStorage, times(1)).delete("chat", key);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void afterUnfriendingTheNextSendIsRefusedButTheHistoryStaysReadable() {
         UUID a = fixture.learner();
         UUID b = fixture.learner();
@@ -739,6 +835,59 @@ class ChatIntegrationTest extends PostgresIntegrationTest {
     private void setLastMessageAt(UUID conversation, String ago) {
         jdbc.sql("update chat_conversations set last_message_at = now() - cast(:ago as interval) where id = :c")
                 .param("ago", ago).param("c", conversation).update();
+    }
+
+    // --- cleanup of empty conversations ----------------------------------------------------------------------------
+
+    @Test
+    void deletingEmptyConversationsIsConditionalAndSaysWhatItRemoved() {
+        UUID a = fixture.learner();
+        UUID b = fixture.learner();
+        befriend(a, b);
+        UUID inUse = conversationOf(a, b);
+        UUID empty = bareConversation();
+
+        List<UUID> first = transactions.execute(tx -> conversationRepo.deleteIfEmpty(List.of(inUse, empty)));
+        List<UUID> second = transactions.execute(tx -> conversationRepo.deleteIfEmpty(List.of(inUse, empty)));
+
+        assertThat(first).containsExactly(empty);
+        assertThat(second).as("the other sweep finds it already gone").isEmpty();
+        assertThat(count("select count(*) from chat_conversations where id = :c", "c", inUse)).isEqualTo(1);
+        assertThat(count("select count(*) from chat_conversations where id = :c", "c", empty)).isZero();
+    }
+
+    @Test
+    void twoSweepsAtOnceNeitherFailsAndEachImageIsRemovedOnce() throws Exception {
+        List<String> keys = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            UUID conversation = bareConversation();
+            String key = "conversations/%s/%s.png".formatted(conversation, UUID.randomUUID());
+            insertMessage(conversation, 1, null, null, key, false);
+            keys.add(key);
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> sweeps = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                sweeps.add(pool.submit(() -> {
+                    go.await();
+                    return conversationService.removeEmptyConversations();
+                }));
+            }
+            go.countDown();
+
+            int removed = 0;
+            for (Future<Integer> sweep : sweeps) {
+                removed += sweep.get(60, TimeUnit.SECONDS);
+            }
+            assertThat(removed).as("between them, each conversation once").isGreaterThanOrEqualTo(25);
+            for (String key : keys) {
+                verify(objectStorage, times(1)).delete("chat", key);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // --- erasure ---------------------------------------------------------------------------------------------------

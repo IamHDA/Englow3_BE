@@ -46,6 +46,7 @@ import com.englow3.chat.entity.ChatMessage;
 import com.englow3.chat.query.ChatConversationListQuery;
 import com.englow3.chat.repository.ChatConversationRepository;
 import com.englow3.chat.repository.ChatMessageRepository;
+import com.englow3.chat.repository.ChatMessageRepository.ImageKeyRow;
 import com.englow3.chat.repository.ChatParticipantRepository;
 import com.englow3.chat.service.impl.ChatConversationServiceImpl;
 import com.englow3.friendship.api.FriendshipReader;
@@ -378,12 +379,17 @@ class ChatConversationServiceTest {
     @Nested
     class RemovingEmptyConversations {
 
+        /** A row as the repository's projection hands it back. */
+        private record Image(UUID getConversationId, String getImageObjectKey) implements ImageKeyRow {
+        }
+
         @Test
         void deletesTheRowsInOneTransactionAndTheImagesAfterItEvenWhenOneObjectWillNotGo() {
             UUID empty = UUID.randomUUID();
             when(conversationRepo.findEmpty()).thenReturn(List.of(empty)).thenReturn(List.of());
-            when(messageRepo.findImageKeys(List.of(empty)))
-                    .thenReturn(List.of("conversations/a/1.png", "conversations/a/2.png"));
+            when(messageRepo.findImageKeys(List.of(empty))).thenReturn(
+                    List.of(new Image(empty, "conversations/a/1.png"), new Image(empty, "conversations/a/2.png")));
+            when(conversationRepo.deleteIfEmpty(List.of(empty))).thenReturn(List.of(empty));
             doAnswer(invocation -> {
                 assertThat(inTransaction).as("objects are deleted after the transaction").isFalse();
                 throw new IllegalStateException("store down");
@@ -392,11 +398,41 @@ class ChatConversationServiceTest {
             int removed = service.removeEmptyConversations();
 
             assertThat(removed).isEqualTo(1);
-            verify(conversationRepo).deleteAllById(List.of(empty));
-            InOrder order = inOrder(conversationRepo, objectStorage);
-            order.verify(conversationRepo).deleteAllById(List.of(empty));
+            InOrder order = inOrder(messageRepo, conversationRepo, objectStorage);
+            order.verify(messageRepo).findImageKeys(List.of(empty));
+            order.verify(conversationRepo).deleteIfEmpty(List.of(empty));
             order.verify(objectStorage).delete("chat", "conversations/a/1.png");
             order.verify(objectStorage).delete("chat", "conversations/a/2.png");
+        }
+
+        @Test
+        void onlyTheImagesOfConversationsThisSweepActuallyDeletedAreRemoved() {
+            UUID mine = UUID.randomUUID();
+            UUID takenByAnotherSweep = UUID.randomUUID();
+            when(conversationRepo.findEmpty()).thenReturn(List.of(mine, takenByAnotherSweep)).thenReturn(List.of());
+            when(messageRepo.findImageKeys(List.of(mine, takenByAnotherSweep)))
+                    .thenReturn(List.of(new Image(mine, "conversations/mine/1.png"),
+                            new Image(takenByAnotherSweep, "conversations/other/1.png")));
+            when(conversationRepo.deleteIfEmpty(List.of(mine, takenByAnotherSweep))).thenReturn(List.of(mine));
+
+            assertThat(service.removeEmptyConversations()).isEqualTo(1);
+
+            verify(objectStorage).delete("chat", "conversations/mine/1.png");
+            verify(objectStorage, never()).delete("chat", "conversations/other/1.png");
+        }
+
+        @Test
+        void aSweepWhoseEveryCandidateWasTakenByAnotherStopsWithoutFailing() {
+            UUID gone = UUID.randomUUID();
+            when(conversationRepo.findEmpty()).thenReturn(List.of(gone));
+            when(messageRepo.findImageKeys(List.of(gone)))
+                    .thenReturn(List.of(new Image(gone, "conversations/x/1.png")));
+            when(conversationRepo.deleteIfEmpty(List.of(gone))).thenReturn(List.of());
+
+            assertThat(service.removeEmptyConversations()).isZero();
+
+            verify(conversationRepo, times(1)).findEmpty();
+            verifyNoInteractions(objectStorage);
         }
 
         @Test
@@ -406,11 +442,13 @@ class ChatConversationServiceTest {
             when(conversationRepo.findEmpty()).thenReturn(List.of(first)).thenReturn(List.of(second))
                     .thenReturn(List.of());
             when(messageRepo.findImageKeys(any())).thenReturn(List.of());
+            when(conversationRepo.deleteIfEmpty(List.of(first))).thenReturn(List.of(first));
+            when(conversationRepo.deleteIfEmpty(List.of(second))).thenReturn(List.of(second));
 
             assertThat(service.removeEmptyConversations()).isEqualTo(2);
 
-            verify(conversationRepo).deleteAllById(List.of(first));
-            verify(conversationRepo).deleteAllById(List.of(second));
+            verify(conversationRepo).deleteIfEmpty(List.of(first));
+            verify(conversationRepo).deleteIfEmpty(List.of(second));
         }
 
         @Test
@@ -419,7 +457,7 @@ class ChatConversationServiceTest {
 
             assertThat(service.removeEmptyConversations()).isZero();
 
-            verify(conversationRepo, never()).deleteAllById(any());
+            verify(conversationRepo, never()).deleteIfEmpty(any());
             verifyNoInteractions(objectStorage);
         }
     }

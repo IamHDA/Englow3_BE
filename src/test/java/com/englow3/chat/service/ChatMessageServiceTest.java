@@ -105,6 +105,12 @@ class ChatMessageServiceTest {
             }
         });
         when(messageRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        // A listener waits for the commit of the transaction that published, so every event must be published inside
+        // one: a publish from anywhere else fails the test that caused it.
+        doAnswer(invocation -> {
+            assertThat(inTransaction).as("events are published inside the transaction that wrote the change").isTrue();
+            return null;
+        }).when(events).publishEvent(any(Object.class));
     }
 
     private SendMessageCommand text(String body) {
@@ -443,7 +449,7 @@ class ChatMessageServiceTest {
 
         @Test
         void aMessageThatDoesNotExistIsNotFound() {
-            when(messageRepo.findById(messageId)).thenReturn(Optional.empty());
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.recall(messageId)).isInstanceOfSatisfying(NotFoundException.class,
                     e -> assertThat(e.getCode()).isEqualTo("CHAT_MESSAGE_NOT_FOUND"));
@@ -453,7 +459,7 @@ class ChatMessageServiceTest {
         void aMessageOfAConversationTheCallerIsNotInLooksTheSame() {
             ChatMessage message = mock(ChatMessage.class);
             when(message.getConversationId()).thenReturn(conversationId);
-            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.of(message));
             when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(false);
 
             assertThatThrownBy(() -> service.recall(messageId)).isInstanceOfSatisfying(NotFoundException.class,
@@ -467,7 +473,7 @@ class ChatMessageServiceTest {
             when(message.getConversationId()).thenReturn(conversationId);
             when(message.getSeq()).thenReturn(4L);
             when(message.recall(me, now)).thenReturn("conversations/c/u.png");
-            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.of(message));
             callerIsInTheConversation();
             when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.of(other));
             doAnswer(invocation -> {
@@ -478,6 +484,8 @@ class ChatMessageServiceTest {
             service.recall(messageId);
 
             verify(message).recall(me, now);
+            // Only the locked lookup: a message loaded any other way first would not be refreshed after the lock.
+            verify(messageRepo, never()).findById(any());
             verify(events).publishEvent(new ChatMessageRecalled(conversationId, messageId, 4, Set.of(other)));
             InOrder order = inOrder(transactions, objectStorage);
             order.verify(transactions).execute(any());
@@ -489,7 +497,7 @@ class ChatMessageServiceTest {
             ChatMessage message = mock(ChatMessage.class);
             when(message.getConversationId()).thenReturn(conversationId);
             when(message.recall(me, now)).thenReturn(null);
-            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.of(message));
             callerIsInTheConversation();
             when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.of(other));
 
@@ -503,7 +511,7 @@ class ChatMessageServiceTest {
             ChatMessage message = mock(ChatMessage.class);
             when(message.getConversationId()).thenReturn(conversationId);
             when(message.recall(me, now)).thenReturn("conversations/c/u.png");
-            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.of(message));
             callerIsInTheConversation();
             when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.of(other));
             doAnswer(invocation -> {
@@ -520,7 +528,7 @@ class ChatMessageServiceTest {
             ChatMessage message = mock(ChatMessage.class);
             when(message.getConversationId()).thenReturn(conversationId);
             when(message.getSeq()).thenReturn(4L);
-            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(messageRepo.findByIdForUpdate(messageId)).thenReturn(Optional.of(message));
             callerIsInTheConversation();
             when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.empty());
 

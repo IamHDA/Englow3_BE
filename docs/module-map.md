@@ -617,8 +617,9 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   but the rule now lives in the entity and is tested without a database. Unique
   `(conversation_id, seq)` backs it. Unique `(sender_id, client_id)` makes a retried
   send return the first message (checked before and again under the lock). The read mark
-  is written with `greatest(...)`. Two friends opening a chat at once meet in
-  `insert ... on conflict (direct_key) do nothing`.
+  is written with `greatest(...)`. A recall takes the message row `FOR UPDATE`, so two
+  recalls at once take turns and the second is refused as already recalled. Two friends
+  opening a chat at once meet in `insert ... on conflict (direct_key) do nothing`.
 - **Delivery:** sending, reading, recalling and history are REST through the
   existing proxy and BFF (implemented). Receiving is a receive-only WebSocket at
   `/ws/chat`, straight to Spring (designed, not implemented). The web asks the proxy for a ticket - random, stored hashed, valid 30
@@ -640,8 +641,10 @@ receive-only WebSocket at `/ws/chat`, `chat_socket_tickets` and typing.
   with a HEAD outside any transaction, then the upload row is consumed in the write
   transaction. Recalling deletes the object after commit. A cleanup job
   (`app.chat.cleanup-enabled`, hourly) removes uploads nobody sent within a day, with
-  their objects, and conversations nobody is in; every removal is a conditional delete, so
-  it is safe on several instances.
+  their objects, and conversations nobody is in; every removal is a conditional delete
+  (the conversation delete re-checks that nobody is in it and says which it removed), and
+  only the sweep whose delete took effect removes the objects, so it is safe on several
+  instances. A sweep that fails is logged and does not stop the others.
 - **Erasure:** messages stay and show as from a deleted user: `sender_id` is set to
   null and the erased learner's participant row cascades. A direct conversation left
   with one participant shows the other side as a deleted user; one left with none is
