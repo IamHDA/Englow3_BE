@@ -457,6 +457,7 @@ class ChatIntegrationTest extends PostgresIntegrationTest {
         assertThat(events.stream(ChatMessageRecalled.class).toList()).singleElement().satisfies(event -> {
             assertThat(event.messageId()).isEqualTo(message.id());
             assertThat(event.seq()).isEqualTo(message.seq());
+            assertThat(event.actorId()).isEqualTo(a);
             assertThat(event.recipientIds()).containsExactly(b);
         });
         SignedIn.as(jdbc, b);

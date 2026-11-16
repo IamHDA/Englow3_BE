@@ -147,6 +147,16 @@ public class ChatConversationServiceImpl implements ChatConversationService {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<UUID> typingRecipient(UUID me, UUID conversationId) {
+        if (!participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)) {
+            return Optional.empty();
+        }
+        return participantRepo.findOtherParticipant(conversationId, me)
+                .filter(other -> friendshipReader.areFriends(me, other));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public long unreadConversationCount() {
         return listQuery.unreadConversationCount(userDirectory.requireCurrentUserId());
     }

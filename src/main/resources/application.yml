@@ -161,6 +161,14 @@ app:
     # Removes images nobody sent and conversations nobody is left in.
     cleanup-enabled: ${CHAT_CLEANUP_ENABLED:true}
     cleanup-delay: ${CHAT_CLEANUP_DELAY:1h}
+    socket:
+      # A browser asks for a ticket and opens the socket straight away, so it only has to outlive one round trip.
+      ticket-ttl: ${CHAT_SOCKET_TICKET_TTL:PT30S}
+      # Below the idle timeout of the proxies between a browser and Render, so an open chat is never cut for silence.
+      ping-interval: ${CHAT_SOCKET_PING_INTERVAL:25s}
+      max-sessions-per-user: ${CHAT_SOCKET_MAX_SESSIONS:5}
+      # The only frame a client sends is a tiny typing signal.
+      max-text-message-bytes: 1024
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}

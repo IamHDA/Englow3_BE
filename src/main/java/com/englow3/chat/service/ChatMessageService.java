@@ -1,6 +1,7 @@
 package com.englow3.chat.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.englow3.chat.dto.command.SendMessageCommand;
@@ -21,4 +22,10 @@ public interface ChatMessageService {
 
     /** Takes back the caller's own message, once, together with its image. */
     ChatMessageResult recall(UUID messageId);
+
+    /**
+     * The message as {@code viewerId} sees it, for pushing it down their socket: the image URL signed for them, the
+     * {@code clientId} only when they sent it. Empty when the message is gone or they are not in its conversation.
+     */
+    Optional<ChatMessageResult> forPush(UUID messageId, UUID viewerId);
 }

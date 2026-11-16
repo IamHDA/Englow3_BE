@@ -8,13 +8,15 @@ import org.springframework.stereotype.Component;
 
 import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatImageService;
+import com.englow3.chat.service.ChatSocketTicketService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Sweeps images nobody sent and conversations nobody is left in. Safe on several instances at once: every removal is a
- * conditional delete, and only the instance whose delete took effect removes the object.
+ * Sweeps images nobody sent, conversations nobody is left in and tickets that expired long ago. Safe on several
+ * instances at once: every removal is a conditional delete, and only the instance whose delete took effect removes the
+ * object.
  */
 @Component
 @ConditionalOnProperty(name = "app.chat.cleanup-enabled", havingValue = "true", matchIfMissing = true)
@@ -24,11 +26,13 @@ public class ChatCleanup {
 
     private final ChatImageService imageService;
     private final ChatConversationService conversationService;
+    private final ChatSocketTicketService ticketService;
 
     @Scheduled(fixedDelayString = "${app.chat.cleanup-delay:1h}", initialDelayString = "${app.chat.cleanup-delay:1h}")
     public void sweep() {
         run("chat image uploads nobody sent", imageService::removeAbandonedUploads);
         run("chat conversations nobody is left in", conversationService::removeEmptyConversations);
+        run("expired chat socket tickets", ticketService::removeExpired);
     }
 
     /**

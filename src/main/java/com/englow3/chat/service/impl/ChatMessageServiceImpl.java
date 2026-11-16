@@ -154,7 +154,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             }
             String removedImageKey = message.recall(me, Instant.now(clock));
             UUID other = participantRepo.findOtherParticipant(conversationId, me).orElse(null);
-            events.publishEvent(new ChatMessageRecalled(conversationId, messageId, message.getSeq(),
+            events.publishEvent(new ChatMessageRecalled(conversationId, messageId, message.getSeq(), me,
                     other == null ? Set.of() : Set.of(other)));
             return new Recalled(message, removedImageKey);
         });
@@ -168,6 +168,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             }
         }
         return result(recalled.message(), me);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ChatMessageResult> forPush(UUID messageId, UUID viewerId) {
+        return messageRepo.findById(messageId).filter(
+                message -> participantRepo.existsByIdConversationIdAndIdUserId(message.getConversationId(), viewerId))
+                .map(message -> result(message, viewerId));
     }
 
     /** Reads what the send needs to decide, in one short transaction. Nothing here locks or writes. */

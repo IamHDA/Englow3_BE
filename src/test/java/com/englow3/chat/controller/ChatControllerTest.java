@@ -34,12 +34,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import com.englow3.chat.dto.result.ChatImageUploadTicket;
 import com.englow3.chat.dto.result.ChatMessageResult;
+import com.englow3.chat.dto.result.ChatSocketTicket;
 import com.englow3.chat.dto.result.ConversationSummaryResult;
 import com.englow3.chat.dto.result.OpenConversationOutcome;
 import com.englow3.chat.dto.result.SendMessageOutcome;
 import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatImageService;
 import com.englow3.chat.service.ChatMessageService;
+import com.englow3.chat.service.ChatSocketTicketService;
 import com.englow3.config.SecurityConfig;
 import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.error.NotFoundException;
@@ -49,9 +51,9 @@ import com.englow3.user.api.UserDirectory;
  * The HTTP behaviour the services cannot show: 201 against 200, 204, what a request is refused for before any service
  * runs, how a domain failure becomes a status, and the bound on the page size.
  */
-@WebMvcTest(controllers = { ChatConversationController.class, ChatMessageController.class }, properties = {
-        "SUPABASE_ISSUER_URI=https://issuer.example.test/auth/v1",
-        "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
+@WebMvcTest(controllers = { ChatConversationController.class, ChatMessageController.class,
+        ChatSocketTicketController.class }, properties = { "SUPABASE_ISSUER_URI=https://issuer.example.test/auth/v1",
+                "SUPABASE_JWKS_URI=https://issuer.example.test/auth/v1/.well-known/jwks.json" })
 @Import(SecurityConfig.class)
 class ChatControllerTest {
 
@@ -72,6 +74,9 @@ class ChatControllerTest {
 
     @MockitoBean
     private ChatMessageService messageService;
+
+    @MockitoBean
+    private ChatSocketTicketService ticketService;
 
     private final UUID conversationId = UUID.randomUUID();
     private final UUID friendId = UUID.randomUUID();
@@ -268,6 +273,25 @@ class ChatControllerTest {
                 .content("{\"contentType\":\"image/png\",\"contentLength\":0}")).andExpect(status().isBadRequest());
 
         verify(imageService).startUpload(any());
+    }
+
+    @Test
+    void aSocketTicketAnswers201WithTheTicketAndForbidsCaching() throws Exception {
+        when(ticketService.issue()).thenReturn(new ChatSocketTicket("t".repeat(43), 30));
+
+        mockMvc.perform(asLearner(post("/api/chat/socket-tickets"))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticket").value("t".repeat(43)))
+                .andExpect(jsonPath("$.expiresInSeconds").value(30))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", "no-store"));
+    }
+
+    @Test
+    void aStaffMemberAskingForATicketIsForbiddenWithTheErrorCode() throws Exception {
+        when(ticketService.issue()).thenThrow(new ForbiddenException("CHAT_LEARNERS_ONLY", "Only learners"));
+
+        mockMvc.perform(asLearner(post("/api/chat/socket-tickets"))).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHAT_LEARNERS_ONLY"));
     }
 
     @Test

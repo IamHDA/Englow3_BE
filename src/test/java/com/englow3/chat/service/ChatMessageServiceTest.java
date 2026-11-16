@@ -12,6 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -443,6 +444,58 @@ class ChatMessageServiceTest {
     }
 
     @Nested
+    class Pushing {
+
+        private final UUID messageId = UUID.randomUUID();
+
+        private ChatMessage sentBy(UUID sender) {
+            return ChatMessage.send(conversationId, 9, sender, "client-9", "hello", "conversations/c/u.png", now);
+        }
+
+        @Test
+        void aRecipientSeesTheMessageWithItsImageSignedForThemAndNoClientId() {
+            ChatMessage message = sentBy(me);
+            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, other)).thenReturn(true);
+            when(presignedUrls.resolve("chat", "conversations/c/u.png", Duration.ofHours(1)))
+                    .thenReturn("https://storage.example/get");
+
+            ChatMessageResult seen = service.forPush(messageId, other).orElseThrow();
+
+            assertThat(seen.id()).isEqualTo(message.getId());
+            assertThat(seen.seq()).isEqualTo(9);
+            assertThat(seen.body()).isEqualTo("hello");
+            assertThat(seen.imageUrl()).isEqualTo("https://storage.example/get");
+            assertThat(seen.clientId()).isNull();
+        }
+
+        @Test
+        void theSenderSeesTheirOwnClientId() {
+            ChatMessage message = sentBy(me);
+            when(messageRepo.findById(messageId)).thenReturn(Optional.of(message));
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(true);
+
+            assertThat(service.forPush(messageId, me).orElseThrow().clientId()).isEqualTo("client-9");
+        }
+
+        @Test
+        void aMessageThatIsGoneIsEmpty() {
+            when(messageRepo.findById(messageId)).thenReturn(Optional.empty());
+
+            assertThat(service.forPush(messageId, other)).isEmpty();
+        }
+
+        @Test
+        void aViewerNotInTheConversationGetsNothing() {
+            when(messageRepo.findById(messageId)).thenReturn(Optional.of(sentBy(me)));
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, other)).thenReturn(false);
+
+            assertThat(service.forPush(messageId, other)).isEmpty();
+            verifyNoInteractions(presignedUrls);
+        }
+    }
+
+    @Nested
     class Recalling {
 
         private final UUID messageId = UUID.randomUUID();
@@ -486,7 +539,7 @@ class ChatMessageServiceTest {
             verify(message).recall(me, now);
             // Only the locked lookup: a message loaded any other way first would not be refreshed after the lock.
             verify(messageRepo, never()).findById(any());
-            verify(events).publishEvent(new ChatMessageRecalled(conversationId, messageId, 4, Set.of(other)));
+            verify(events).publishEvent(new ChatMessageRecalled(conversationId, messageId, 4, me, Set.of(other)));
             InOrder order = inOrder(transactions, objectStorage);
             order.verify(transactions).execute(any());
             order.verify(objectStorage).delete("chat", "conversations/c/u.png");
@@ -534,7 +587,7 @@ class ChatMessageServiceTest {
 
             service.recall(messageId);
 
-            verify(events).publishEvent(new ChatMessageRecalled(conversationId, messageId, 4, Set.of()));
+            verify(events).publishEvent(new ChatMessageRecalled(conversationId, messageId, 4, me, Set.of()));
         }
     }
 }

@@ -321,6 +321,48 @@ class ChatConversationServiceTest {
     }
 
     @Nested
+    class Typing {
+
+        @Test
+        void theOtherPersonIsTheRecipientWhileTheyAreStillFriends() {
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(true);
+            when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.of(friend));
+            when(friendshipReader.areFriends(me, friend)).thenReturn(true);
+
+            assertThat(service.typingRecipient(me, conversationId)).contains(friend);
+        }
+
+        @Test
+        void nobodyIsToldAfterUnfriending() {
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(true);
+            when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.of(friend));
+            when(friendshipReader.areFriends(me, friend)).thenReturn(false);
+
+            assertThat(service.typingRecipient(me, conversationId)).isEmpty();
+        }
+
+        @Test
+        void aPersonNotInTheConversationGetsEmptyNotAnErrorAndNothingIsAsked() {
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(false);
+
+            assertThat(service.typingRecipient(me, conversationId)).isEmpty();
+
+            verify(participantRepo, never()).findOtherParticipant(any(), any());
+            verifyNoInteractions(friendshipReader);
+        }
+
+        @Test
+        void aConversationWhoseOtherPersonIsGoneHasNoRecipient() {
+            when(participantRepo.existsByIdConversationIdAndIdUserId(conversationId, me)).thenReturn(true);
+            when(participantRepo.findOtherParticipant(conversationId, me)).thenReturn(Optional.empty());
+
+            assertThat(service.typingRecipient(me, conversationId)).isEmpty();
+
+            verifyNoInteractions(friendshipReader);
+        }
+    }
+
+    @Nested
     class MarkingRead {
 
         @Test

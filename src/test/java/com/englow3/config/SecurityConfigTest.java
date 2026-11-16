@@ -93,6 +93,17 @@ class SecurityConfigTest {
         void letsAVisitorReachThePlanCatalogue() throws Exception {
             mockMvc.perform(get("/api/plans")).andExpect(status().isNotFound());
         }
+
+        /**
+         * A browser cannot send a token on a socket, so the HTTP layer lets the chat handshake through and the
+         * handshake interceptor checks the ticket. No handler is registered in this slice, so "let through" shows as
+         * 404 where "turned away" would be 401.
+         */
+        @Test
+        void letsTheChatSocketHandshakeThroughToItsInterceptor() throws Exception {
+            mockMvc.perform(get("/ws/chat")).andExpect(status().isNotFound());
+            mockMvc.perform(get("/ws/chat").param("ticket", "anything")).andExpect(status().isNotFound());
+        }
     }
 
     @Nested
@@ -109,6 +120,25 @@ class SecurityConfigTest {
             mockMvc.perform(get("/api/user/me/subscription")).andExpect(status().isUnauthorized());
             mockMvc.perform(
                     org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/user/me/erase"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        /** Only the chat socket itself is open: nothing near it, and not the ticket endpoint that hands out entry. */
+        @Test
+        void keepsEveryOtherSocketPathAndTheTicketEndpointAuthenticated() throws Exception {
+            mockMvc.perform(get("/ws/other")).andExpect(status().isUnauthorized());
+            mockMvc.perform(get("/ws/chat/extra")).andExpect(status().isUnauthorized());
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                    .post("/api/chat/socket-tickets")).andExpect(status().isUnauthorized());
+        }
+
+        /** The route is open to a visitor, not to a forged token: a Bearer token that is not valid is still a 401. */
+        @Test
+        void stillRefusesAnInvalidBearerTokenOnTheChatSocket() throws Exception {
+            org.mockito.Mockito.when(jwtDecoder.decode("forged"))
+                    .thenThrow(new org.springframework.security.oauth2.jwt.BadJwtException("not valid"));
+
+            mockMvc.perform(get("/ws/chat").header("Authorization", "Bearer forged"))
                     .andExpect(status().isUnauthorized());
         }
 

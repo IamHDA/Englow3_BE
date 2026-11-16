@@ -54,6 +54,11 @@ public class SecurityConfig {
                         .permitAll()
                         // The pricing page's data: public by design, and it names no one
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/plans").permitAll()
+                        // The chat socket: the HTTP layer lets the handshake through, and
+                        // ChatSocketHandshakeInterceptor
+                        // accepts it only with a valid single-use ticket (browser) or an already-authenticated Bearer
+                        // token (mobile). A Bearer token that is not valid is still refused with 401 by its filter.
+                        .requestMatchers("/ws/chat").permitAll()
                         .requestMatchers("/actuator/startup", "/actuator/metrics", "/actuator/metrics/**")
                         .hasRole("ADMIN")
                         // A second gate behind each admin controller's @PreAuthorize: a controller added under

@@ -1,5 +1,6 @@
 package com.englow3.chat.service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -25,6 +26,13 @@ public interface ChatConversationService {
 
     /** How many of the caller's conversations hold something unread. */
     long unreadConversationCount();
+
+    /**
+     * The other participant, when {@code me} is in the conversation and the two are still friends. Never stores
+     * anything, and never refuses: no conversation, not in it, not friends any more - all give empty. For the typing
+     * signal, which is disposable.
+     */
+    Optional<UUID> typingRecipient(UUID me, UUID conversationId);
 
     /** For the cleanup job: removes conversations nobody is in any more, and their images. Returns how many. */
     int removeEmptyConversations();
