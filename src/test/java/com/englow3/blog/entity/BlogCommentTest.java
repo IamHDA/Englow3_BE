@@ -27,7 +27,10 @@ class BlogCommentTest {
         return BlogComment.write(postId, author, "Thanks, this helped", WRITTEN);
     }
 
-    /** Hiding and removing belong to moderation, which does not exist yet; the tests put a comment there by hand. */
+    /**
+     * A comment in a given status without going through moderation, for the tests of what a hidden or removed comment
+     * allows. The moves between statuses have their own tests, under {@code Moderating}.
+     */
     private static BlogComment inStatus(BlogComment comment, BlogCommentStatus status) {
         ReflectionTestUtils.setField(comment, "status", status);
         return comment;
@@ -143,6 +146,75 @@ class BlogCommentTest {
             assertThat(comment().isEditableBy(author)).isTrue();
             assertThat(comment().isEditableBy(other)).isFalse();
             assertThat(inStatus(comment(), BlogCommentStatus.HIDDEN).isEditableBy(author)).isFalse();
+        }
+    }
+
+    @Nested
+    class Moderating {
+
+        private void refusedAsAnInvalidTransition(Runnable move) {
+            assertThatThrownBy(move::run).isInstanceOfSatisfying(ConflictException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("BLOG_MODERATION_INVALID_TRANSITION"));
+        }
+
+        @Test
+        void aVisibleCommentCanBeHiddenAndRestored() {
+            BlogComment comment = comment();
+
+            comment.hide();
+            assertThat(comment.getStatus()).isEqualTo(BlogCommentStatus.HIDDEN);
+
+            comment.restore();
+            assertThat(comment.getStatus()).isEqualTo(BlogCommentStatus.VISIBLE);
+        }
+
+        @Test
+        void aVisibleOrHiddenCommentCanBeRemoved() {
+            BlogComment visible = comment();
+            BlogComment hidden = inStatus(comment(), BlogCommentStatus.HIDDEN);
+
+            visible.remove();
+            hidden.remove();
+
+            assertThat(visible.getStatus()).isEqualTo(BlogCommentStatus.REMOVED);
+            assertThat(hidden.getStatus()).isEqualTo(BlogCommentStatus.REMOVED);
+        }
+
+        @Test
+        void moderationLeavesTheTextAndWhenItWasEditedAlone() {
+            BlogComment comment = comment();
+            comment.edit(author, "Edited", EDITED);
+
+            comment.hide();
+
+            assertThat(comment.getBody()).isEqualTo("Edited");
+            assertThat(comment.getEditedAt()).isEqualTo(EDITED);
+        }
+
+        @Test
+        void aCommentThatIsNotVisibleCannotBeHidden() {
+            refusedAsAnInvalidTransition(() -> inStatus(comment(), BlogCommentStatus.HIDDEN).hide());
+            refusedAsAnInvalidTransition(() -> inStatus(comment(), BlogCommentStatus.REMOVED).hide());
+        }
+
+        @Test
+        void onlyAHiddenCommentCanBeRestored() {
+            refusedAsAnInvalidTransition(() -> comment().restore());
+            refusedAsAnInvalidTransition(() -> inStatus(comment(), BlogCommentStatus.REMOVED).restore());
+        }
+
+        @Test
+        void aRemovedCommentCannotBeRemovedAgain() {
+            refusedAsAnInvalidTransition(() -> inStatus(comment(), BlogCommentStatus.REMOVED).remove());
+        }
+
+        @Test
+        void aRefusedMoveChangesNothing() {
+            BlogComment removed = inStatus(comment(), BlogCommentStatus.REMOVED);
+
+            refusedAsAnInvalidTransition(removed::restore);
+
+            assertThat(removed.getStatus()).isEqualTo(BlogCommentStatus.REMOVED);
         }
     }
 }

@@ -30,8 +30,8 @@ class BlogPostTest {
     }
 
     /**
-     * Hiding and removing belong to moderation, which does not exist yet, so nothing in the class can put a post in
-     * either state. The tests do it by hand; when the moderation methods arrive they replace this.
+     * A post in a given status without going through moderation, for the tests of what a hidden or removed post allows.
+     * The moves between statuses have their own tests, under {@code Moderating}.
      */
     private static BlogPost inStatus(BlogPost post, BlogPostStatus status) {
         ReflectionTestUtils.setField(post, "status", status);
@@ -272,6 +272,107 @@ class BlogPostTest {
             assertThat(post().isEditableBy(author)).isTrue();
             assertThat(post().isEditableBy(reader)).isFalse();
             assertThat(inStatus(post(), BlogPostStatus.HIDDEN).isEditableBy(author)).isFalse();
+        }
+    }
+
+    @Nested
+    class Moderating {
+
+        private static final Instant MODERATED = Instant.parse("2026-11-16T12:00:00Z");
+
+        private void refusedAsAnInvalidTransition(Runnable move) {
+            assertThatThrownBy(move::run).isInstanceOfSatisfying(ConflictException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("BLOG_MODERATION_INVALID_TRANSITION"));
+        }
+
+        @Test
+        void aPublishedPostCanBeHiddenAndRestored() {
+            BlogPost post = post();
+
+            post.hide(MODERATED);
+            assertThat(post.getStatus()).isEqualTo(BlogPostStatus.HIDDEN);
+
+            post.restore(MODERATED.plusSeconds(60));
+            assertThat(post.getStatus()).isEqualTo(BlogPostStatus.PUBLISHED);
+        }
+
+        @Test
+        void aPublishedOrHiddenPostCanBeRemoved() {
+            BlogPost published = post();
+            BlogPost hidden = inStatus(post(), BlogPostStatus.HIDDEN);
+
+            published.remove(MODERATED);
+            hidden.remove(MODERATED);
+
+            assertThat(published.getStatus()).isEqualTo(BlogPostStatus.REMOVED);
+            assertThat(hidden.getStatus()).isEqualTo(BlogPostStatus.REMOVED);
+        }
+
+        @Test
+        void everyMoveSetsWhenThePostWasLastChangedButNeverWhenItsAuthorLastEditedIt() {
+            BlogPost post = post();
+            post.edit(author, "Edited title", "Edited body", Set.of(), EDITED);
+
+            post.hide(MODERATED);
+
+            assertThat(post.getUpdatedAt()).isEqualTo(MODERATED);
+            assertThat(post.getEditedAt()).isEqualTo(EDITED);
+
+            post.restore(MODERATED.plusSeconds(60));
+            assertThat(post.getUpdatedAt()).isEqualTo(MODERATED.plusSeconds(60));
+            assertThat(post.getEditedAt()).isEqualTo(EDITED);
+
+            post.remove(MODERATED.plusSeconds(120));
+            assertThat(post.getUpdatedAt()).isEqualTo(MODERATED.plusSeconds(120));
+            assertThat(post.getEditedAt()).isEqualTo(EDITED);
+        }
+
+        @Test
+        void moderationLeavesTheTextAndTheTagsAlone() {
+            BlogPost post = post();
+
+            post.hide(MODERATED);
+
+            assertThat(post.getTitle()).isEqualTo("Ten tips for IELTS writing");
+            assertThat(post.getBody()).isEqualTo("Body in **Markdown**");
+            assertThat(post.getTags()).containsExactly(BlogTag.of(BlogTagKind.SKILL, "WRITING"));
+        }
+
+        @Test
+        void aPostThatIsNotPublishedCannotBeHidden() {
+            refusedAsAnInvalidTransition(() -> inStatus(post(), BlogPostStatus.HIDDEN).hide(MODERATED));
+            refusedAsAnInvalidTransition(() -> inStatus(post(), BlogPostStatus.REMOVED).hide(MODERATED));
+        }
+
+        @Test
+        void onlyAHiddenPostCanBeRestored() {
+            refusedAsAnInvalidTransition(() -> post().restore(MODERATED));
+            refusedAsAnInvalidTransition(() -> inStatus(post(), BlogPostStatus.REMOVED).restore(MODERATED));
+        }
+
+        @Test
+        void aRemovedPostCannotBeRemovedAgain() {
+            refusedAsAnInvalidTransition(() -> inStatus(post(), BlogPostStatus.REMOVED).remove(MODERATED));
+        }
+
+        @Test
+        void aRefusedMoveChangesNothing() {
+            BlogPost removed = inStatus(post(), BlogPostStatus.REMOVED);
+
+            refusedAsAnInvalidTransition(() -> removed.restore(MODERATED));
+
+            assertThat(removed.getStatus()).isEqualTo(BlogPostStatus.REMOVED);
+            assertThat(removed.getUpdatedAt()).isEqualTo(POSTED);
+        }
+
+        @Test
+        void onlyAPublishedPostCanBeReported() {
+            post().ensureReportable();
+
+            assertThatThrownBy(() -> inStatus(post(), BlogPostStatus.HIDDEN).ensureReportable()).isInstanceOfSatisfying(
+                    ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_OPEN"));
+            assertThatThrownBy(() -> inStatus(post(), BlogPostStatus.REMOVED).ensureReportable())
+                    .isInstanceOf(ConflictException.class);
         }
     }
 }

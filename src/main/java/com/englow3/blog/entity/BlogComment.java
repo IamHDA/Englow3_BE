@@ -17,7 +17,8 @@ import lombok.Getter;
 
 /**
  * A flat comment on a post. Only its author edits or deletes it, and a hidden or removed comment can no longer be
- * edited. {@code authorId} is null once the author's account is erased: the comment stays, as by a deleted user.
+ * edited. A moderator hides it (reversible), restores a hidden one, or removes it (permanent). {@code authorId} is null
+ * once the author's account is erased: the comment stays, as by a deleted user.
  * <p>
  * The 2000-character limit is also a check constraint; here it gives the caller an error with a code.
  */
@@ -71,6 +72,34 @@ public class BlogComment extends BasePersistedEntity {
         }
         this.body = validBody(body);
         this.editedAt = now;
+    }
+
+    /** Moderation: takes a visible comment out of sight. It can be restored. */
+    public void hide() {
+        if (status != BlogCommentStatus.VISIBLE) {
+            throw invalidTransition("Only a visible comment can be hidden");
+        }
+        this.status = BlogCommentStatus.HIDDEN;
+    }
+
+    /** Moderation: puts a hidden comment back. A removed comment stays removed. */
+    public void restore() {
+        if (status != BlogCommentStatus.HIDDEN) {
+            throw invalidTransition("Only a hidden comment can be restored");
+        }
+        this.status = BlogCommentStatus.VISIBLE;
+    }
+
+    /** Moderation: takes a visible or hidden comment down for good. */
+    public void remove() {
+        if (status == BlogCommentStatus.REMOVED) {
+            throw invalidTransition("The comment is already removed");
+        }
+        this.status = BlogCommentStatus.REMOVED;
+    }
+
+    private static ConflictException invalidTransition(String message) {
+        return new ConflictException("BLOG_MODERATION_INVALID_TRANSITION", message);
     }
 
     /** Deleting is the author's, in every status. */

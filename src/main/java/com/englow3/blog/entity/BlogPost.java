@@ -25,8 +25,9 @@ import lombok.Getter;
 
 /**
  * A knowledge-sharing post. It is visible as soon as it is posted; only its author edits or deletes it; once it is
- * hidden or removed it can be neither edited nor interacted with, though its author can still read it and delete it.
- * Moderation itself (the move to HIDDEN or REMOVED) is not here yet: nothing in this class leaves PUBLISHED.
+ * hidden or removed it can be neither edited nor interacted with, though its author can still read it and delete it. A
+ * moderator hides it (reversible), restores a hidden one, or removes it (permanent): {@link #hide}, {@link #restore}
+ * and {@link #remove} are the only ways out of PUBLISHED and the only way back, and none of them is the author's.
  * <p>
  * {@code authorId} is null once the author's account is erased: the post stays, as by a deleted user, and nobody is its
  * author any more. {@code version} makes an author's edit fail rather than silently undo a moderator's decision made
@@ -111,6 +112,40 @@ public class BlogPost extends BasePersistedEntity {
         this.updatedAt = now;
     }
 
+    /** Moderation: takes a published post out of sight. It can be restored. */
+    public void hide(Instant now) {
+        if (status != BlogPostStatus.PUBLISHED) {
+            throw invalidTransition("Only a published post can be hidden");
+        }
+        moderate(BlogPostStatus.HIDDEN, now);
+    }
+
+    /** Moderation: puts a hidden post back. A removed post stays removed. */
+    public void restore(Instant now) {
+        if (status != BlogPostStatus.HIDDEN) {
+            throw invalidTransition("Only a hidden post can be restored");
+        }
+        moderate(BlogPostStatus.PUBLISHED, now);
+    }
+
+    /** Moderation: takes a published or hidden post down for good. */
+    public void remove(Instant now) {
+        if (status == BlogPostStatus.REMOVED) {
+            throw invalidTransition("The post is already removed");
+        }
+        moderate(BlogPostStatus.REMOVED, now);
+    }
+
+    /** Not {@code editedAt}: that is when the author last changed the text, which a moderator did not. */
+    private void moderate(BlogPostStatus newStatus, Instant now) {
+        this.status = newStatus;
+        this.updatedAt = now;
+    }
+
+    private static ConflictException invalidTransition(String message) {
+        return new ConflictException("BLOG_MODERATION_INVALID_TRANSITION", message);
+    }
+
     /** Deleting is the author's, in every status: a hidden post can still be taken down by the person who wrote it. */
     public void ensureDeletableBy(UUID actorId) {
         if (!isAuthor(actorId)) {
@@ -123,6 +158,13 @@ public class BlogPost extends BasePersistedEntity {
         if (!isOpenForInteraction()) {
             throw new ConflictException("BLOG_POST_NOT_OPEN",
                     "A hidden or removed post cannot be commented on or liked");
+        }
+    }
+
+    /** Reporting: only a published post. A hidden or removed one has been taken out of sight already. */
+    public void ensureReportable() {
+        if (status != BlogPostStatus.PUBLISHED) {
+            throw new ConflictException("BLOG_POST_NOT_OPEN", "A hidden or removed post cannot be reported");
         }
     }
 

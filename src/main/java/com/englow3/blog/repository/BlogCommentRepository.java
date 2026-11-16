@@ -1,16 +1,20 @@
 package com.englow3.blog.repository;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.englow3.blog.entity.BlogComment;
 import com.englow3.blog.entity.BlogCommentStatus;
+
+import jakarta.persistence.LockModeType;
 
 public interface BlogCommentRepository extends JpaRepository<BlogComment, UUID> {
 
@@ -31,4 +35,12 @@ public interface BlogCommentRepository extends JpaRepository<BlogComment, UUID> 
 
     /** The number shown on a post: visible comments only, whoever is asking. */
     long countByPostIdAndStatus(UUID postId, BlogCommentStatus status);
+
+    /** The comment with its row locked until the transaction ends, read fresh: see {@code BlogPostRepository}. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from BlogComment c where c.id = :id")
+    Optional<BlogComment> findByIdForUpdate(@Param("id") UUID id);
+
+    /** Whether the comment exists and this person wrote it: nothing is loaded, so nothing is held. */
+    boolean existsByIdAndAuthorId(UUID id, UUID authorId);
 }
