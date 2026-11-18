@@ -50,10 +50,11 @@ public class BlockServiceImpl implements BlockService {
         if (blockedId.equals(me)) {
             throw new BadRequestException("BLOCK_SELF", "You cannot block yourself");
         }
-        if (!publicProfileReader.isLearner(me)) {
+        Set<UUID> learners = publicProfileReader.lockLearners(Set.of(me, blockedId));
+        if (!learners.contains(me)) {
             throw new ForbiddenException("FRIENDSHIP_LEARNERS_ONLY", "Only learners can use friends");
         }
-        if (!publicProfileReader.isLearner(blockedId)) {
+        if (!learners.contains(blockedId)) {
             throw new NotFoundException("LEARNER_NOT_FOUND", "No such learner");
         }
 

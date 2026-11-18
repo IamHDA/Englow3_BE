@@ -60,8 +60,7 @@ class BlockServiceTest {
     @BeforeEach
     void signIn() {
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
-        when(publicProfileReader.isLearner(me)).thenReturn(true);
-        when(publicProfileReader.isLearner(other)).thenReturn(true);
+        when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(me, other));
     }
 
     @Test
@@ -83,7 +82,7 @@ class BlockServiceTest {
 
     @Test
     void staffCannotBlock() {
-        when(publicProfileReader.isLearner(me)).thenReturn(false);
+        when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(other));
 
         assertThatThrownBy(() -> service.block(other)).isInstanceOfSatisfying(ForbiddenException.class,
                 e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_LEARNERS_ONLY"));
@@ -92,7 +91,7 @@ class BlockServiceTest {
 
     @Test
     void aTargetThatIsNotALearnerIsNotFound() {
-        when(publicProfileReader.isLearner(other)).thenReturn(false);
+        when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(me));
 
         assertThatThrownBy(() -> service.block(other)).isInstanceOfSatisfying(NotFoundException.class,
                 e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));

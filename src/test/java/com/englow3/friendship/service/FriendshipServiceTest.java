@@ -79,6 +79,7 @@ class FriendshipServiceTest {
         when(userDirectory.requireCurrentUserId()).thenReturn(me);
         when(publicProfileReader.isLearner(me)).thenReturn(true);
         when(publicProfileReader.isLearner(other)).thenReturn(true);
+        when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(me, other));
         when(friendshipRepo.save(any(Friendship.class))).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -138,6 +139,7 @@ class FriendshipServiceTest {
         @Test
         void staffCannotSendOneAndTakeNoLock() {
             when(publicProfileReader.isLearner(me)).thenReturn(false);
+            when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(other));
 
             assertThatThrownBy(() -> service.sendRequest(new SendFriendRequestCommand(other))).isInstanceOfSatisfying(
                     ForbiddenException.class, e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_LEARNERS_ONLY"));
@@ -148,6 +150,7 @@ class FriendshipServiceTest {
         @Test
         void aTargetThatIsNotALearnerIsNotFound() {
             when(publicProfileReader.isLearner(other)).thenReturn(false);
+            when(publicProfileReader.lockLearners(anyCollection())).thenReturn(Set.of(me));
 
             assertThatThrownBy(() -> service.sendRequest(new SendFriendRequestCommand(other))).isInstanceOfSatisfying(
                     NotFoundException.class, e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
@@ -252,6 +255,18 @@ class FriendshipServiceTest {
             assertThatThrownBy(() -> service.accept(requestId)).isInstanceOfSatisfying(ForbiddenException.class,
                     e -> assertThat(e.getCode()).isEqualTo("FRIENDSHIP_LEARNERS_ONLY"));
             verifyNoInteractions(friendshipRepo);
+        }
+
+        @Test
+        void aRequesterWhoIsNoLongerALearnerCannotBeAccepted() {
+            PairIds theirPair = pair(other, me);
+            when(friendshipRepo.findPairIds(requestId)).thenReturn(Optional.of(theirPair));
+            when(publicProfileReader.lockLearners(Set.of(me, other))).thenReturn(Set.of(me));
+
+            assertThatThrownBy(() -> service.accept(requestId)).isInstanceOfSatisfying(NotFoundException.class,
+                    e -> assertThat(e.getCode()).isEqualTo("LEARNER_NOT_FOUND"));
+            verify(friendshipRepo, never()).lockPair(anyString());
+            verify(friendshipRepo, never()).findById(any());
         }
 
         @Test

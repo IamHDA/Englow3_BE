@@ -39,7 +39,9 @@ skills, and onboarding.
   replace a final result of the same sitting. Learner profiles use optimistic versions.
 - **Account export:** declared read-only joins include full-test sittings, roadmap
   stages/items/milestones/adjustments, level checks, exam selections, quiz answers and
-  pronunciation words. The export uses one repeatable-read snapshot and reports its
+  pronunciation words, friendships involving the caller (sent, received or accepted), and
+  blocks placed by the caller. Blocks placed by other accounts are never exported.
+  The export uses one repeatable-read snapshot and reports its
   per-kind row limit and possibly truncated sections in `exportMetadata`.
 - **Cross-module reference:** `learner_profiles.placement_attempt_id` stores an exam
   attempt UUID. It is not a JPA relationship to the exam module.
@@ -48,6 +50,8 @@ skills, and onboarding.
   `user.api.PublicProfileReader` hands other modules what other learners may see of an
   account - display name and avatar URL, never email - for a set of ids in one query,
   whether an id is a learner, and the learner search by display name (`friendship` uses it).
+  `lockLearners` takes shared user-row locks in id order inside the caller's write transaction,
+  protecting a social role check against a concurrent role change without exposing user entities.
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
   level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
   daily study minutes and purposes as plain values. User entities,
@@ -531,8 +535,11 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Who:** learners only. Staff and Admin neither send nor receive requests, checked
   through `PublicProfileReader.isLearner` (a role of exactly `LEARNER`), not
   `UserDirectory.isBackOfficeUser`. Sending, accepting, blocking and searching require the
-  caller to be a learner; withdrawing, unfriending, unblocking and reading one's own lists
-  do not, so an account whose role changed can still clean up what it already has. The
+  caller and target to be current learners. Pending and accepted connections are suspended
+  while either account is Staff/Admin: lists, badges, counts and `FriendshipReader.areFriends`
+  all exclude them. The rows remain available for export and reactivate if both accounts
+  become learners again. Withdrawing, unfriending and unblocking remain allowed after a
+  role change, so either owner can still remove a retained connection by id. The
   relationship and friend-count reads never refuse on role: they answer `NOT_APPLICABLE`
   or a count, so a wall can always ask.
 - **Entities with rules:** `Friendship` - nobody befriends themselves, only the
@@ -546,6 +553,9 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
   second row for one pair impossible, whichever side asked.
   Every write for a pair (request, accept, block, unfriend) takes a transaction
   advisory lock on the pair, so a block cannot race an accept.
+  Sending, accepting and blocking first take shared role locks through `user` in id order,
+  before the pair lock; role updates take an incompatible user-row write lock. Acceptance
+  rechecks both people after obtaining those locks, including a requester's later promotion.
 - **Talks to:** `user` via `user.api.PublicProfileReader` (name and picture for a whole
   page of people in one call, whether an id is a learner, and the learner search by
   display name - never by email) and `UserDirectory` (the caller's id). Publishes
@@ -553,7 +563,10 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
   which ids has a learner blocked or been blocked by - for `chat` and `blog`. It
   depends on neither of them.
 - **Erasure:** both tables cascade from `users`.
-- **Read path:** repository only; the search itself runs in `user`, behind
+- **Read path:** repository only. Active list/count/relationship queries make a declared
+  read-only join to `users.role` for both participants; only `user` writes those roles.
+  Account export's declared read of friendship tables includes caller-involved rows and
+  caller-owned blocks, including suspended relationships. The search itself runs in `user`, behind
   `PublicProfileReader`, because it reads `users`.
 - **Entry points:** `/api/friends` (friends, requests, search, relationships, and
   `/users/{userId}/count` for a learner's friend count) and `/api/friends/blocks`.
@@ -561,8 +574,9 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
   `REQUEST_RECEIVED`, `BLOCKED_BY_ME`, `UNAVAILABLE` (the other side blocked the viewer;
   the reason is never stated), `SELF`, and `NOT_APPLICABLE` (viewer or target is not a
   learner, so no friend actions apply).
-- **Visibility:** anyone may read how many friends a learner has; only the owner reads
-  the list itself. Both are refused as not found when the two block each other.
+- **Visibility:** anyone may read how many active friends a learner has; only the owner
+  reads the list itself. A friend-count read is refused as not found when either account
+  blocked the other. Private lists and badge totals contain only current learner pairs.
 - **Wall (a screen, not a module):** each account's page is composed in the BFF from
   three independent calls made in parallel - the public profile (`user`), the
   relationship and friend count (`friendship`), and posts by author (`blog`). Staff and
@@ -783,7 +797,7 @@ gone rather than kept: all three describe a state that no longer exists.
   which the session-mode pooler allows and transaction mode does not.
 - **Notifications** for friend requests, new messages while offline and comments on
   one's posts. No module owns notifications yet; decide when the first one is built.
-- **Account export** does not yet cover `friendship`, `chat` or `blog`.
+- **Account export** covers `friendship`; extend it when the planned `chat` and `blog` modules land.
 - **Blog erasure** keeping posts and comments as by a deleted user follows the choice
   made for chat; confirm it with the product owner and the privacy policy before the
   first migration.

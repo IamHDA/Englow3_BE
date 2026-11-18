@@ -9,7 +9,7 @@ import java.util.UUID;
  */
 public interface FriendshipReader {
 
-    /** An accepted friendship exists. A block always deletes the friendship, so this also means "not blocked". */
+    /** An accepted friendship between current learners. Role changes suspend it; a block deletes it. */
     boolean areFriends(UUID a, UUID b);
 
     boolean isBlockedEitherWay(UUID a, UUID b);

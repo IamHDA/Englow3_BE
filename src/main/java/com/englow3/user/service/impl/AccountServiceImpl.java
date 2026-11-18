@@ -111,6 +111,9 @@ public class AccountServiceImpl implements AccountService {
         out.put("tutorConversations", rows("tutor_conversations", "user_id = :u", userId));
         out.put("tutorMessages", rows("tutor_messages",
                 "tutor_conversation_id in (select id from tutor_conversations where user_id = :u)", userId));
+        out.put("friendships", rows("friendships", "requester_id = :u or addressee_id = :u", userId));
+        // The caller owns these blocks. Who blocked the caller must remain private.
+        out.put("userBlocks", rows("user_blocks", "blocker_id = :u", userId));
         var possiblyTruncated = out.entrySet().stream()
                 .filter(e -> e.getValue().isArray() && e.getValue().size() >= MAX_ROWS_PER_KIND).map(Map.Entry::getKey)
                 .toList();

@@ -51,4 +51,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             org.springframework.data.domain.Pageable page);
 
     boolean existsByIdAndRole(UUID id, com.englow3.user.entity.Role role);
+
+    /** Shared row locks conflict with role updates, without serializing independent requests by the same learner. */
+    @org.springframework.data.jpa.repository.Query(value = "select id from users where id in (:ids) and role = 'LEARNER' order by id for share", nativeQuery = true)
+    java.util.List<UUID> lockLearners(
+            @org.springframework.data.repository.query.Param("ids") java.util.Collection<UUID> ids);
 }

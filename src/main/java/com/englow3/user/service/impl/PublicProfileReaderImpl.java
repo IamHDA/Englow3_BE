@@ -3,6 +3,7 @@ package com.englow3.user.service.impl;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,12 @@ public class PublicProfileReaderImpl implements PublicProfileReader {
     @Transactional(readOnly = true)
     public boolean isLearner(UUID id) {
         return userRepo.existsByIdAndRole(id, Role.LEARNER);
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Set<UUID> lockLearners(Collection<UUID> ids) {
+        return ids.isEmpty() ? Set.of() : Set.copyOf(userRepo.lockLearners(ids));
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.englow3.user.api;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -21,6 +22,12 @@ public interface PublicProfileReader {
 
     /** True only for an existing account whose current role is LEARNER. */
     boolean isLearner(UUID id);
+
+    /**
+     * Current learner ids, protected against role changes until the caller's write transaction ends. Locks accounts in
+     * database id order; call before taking any feature-specific locks. Never use this on a read-only path.
+     */
+    Set<UUID> lockLearners(Collection<UUID> ids);
 
     /**
      * Learners whose display name contains {@code term} (case-insensitive), ordered by display name then id.

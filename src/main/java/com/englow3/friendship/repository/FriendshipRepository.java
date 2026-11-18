@@ -17,6 +17,12 @@ import com.englow3.friendship.entity.FriendshipStatus;
 
 public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
 
+    /** Declared read-only user-role join: historical rows are inactive while either account is not a learner. */
+    String ACTIVE_LEARNERS = """
+            exists (select u.id from User u where u.id = f.requesterId and u.role = com.englow3.user.entity.Role.LEARNER)
+            and exists (select u.id from User u where u.id = f.addresseeId and u.role = com.englow3.user.entity.Role.LEARNER)
+            """;
+
     /** Held to the end of the transaction. Every write for one pair takes it first. */
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:key,0)) as text)", nativeQuery = true)
     String lockPair(@Param("key") String key);
@@ -47,20 +53,25 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
             """)
     int deletePair(@Param("a") UUID a, @Param("b") UUID b);
 
-    @Query("""
-            select f from Friendship f
-            where f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
+    @Query("select f from Friendship f where " + ACTIVE_LEARNERS + " and " + """
+            f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
               and (f.requesterId = :me or f.addresseeId = :me)
             """)
     Page<Friendship> findFriendships(@Param("me") UUID me, Pageable page);
 
     /** Requests waiting for {@code addresseeId} to answer. */
-    Page<Friendship> findByAddresseeIdAndStatus(UUID addresseeId, FriendshipStatus status, Pageable page);
+    @Query("select f from Friendship f where " + ACTIVE_LEARNERS + " and f.addresseeId = :id and f.status = :status")
+    Page<Friendship> findByAddresseeIdAndStatus(@Param("id") UUID addresseeId, @Param("status") FriendshipStatus status,
+            Pageable page);
 
     /** Requests {@code requesterId} has sent and nobody has answered yet. */
-    Page<Friendship> findByRequesterIdAndStatus(UUID requesterId, FriendshipStatus status, Pageable page);
+    @Query("select f from Friendship f where " + ACTIVE_LEARNERS + " and f.requesterId = :id and f.status = :status")
+    Page<Friendship> findByRequesterIdAndStatus(@Param("id") UUID requesterId, @Param("status") FriendshipStatus status,
+            Pageable page);
 
-    long countByAddresseeIdAndStatus(UUID addresseeId, FriendshipStatus status);
+    @Query("select count(f) from Friendship f where " + ACTIVE_LEARNERS
+            + " and f.addresseeId = :id and f.status = :status")
+    long countByAddresseeIdAndStatus(@Param("id") UUID addresseeId, @Param("status") FriendshipStatus status);
 
     /** Whatever connects {@code me} to each of {@code others}: one row at most per person. */
     @Query("""
@@ -70,12 +81,14 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
             """)
     List<Friendship> findPairsWith(@Param("me") UUID me, @Param("others") Collection<UUID> others);
 
-    boolean existsByStatusAndRequesterIdAndAddresseeId(FriendshipStatus status, UUID requesterId, UUID addresseeId);
+    @Query("select count(f) > 0 from Friendship f where " + ACTIVE_LEARNERS
+            + " and f.status = :status and f.requesterId = :requester and f.addresseeId = :addressee")
+    boolean existsByStatusAndRequesterIdAndAddresseeId(@Param("status") FriendshipStatus status,
+            @Param("requester") UUID requesterId, @Param("addressee") UUID addresseeId);
 
     /** Accepted friendships on either side; a pending request is not a friend yet. */
-    @Query("""
-            select count(f) from Friendship f
-            where f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
+    @Query("select count(f) from Friendship f where " + ACTIVE_LEARNERS + " and " + """
+            f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
               and (f.requesterId = :user or f.addresseeId = :user)
             """)
     long countFriendsOf(@Param("user") UUID userId);

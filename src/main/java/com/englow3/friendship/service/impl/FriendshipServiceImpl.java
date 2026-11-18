@@ -44,9 +44,9 @@ import com.englow3.user.api.UserDirectory;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Orchestrates requests, friendships and the friend search. Every write on a pair takes the pair's advisory lock first
- * and reads afterwards, so a block cannot race an accept and two crossed requests cannot both create a row. The rules
- * about one row live in {@link Friendship}; what spans a block, a lock and a second row is here.
+ * Orchestrates requests, friendships and the friend search. Learner-only writes first lock the participants' roles,
+ * then take the pair's advisory lock and read afterwards. A block cannot race an accept, a promotion cannot race the
+ * role check, and crossed requests cannot both create a row. Single-row rules live in {@link Friendship}.
  */
 @Service
 @RequiredArgsConstructor
@@ -66,8 +66,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     public FriendRequestOutcome sendRequest(SendFriendRequestCommand command) {
         UUID me = userDirectory.requireCurrentUserId();
         UUID other = command.addresseeId();
-        requireLearnerCaller(me);
-        requireLearnerTarget(other);
+        requireLearnerPair(me, other);
 
         friendshipRepo.lockPair(Friendship.pairKey(me, other));
         if (userBlockRepo.existsEitherWay(me, other)) {
@@ -98,7 +97,7 @@ public class FriendshipServiceImpl implements FriendshipService {
         UUID me = userDirectory.requireCurrentUserId();
         requireLearnerCaller(me);
 
-        Friendship friendship = lockAndLoad(requestId, me);
+        Friendship friendship = lockAndLoad(requestId, me, true);
         friendship.accept(me, Instant.now(clock));
         return new FriendRequestOutcome(requestResult(friendship, friendship.otherParty(me)), false);
     }
@@ -108,7 +107,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     public void withdraw(UUID requestId) {
         UUID me = userDirectory.requireCurrentUserId();
 
-        Friendship friendship = lockAndLoad(requestId, me);
+        Friendship friendship = lockAndLoad(requestId, me, false);
         friendship.ensureWithdrawableBy(me);
         friendshipRepo.delete(friendship);
     }
@@ -237,10 +236,13 @@ public class FriendshipServiceImpl implements FriendshipService {
      * the entity, so the lock is taken before the first load and the load sees the latest committed state. Someone
      * else's request is reported as missing, so a request id says nothing about other people's.
      */
-    private Friendship lockAndLoad(UUID requestId, UUID me) {
+    private Friendship lockAndLoad(UUID requestId, UUID me, boolean accepting) {
         PairIds pair = friendshipRepo.findPairIds(requestId).orElseThrow(FriendshipServiceImpl::requestNotFound);
         if (!me.equals(pair.getRequesterId()) && !me.equals(pair.getAddresseeId())) {
             throw requestNotFound();
+        }
+        if (accepting) {
+            requireLearnerPair(me, me.equals(pair.getRequesterId()) ? pair.getAddresseeId() : pair.getRequesterId());
         }
         friendshipRepo.lockPair(Friendship.pairKey(pair.getRequesterId(), pair.getAddresseeId()));
         return friendshipRepo.findById(requestId).orElseThrow(FriendshipServiceImpl::requestNotFound);
@@ -256,8 +258,12 @@ public class FriendshipServiceImpl implements FriendshipService {
         }
     }
 
-    private void requireLearnerTarget(UUID other) {
-        if (!publicProfileReader.isLearner(other)) {
+    private void requireLearnerPair(UUID me, UUID other) {
+        Set<UUID> learners = publicProfileReader.lockLearners(new HashSet<>(List.of(me, other)));
+        if (!learners.contains(me)) {
+            throw new ForbiddenException("FRIENDSHIP_LEARNERS_ONLY", "Only learners can use friends");
+        }
+        if (!learners.contains(other)) {
             throw new NotFoundException("LEARNER_NOT_FOUND", "No such learner");
         }
     }

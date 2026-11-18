@@ -205,6 +205,42 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void exportsSocialRecordsWithoutRevealingWhoBlockedTheCaller() {
+        LearnerFixture fixture = new LearnerFixture(jdbc);
+        UUID sentTo = fixture.learner();
+        UUID receivedFrom = fixture.learner();
+        UUID accepted = fixture.learner();
+        UUID unrelated = fixture.learner();
+        UUID blockedByMe = fixture.learner();
+        UUID blockedMe = fixture.learner();
+        UUID sentId = UUID.randomUUID(), receivedId = UUID.randomUUID(), acceptedId = UUID.randomUUID();
+        for (var row : List.of(Map.of("id", sentId, "requester", userId, "addressee", sentTo, "status", "PENDING"),
+                Map.of("id", receivedId, "requester", receivedFrom, "addressee", userId, "status", "PENDING"),
+                Map.of("id", acceptedId, "requester", userId, "addressee", accepted, "status", "ACCEPTED"),
+                Map.of("id", UUID.randomUUID(), "requester", sentTo, "addressee", unrelated, "status", "PENDING"))) {
+            jdbc.sql("""
+                    insert into friendships (id, requester_id, addressee_id, status, accepted_at)
+                    values (:id, :requester, :addressee, :status, case when :status = 'ACCEPTED' then now() end)
+                    """).params(row).update();
+        }
+        jdbc.sql(
+                "insert into user_blocks (blocker_id, blocked_id) values (:owner, :blocked), (:blocker, :owner), (:other, :blocked)")
+                .param("owner", userId).param("blocked", blockedByMe).param("blocker", blockedMe)
+                .param("other", unrelated).update();
+
+        Map<String, JsonNode> data = account.exportData();
+
+        assertThat(data.get("friendships")).hasSize(3);
+        assertThat(data.get("friendships")).extracting(row -> row.get("id").asText())
+                .containsExactlyInAnyOrder(sentId.toString(), receivedId.toString(), acceptedId.toString());
+        assertThat(data.get("userBlocks")).hasSize(1);
+        assertThat(data.get("userBlocks").get(0).get("blocker_id").asText()).isEqualTo(userId.toString());
+        assertThat(data.get("userBlocks").get(0).get("blocked_id").asText()).isEqualTo(blockedByMe.toString());
+        assertThat(data.get("userBlocks").toString()).doesNotContain(blockedMe.toString(), unrelated.toString());
+        assertThat(data.get("exportMetadata").get("rowLimitPerKind").asInt()).isEqualTo(20_000);
+    }
+
+    @Test
     void exportsOnlyTheCallersOwnRecords() {
         UUID other = new LearnerFixture(jdbc).learner();
         sit(other);
