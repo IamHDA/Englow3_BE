@@ -563,13 +563,14 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
   learner, so no friend actions apply).
 - **Visibility:** anyone may read how many friends a learner has; only the owner reads
   the list itself. Both are refused as not found when the two block each other.
-- **Wall (a screen, not a module):** each account's page is composed in the BFF from
-  three independent calls made in parallel - the public profile (`user`), the
-  relationship and friend count (`friendship`), and posts by author (`blog`). Staff and
-  Admin have walls with posts and no friend actions. When the relationship says
-  `UNAVAILABLE` or `BLOCKED_BY_ME`, the BFF shows the wall as unavailable; the posts
-  themselves are already withheld by `blog`, so the only thing the BFF rule hides on its
-  own is the public name and picture.
+- **Wall (a screen, not a module):** each account's page is composed in the BFF. The
+  relationship (`friendship`) is asked first; when it says `UNAVAILABLE` or
+  `BLOCKED_BY_ME` the wall is unavailable and nothing else is fetched. Otherwise the
+  public profile (`user`), the friend count (`friendship`) and posts by author (`blog`)
+  are fetched in parallel, each as its own nullable field. Staff and Admin have walls
+  with posts, no friend actions and no friend count. The posts themselves are already
+  withheld by `blog`, so the only thing the BFF rule hides on its own is the public
+  name and picture.
 - **Why:** request, accept and block are a different vocabulary and lifecycle from a
   conversation's, and `blog` needs blocks without needing chat.
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a
