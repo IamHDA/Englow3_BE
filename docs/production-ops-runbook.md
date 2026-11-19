@@ -19,7 +19,7 @@ Mục lục: [2.1 Backup](#21-backup-và-khôi-phục) · [2.2 Hosting](#22-host
 | Thứ | Chứa gì | Mất thì sao |
 |---|---|---|
 | Cơ sở dữ liệu Postgres (schema `englow3`) | tài khoản, kết quả thi, tiến độ, gói dịch vụ | mất lịch sử học của mọi người |
-| Đối tượng trong Storage (bucket `avatars`, `exams`, `learning`, `speaking`) | ảnh, audio đề thi, bản ghi âm người học | đề thi nghe không còn tiếng; mất bản ghi âm |
+| Đối tượng trong Storage (bucket `avatars`, `exams`, `learning`, `speaking`, `chat`, `blog`) | ảnh, audio đề thi, bản ghi âm người học, ảnh trong tin nhắn, ảnh trong bài blog | đề thi nghe không còn tiếng; mất bản ghi âm, ảnh chat và ảnh blog |
 | Tài khoản đăng nhập (`auth.users`) | email, mật khẩu băm | không ai đăng nhập được |
 
 Mục tiêu đề xuất: **RPO ≤ 24 giờ** (mất tối đa một ngày dữ liệu), **RTO ≤ 4 giờ** (dựng lại dịch vụ). Nếu không chấp nhận mất tới 24 giờ kết quả thi, bật PITR (bước 2).
@@ -58,7 +58,11 @@ Sao lưu cơ sở dữ liệu **không** chứa file. Đồng bộ định kỳ 
 aws s3 sync s3://speaking s3://<bucket-sao-luu-rieng>/storage/speaking/ \
   --endpoint-url <supabase-s3-endpoint>
 ```
-Lặp cho `exams`, `learning`, `avatars`. `exams` và `learning` có thể dựng lại từ `data_pipeline` nên ưu tiên thấp hơn `speaking`.
+Lặp cho `exams`, `learning`, `avatars`, `chat`, `blog`. `exams` và `learning` có thể dựng lại từ `data_pipeline` nên ưu tiên thấp hơn `speaking`, `chat` và `blog` (ảnh người học gửi nhau và ảnh trong bài viết, không dựng lại được).
+
+Bucket `chat`: **bucket private**, tạo trên Supabase Storage **trước khi deploy** bản có tính năng chat, và đặt `STORAGE_CHAT_BUCKET` trên Render nếu tên khác `chat`. Ảnh chỉ được đọc qua URL presigned ngắn hạn cấp cho hai người trong hội thoại; không bật quyền đọc công khai.
+
+Bucket `blog`: **bucket private**, tạo trên Supabase Storage **trước khi deploy** bản có tính năng blog, và đặt `STORAGE_BLOG_BUCKET` trên Render nếu tên khác `blog`. Bài viết chỉ ghi tham chiếu `blog-image:<id>`, không ghi URL; ảnh được đọc qua URL presigned ngắn hạn (`STORAGE_BLOG_IMAGE_URL_TTL`, mặc định 3 giờ) cấp cho người đã đăng nhập đọc được bài. Không bật quyền đọc công khai. Job dọn `BLOG_CLEANUP_ENABLED` (mặc định bật, mỗi giờ) xóa ảnh đã tải lên nhưng không bài nào dùng sau 24 giờ, kèm object. Xóa bài hoặc bỏ ảnh khỏi bài xóa object sau khi commit; nếu kho lỗi lúc đó, object còn lại chỉ là file thừa trong bucket, không làm hỏng bài nào. Xóa tài khoản giữ bài, bình luận và ảnh của bài (hiện "Người dùng đã xóa"); chỉ ảnh tải lên mà chưa dùng thì bị job dọn.
 
 ### Bước 5 — Thử khôi phục (bắt buộc, mỗi quý một lần)
 Một bản sao lưu chưa từng khôi phục thử chưa phải là bản sao lưu.
@@ -85,7 +89,8 @@ Một bản sao lưu chưa từng khôi phục thử chưa phải là bản sao 
    - Settings → Instance Type: chọn gói trả phí **luôn bật** (không ngủ). Chọn RAM tối thiểu 1 GB; Spring Boot trên 512 MB dễ hết bộ nhớ khi tải cao.
    - Health Check Path: `/actuator/health/readiness` (đã mở không cần đăng nhập, xem `SecurityConfig`). Render chỉ chuyển lưu lượng sang bản mới khi đường này trả 200 → deploy không gián đoạn.
    - Auto-Deploy: giữ qua deploy hook như `cd.yml` đang làm.
-   - Khi cần chịu tải, đặt số instance = 2. Kiểm tra: gọi `/actuator/info`, `release` phải trùng commit.
+   - Chat realtime: Render phải cho phép WebSocket tới `/ws/chat`; `CORS_ALLOWED_ORIGINS` phải chứa đúng origin của web, vì handshake WebSocket kiểm `Origin` theo danh sách này. Socket chỉ nhận đẩy từ instance đang giữ nó, nên chạy **một instance** cho tới khi chat có `LISTEN/NOTIFY` (module map, mục *Still open*).
+   - Khi cần chịu tải, đặt số instance = 2 (chỉ sau khi chat đã có `LISTEN/NOTIFY`, xem dòng trên). Kiểm tra: gọi `/actuator/info`, `release` phải trùng commit.
 2. **Render — `ai_service`:** cùng quy tắc luôn bật. Nó là điểm duy nhất nói chuyện với nhà cung cấp AI; khi nó ngủ, chấm bài sẽ chờ khởi động.
 3. **Cùng vùng địa lý:** đặt Render, Supabase và Vercel Functions trong cùng khu vực (hoặc gần nhất có thể). Mỗi lệnh gọi DB qua vùng khác tốn khoảng 100–200 ms, nhân lên theo số truy vấn của mỗi trang.
 4. **DB — pooler và kết nối:** dùng chuỗi kết nối pooler (Supavisor, chế độ session) cho BE. Giữ `hikari.maximum-pool-size` × số instance nhỏ hơn giới hạn kết nối của gói Supabase. Thêm `reWriteBatchedInserts=true` vào `DB_URL` (đã bật batch insert trong code; tham số này gom nhiều INSERT thành một lệnh).
@@ -197,7 +202,7 @@ Log của Render và Vercel được giữ ngắn. Tạo log drain tới một d
 - [ ] Log drain tới dịch vụ lưu log
 - [ ] Staging và production dùng **Supabase project khác nhau** và khoá khác nhau
 - [ ] Khoá Groq cũ đã xoay; `Englow3_BE.zip` đã xoá và mọi khoá trong đó đã xoay
-- [ ] `CORS_ALLOWED_ORIGINS` đúng tên miền thật
+- [ ] `CORS_ALLOWED_ORIGINS` đúng tên miền thật (cả handshake WebSocket `/ws/chat` kiểm `Origin` theo danh sách này)
 - [ ] `AI_PLATFORM_DAILY_REQUEST_LIMIT` và giới hạn chi tiêu hàng tháng ở nhà cung cấp đã đặt
 - [ ] `NEXT_PUBLIC_CONTACT_EMAIL` và `NEXT_PUBLIC_OPERATOR_NAME` đã đặt (trang pháp lý)
 - [ ] Trang Điều khoản/Bảo mật đã được người có chuyên môn pháp lý rà soát

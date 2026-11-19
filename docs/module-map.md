@@ -49,7 +49,7 @@ skills, and onboarding.
   contracts for cross-module identity lookup and placement recording.
   `user.api.PublicProfileReader` hands other modules what other learners may see of an
   account - display name and avatar URL, never email - for a set of ids in one query,
-  whether an id is a learner, and the learner search by display name (`friendship` uses it).
+  whether an id is a learner, and the learner search by display name (`friendship`, `chat` and `blog` use it).
   `lockLearners` takes shared user-row locks in id order inside the caller's write transaction,
   protecting a social role check against a concurrent role change without exposing user entities.
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
@@ -577,122 +577,271 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Visibility:** anyone may read how many active friends a learner has; only the owner
   reads the list itself. A friend-count read is refused as not found when either account
   blocked the other. Private lists and badge totals contain only current learner pairs.
-- **Wall (a screen, not a module):** each account's page is composed in the BFF from
-  three independent calls made in parallel - the public profile (`user`), the
-  relationship and friend count (`friendship`), and posts by author (`blog`). Staff and
-  Admin have walls with posts and no friend actions. When the relationship says
-  `UNAVAILABLE` or `BLOCKED_BY_ME`, the BFF shows the wall as unavailable; the posts
-  themselves are already withheld by `blog`, so the only thing the BFF rule hides on its
-  own is the public name and picture.
+- **Wall (a screen, not a module):** each account's page is composed in the BFF. The
+  relationship (`friendship`) is asked first; when it says `UNAVAILABLE` or
+  `BLOCKED_BY_ME` the wall is unavailable and nothing else is fetched. Otherwise the
+  public profile (`user`), the friend count (`friendship`) and posts by author (`blog`)
+  are fetched in parallel, each as its own nullable field. Staff and Admin have walls
+  with posts, no friend actions and no friend count. The posts themselves are already
+  withheld by `blog`, so the only thing the BFF rule hides on its own is the public
+  name and picture.
 - **Why:** request, accept and block are a different vocabulary and lifecycle from a
   conversation's, and `blog` needs blocks without needing chat.
 - **Revisit if:** group chat or following without friendship arrives, or blocks need a
   reason and a report trail.
 
-## `chat` (planned)
+## `chat`
 
-Designed 2026-11-15, not implemented yet. Owns one-to-one conversations between
-friends.
+Implemented: one-to-one conversations between friends - open a conversation, send text
+and/or one image, history by `seq`, read marks, recall, the conversation list with unread
+counts - over REST behind `/api/chat`, and a receive-only WebSocket at `/ws/chat` that pushes
+new messages, recalls, read marks and typing. Owns one-to-one conversations between friends.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `chat_conversations` (`id`, `direct_key`, `last_seq`,
   `last_message_at`); `chat_participants` (`conversation_id`, `user_id`,
   `last_read_seq`, `joined_at`); `chat_messages` (`id`, `seq` within the
   conversation, `sender_id`, `client_id`, text, an optional image object key,
-  `recalled_at`, `sent_at`); `chat_socket_tickets`. A conversation holds no user
-  columns: who is in it, and how far each has read, are participant rows. Sending
-  moves the sender's own read mark, so unread is `last_seq - last_read_seq` without
-  counting rows.
+  `recalled_at`, `sent_at`); `chat_image_uploads` (`id`, `conversation_id`, `uploader_id`,
+  `object_key`, `content_type`, `content_length`, `created_at`: an image a participant was
+  given an upload URL for and has not yet attached to a message - sending consumes the row,
+  and without it a learner could upload any number of images that are never sent and no job
+  could find them); `chat_socket_tickets` (`token_hash`, `user_id`, `expires_at`,
+  `used_at`, `created_at`: the single-use tickets a browser opens the socket with; only the
+  SHA-256 of a ticket is stored). A conversation holds no user columns: who is in it, and
+  how far each has read, are participant rows. Sending moves the sender's own read mark, so
+  unread is `last_seq - last_read_seq` without counting rows.
 - **One conversation per pair:** `direct_key` is `"<smaller uuid>:<larger uuid>"`,
   unique, so two friends opening a chat at the same moment get one conversation. It
   is the only place the pair is sorted.
 - **Entities with rules:** `ChatConversation` hands out the next `seq`.
-  `ChatMessage` - text, one image, or both, never empty; only the sender recalls it,
-  once; a recalled message loses its text and image and shows as recalled; no
-  editing. `ChatParticipant` - the read mark never moves backwards.
+  `ChatMessage` - text (at most 4000 characters), one image, or both, never empty; only
+  the sender recalls it, once; a recalled message loses its text and image and shows as
+  recalled; no editing. `ChatParticipant` is plain: the read mark has no setter and is
+  written only by `greatest(...)` in `ChatParticipantRepository.advanceReadMark`, which
+  keeps it from moving backwards or past `last_seq` even when two tabs write at once.
+  `ChatImageUpload` is a plain row.
 - **Who may send:** the two must be friends with no block either way, asked through
   `FriendshipReader` on every send and never cached, so unfriending or blocking stops
   the next message. History stays readable after unfriending.
-- **Concurrency:** `seq` comes from one atomic
-  `UPDATE ... SET last_seq = last_seq + 1 ... RETURNING`, backed by unique
-  `(conversation_id, seq)`. Unique `(sender_id, client_id)` makes a retried send
-  return the first message. The read mark is written with `greatest(...)`.
+- **Concurrency:** a send takes the conversation row `FOR UPDATE`
+  (`@Lock(PESSIMISTIC_WRITE)`) and `ChatConversation.nextSeq` increments `last_seq` in
+  the entity; the lock is held to commit, so `seq` order is commit order. This replaces
+  the single `UPDATE ... RETURNING` the first design named: the guarantee is the same,
+  but the rule now lives in the entity and is tested without a database. Unique
+  `(conversation_id, seq)` backs it. Unique `(sender_id, client_id)` makes a retried
+  send return the first message (checked before and again under the lock). The read mark
+  is written with `greatest(...)`. A recall takes the message row `FOR UPDATE`, so two
+  recalls at once take turns and the second is refused as already recalled. Two friends
+  opening a chat at once meet in `insert ... on conflict (direct_key) do nothing`.
 - **Delivery:** sending, reading, recalling and history are REST through the
   existing proxy and BFF. Receiving is a receive-only WebSocket at `/ws/chat`, straight
-  to Spring. The web asks the proxy for a ticket - random, stored hashed, valid 30
-  seconds, single use, redeemed by one conditional `UPDATE` so it works on any
-  instance; mobile may send `Authorization: Bearer` instead. The handshake checks
-  `Origin` against `app.cors.allowed-origins`. The only client frame is
-  `{conversationId, active}` for typing, which is relayed and never stored. Pushes
-  happen after commit. After every (re)connect the client catches up over REST: the
+  to Spring. The HTTP layer lets the handshake through (`permitAll` - the only route
+  opened for it) and `ChatSocketHandshakeInterceptor` decides who the socket belongs to.
+  The web asks the proxy (`POST /api/chat/socket-tickets`) for a ticket - random, stored
+  hashed, valid 30 seconds, single use, redeemed by one conditional `UPDATE` so it works on
+  any instance; mobile may send `Authorization: Bearer` instead. Neither is a 401. The
+  handshake checks `Origin` against `app.cors.allowed-origins` (a 403). The only client
+  frame is `{conversationId, active}` for typing, which is relayed to the other person
+  while the two are still friends and never stored; any other frame, broken or unknown, is
+  dropped without closing the socket. Pushes happen after commit (`AFTER_COMMIT`
+  listeners; a failure is logged and never fails the request that committed): a new
+  message, a recall and a read mark go to the other person and to the actor's own other
+  sockets, to participants only. Sockets are held in memory - five per person at most, the
+  oldest closed with a policy violation past that - each behind a decorator that
+  serialises sends, with a ping every 25 seconds so an idle chat is not cut by a proxy.
+  After every (re)connect the client catches up over REST: the
   conversation list carries each conversation's `last_seq`, and an open conversation
   fetches messages after its own `seq`. There is deliberately no single cursor across
   conversations: an id or sequence is handed out before commit, so a later one can
   commit first and a reconnect would skip the earlier message. Within one
   conversation `seq` is safe, because the `last_seq` row lock is held to commit.
-- **Images:** presigned PUT through the shared storage client into a private
-  location; read through short-lived presigned GETs issued only to the two
-  participants. Object-key meaning stays in `chat`. Recalling deletes the object.
+- **Images:** presigned PUT through the shared storage client into the private `chat`
+  bucket (`app.storage.chat-bucket`), bound to the declared type (JPEG, PNG, WebP) and
+  size (at most 5 MB), keyed `conversations/{conversationId}/{uploadId}.{ext}`; read
+  through short-lived presigned GETs issued only to the two participants. Object-key
+  meaning stays in `chat`. Sending names the upload id: the object's existence is checked
+  with a HEAD outside any transaction, then the upload row is consumed in the write
+  transaction. Recalling deletes the object after commit. A cleanup job
+  (`app.chat.cleanup-enabled`, hourly) removes uploads nobody sent within a day, with
+  their objects, conversations nobody is in, and socket tickets that expired long ago; every removal is a conditional delete
+  (the conversation delete re-checks that nobody is in it and says which it removed), and
+  only the sweep whose delete took effect removes the objects, so it is safe on several
+  instances. A sweep that fails is logged and does not stop the others.
 - **Erasure:** messages stay and show as from a deleted user: `sender_id` is set to
   null and the erased learner's participant row cascades. A direct conversation left
   with one participant shows the other side as a deleted user; one left with none is
-  cleaned up. Images the erased learner sent stay with their messages. The privacy
-  policy has to say so.
+  cleaned up. Images the erased learner sent stay with their messages. An upload URL
+  issued but never used goes with the account (its row cascades); if the file had already
+  been PUT it stays in the bucket as a stray. The privacy policy has to say so.
 - **Moderation:** none in this version. No reporting; a learner protects themselves by
   blocking, and staff never read private messages.
-- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
-- **Read path:** repository; the conversation list (last message, unread count) moves
-  to `chat/query` if one repository query cannot carry it.
+- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory` and
+  `PublicProfileReader` (the other person's name and picture for a whole page of
+  conversations in one call).
+- **Entry points:** `/api/chat` - `conversations` (list, open, one, `messages` history and
+  send, `read`, `image-uploads`), `messages/{id}/recall`, `unread-count` (conversations
+  with something unread, not a message count) and `POST /api/chat/socket-tickets`; and the
+  WebSocket `/ws/chat`.
+- **Read path:** repository for everything but the conversation list; the list (last
+  message, unread, newest first, only conversations that have a message) is
+  `chat/query` because it is one join across three tables.
 - **Why WebSocket, receive-only:** web and BFF run as Vercel functions - 60 seconds at
   most, no WebSocket - and the browser never holds the token (HttpOnly session
   cookie). SSE through them would keep two functions running for every learner with
   the app open and cannot carry typing cheaply. Sends stay on REST so a dropped socket
   never loses a message, and validation, errors and rate limits stay the existing ones.
+- **Where the web listens:** the socket is opened only on the chat screens. Everywhere
+  else the header shows a new-message indicator fed by `GET /api/chat/unread-count`,
+  asked again on navigation, on returning to the tab and about once a minute - so a
+  learner who is not chatting holds no connection to the backend.
 - **Revisit if:** group chat (participant rows already allow it; `direct_key` becomes
   nullable for groups), presence, or send latency starts to matter (send over the
   socket too); abuse in chat is reported (a report flow that shows staff only the
   reported message); the backend runs more than one instance (see Still open).
 
-## `blog` (planned)
+## `blog`
 
-Designed 2026-11-15, not implemented yet. Owns knowledge-sharing posts, their
-comments, likes, reports and moderation.
+Implemented: posts with Markdown, images and tags, flat comments, likes and the post list,
+behind `/api/blog`; reports of posts and comments (`/api/blog/.../reports`) and their moderation by
+Staff and Admin (`/api/admin/blog`). Owns knowledge-sharing posts, their comments, likes, reports
+and moderation.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
-  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`,
-  `blog_reports`, `blog_moderation_actions`. Comments are flat - no replies.
-- **Who:** every signed-in account posts, comments and likes. Staff and Admin
-  moderate through `/api/admin/blog`, a separate controller in this module.
+  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`, `blog_reports`
+  (a reader's report of a post or a comment) and `blog_moderation_actions` (the append-only history
+  of what moderators did). Comments are flat - no replies. A report and an action name their
+  target by `(target_type, target_id)` with no foreign key, because the target is a post or a
+  comment and its author may delete it.
+- **Who:** every signed-in account posts, comments and likes; nothing is readable
+  without signing in (no route under `/api/blog` is public). Staff and Admin moderate through
+  `/api/admin/blog`, a separate controller in this module - never content they wrote themselves.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
-  reports. Moderators hide (reversible) or remove (permanent) a post or comment,
-  always with a reason, recorded in `blog_moderation_actions`.
+  reports. Moderators hide (reversible) or remove (permanent) a post or comment, or
+  dismiss its reports, always with a reason, recorded in `blog_moderation_actions`: all four
+  actions are recorded, a dismissal included. Only moderation sets `HIDDEN` or `REMOVED`.
+- **What an author sees:** their own posts and comments in every status, with the
+  status shown, so a hidden or removed post is found in their own list rather than
+  only by its link. Everyone else sees published posts and visible comments. In the API this
+  is `GET /api/blog/posts?authorId=<the caller>`: the one list that includes every status
+  (the query decides it from `authorId == viewer`, so no other filter combination can reach
+  hidden posts), and the comment list returns the caller's own hidden or removed comments
+  with their `status`. A hidden or removed post is opened only by its author, and then
+  `canEdit` and `canInteract` are false.
+- **One read rule:** a post that does not exist, is hidden from the caller, or is by someone
+  the caller has a block with is the same `BLOG_POST_NOT_FOUND`, so neither moderation state
+  nor a block is revealed. It applies to reading, editing, deleting (someone else's post the caller
+  cannot read is `BLOG_POST_NOT_FOUND`, not a refusal that would show it exists), listing and writing
+  comments, editing a comment and liking; unliking, deleting one's own post and deleting one's own
+  comment are allowed in every status (an unlike of a post the caller cannot read reports a like count
+  of 0). One package-private collaborator, `BlogReadRule`, answers the question for every service.
 - **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
-  `user`'s - used for filtering. Attaching a specific exam or deck is not in this
-  version.
+  `user`'s - used for filtering (a filter that is given must match; tags combine with AND).
+  Attaching a specific exam or deck is not in this version.
 - **Entities with rules:** `BlogPost` - only the author edits or deletes it; a hidden
-  or removed post cannot be edited by its author or commented on. `BlogComment` -
-  the same author rule. `BlogReport` - one per reporter and target, resolved once.
-  Likes and tags are plain rows.
+  or removed post cannot be edited by its author or commented on; title 1-200 characters,
+  body 1-20 000, at most 8 tags. `BlogComment` - the same author rule, 1-2000 characters, no
+  edit once hidden or removed. `BlogTag` is an immutable embeddable checked against the
+  kind's own enum. `BlogPost` and `BlogComment` also own the moves of moderation: hide (only
+  from published or visible), restore (only from hidden - a removed one stays removed) and remove
+  (from anything but removed), anything else `BLOG_MODERATION_INVALID_TRANSITION`; a post's move
+  sets `updated_at` and never `edited_at`, which is the author's. `BlogReport` - one open report
+  per reporter and target, closed once (resolved or dismissed); after it is closed the same
+  reader may report that content again, because an edit can make dismissed content a problem
+  later; the note is at most 500 characters. `BlogModerationAction` - recorded, never changed;
+  the reason is 1-500 characters. Likes and tags are plain rows; images are plain rows whose
+  `post_id` is written only by a conditional update.
 - **Blocks:** posts and comments by anyone blocked either way are left out of a
-  learner's lists, and neither side can comment on the other's posts, via
-  `FriendshipReader`.
+  learner's lists, and neither side can comment on, like or open the other's posts, via
+  `FriendshipReader`. Blocking is learner-only, so for Staff and Admin the blocked set is
+  normally empty. A block never hides a person's own posts from their own list. A post whose
+  author is erased (null) is nobody's to hide and stays in every list, whatever blocks the viewer has.
 - **Concurrency:** `@Version` on `blog_posts`, so an author's edit cannot silently
-  undo a moderator's hide. Like primary key `(post_id, user_id)`. Like and comment
-  counts are counted for each page of posts, not stored: erasure removes likes by
-  cascade, and a stored counter would drift. Unique
-  `(reporter_id, target_type, target_id)`.
-- **Images:** presigned PUT through shared storage; keys recorded in
-  `blog_post_images` so deleting a post can remove them.
+  undo a moderator's hide: the editor sends back the version it opened and a post that has
+  changed since is refused as `BLOG_POST_STALE`; Hibernate's check on the write turns two saves that
+  both passed it into `CONCURRENT_UPDATE`. A moderator's action locks the post or comment row
+  (`select ... for update`) and reads it fresh, so two moderators acting at once are serialised
+  and the second is told the content is already hidden. A comment has no version and Hibernate
+  writes every column of a row it updates, so the author's side of a comment takes the same lock:
+  an edit and a delete read the comment through `findByIdForUpdate` as their first and only read.
+  An edit after a hide reads `HIDDEN` and is refused (`BLOG_COMMENT_NOT_EDITABLE`), a hide after
+  an edit hides the text as edited, and a delete waits for an action in progress and then removes
+  the row - an edit can never write `VISIBLE` back over a hide. A post is protected against an
+  author's edit by `@Version` and the moderator's lock together (a post changed since the editor
+  opened it is `BLOG_POST_STALE` or `CONCURRENT_UPDATE`); the author's delete reads it with the
+  lock too, so it waits for a hide in progress and removes the post as it then is, where the
+  version check alone would have failed it. Writing a comment or a like while a post is being hidden
+  is a benign race and is not serialised. Like primary key `(post_id, user_id)` with
+  an `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
+  not stored: erasure removes likes by cascade, and a stored counter would drift. Unique
+  `(reporter_id, target_type, target_id)` among open reports only (a partial unique index),
+  filed with `on conflict ... where status = 'OPEN' do nothing`, so reporting twice is one report.
+- **Images:** the Markdown refers to an image as `blog-image:<id>`, never by URL, so the
+  `blog` bucket stays private, a link that expires cannot break a saved post, and moving the
+  storage domain changes no data. The read API returns the body as written plus
+  `images: [{id, url}]` with presigned GETs (`app.storage.blog-image-url-ttl`, 3 hours) and the
+  page swaps each reference for its URL. An upload is a presigned PUT
+  (`POST /api/blog/images`, bound to the declared type - JPEG, PNG, WebP - and size - at most
+  5 MB - and valid 10 minutes) into `app.storage.blog-bucket`, keyed `posts/{uploaderId}/{imageId}.{ext}`;
+  the row is written with `post_id` null. At most 10 images per post. Saving a post names
+  its images in the text: each must exist, be the caller's and be unattached or already this
+  post's; the object's existence is checked with a HEAD outside any transaction; and the write
+  attaches them with a conditional update whose row count must equal the number it expected, so a
+  post is never saved pointing at an image it did not get (another post took it, or the sweep
+  removed it) - that rolls the write back. An image taken out of the text on edit is deleted
+  (row, then object after commit). Deleting a post removes its image rows by cascade but not their
+  objects, so every path that deletes a post reads the keys first and deletes the objects after
+  the commit. A cleanup job (`app.blog.cleanup-enabled`, hourly) removes images no post took
+  within a day, with their objects, by conditional delete.
+- **Excerpt:** the list reads the first 1200 characters of each body and `BlogMarkdown.excerpt`
+  makes a plain-text excerpt of at most 200 characters (the ellipsis counts) at a word boundary.
+  Text that ends inside an image or a link never reaches the excerpt, so no truncated
+  `blog-image:` fragment leaks.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
-  set to null); likes cascade; the erased user's reports are deleted.
-- **Talks to:** `friendship` via `FriendshipReader`; `user` via `UserDirectory`.
-- **Read path:** the post list - optional tag, author and sort filters with paging -
-  lives in `blog/query`, read-only; everything else is repository.
+  set to null) - confirmed by the product owner on 2026-11-16, the same choice as
+  chat; likes cascade; images stay with their post (an upload nobody used keeps a null
+  `uploader_id` and is swept after a day); the erased user's reports are deleted by cascade,
+  while the moderation history stays (an action then points at no report). `moderator_id` and
+  `resolved_by_user_id` are `on delete restrict`: Staff accounts are removed by an Admin and cannot
+  erase themselves (`AccountServiceImpl` refuses), so they never block a learner's erasure. The
+  privacy policy has to say so.
+- **Reports and moderation:** a reader reports a post they can read (published) or a visible
+  comment on one, with a reason and an optional note, at most 10 an hour; never their own, and
+  reporting again while their report is open returns that report (`200`, a new one is `201`).
+  The queue is grouped by content: a post reported by five people is one row, with the number of
+  open reports and their reasons, oldest first or most reported first. An action applies to the
+  content and closes every open report of it at once with one `update`: hide and remove resolve
+  them, dismiss dismisses them and leaves the content alone, restore leaves them. Every action
+  records the most recent open report it closed. A moderator never acts on content they wrote -
+  `BLOG_MODERATION_OWN_CONTENT`, checked before anything is locked or written, for all four
+  actions - and another moderator does. Content its author deleted after it was reported stays in
+  the queue as `DELETED` until someone dismisses it. The author of a hidden or removed post is
+  given the reason of the last hide or removal as `moderationNote` on the post (no one else
+  is: Staff read content through the admin routes, which show every status).
+- **Talks to:** `friendship` via `FriendshipReader` (the blocked set for a list, whether two
+  accounts are blocked for one post); `user` via `UserDirectory` (the caller's id) and
+  `PublicProfileReader` (name and picture for a whole page of authors in one call).
+- **Entry points:** `/api/blog` - `posts` (list, create, one, edit, delete), `posts/{id}/like`,
+  `posts/{id}/comments`, `comments/{id}`, `images`, `tags`, and the reports
+  `posts/{id}/reports` and `comments/{id}/reports`. `/api/admin/blog` (Staff and Admin, in
+  `AdminBlogModerationController`) - `queue`, `targets/{post|comment}/{id}` (the content in any
+  status with every report and the history), `targets/{post|comment}/{id}/actions` and `actions`
+  (what moderators did).
+- **Read path:** the post list - optional tag, title, author and sort filters with paging -
+  lives in `blog/query/BlogPostListQuery`, read-only, `JdbcClient`, every value bound and no empty
+  collection ever given to `in`; the moderation queue (open reports grouped by content, then the
+  start of each post and comment in one query each) lives in `blog/query/BlogModerationQueueQuery`
+  on the same terms; everything else is repository. The comment list is a repository
+  query that always passes at least one id to `not in`.
 - **Why:** posts, comments and moderation have their own lifecycle and reviewers;
   nothing here shares tables or vocabulary with the learning modules.
 - **Revisit if:** learners need search beyond tags and title, attaching learning
-  content, pre-moderation for new accounts, or saved posts.
+  content, pre-moderation for new accounts, or saved posts. Sorting by likes is slow - it
+  counts the likes of every matching post on each call: store a reconciled counter or a
+  statistics table. The comment count on a post card counts every visible comment whatever the
+  viewer has blocked, so a block can leave it a little high; make it per viewer only if that is
+  noticed.
 
 ## `shared` and `config`
 
@@ -704,7 +853,7 @@ These are technical packages, not business modules, and own no business tables.
 - `shared/storage` provides generic object-storage operations without business key
   conventions.
 - `shared/page` and `shared/logging` contain transport-level infrastructure.
-- `config` wires security, OpenAPI, and storage clients.
+- `config` wires security, OpenAPI, storage clients, and the chat WebSocket registration.
 
 Business enums, business DTOs, authorization decisions, and table writes do not
 belong in `shared`.
@@ -795,9 +944,15 @@ gone rather than kept: all three describe a state that no longer exists.
   committed the message. Before the backend runs two instances, chat needs Postgres
   `LISTEN/NOTIFY` (or equivalent) between them. `LISTEN` holds a dedicated connection,
   which the session-mode pooler allows and transaction mode does not.
-- **Notifications** for friend requests, new messages while offline and comments on
-  one's posts. No module owns notifications yet; decide when the first one is built.
-- **Account export** covers `friendship`; extend it when the planned `chat` and `blog` modules land.
-- **Blog erasure** keeping posts and comments as by a deleted user follows the choice
-  made for chat; confirm it with the product owner and the privacy policy before the
-  first migration.
+- **Chat socket sends run on shared threads.** A push runs on the request thread that
+  committed the change and a ping on Boot's single scheduler thread; a half-open socket
+  can block either for Tomcat's blocking-send timeout. Move push and ping to a dedicated
+  executor (or lower the timeout) before chat traffic grows.
+- **Notifications** for friend requests, new messages while offline, comments on
+  one's posts, and what moderators decided about a blog report or a post (the author finds
+  the reason on the post, the reporter is not told). No module owns notifications yet; decide
+  when the first one is built.
+- **Account export** covers `friendship`; `chat` and `blog` are not exported yet.
+- **Privacy policy text** for erasure: chat messages, their images, blog posts and
+  comments stay after an account is erased, shown as by a deleted user. Decided; the
+  policy page still has to state it.

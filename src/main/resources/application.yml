@@ -102,6 +102,17 @@ app:
     # Long enough to finish one upload, short enough that a leaked URL is worth little.
     speaking-upload-url-ttl: ${STORAGE_SPEAKING_UPLOAD_URL_TTL:PT15M}
     speaking-media-url-ttl: ${STORAGE_SPEAKING_MEDIA_URL_TTL:PT3H}
+    # Private: chat images are read only through short-lived presigned URLs handed to the two people in the chat.
+    chat-bucket: ${STORAGE_CHAT_BUCKET:chat}
+    # Long enough to finish one upload, short enough that a leaked URL is worth little.
+    chat-upload-url-ttl: ${STORAGE_CHAT_UPLOAD_URL_TTL:PT10M}
+    chat-image-url-ttl: ${STORAGE_CHAT_IMAGE_URL_TTL:PT1H}
+    # Private: blog images are read only through presigned URLs handed to signed-in readers of the post. The URL is
+    # fetched when the page is opened, so it only has to outlive reading one page, not the post's whole life.
+    blog-bucket: ${STORAGE_BLOG_BUCKET:blog}
+    # Long enough to finish one upload, short enough that a leaked URL is worth little.
+    blog-upload-url-ttl: ${STORAGE_BLOG_UPLOAD_URL_TTL:PT10M}
+    blog-image-url-ttl: ${STORAGE_BLOG_IMAGE_URL_TTL:PT3H}
 
     # Read side of the public bucket only - the URL a browser fetches, which is not the S3 endpoint the server signs
     # against. On Supabase the two differ in path shape, not just in host.
@@ -151,6 +162,24 @@ app:
 
   speech:
     locale: ${SPEECH_LOCALE:en-US}
+
+  chat:
+    # Removes images nobody sent and conversations nobody is left in.
+    cleanup-enabled: ${CHAT_CLEANUP_ENABLED:true}
+    cleanup-delay: ${CHAT_CLEANUP_DELAY:1h}
+    socket:
+      # A browser asks for a ticket and opens the socket straight away, so it only has to outlive one round trip.
+      ticket-ttl: ${CHAT_SOCKET_TICKET_TTL:PT30S}
+      # Below the idle timeout of the proxies between a browser and Render, so an open chat is never cut for silence.
+      ping-interval: ${CHAT_SOCKET_PING_INTERVAL:25s}
+      max-sessions-per-user: ${CHAT_SOCKET_MAX_SESSIONS:5}
+      # The only frame a client sends is a tiny typing signal.
+      max-text-message-bytes: 1024
+
+  blog:
+    # Removes images that were uploaded and never put in a saved post.
+    cleanup-enabled: ${BLOG_CLEANUP_ENABLED:true}
+    cleanup-delay: ${BLOG_CLEANUP_DELAY:1h}
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}
