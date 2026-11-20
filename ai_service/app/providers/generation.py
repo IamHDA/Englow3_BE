@@ -100,6 +100,15 @@ class GenerationProvider:
                 retryable=is_retryable_http_status(status),
                 retry_after_seconds=retry_after_seconds(exc.response.headers.get("retry-after")),
             ) from exc
+        except httpx.TimeoutException as exc:
+            # Caught before RequestError, which it is a kind of: a slow model is not an outage,
+            # and the cure differs (a lower reasoning effort or a longer timeout, not the network).
+            raise ProviderError(
+                code="AI_PROVIDER_TIMEOUT",
+                message="The generation model took longer than the timeout to answer",
+                status_code=502,
+                retryable=True,
+            ) from exc
         except httpx.RequestError as exc:
             raise ProviderError(
                 code="AI_PROVIDER_UNAVAILABLE",

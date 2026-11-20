@@ -247,3 +247,50 @@ def test_an_unknown_reasoning_effort_is_refused_at_startup():
 
     with pytest.raises(ValidationError):
         settings(generation_reasoning_effort="extreme")
+
+
+def test_a_model_slower_than_the_timeout_is_reported_as_a_timeout_not_an_outage():
+    import asyncio
+
+    import httpx
+    import pytest
+
+    from app.errors import ProviderError
+    from app.providers.generation import GenerationProvider
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("no answer in time", request=request)
+
+    async def call():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+            return await GenerationProvider(client, settings()).complete(
+                [{"role": "user", "content": "hi"}]
+            )
+
+    with pytest.raises(ProviderError) as raised:
+        asyncio.run(call())
+    assert raised.value.code == "AI_PROVIDER_TIMEOUT"
+    assert raised.value.retryable
+
+
+def test_an_unreachable_provider_is_still_reported_as_unavailable():
+    import asyncio
+
+    import httpx
+    import pytest
+
+    from app.errors import ProviderError
+    from app.providers.generation import GenerationProvider
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("no route", request=request)
+
+    async def call():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+            return await GenerationProvider(client, settings()).complete(
+                [{"role": "user", "content": "hi"}]
+            )
+
+    with pytest.raises(ProviderError) as raised:
+        asyncio.run(call())
+    assert raised.value.code == "AI_PROVIDER_UNAVAILABLE"

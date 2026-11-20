@@ -130,6 +130,9 @@ app:
     connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
     read-timeout: ${AI_READ_TIMEOUT:55s}
     speech-read-timeout: ${AI_SPEECH_READ_TIMEOUT:70s}
+    # Waiting for one content generation step. Longer than the AI service's own model timeout
+    # (AI_SERVICE_GENERATION_TIMEOUT_SECONDS) and shorter than the generation lane's run limit below.
+    generation-read-timeout: ${AI_GENERATION_READ_TIMEOUT:255s}
     daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
     # Spend cap for the whole platform per day (0 = off). Set it to what the provider plan can bear.
     platform-daily-request-limit: ${AI_PLATFORM_DAILY_REQUEST_LIMIT:0}
@@ -140,6 +143,9 @@ app:
       fixed-delay: ${AI_WORKER_FIXED_DELAY:2s}
       lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:3m}
       max-run: ${AI_WORKER_MAX_RUN:140s}
+      # The content generation lane only: a step is one long model call, nobody waits on it, and a
+      # tighter limit would cut off a reasoning model mid-passage. Grading and the tutor keep max-run.
+      generation-max-run: ${AI_WORKER_GENERATION_MAX_RUN:270s}
       reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:30s}
 
   tutor:

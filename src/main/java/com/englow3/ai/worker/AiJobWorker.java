@@ -25,6 +25,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.client.AiServiceReadiness;
 import com.englow3.ai.entity.AiJob;
+import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.service.AiJobWorkerQueue;
 import com.englow3.ai.service.AiJobQueued;
 
@@ -39,6 +40,8 @@ public class AiJobWorker implements AutoCloseable {
     private final Map<String, AiJobHandler> handlers;
     private final Duration lockTimeout;
     private final Duration maxRun;
+    /** Content generation's own run limit: one step is a single long model call nobody is waiting on. */
+    private final Duration generationMaxRun;
     private final AiServiceReadiness readiness;
     /** One thread per lane: tutor, grading, and content generation. */
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
@@ -54,17 +57,20 @@ public class AiJobWorker implements AutoCloseable {
     }
 
     public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers, Duration lockTimeout, Duration maxRun) {
-        this(queue, handlers, lockTimeout, maxRun, null);
+        this(queue, handlers, lockTimeout, maxRun, maxRun, null);
     }
 
     @Autowired
     public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers,
             @Value("${app.ai.worker.lock-timeout:3m}") Duration lockTimeout,
-            @Value("${app.ai.worker.max-run:140s}") Duration maxRun, AiServiceReadiness readiness) {
+            @Value("${app.ai.worker.max-run:140s}") Duration maxRun,
+            @Value("${app.ai.worker.generation-max-run:270s}") Duration generationMaxRun,
+            AiServiceReadiness readiness) {
         this.queue = queue;
         this.handlers = handlers.stream().collect(Collectors.toUnmodifiableMap(AiJobHandler::handles, h -> h));
         this.lockTimeout = lockTimeout;
         this.maxRun = maxRun;
+        this.generationMaxRun = generationMaxRun;
         this.readiness = readiness;
         heartbeat.scheduleWithFixedDelay(this::renew, 10, 10, TimeUnit.SECONDS);
     }
@@ -147,7 +153,7 @@ public class AiJobWorker implements AutoCloseable {
                 outcome = handler == null
                         ? AiJobHandler.Outcome.permanentFailure("AI_JOB_NO_HANDLER", "No handler registered")
                         : handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
-            if (Duration.ofNanos(System.nanoTime() - start).compareTo(maxRun) > 0) {
+            if (Duration.ofNanos(System.nanoTime() - start).compareTo(maxRunOf(job)) > 0) {
                 outcome = AiJobHandler.Outcome.transientFailure("AI_JOB_DEADLINE",
                         "Processing exceeded its time budget");
             }
@@ -174,7 +180,7 @@ public class AiJobWorker implements AutoCloseable {
 
     private void renew() {
         running.values().forEach(active -> {
-            if (Duration.ofNanos(System.nanoTime() - active.started()).compareTo(maxRun) >= 0)
+            if (Duration.ofNanos(System.nanoTime() - active.started()).compareTo(maxRunOf(active.job())) >= 0)
                 return;
             try {
                 queue.heartbeat(active.job().getId(), active.job().getStartedAt(), lockTimeout);
@@ -182,6 +188,10 @@ public class AiJobWorker implements AutoCloseable {
                 log.warn("AI heartbeat failed id={}", active.job().getId());
             }
         });
+    }
+
+    private Duration maxRunOf(AiJob job) {
+        return job.getJobType() == AiJobType.CONTENT_GENERATION ? generationMaxRun : maxRun;
     }
 
     @Scheduled(fixedDelayString = "${app.ai.worker.reconcile-delay:30s}")

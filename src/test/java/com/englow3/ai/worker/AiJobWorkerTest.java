@@ -69,7 +69,7 @@ class AiJobWorkerTest {
         var handler = mock(AiJobHandler.class);
         when(handler.handles()).thenReturn("TUTOR_REPLY");
         try (var worker = new AiJobWorker(queue, List.of(handler), Duration.ofMinutes(3), Duration.ofSeconds(140),
-                readiness)) {
+                Duration.ofSeconds(270), readiness)) {
             worker.drain();
         }
         verify(queue).defer(claimed.getId(), claimed.getStartedAt(), Duration.ofSeconds(10));
@@ -179,6 +179,18 @@ class AiJobWorkerTest {
         }
         verify(queue).record(eq(job.getId()), any(),
                 argThat(result -> !result.success() && result.errorCode().equals("AI_JOB_DEADLINE")), any());
+    }
+
+    @Test
+    void aGenerationStepHasItsOwnLongerRunLimit() {
+        AiJob step = job(AiJobType.CONTENT_GENERATION);
+        when(queue.claimBatch(eq(1), eq(List.of("CONTENT_GENERATION")), any())).thenReturn(List.of(step));
+        // No time at all for grading and the tutor; the generation lane keeps its own budget.
+        try (var worker = new AiJobWorker(queue, List.of(handler("CONTENT_GENERATION", () -> {
+        })), Duration.ofMinutes(3), Duration.ZERO, Duration.ofSeconds(270), null)) {
+            worker.drain();
+        }
+        verify(queue).record(eq(step.getId()), any(), argThat(AiJobHandler.Outcome::success), any());
     }
 
     private AiJobWorker worker(List<AiJobHandler> handlers) {
