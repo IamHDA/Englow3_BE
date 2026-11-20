@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import com.englow3.exam.entity.CertificateType;
 import com.englow3.exam.entity.Exam;
 import com.englow3.exam.entity.ExamStatus;
 import com.englow3.exam.entity.ExamType;
@@ -100,6 +101,24 @@ class ExamCatalogueOrderIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(ascending).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
         assertThat(descending).containsExactly(9, 10, 11, 12, 5, 6, 7, 8, 1, 2, 3, 4);
+    }
+
+    /**
+     * An IELTS paper is the Listening + Reading of a full test, never a paper of its own, so the catalogue leaves it
+     * out - asked for IELTS by name or not, and whichever order is asked for.
+     */
+    @Test
+    void leavesIeltsPapersOutOfTheCatalogue() {
+        jdbc.sql("update exams set certificate_type = 'IELTS', certificate_variant = 'ACADEMIC' where title = :title")
+                .param("title", SERIES + 1).update();
+        jdbc.sql("update exams set certificate_type = 'TOEIC', certificate_variant = 'LR' where title = :title")
+                .param("title", SERIES + 2).update();
+        UUID learner = new LearnerFixture(jdbc).learner();
+
+        assertThat(numbers(page(ExamCatalogueSort.NEWEST, 0, 20))).doesNotContain(1).contains(2, 3);
+        assertThat(bestScoreOrder(learner, 0, 20)).doesNotContain(1).contains(2, 3);
+        assertThat(exams.searchCatalogue(ExamStatus.PUBLISHED, ExamType.MOCK, CertificateType.IELTS, null, null,
+                SERIES.trim(), StablePage.of(PageRequest.of(0, 20, ExamCatalogueSort.NEWEST.toSort())))).isEmpty();
     }
 
     private UUID idOf(int number) {

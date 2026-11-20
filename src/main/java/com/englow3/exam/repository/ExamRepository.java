@@ -33,6 +33,9 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
      * it a null title reaches Postgres as an untyped parameter, it infers {@code bytea}, and the statement dies on
      * "function lower(bytea) does not exist" - which is every unfiltered call to this list. The enum parameters need no
      * cast: each is compared to a typed column in the same expression, so Postgres infers them from that.
+     * <p>
+     * An IELTS paper is never listed on its own: it is the Listening + Reading of a full test and reached through one
+     * (D-IELTS-11). The same holds for {@link #searchCatalogueByBestScore}.
      */
     @Query("""
             select e from Exam e
@@ -48,6 +51,7 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             where (:status is null or e.status = :status)
               and (:examType is null or e.examType = :examType)
               and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
+              and (e.certificateType is null or e.certificateType <> com.englow3.exam.entity.CertificateType.IELTS)
               and (:certificateType is null or e.certificateType = :certificateType)
               and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
               and (:targetLevel is null or e.targetLevel = :targetLevel)
@@ -68,6 +72,7 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
             where (:status is null or e.status = :status)
               and (:examType is null or e.examType = :examType)
               and e.examType <> com.englow3.exam.entity.ExamType.LEVEL_CHECK
+              and (e.certificateType is null or e.certificateType <> com.englow3.exam.entity.CertificateType.IELTS)
               and (:certificateType is null or e.certificateType = :certificateType)
               and (:certificateVariant is null or e.certificateVariant = :certificateVariant)
               and (:targetLevel is null or e.targetLevel = :targetLevel)
