@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
@@ -69,7 +70,7 @@ class AiJobWorkerTest {
         var handler = mock(AiJobHandler.class);
         when(handler.handles()).thenReturn("TUTOR_REPLY");
         try (var worker = new AiJobWorker(queue, List.of(handler), Duration.ofMinutes(3), Duration.ofSeconds(140),
-                Duration.ofSeconds(270), readiness)) {
+                Duration.ofSeconds(270), Duration.ofMinutes(30), readiness)) {
             worker.drain();
         }
         verify(queue).defer(claimed.getId(), claimed.getStartedAt(), Duration.ofSeconds(10));
@@ -187,10 +188,31 @@ class AiJobWorkerTest {
         when(queue.claimBatch(eq(1), eq(List.of("CONTENT_GENERATION")), any())).thenReturn(List.of(step));
         // No time at all for grading and the tutor; the generation lane keeps its own budget.
         try (var worker = new AiJobWorker(queue, List.of(handler("CONTENT_GENERATION", () -> {
-        })), Duration.ofMinutes(3), Duration.ZERO, Duration.ofSeconds(270), null)) {
+        })), Duration.ofMinutes(3), Duration.ZERO, Duration.ofSeconds(270), Duration.ofMinutes(30), null)) {
             worker.drain();
         }
         verify(queue).record(eq(step.getId()), any(), argThat(AiJobHandler.Outcome::success), any());
+    }
+
+    @Test
+    void aGenerationStepQueuedTwentyMinutesAgoStillRunsWhereAGradeWouldExpire() {
+        Instant twentyMinutesAgo = Instant.now().minus(Duration.ofMinutes(20));
+        AiJob step = job(AiJobType.CONTENT_GENERATION);
+        AiJob grade = job(AiJobType.PRODUCTIVE_ASSESSMENT);
+        ReflectionTestUtils.setField(step, "createdAt", twentyMinutesAgo);
+        ReflectionTestUtils.setField(grade, "createdAt", twentyMinutesAgo);
+        when(queue.claimBatch(eq(1), eq(List.of("CONTENT_GENERATION")), any())).thenReturn(List.of(step));
+        when(queue.claimBatch(eq(1), eq(
+                List.of("PRODUCTIVE_ASSESSMENT", "SPEECH_ASSESSMENT", "ROADMAP_GENERATION", "TRANSLATION_ASSESSMENT")),
+                any())).thenReturn(List.of(grade));
+        try (var worker = new AiJobWorker(queue, List.of(handler("CONTENT_GENERATION", () -> {
+        }), handler("PRODUCTIVE_ASSESSMENT", () -> {
+        })), Duration.ofMinutes(3), Duration.ofSeconds(140), Duration.ofSeconds(270), Duration.ofMinutes(30), null)) {
+            worker.drain();
+        }
+        verify(queue).record(eq(step.getId()), any(), argThat(AiJobHandler.Outcome::success), any());
+        verify(queue).record(eq(grade.getId()), any(),
+                argThat(result -> !result.success() && result.errorCode().equals("AI_JOB_EXPIRED")), any());
     }
 
     private AiJobWorker worker(List<AiJobHandler> handlers) {

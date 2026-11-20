@@ -36,12 +36,19 @@ import jakarta.annotation.PreDestroy;
 @ConditionalOnProperty(name = { "app.ai.enabled", "app.ai.worker.enabled" }, havingValue = "true")
 public class AiJobWorker implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AiJobWorker.class);
+    /** A job that cannot start an attempt this long after it was queued is dropped: its learner has moved on. */
+    private static final Duration EXPIRY = Duration.ofMinutes(15);
     private final AiJobWorkerQueue queue;
     private final Map<String, AiJobHandler> handlers;
     private final Duration lockTimeout;
     private final Duration maxRun;
     /** Content generation's own run limit: one step is a single long model call nobody is waiting on. */
     private final Duration generationMaxRun;
+    /**
+     * Content generation's own expiry. Four attempts that each run to the timeout take ~18 minutes, and its lane is
+     * shared by every author's requests; nobody is waiting on the screen, so a late step is still worth running.
+     */
+    private final Duration generationExpiry;
     private final AiServiceReadiness readiness;
     /** One thread per lane: tutor, grading, and content generation. */
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
@@ -57,7 +64,7 @@ public class AiJobWorker implements AutoCloseable {
     }
 
     public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers, Duration lockTimeout, Duration maxRun) {
-        this(queue, handlers, lockTimeout, maxRun, maxRun, null);
+        this(queue, handlers, lockTimeout, maxRun, maxRun, EXPIRY, null);
     }
 
     @Autowired
@@ -65,12 +72,13 @@ public class AiJobWorker implements AutoCloseable {
             @Value("${app.ai.worker.lock-timeout:3m}") Duration lockTimeout,
             @Value("${app.ai.worker.max-run:140s}") Duration maxRun,
             @Value("${app.ai.worker.generation-max-run:270s}") Duration generationMaxRun,
-            AiServiceReadiness readiness) {
+            @Value("${app.ai.worker.generation-expiry:30m}") Duration generationExpiry, AiServiceReadiness readiness) {
         this.queue = queue;
         this.handlers = handlers.stream().collect(Collectors.toUnmodifiableMap(AiJobHandler::handles, h -> h));
         this.lockTimeout = lockTimeout;
         this.maxRun = maxRun;
         this.generationMaxRun = generationMaxRun;
+        this.generationExpiry = generationExpiry;
         this.readiness = readiness;
         heartbeat.scheduleWithFixedDelay(this::renew, 10, 10, TimeUnit.SECONDS);
     }
@@ -142,8 +150,8 @@ public class AiJobWorker implements AutoCloseable {
         AiJobHandler handler = handlers.get(job.getJobType().name());
         AiJobHandler.Outcome outcome;
         try {
-            if (job.getCreatedAt() != null && Duration.between(job.getCreatedAt(), java.time.Instant.now())
-                    .compareTo(Duration.ofMinutes(15)) > 0) {
+            if (job.getCreatedAt() != null
+                    && Duration.between(job.getCreatedAt(), java.time.Instant.now()).compareTo(expiryOf(job)) > 0) {
                 outcome = AiJobHandler.Outcome.permanentFailure("AI_JOB_EXPIRED",
                         "Processing could not start within its time budget");
             } else if (readiness != null && !readiness.isLive()) {
@@ -192,6 +200,10 @@ public class AiJobWorker implements AutoCloseable {
 
     private Duration maxRunOf(AiJob job) {
         return job.getJobType() == AiJobType.CONTENT_GENERATION ? generationMaxRun : maxRun;
+    }
+
+    private Duration expiryOf(AiJob job) {
+        return job.getJobType() == AiJobType.CONTENT_GENERATION ? generationExpiry : EXPIRY;
     }
 
     @Scheduled(fixedDelayString = "${app.ai.worker.reconcile-delay:30s}")

@@ -146,6 +146,9 @@ app:
       # The content generation lane only: a step is one long model call, nobody waits on it, and a
       # tighter limit would cut off a reasoning model mid-passage. Grading and the tutor keep max-run.
       generation-max-run: ${AI_WORKER_GENERATION_MAX_RUN:270s}
+      # How long after it is queued a generation step may still start an attempt (other jobs: 15 minutes). Four
+      # attempts at the run limit take ~18 minutes, and every author's requests share the one lane.
+      generation-expiry: ${AI_WORKER_GENERATION_EXPIRY:30m}
       reconcile-delay: ${AI_WORKER_RECONCILE_DELAY:30s}
 
   tutor:
