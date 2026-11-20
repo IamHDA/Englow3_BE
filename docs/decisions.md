@@ -410,6 +410,28 @@ cho AI.
 **Đổi ý thì:** chuyển phần gom sang module khác thì phải chuyển 2 bảng và các listener.
 Các lượt làm bài trong `exam` và `assessment` không ảnh hưởng.
 
+### D-IELTS-11 — Thư viện đề IELTS là thư viện full test
+
+**Chốt:**
+- IELTS không có đề L+R lẻ. Đề L+R chỉ là phần Listening + Reading của một full test,
+  nên danh mục đề của người học (`GET /api/exams`, cả hai cách sắp xếp) **không trả đề
+  IELTS**. Admin vẫn thấy đủ trong danh sách soạn đề.
+- Tab IELTS Academic / General trên thư viện liệt kê full test theo `certificateVariant`.
+  Không còn nút "IELTS Full Test" riêng.
+- Trang một full test có hai chế độ, giống đề TOEIC:
+  - **Luyện tập:** chọn part Listening/Reading của đề L+R (lượt `PRACTICE`, không
+    tính tiến độ), hoặc làm riêng từng task Writing/Speaking. Không ra band tổng.
+  - **Thi thật:** mở lượt full test, giữ nguyên quy tắc 7 ngày của D-IELTS-10.
+- Mở thẳng một đề IELTS (không qua lượt full test) chỉ cho luyện tập. Phần thi thật
+  dẫn về full test.
+
+**Lý do:** người học IELTS nghĩ theo bài thi 4 kỹ năng. Để đề L+R và full test ở hai
+chỗ thì họ phải tự hiểu hai thứ khác nhau ra sao, mà đề L+R làm riêng cũng không cho
+band tổng (D-IELTS-6).
+
+**Còn hở:** backend vẫn nhận lượt `FULL` trên đề IELTS mở ngoài lượt full test. Giao diện
+không còn đường dẫn tới đó; chặn ở entity khi cần.
+
 ---
 
 ## Còn treo — chưa quyết được vì phụ thuộc môi trường
