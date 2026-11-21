@@ -25,6 +25,7 @@ import base64
 import json
 import mimetypes
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -220,6 +221,26 @@ def speaking_answers(client, model, part: dict, band: str) -> dict:
     return {"answers": [{"question": q["text"], "answer": by_number[i]} for i, q in enumerate(part["questions"], 1)]}
 
 
+OVERLOAD_WAITS = (30, 90, 180)  # seconds; on top of the SDK's own quick retries
+
+
+def generate(make, client, model, item, band):
+    """Call the model, waiting minutes rather than seconds when the provider is overloaded.
+
+    A 503 ("model overloaded") or a dropped connection usually clears within a few minutes, which is
+    longer than the SDK's built-in backoff covers. Anything else is raised at once.
+    """
+    for wait in OVERLOAD_WAITS + (None,):
+        try:
+            return make(client, model, item, band)
+        except (openai.InternalServerError, openai.APIConnectionError) as e:
+            if wait is None:
+                raise
+            status = getattr(e, "status_code", None) or "connection error"
+            print(f"  provider unavailable ({status}); waiting {wait}s before trying again", file=sys.stderr, flush=True)
+            time.sleep(wait)
+
+
 def jobs(collection: dict, skills: set[str], bands: list[str], rubrics: bool):
     """Yield (key, callable) for every answer this collection should have."""
     for test in collection["tests"]:
@@ -273,7 +294,7 @@ def main() -> int:
                 print(f"Reached --limit {args.limit}; stopping.")
                 return report(generated, skipped, failures, stopped_early=True)
             try:
-                answer = make(client, args.model, item, band)
+                answer = generate(make, client, args.model, item, band)
             except openai.RateLimitError as e:
                 # Still refused after the SDK's retries: a daily quota (free tiers have one). Every later
                 # request would fail the same way, and a re-run picks up where this one stopped.
