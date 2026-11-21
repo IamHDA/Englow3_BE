@@ -4,7 +4,8 @@
     npm install && pip install -r requirements.txt        (once; ffmpeg must be on PATH)
 
     export OPENAI_API_KEY=...        # optional: without it, or without --model, the AI step is skipped
-    export ENGLOW_TOKEN=...          # an ADMIN access token when --publish is used
+    export SUPABASE_URL=... SUPABASE_PUBLISHABLE_KEY=... ENGLOW_EMAIL=... ENGLOW_PASSWORD=...
+                                     # an ADMIN account when --publish is used (see supabase_auth.py)
     python run_all.py --base-url https://api.example.com --model <openai model> --publish [--match 2026] [--limit 2]
 
 Everything lands under --work (default ./data): scrape/, answers/, sets/. Each step skips what it has
@@ -42,9 +43,15 @@ def main() -> int:
     if not (HERE / "node_modules" / "jsdom").is_dir():
         print(f"Run `npm install` in {HERE} first.", file=sys.stderr)
         return 2
-    if args.base_url and not os.environ.get("ENGLOW_TOKEN"):
-        print("Set ENGLOW_TOKEN, or leave out --base-url to stop after building the sets.", file=sys.stderr)
-        return 2
+    if args.base_url:
+        sys.path.insert(0, str(HERE))
+        from supabase_auth import Auth, AuthError
+
+        try:
+            Auth()  # checks the variables are there; load_sets.py signs in itself
+        except AuthError as e:
+            print(f"{e}\nOr leave out --base-url to stop after building the sets.", file=sys.stderr)
+            return 2
 
     scrape, answers, sets = args.work / "scrape", args.work / "answers", args.work / "sets"
     py = [sys.executable]

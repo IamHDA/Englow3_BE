@@ -57,14 +57,34 @@ pip install -r requirements.txt
 
 ### Lấy thông tin đăng nhập
 
-**`ENGLOW_TOKEN`**: access token Supabase của tài khoản Englow3.
+Backend nhận **access token của một người dùng đã đăng nhập Supabase**: một JWT, trong đó
+`app_metadata.role` cho biết vai trò. Đây không phải publishable key (anon key) hay
+service_role key của project.
+
+Không lấy token này từ trình duyệt được: web app giữ nó trong cookie `httpOnly` và gọi backend
+từ phía server, nên tab Network không có header `Authorization`. Thay vào đó, các script tự
+đăng nhập bằng email và mật khẩu, và tự lấy token mới khi token cũ hết hạn (mặc định sau 1 giờ),
+nên chạy lâu cũng không bị gián đoạn.
+
+| Biến | Lấy ở đâu |
+|---|---|
+| `SUPABASE_URL` | Giá trị `NEXT_PUBLIC_SUPABASE_URL` trong `apps/web/.env.local` của `Englow3_FE` |
+| `SUPABASE_PUBLISHABLE_KEY` | Giá trị `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` trong cùng file |
+| `ENGLOW_EMAIL`, `ENGLOW_PASSWORD` | Tài khoản Englow3 đăng nhập bằng email và mật khẩu |
 
 - Chỉ nạp và gửi duyệt: tài khoản STAFF hoặc ADMIN.
-- Có `--publish`: bắt buộc ADMIN (STAFF không được duyệt).
-- Cách lấy: đăng nhập trang admin, mở DevTools (F12) > tab Network, chọn một request tới
-  backend, copy phần sau `Bearer ` trong header `Authorization`.
-- Token hết hạn sau một thời gian. Nếu script báo `401` thì lấy token mới và chạy lại cùng
-  lệnh; phần đã xong không bị làm lại.
+- Có `--publish`: bắt buộc ADMIN.
+- Tài khoản chỉ đăng nhập bằng Google thì không dùng được; tạo mật khẩu cho nó hoặc dùng tài
+  khoản khác.
+
+Kiểm tra đăng nhập trước khi chạy (in ra token và vai trò):
+
+```bash
+python supabase_auth.py
+```
+
+Nếu đã có sẵn token, đặt `ENGLOW_TOKEN` thay cho bốn biến trên. Token đó được dùng nguyên, không
+tự gia hạn được.
 
 **`OPENAI_API_KEY`**: chỉ cần cho bước 2. Model chọn qua `--model` phải đọc được ảnh, vì
 Writing Task 1 gửi kèm biểu đồ.
@@ -72,14 +92,20 @@ Writing Task 1 gửi kèm biểu đồ.
 Đặt biến môi trường. PowerShell:
 
 ```powershell
-$env:ENGLOW_TOKEN = "..."
+$env:SUPABASE_URL = "https://<project-ref>.supabase.co"
+$env:SUPABASE_PUBLISHABLE_KEY = "..."
+$env:ENGLOW_EMAIL = "..."
+$env:ENGLOW_PASSWORD = "..."
 $env:OPENAI_API_KEY = "..."
 ```
 
 bash / zsh:
 
 ```bash
-export ENGLOW_TOKEN=...
+export SUPABASE_URL=https://<project-ref>.supabase.co
+export SUPABASE_PUBLISHABLE_KEY=...
+export ENGLOW_EMAIL=...
+export ENGLOW_PASSWORD=...
 export OPENAI_API_KEY=...
 ```
 
@@ -128,7 +154,7 @@ vẫn chạy tiếp) hoặc `DID NOT RUN`. Chi tiết của từng đề nằm t
 Chạy lại đúng lệnh cũ là an toàn: mỗi bước bỏ qua phần đã làm, không tạo đề, task hay full
 test trùng. Dùng khi:
 
-- lần trước lỗi giữa chừng (mạng, token hết hạn);
+- lần trước lỗi giữa chừng (mạng, backend tạm lỗi);
 - trang nguồn có collection mới;
 - lần đầu chạy không `--publish`, giờ muốn publish.
 
@@ -230,7 +256,7 @@ Bỏ `--only` để nạp tất cả. Đề và task được gửi duyệt, ch�
 
 Hoặc vào trang admin duyệt đề, duyệt 5 task, rồi tạo full test ở `/admin/full-tests`.
 
-Hoặc để script làm tự động (token ADMIN):
+Hoặc để script làm tự động (tài khoản ADMIN):
 
 ```bash
 python load_sets.py --base-url https://api.example.com --sets data/sets --publish
@@ -248,8 +274,12 @@ phần nào.
 |---|---|
 | `Not on PATH: ffmpeg` | Cài ffmpeg (mục 0), mở terminal mới |
 | `Run npm install ... first` | Chạy `npm install` trong thư mục này |
-| `401` / `The token was refused` | Token hết hạn hoặc sai: lấy token mới, chạy lại |
-| `403` khi `--publish` | Token là STAFF, cần ADMIN |
+| `Set ENGLOW_TOKEN, or SUPABASE_URL, ...` | Chưa đặt biến đăng nhập (mục 0) |
+| `Supabase sign-in failed with 400` | Sai email hoặc mật khẩu, hoặc tài khoản không có mật khẩu |
+| `Supabase sign-in failed with 401` | `SUPABASE_PUBLISHABLE_KEY` sai |
+| `The account's role is STAFF; this needs ADMIN` | Dùng tài khoản ADMIN khi có `--publish` |
+| `The account's role is not set` | Tài khoản chưa có vai trò trong `app_metadata`; nếu vừa được cấp quyền thì chạy lại để lấy token mới |
+| `The account or token was refused` | Backend từ chối cả token mới; kiểm tra backend và project Supabase có khớp nhau |
 | `No collections found on the library page` | Trang nguồn đổi giao diện; parser trong `extension/parser.js` cần sửa |
 | `Writing Task 1: could not fetch its image` | Không tải được biểu đồ; chạy lại bước 3 sau, set này không được publish |
 | `the source has no mp3 link (YouTube only)` | Đề chỉ có audio YouTube; tự tải, đặt vào `audio/source.mp3` của set, chạy lại bước 4 |
