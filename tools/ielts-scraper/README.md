@@ -52,8 +52,12 @@ npm install
 ```
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+Dùng `python -m pip` (không phải `pip` trơn) để thư viện được cài vào đúng bản Python dùng để
+chạy script. Máy có nhiều bản Python thì `pip` có thể cài sang bản khác, và script sẽ báo
+`No module named 'openai'` hoặc `No module named 'PIL'`.
 
 ### Lấy thông tin đăng nhập
 
@@ -139,14 +143,14 @@ Dùng OpenAI thì bỏ dòng `OPENAI_BASE_URL`.
 Thử trước với một collection:
 
 ```bash
-python run_all.py --base-url https://api.example.com --model gemini-4-hydrogen --match 2026-january --limit 1
+python run_all.py --base-url http://localhost:8080 --model gemini-4-hydrogen --match 2026-january --limit 1
 ```
 
 Không có `--publish` nên đề và task chỉ ở trạng thái chờ duyệt. Vào trang admin xem đề hiển
 thị đúng, nghe thử audio, rồi mới chạy toàn bộ:
 
 ```bash
-python run_all.py --base-url https://api.example.com --model gemini-4-hydrogen --publish
+python run_all.py --base-url http://localhost:8080 --model gemini-4-hydrogen --publish
 ```
 
 ### Tham số
@@ -265,7 +269,7 @@ backend không nhận file trên 12 MB.
 ### Bước 5. Nạp vào Englow3
 
 ```bash
-python load_sets.py --base-url https://api.example.com --sets data/sets --only <tên thư mục set>
+python load_sets.py --base-url http://localhost:8080 --sets data/sets --only <tên thư mục set>
 ```
 
 Bỏ `--only` để nạp tất cả. Đề và task được gửi duyệt, chưa publish.
@@ -282,7 +286,7 @@ Hoặc vào trang admin duyệt đề, duyệt 5 task, rồi tạo full test ở
 Hoặc để script làm tự động (tài khoản ADMIN):
 
 ```bash
-python load_sets.py --base-url https://api.example.com --sets data/sets --publish
+python load_sets.py --base-url http://localhost:8080 --sets data/sets --publish
 ```
 
 Script duyệt đề, duyệt 5 task, tạo full test, gửi duyệt và duyệt full test. Đề thiếu một
@@ -295,6 +299,8 @@ phần nào.
 
 | Thông báo | Cách xử lý |
 |---|---|
+| `Missing Python packages` / `No module named 'openai'` / `No module named 'PIL'` | Chạy đúng lệnh cài mà script in ra (`python -m pip install -r requirements.txt`) |
+| `Cannot reach the backend` / `getaddrinfo failed` | `--base-url` sai hoặc backend chưa chạy. Backend chạy local thường là `http://localhost:8080` |
 | `Not on PATH: ffmpeg` | Cài ffmpeg (mục 0), mở terminal mới |
 | `Run npm install ... first` | Chạy `npm install` trong thư mục này |
 | `Set ENGLOW_TOKEN, or SUPABASE_URL, ...` | Chưa đặt biến đăng nhập (mục 0) |

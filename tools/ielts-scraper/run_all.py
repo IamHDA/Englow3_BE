@@ -18,10 +18,13 @@ failures, and each set's source.json says what happened to it.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -44,7 +47,26 @@ def main() -> int:
     if not (HERE / "node_modules" / "jsdom").is_dir():
         print(f"Run `npm install` in {HERE} first.", file=sys.stderr)
         return 2
+    # The steps run with this same interpreter, so the packages must be installed for it.
+    absent = [name for module, name in (("PIL", "pillow"), ("openai", "openai"))
+              if importlib.util.find_spec(module) is None and (module != "openai" or args.model)]
+    if absent:
+        print(f"Missing Python packages for {sys.executable}: {', '.join(absent)}\n"
+              f"Install them with:  \"{sys.executable}\" -m pip install -r \"{HERE / 'requirements.txt'}\"",
+              file=sys.stderr)
+        return 2
     if args.base_url:
+        health = args.base_url.rstrip("/") + "/actuator/health"
+        try:
+            urllib.request.urlopen(health, timeout=15).close()
+        except urllib.error.HTTPError:
+            pass  # the server answered; whether health is public does not matter here
+        except (urllib.error.URLError, OSError) as e:
+            reason = getattr(e, "reason", e)
+            print(f"Cannot reach the backend at {args.base_url} ({reason}).\n"
+                  "Check --base-url: a local backend is usually http://localhost:8080, and it must be running.",
+                  file=sys.stderr)
+            return 2
         sys.path.insert(0, str(HERE))
         from supabase_auth import Auth, AuthError
 
