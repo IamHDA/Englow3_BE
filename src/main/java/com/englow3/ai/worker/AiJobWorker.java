@@ -25,6 +25,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.ai.client.AiServiceReadiness;
 import com.englow3.ai.entity.AiJob;
+import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.service.AiJobWorkerQueue;
 import com.englow3.ai.service.AiJobQueued;
 
@@ -35,10 +36,19 @@ import jakarta.annotation.PreDestroy;
 @ConditionalOnProperty(name = { "app.ai.enabled", "app.ai.worker.enabled" }, havingValue = "true")
 public class AiJobWorker implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AiJobWorker.class);
+    /** A job that cannot start an attempt this long after it was queued is dropped: its learner has moved on. */
+    private static final Duration EXPIRY = Duration.ofMinutes(15);
     private final AiJobWorkerQueue queue;
     private final Map<String, AiJobHandler> handlers;
     private final Duration lockTimeout;
     private final Duration maxRun;
+    /** Content generation's own run limit: one step is a single long model call nobody is waiting on. */
+    private final Duration generationMaxRun;
+    /**
+     * Content generation's own expiry. Four attempts that each run to the timeout take ~18 minutes, and its lane is
+     * shared by every author's requests; nobody is waiting on the screen, so a late step is still worth running.
+     */
+    private final Duration generationExpiry;
     private final AiServiceReadiness readiness;
     /** One thread per lane: tutor, grading, and content generation. */
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
@@ -54,17 +64,21 @@ public class AiJobWorker implements AutoCloseable {
     }
 
     public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers, Duration lockTimeout, Duration maxRun) {
-        this(queue, handlers, lockTimeout, maxRun, null);
+        this(queue, handlers, lockTimeout, maxRun, maxRun, EXPIRY, null);
     }
 
     @Autowired
     public AiJobWorker(AiJobWorkerQueue queue, List<AiJobHandler> handlers,
             @Value("${app.ai.worker.lock-timeout:3m}") Duration lockTimeout,
-            @Value("${app.ai.worker.max-run:140s}") Duration maxRun, AiServiceReadiness readiness) {
+            @Value("${app.ai.worker.max-run:140s}") Duration maxRun,
+            @Value("${app.ai.worker.generation-max-run:270s}") Duration generationMaxRun,
+            @Value("${app.ai.worker.generation-expiry:30m}") Duration generationExpiry, AiServiceReadiness readiness) {
         this.queue = queue;
         this.handlers = handlers.stream().collect(Collectors.toUnmodifiableMap(AiJobHandler::handles, h -> h));
         this.lockTimeout = lockTimeout;
         this.maxRun = maxRun;
+        this.generationMaxRun = generationMaxRun;
+        this.generationExpiry = generationExpiry;
         this.readiness = readiness;
         heartbeat.scheduleWithFixedDelay(this::renew, 10, 10, TimeUnit.SECONDS);
     }
@@ -136,8 +150,8 @@ public class AiJobWorker implements AutoCloseable {
         AiJobHandler handler = handlers.get(job.getJobType().name());
         AiJobHandler.Outcome outcome;
         try {
-            if (job.getCreatedAt() != null && Duration.between(job.getCreatedAt(), java.time.Instant.now())
-                    .compareTo(Duration.ofMinutes(15)) > 0) {
+            if (job.getCreatedAt() != null
+                    && Duration.between(job.getCreatedAt(), java.time.Instant.now()).compareTo(expiryOf(job)) > 0) {
                 outcome = AiJobHandler.Outcome.permanentFailure("AI_JOB_EXPIRED",
                         "Processing could not start within its time budget");
             } else if (readiness != null && !readiness.isLive()) {
@@ -147,7 +161,7 @@ public class AiJobWorker implements AutoCloseable {
                 outcome = handler == null
                         ? AiJobHandler.Outcome.permanentFailure("AI_JOB_NO_HANDLER", "No handler registered")
                         : handler.run(job.getId(), job.getTargetId(), job.getInputPayload());
-            if (Duration.ofNanos(System.nanoTime() - start).compareTo(maxRun) > 0) {
+            if (Duration.ofNanos(System.nanoTime() - start).compareTo(maxRunOf(job)) > 0) {
                 outcome = AiJobHandler.Outcome.transientFailure("AI_JOB_DEADLINE",
                         "Processing exceeded its time budget");
             }
@@ -174,7 +188,7 @@ public class AiJobWorker implements AutoCloseable {
 
     private void renew() {
         running.values().forEach(active -> {
-            if (Duration.ofNanos(System.nanoTime() - active.started()).compareTo(maxRun) >= 0)
+            if (Duration.ofNanos(System.nanoTime() - active.started()).compareTo(maxRunOf(active.job())) >= 0)
                 return;
             try {
                 queue.heartbeat(active.job().getId(), active.job().getStartedAt(), lockTimeout);
@@ -182,6 +196,14 @@ public class AiJobWorker implements AutoCloseable {
                 log.warn("AI heartbeat failed id={}", active.job().getId());
             }
         });
+    }
+
+    private Duration maxRunOf(AiJob job) {
+        return job.getJobType() == AiJobType.CONTENT_GENERATION ? generationMaxRun : maxRun;
+    }
+
+    private Duration expiryOf(AiJob job) {
+        return job.getJobType() == AiJobType.CONTENT_GENERATION ? generationExpiry : EXPIRY;
     }
 
     @Scheduled(fixedDelayString = "${app.ai.worker.reconcile-delay:30s}")

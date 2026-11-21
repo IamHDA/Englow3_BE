@@ -15,8 +15,9 @@ import org.springframework.web.client.RestClientException;
  * the generation module knows what is in them; this class knows only how to reach the adapter and whether a failure is
  * worth repeating.
  * <p>
- * The read timeout stays under the worker's run limit (140s by default), so a step that hangs fails as a timeout the
- * queue can retry instead of a job reclaimed as stalled.
+ * The read timeout (app.ai.generation-read-timeout) sits between the AI service's model timeout and the generation
+ * lane's run limit (app.ai.worker.generation-max-run): the AI service gives up first and says why, and a step that
+ * hangs anyway still fails as a timeout the queue can retry instead of a job reclaimed as stalled.
  */
 @Component
 public class GenerationClient {
@@ -29,7 +30,7 @@ public class GenerationClient {
     public GenerationClient(@Value("${app.ai.base-url}") String baseUrl,
             @Value("${app.ai.internal-api-key:}") String internalApiKey,
             @Value("${app.ai.connect-timeout:5s}") Duration connectTimeout,
-            @Value("${app.ai.generation-read-timeout:125s}") Duration readTimeout) {
+            @Value("${app.ai.generation-read-timeout:255s}") Duration readTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(connectTimeout);
         requestFactory.setReadTimeout(readTimeout);
