@@ -58,7 +58,8 @@ def main() -> int:
     if args.base_url:
         health = args.base_url.rstrip("/") + "/actuator/health"
         try:
-            urllib.request.urlopen(health, timeout=15).close()
+            print(f"Checking the backend at {args.base_url} (a sleeping Render service can take a minute to wake)...")
+            urllib.request.urlopen(health, timeout=120).close()
         except urllib.error.HTTPError:
             pass  # the server answered; whether health is public does not matter here
         except (urllib.error.URLError, OSError) as e:
