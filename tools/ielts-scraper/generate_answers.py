@@ -308,12 +308,12 @@ def main() -> int:
                 print(f"Stopping: the provider's rate limit is used up ({e}). Run the same command again "
                       "once the quota resets.", file=sys.stderr)
                 failures.append(f"{path.stem}|{key}: rate limit")
-                return report(generated, skipped, failures, stopped_early=True)
+                return report(generated, skipped, failures, stopped_early=True, cut_short=True)
             except (openai.AuthenticationError, openai.PermissionDeniedError, openai.NotFoundError) as e:
                 # Wrong key or model id: every later request would fail the same way.
                 print(f"Stopping: {e}", file=sys.stderr)
                 failures.append(f"{path.stem}|{key}: {e}")
-                return report(generated, skipped, failures, stopped_early=True)
+                return report(generated, skipped, failures, stopped_early=True, cut_short=True)
             except (openai.APIError, Unusable, OSError) as e:
                 failures.append(f"{path.stem}|{key}: {e}")
                 print(f"FAILED  {path.stem}|{key}: {e}", file=sys.stderr)
@@ -331,12 +331,15 @@ def main() -> int:
     return report(generated, skipped, failures, stopped_early=False)
 
 
-def report(generated: int, skipped: int, failures: list[str], stopped_early: bool) -> int:
+CUT_SHORT = 3  # exit code: stopped by the provider (quota, key or model id), so later items were never tried
+
+
+def report(generated: int, skipped: int, failures: list[str], stopped_early: bool, cut_short: bool = False) -> int:
     print(f"\n{generated} generated, {skipped} already present, {len(failures)} failed"
           + (" (stopped before the end)" if stopped_early else ""))
     for f in failures:
         print(f"  - {f}")
-    return 1 if failures else 0
+    return CUT_SHORT if cut_short else 1 if failures else 0
 
 
 if __name__ == "__main__":

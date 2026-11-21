@@ -173,8 +173,13 @@ data/
 `-- sets/      bước 3-6: mỗi đề một thư mục
 ```
 
-Cuối lần chạy có bảng tóm tắt từng bước: `ok`, `some failed` (một số đề lỗi, các đề khác
-vẫn chạy tiếp) hoặc `DID NOT RUN`. Chi tiết của từng đề nằm trong `data/sets/<đề>/source.json`.
+Cuối lần chạy có bảng tóm tắt từng bước: `ok`, `some failed or need a look` (một số đề lỗi
+hoặc cần người xem, các đề khác vẫn chạy tiếp) hoặc `DID NOT RUN`.
+
+Nếu bước 2 dừng giữa chừng vì hết quota (hoặc sai key, sai model), bước nạp không chạy: task
+đã gửi duyệt thì lần sau không được cập nhật, nên nạp lúc này sẽ để các task thiếu bài mẫu và
+`rubricNotes` mãi mãi. Chạy lại đúng lệnh khi quota reset. Muốn nạp ngay không cần AI thì bỏ
+`--model`. Chi tiết của từng đề nằm trong `data/sets/<đề>/source.json`.
 
 ### Chạy lại
 
@@ -276,8 +281,9 @@ Bỏ `--only` để nạp tất cả. Đề và task được gửi duyệt, ch�
 
 - Đề chưa có audio bị bỏ qua; thêm `--allow-silent` để vẫn nạp.
 - Id đã tạo được ghi vào `source.json` mục `load`, nên chạy lại không tạo trùng.
-- Nếu một đề tạo được bản nháp rồi lỗi, lần sau script không tạo lại mà in id bản nháp. Xoá
-  bản nháp đó trong trang admin, xoá mục `"load"` trong `source.json`, rồi chạy lại.
+- Nếu một đề tạo được bản nháp rồi lỗi, lần sau script không tạo đề mới mà làm tiếp bản nháp
+  đó (upload lại audio và ảnh, lưu nội dung, gửi duyệt). Nếu lại lỗi, thông báo lỗi in ra là
+  nguyên nhân thật cần sửa.
 
 ### Bước 6. Publish
 
@@ -312,7 +318,8 @@ phần nào.
 | `No collections found on the library page` | Trang nguồn đổi giao diện; parser trong `extension/parser.js` cần sửa |
 | `Writing Task 1: could not fetch its image` | Không tải được biểu đồ; chạy lại bước 3 sau, set này không được publish |
 | `the source has no mp3 link (YouTube only)` | Đề chỉ có audio YouTube; tự tải, đặt vào `audio/source.mp3` của set, chạy lại bước 4 |
-| `an earlier run left draft paper ... unfinished` | Xem bước 5 |
+| `Stopping: the provider's rate limit is used up (Error code: 429)` | Hết quota ngày của model AI. Chạy lại khi quota reset (Gemini: nửa đêm giờ Thái Bình Dương, tức 14:00 hoặc 15:00 giờ Việt Nam), hoặc đổi model hay nhà cung cấp có quota lớn hơn |
+| `paper ... from an earlier run is REJECTED` | Bản nháp đã bị xử lý trong trang admin; xem ở đó, rồi xoá mục `"load"` trong `source.json` để nạp lại từ đầu |
 
 ## Khi xong
 

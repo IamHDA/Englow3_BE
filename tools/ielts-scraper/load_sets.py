@@ -31,7 +31,9 @@ from supabase_auth import Auth, AuthError, role_in
 
 
 class ApiError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 def call(base: str, auth: Auth, method: str, path: str, body=None, content_type: str = "application/json"):
@@ -51,7 +53,8 @@ def call(base: str, auth: Auth, method: str, path: str, body=None, content_type:
             # 401 is an expired or invalid token: sign in again once and repeat the same request.
             if error.code == 401 and attempt == 1 and auth.renew():
                 continue
-            raise ApiError(f"{method} {path} failed with {error.code}: {error.read().decode()[:400]}") from error
+            raise ApiError(f"{method} {path} failed with {error.code}: {error.read().decode()[:400]}",
+                           error.code) from error
         except urllib.error.URLError as error:
             raise ApiError(f"{method} {path} failed: {error.reason}") from error
         except TimeoutError as error:
@@ -68,15 +71,48 @@ def upload(base: str, auth: Auth, path: str, file: Path, content_type: str):
     return call(base, auth, "POST", path, body, f"multipart/form-data; boundary={boundary}")
 
 
+def earlier_draft(base: str, auth: Auth, state: dict, save) -> dict | None:
+    """The draft paper an earlier run created and did not finish, to carry on with instead of making a second one.
+
+    Media uploads, the content save and the submit can all be repeated on a draft, so finishing it is the same
+    work as a fresh load. None when there is no earlier paper, or it no longer exists.
+    """
+    if not state.get("exam_id"):
+        return None
+    try:
+        exam = call(base, auth, "GET", f"/api/admin/exams/{state['exam_id']}/authoring")
+    except ApiError as e:
+        if e.status != 404:
+            raise
+        print(f"  draft paper {state['exam_id']} from an earlier run is gone; creating a new one", flush=True)
+        del state["exam_id"]
+        save()
+        return None
+    if exam["status"] in ("PENDING_REVIEW", "PUBLISHED"):
+        # The submit went through but its answer never arrived.
+        state["exam_submitted"] = True
+        save()
+        return exam
+    if exam["status"] != "DRAFT":
+        raise ApiError(f"paper {state['exam_id']} from an earlier run is {exam['status']}, so it cannot be finished here; "
+                       'deal with it in the admin site, then remove "load" from source.json to load the set afresh')
+    print(f"  finishing draft paper {state['exam_id']} left by an earlier run", flush=True)
+    return exam
+
+
 def load_paper(base: str, auth: Auth, folder: Path, state: dict, save) -> None:
     paper = json.loads((folder / "paper.json").read_text(encoding="utf-8"))
     sections = {s["sectionType"]: s for s in paper["content"]["sections"]}
     audio = [folder / "audio" / f"part-{n}.mp3" for n in range(1, len(sections["LISTENING"]["parts"]) + 1)]
     images = json.loads((folder / "images.json").read_text(encoding="utf-8")) if (folder / "images.json").is_file() else []
 
-    exam = call(base, auth, "POST", "/api/admin/exams/authoring", paper)
-    state["exam_id"] = exam["id"]  # recorded at once: a failure below leaves a draft that must not be duplicated
-    save()
+    exam = earlier_draft(base, auth, state, save)
+    if state.get("exam_submitted"):
+        return
+    if exam is None:
+        exam = call(base, auth, "POST", "/api/admin/exams/authoring", paper)
+        state["exam_id"] = exam["id"]  # recorded at once: a failure below leaves a draft that must not be duplicated
+        save()
     media = f"/api/admin/exams/{exam['id']}/media"
     if all(path.is_file() for path in audio):
         for part, path in zip(sections["LISTENING"]["parts"], audio):
@@ -188,11 +224,6 @@ def main() -> int:
         live = state.get("published", {}).get("full_test_approved")
         if state.get("exam_submitted") and tasks_done and (live or not args.publish):
             counts["already loaded"] += 1
-            continue
-        if state.get("exam_id") and not state.get("exam_submitted"):
-            counts["skipped"] += 1
-            print(f"skipped  {folder.name}: an earlier run left draft paper {state['exam_id']} unfinished. Delete it in "
-                  'the admin site, remove "load" from source.json, and run again.')
             continue
         if not (folder / "audio" / "part-1.mp3").is_file() and not args.allow_silent and not state.get("exam_submitted"):
             counts["skipped"] += 1

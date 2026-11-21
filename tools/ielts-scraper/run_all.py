@@ -99,15 +99,25 @@ def main() -> int:
         steps.append(("Load into Englow3", load + (["--publish"] if args.publish else [])))
 
     outcome = []
+    answers_cut_short = False
     for name, command in steps:
+        if name == "Load into Englow3" and answers_cut_short:
+            # Tasks are created with whatever answers exist, and a later run never updates a submitted task,
+            # so loading now would leave these sets without sample answers and rubric notes for good.
+            print(f"\n=== {name} ===\nNot loading: the AI step stopped before the end, so some tasks have no sample "
+                  "answer or rubric notes yet. Run the same command again once the provider's quota resets.")
+            break
         print(f"\n=== {name} ===", flush=True)
         code = subprocess.run(command).returncode
+        if name == "AI answers and rubric notes" and code == 3:  # generate_answers.CUT_SHORT
+            answers_cut_short, code = True, 1
         outcome.append((name, code))
         if code not in (0, 1):  # 1 means some items failed; anything else means the step could not run at all
             break
     print("\n=== Summary ===")
     for name, code in outcome:
-        print(f"{'ok' if code == 0 else 'some failed' if code == 1 else 'DID NOT RUN'} : {name}")
+        label = {0: "ok", 1: "some failed or need a look"}.get(code, "DID NOT RUN")
+        print(f"{label} : {name}")
     for name, _ in steps[len(outcome):]:
         print(f"not attempted : {name}")
     if not args.base_url:
