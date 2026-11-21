@@ -54,6 +54,10 @@ def call(base: str, auth: Auth, method: str, path: str, body=None, content_type:
             raise ApiError(f"{method} {path} failed with {error.code}: {error.read().decode()[:400]}") from error
         except urllib.error.URLError as error:
             raise ApiError(f"{method} {path} failed: {error.reason}") from error
+        except TimeoutError as error:
+            # The backend may have finished the request after we stopped waiting, e.g. created a paper.
+            raise ApiError(f"{method} {path} got no answer within 120s; the backend may still have done it, "
+                           "so check the admin site for a draft before running again") from error
 
 
 def upload(base: str, auth: Auth, path: str, file: Path, content_type: str):

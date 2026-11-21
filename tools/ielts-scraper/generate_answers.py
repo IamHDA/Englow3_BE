@@ -239,6 +239,13 @@ def generate(make, client, model, item, band):
             status = getattr(e, "status_code", None) or "connection error"
             print(f"  provider unavailable ({status}); waiting {wait}s before trying again", file=sys.stderr, flush=True)
             time.sleep(wait)
+        except openai.RateLimitError:
+            # Free tiers limit requests per minute as well as per day. A per-minute limit clears within
+            # a minute; one still refused after three full minutes is the daily quota, and main() stops.
+            if wait is None or wait == OVERLOAD_WAITS[-1]:
+                raise
+            print("  rate limited (429); waiting 65s for the per-minute limit to clear", file=sys.stderr, flush=True)
+            time.sleep(65)
 
 
 def jobs(collection: dict, skills: set[str], bands: list[str], rubrics: bool):
