@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,9 +26,6 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import com.englow3.blog.dto.command.ListPostsCommand;
 import com.englow3.blog.dto.command.SavePostCommand;
 import com.englow3.blog.dto.projection.PostListFilter;
-import com.englow3.blog.dto.projection.PostSummaryRow;
-import com.englow3.blog.dto.projection.PostTagRow;
-import com.englow3.blog.dto.result.BlogAuthorResult;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
 import com.englow3.blog.dto.result.BlogTagCatalogue;
@@ -108,6 +104,7 @@ public class BlogPostServiceImpl implements BlogPostService {
     private final BlogPostLikeRepository likeRepo;
     private final BlogModerationActionRepository actionRepo;
     private final BlogPostListQuery listQuery;
+    private final BlogPostSummaries summaries;
     private final ObjectStorageClient objectStorage;
     private final BlogImageLinks imageLinks;
     private final UserRateLimiter rateLimiter;
@@ -212,22 +209,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         PostListFilter filter = new PostListFilter(me, hidden, titleTerm, command.skill(), command.level(),
                 command.certificate(), command.authorId(), sort, size, offset);
 
-        List<PostSummaryRow> rows = listQuery.list(filter);
-        Set<UUID> postIds = rows.stream().map(PostSummaryRow::id).collect(Collectors.toSet());
-        Map<UUID, List<BlogTagResult>> tags = listQuery.tagsOf(postIds).stream()
-                .collect(Collectors.groupingBy(PostTagRow::postId,
-                        Collectors.mapping(row -> new BlogTagResult(row.kind(), row.value()), Collectors.toList())));
-        // One call for the whole page. A null author is a person who erased their account: no profile to look up.
-        Set<UUID> authorIds = rows.stream().map(PostSummaryRow::authorId).filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<UUID, PublicProfile> profiles = authorIds.isEmpty() ? Map.of() : publicProfileReader.profiles(authorIds);
-
-        List<BlogPostSummaryResult> content = rows.stream()
-                .map(row -> new BlogPostSummaryResult(row.id(), row.title(), BlogMarkdown.excerpt(row.bodyHead()),
-                        authorOf(row.authorId(), profiles), row.status(),
-                        sorted(tags.getOrDefault(row.id(), List.of())), row.likeCount(), row.commentCount(),
-                        row.likedByMe(), row.createdAt(), row.editedAt()))
-                .toList();
+        List<BlogPostSummaryResult> content = summaries.of(listQuery.list(filter));
         return PageableExecutionUtils.getPage(content, pageable, () -> listQuery.count(filter));
     }
 
@@ -250,11 +232,11 @@ public class BlogPostServiceImpl implements BlogPostService {
         BlogPost post = readablePost(postId, me);
         Map<UUID, PublicProfile> profiles = post.getAuthorId() == null ? Map.of()
                 : publicProfileReader.profiles(Set.of(post.getAuthorId()));
-        List<BlogTagResult> tags = sorted(
-                post.getTags().stream().map(tag -> new BlogTagResult(tag.getKind(), tag.getValue())).toList());
+        List<BlogTagResult> tags = BlogPostSummaries
+                .sorted(post.getTags().stream().map(tag -> new BlogTagResult(tag.getKind(), tag.getValue())).toList());
         return new BlogPostDetailResult(post.getId(), post.getTitle(), post.getBody(),
-                imageLinks.of(post.getId(), post.getBody()), authorOf(post.getAuthorId(), profiles), tags,
-                post.getStatus(), post.getVersion(), likeRepo.countByIdPostId(postId),
+                imageLinks.of(post.getId(), post.getBody()), BlogPostSummaries.authorOf(post.getAuthorId(), profiles),
+                tags, post.getStatus(), post.getVersion(), likeRepo.countByIdPostId(postId),
                 commentRepo.countByPostIdAndStatus(postId, BlogCommentStatus.VISIBLE),
                 likeRepo.existsByIdPostIdAndIdUserId(postId, me), post.isEditableBy(me),
                 // A block would have made the post unreadable above, so what is left to ask is whether it is open.
@@ -274,15 +256,6 @@ public class BlogPostServiceImpl implements BlogPostService {
                 .findFirstByTargetTypeAndTargetIdAndActionInOrderByCreatedAtDescIdDesc(BlogTargetType.POST,
                         post.getId(), List.of(BlogModerationActionType.HIDE, BlogModerationActionType.REMOVE))
                 .map(BlogModerationAction::getReason).orElse(null);
-    }
-
-    private static BlogAuthorResult authorOf(UUID authorId, Map<UUID, PublicProfile> profiles) {
-        PublicProfile profile = authorId == null ? null : profiles.get(authorId);
-        return profile == null ? null : new BlogAuthorResult(profile.id(), profile.displayName(), profile.avatarUrl());
-    }
-
-    private static List<BlogTagResult> sorted(List<BlogTagResult> tags) {
-        return tags.stream().sorted(BlogTagResult.DISPLAY_ORDER).toList();
     }
 
     private static String titleTerm(String q) {

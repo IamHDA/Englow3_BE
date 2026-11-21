@@ -96,6 +96,8 @@ class BlogPostServiceTest {
     private final BlogPostLikeRepository likeRepo = mock(BlogPostLikeRepository.class);
     private final BlogModerationActionRepository actionRepo = mock(BlogModerationActionRepository.class);
     private final BlogPostListQuery listQuery = mock(BlogPostListQuery.class);
+    /** Real: it only makes summaries of rows, through the two mocks it is given. */
+    private final BlogPostSummaries summaries = new BlogPostSummaries(listQuery, publicProfileReader);
     private final ObjectStorageClient objectStorage = mock(ObjectStorageClient.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
     /** Real: it only turns the image rows into links, through the mocks above. Its own test covers the details. */
@@ -105,7 +107,7 @@ class BlogPostServiceTest {
     private final Instant now = Instant.parse("2026-11-16T10:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final BlogPostService service = new BlogPostServiceImpl(userDirectory, friendshipReader,
-            publicProfileReader, readRule, postRepo, commentRepo, imageRepo, likeRepo, actionRepo, listQuery,
+            publicProfileReader, readRule, postRepo, commentRepo, imageRepo, likeRepo, actionRepo, listQuery, summaries,
             objectStorage, imageLinks, rateLimiter, transactions, clock);
 
     /** True only while a callback given to the transaction template is running. */
@@ -851,7 +853,7 @@ class BlogPostServiceTest {
 
         private PostSummaryRow row(UUID author, String bodyHead) {
             return new PostSummaryRow(UUID.randomUUID(), author, "Title", BlogPostStatus.PUBLISHED, bodyHead, now, null,
-                    3, 2, true);
+                    3, 2, true, true);
         }
 
         @Test
@@ -959,7 +961,7 @@ class BlogPostServiceTest {
             UUID tagged = UUID.randomUUID();
             PostSummaryRow withTags = new PostSummaryRow(tagged, other, "Tips", BlogPostStatus.HIDDEN,
                     "# Tips\n\nSome **bold** text ![d](blog-image:6f1c2a40-1b2c-4d3e-8f90-a1b2c3d4e5f6) end", now, now,
-                    9, 4, false);
+                    9, 4, false, true);
             when(listQuery.list(any())).thenReturn(List.of(withTags));
             when(listQuery.tagsOf(any())).thenReturn(List.of(new PostTagRow(tagged, BlogTagKind.SKILL, "WRITING"),
                     new PostTagRow(tagged, BlogTagKind.CERTIFICATE, "IELTS"),
@@ -975,6 +977,7 @@ class BlogPostServiceTest {
             assertThat(summary.likeCount()).isEqualTo(9);
             assertThat(summary.commentCount()).isEqualTo(4);
             assertThat(summary.likedByMe()).isFalse();
+            assertThat(summary.savedByMe()).isTrue();
         }
 
         @Test

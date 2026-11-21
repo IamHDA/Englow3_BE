@@ -12,5 +12,5 @@ import com.englow3.blog.entity.BlogPostStatus;
  */
 public record BlogPostSummaryResult(UUID id, String title, String excerpt, BlogAuthorResult author,
         BlogPostStatus status, List<BlogTagResult> tags, long likeCount, long commentCount, boolean likedByMe,
-        Instant createdAt, Instant editedAt) {
+        boolean savedByMe, Instant createdAt, Instant editedAt) {
 }

@@ -57,6 +57,7 @@ import com.englow3.blog.service.BlogCommentService;
 import com.englow3.blog.service.BlogImageService;
 import com.englow3.blog.service.BlogLikeService;
 import com.englow3.blog.service.BlogPostService;
+import com.englow3.blog.service.BlogSaveService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
@@ -87,6 +88,8 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
     BlogLikeService likeService;
     @Autowired
     BlogImageService imageService;
+    @Autowired
+    BlogSaveService saveService;
     @Autowired
     BlogPostRepository postRepo;
     @Autowired
@@ -167,6 +170,17 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
             spec = spec.param((String) namedParams[i], namedParams[i + 1]);
         }
         return spec.query(Long.class).single();
+    }
+
+    private void save(UUID post, UUID user, Instant at) {
+        jdbc.sql("insert into blog_post_saves (post_id, user_id, created_at) values (:post, :user, :at)")
+                .param("post", post).param("user", user).param("at", SqlTime.at(at)).update();
+    }
+
+    private List<UUID> savedIds(UUID as) {
+        SignedIn.as(jdbc, as);
+        return saveService.listSaved(PageRequest.of(0, 50)).getContent().stream().map(BlogPostSummaryResult::id)
+                .toList();
     }
 
     private static SavePostCommand.Tag skill(BlogSkill skill) {
@@ -1089,6 +1103,146 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
                 "insert into blog_posts (id, author_id, title, body, status) values (:id, null, :title, :body, :status)")
                 .param("id", UUID.randomUUID()).param("title", title).param("body", body).param("status", status)
                 .update();
+    }
+
+    // --- saved posts -----------------------------------------------------------------------------------------------
+
+    @Test
+    void savingTwiceIsOneSaveAndOnlyTheSaversSummaryShowsItSaved() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        UUID other = fixture.learner();
+        UUID post = insertPost(author, marker + " keeper");
+
+        SignedIn.as(jdbc, reader);
+        saveService.save(post);
+        var again = saveService.save(post);
+
+        assertThat(again.saved()).isTrue();
+        assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", post)).isEqualTo(1);
+        assertThat(list(reader).get(0).savedByMe()).isTrue();
+        assertThat(list(other).get(0).savedByMe()).isFalse();
+
+        SignedIn.as(jdbc, reader);
+        assertThat(saveService.unsave(post).saved()).isFalse();
+        // Unsaving something never saved changes nothing and is not an error.
+        assertThat(saveService.unsave(post).saved()).isFalse();
+        assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", post)).isZero();
+        assertThat(list(reader).get(0).savedByMe()).isFalse();
+    }
+
+    @Test
+    void aHiddenPostCannotBeSavedAndAPostOfSomeoneWhoBlockedTheReaderIsNotFound() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        UUID hidden = insertPost(author, marker + " hidden", "HIDDEN", Instant.now());
+        UUID blockedOut = insertPost(author, marker + " blocked out");
+        block(author, reader);
+
+        SignedIn.as(jdbc, reader);
+        assertThatThrownBy(() -> saveService.save(blockedOut)).isInstanceOfSatisfying(NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
+        assertThatThrownBy(() -> saveService.save(hidden)).isInstanceOfSatisfying(NotFoundException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_FOUND"));
+
+        SignedIn.as(jdbc, author);
+        assertThatThrownBy(() -> saveService.save(hidden)).isInstanceOfSatisfying(ConflictException.class,
+                e -> assertThat(e.getCode()).isEqualTo("BLOG_POST_NOT_OPEN"));
+        assertThat(
+                count("select count(*) from blog_post_saves where post_id in (:a, :b)", "a", hidden, "b", blockedOut))
+                        .isZero();
+    }
+
+    @Test
+    void aSaveCanBeTakenBackAfterThePostWasHiddenAndTheAuthorBlockedTheReader() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        UUID post = insertPost(author, marker + " saved then gone");
+        save(post, reader, Instant.now());
+        setStatus(post, "HIDDEN");
+        block(author, reader);
+
+        SignedIn.as(jdbc, reader);
+        assertThat(saveService.unsave(post).saved()).isFalse();
+
+        assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", post)).isZero();
+    }
+
+    @Test
+    void theSavedListHoldsOnlyTheCallersSavesLatestSaveFirstAndLeavesOutWhatIsNoLongerReadable() {
+        UUID author = fixture.learner();
+        UUID blockedAuthor = fixture.learner();
+        UUID reader = fixture.learner();
+        UUID other = fixture.learner();
+        Instant base = Instant.now().minus(5, ChronoUnit.DAYS);
+        // Written long ago but saved last, and the other way round: the order is the order of the saves.
+        UUID savedLast = insertPost(author, marker + " written first", "PUBLISHED", base.minusSeconds(900));
+        UUID savedFirst = insertPost(author, marker + " written last", "PUBLISHED", base);
+        UUID hidden = insertPost(author, marker + " hidden", "PUBLISHED", base);
+        UUID byBlocked = insertPost(blockedAuthor, marker + " by blocked", "PUBLISHED", base);
+        UUID notMine = insertPost(author, marker + " saved by someone else", "PUBLISHED", base);
+        save(savedFirst, reader, base.plusSeconds(10));
+        save(hidden, reader, base.plusSeconds(20));
+        save(byBlocked, reader, base.plusSeconds(30));
+        save(savedLast, reader, base.plusSeconds(40));
+        save(notMine, other, base.plusSeconds(50));
+        setStatus(hidden, "HIDDEN");
+        block(reader, blockedAuthor);
+
+        assertThat(savedIds(reader)).containsExactly(savedLast, savedFirst);
+        SignedIn.as(jdbc, reader);
+        var page = saveService.listSaved(PageRequest.of(0, 50));
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(page.getContent()).allMatch(BlogPostSummaryResult::savedByMe);
+        assertThat(page.getContent().get(0).author()).isNotNull();
+        assertThat(savedIds(other)).containsExactly(notMine);
+
+        // Hidden and restored: the save never went, so the post is back in the list where its save puts it.
+        setStatus(hidden, "PUBLISHED");
+        assertThat(savedIds(reader)).containsExactly(savedLast, hidden, savedFirst);
+    }
+
+    @Test
+    void theSavedListPagesInTheOrderOfTheSavesAndCountsAcrossPages() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        Instant base = Instant.now().minus(1, ChronoUnit.DAYS);
+        List<UUID> saved = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            UUID post = insertPost(author, marker + " post " + i);
+            save(post, reader, base.plusSeconds(i));
+            saved.add(0, post);
+        }
+
+        SignedIn.as(jdbc, reader);
+        var firstPage = saveService.listSaved(PageRequest.of(0, 2));
+        var lastPage = saveService.listSaved(PageRequest.of(2, 2));
+
+        assertThat(firstPage.getContent()).extracting(BlogPostSummaryResult::id).containsExactly(saved.get(0),
+                saved.get(1));
+        assertThat(firstPage.getTotalElements()).isEqualTo(5);
+        assertThat(firstPage.getTotalPages()).isEqualTo(3);
+        assertThat(lastPage.getContent()).extracting(BlogPostSummaryResult::id).containsExactly(saved.get(4));
+    }
+
+    @Test
+    void aSaveGoesWhenItsPostIsDeletedAndWhenItsReadersAccountIsErased() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        UUID eraser = fixture.learner();
+        UUID deleted = insertPost(author, marker + " to delete");
+        UUID kept = insertPost(author, marker + " kept");
+        save(deleted, reader, Instant.now());
+        save(kept, reader, Instant.now());
+        save(kept, eraser, Instant.now());
+
+        SignedIn.as(jdbc, author);
+        postService.delete(deleted);
+        jdbc.sql("delete from users where id = :id").param("id", eraser).update();
+
+        assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", deleted)).isZero();
+        assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", kept)).isEqualTo(1);
+        assertThat(savedIds(reader)).containsExactly(kept);
     }
 
     // --- misc ------------------------------------------------------------------------------------------------------

@@ -14,12 +14,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 public record BlogPostSummaryResponse(UUID id, String title, String excerpt,
         @Schema(nullable = true) BlogAuthorResponse author, String status, List<BlogTagResponse> tags, long likeCount,
-        long commentCount, boolean likedByMe, Instant createdAt, @Schema(nullable = true) Instant editedAt) {
+        long commentCount, boolean likedByMe, boolean savedByMe, Instant createdAt,
+        @Schema(nullable = true) Instant editedAt) {
 
     public static BlogPostSummaryResponse from(BlogPostSummaryResult result) {
         return new BlogPostSummaryResponse(result.id(), result.title(), result.excerpt(),
                 BlogAuthorResponse.from(result.author()), result.status().name(),
                 result.tags().stream().map(BlogTagResponse::from).toList(), result.likeCount(), result.commentCount(),
-                result.likedByMe(), result.createdAt(), result.editedAt());
+                result.likedByMe(), result.savedByMe(), result.createdAt(), result.editedAt());
     }
 }

@@ -153,11 +153,11 @@ public class BlogPost extends BasePersistedEntity {
         }
     }
 
-    /** Commenting and liking: only while the post is published. */
+    /** Commenting, liking and saving: only while the post is published. */
     public void ensureOpenForInteraction() {
         if (!isOpenForInteraction()) {
             throw new ConflictException("BLOG_POST_NOT_OPEN",
-                    "A hidden or removed post cannot be commented on or liked");
+                    "A hidden or removed post cannot be commented on, liked or saved");
         }
     }
 

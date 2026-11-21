@@ -128,7 +128,7 @@ class BlogControllerTest {
 
     private BlogPostSummaryResult summary() {
         return new BlogPostSummaryResult(postId, "A title", "An excerpt", new BlogAuthorResult(authorId, "Lan", null),
-                BlogPostStatus.HIDDEN, List.of(new BlogTagResult(BlogTagKind.LEVEL, "B2")), 4, 2, true, now, now);
+                BlogPostStatus.HIDDEN, List.of(new BlogTagResult(BlogTagKind.LEVEL, "B2")), 4, 2, true, true, now, now);
     }
 
     private BlogCommentResult comment() {
@@ -324,6 +324,7 @@ class BlogControllerTest {
                 .andExpect(jsonPath("$.items[0].likeCount").value(4))
                 .andExpect(jsonPath("$.items[0].commentCount").value(2))
                 .andExpect(jsonPath("$.items[0].likedByMe").value(true))
+                .andExpect(jsonPath("$.items[0].savedByMe").value(true))
                 .andExpect(jsonPath("$.items[0].createdAt").exists())
                 .andExpect(jsonPath("$.items[0].editedAt").exists()).andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20)).andExpect(jsonPath("$.totalItems").value(41))
