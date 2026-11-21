@@ -190,6 +190,83 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(generation.allowance().inProgress()).isTrue();
     }
 
+    /**
+     * The case seen on testing: the chart step stopped (AI_JOB_EXPIRED) after the model had written every part.
+     * Resuming picks the request up at the chart, asks the model for nothing it already wrote, and finishes the set
+     * with one paper and one full test.
+     */
+    @Test
+    void aFailedRequestResumesAtItsStepWithoutAskingTheModelAgain() {
+        SignedIn.as(jdbc, staff, "STAFF");
+        var request = generation.request(GenerationKind.IELTS_FULL_TEST, null);
+        SignedIn.out();
+        runUntil(request.id(), "chart");
+        int writtenSteps = stepBodies.size();
+        giveUpPendingJob(request.id(), "AI_JOB_EXPIRED");
+        var failed = requestDetail(request.id());
+        assertThat(failed.status()).isEqualTo(GenerationStatus.FAILED);
+        assertThat(failed.step()).isEqualTo("chart");
+        assertThat(failed.resumable()).isTrue();
+
+        SignedIn.as(jdbc, staff, "STAFF");
+        var resumed = generation.resume(request.id());
+        SignedIn.out();
+        assertThat(resumed.status()).isEqualTo(GenerationStatus.QUEUED);
+        assertThat(resumed.step()).isEqualTo("chart");
+        assertThat(resumed.resumeCount()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                select idempotency_key from ai_jobs where target_id = :r and status = 'PENDING'
+                """).param("r", request.id()).query(String.class).single()).endsWith(":chart:0:resume-1");
+
+        runAllJobs(request.id());
+
+        var done = requestDetail(request.id());
+        assertThat(done.status()).isEqualTo(GenerationStatus.COMPLETED);
+        assertThat(stepBodies).as("no writing step was asked for again").hasSize(writtenSteps);
+        assertThat(jdbc.sql("select count(*) from full_tests where created_by_user_id = :u").param("u", staff)
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(column("select image_object_key from assessment_tasks where id = :id", done.taskIds().getFirst()))
+                .startsWith("assessment-tasks/");
+    }
+
+    @Test
+    void resumingFollowsTheAuthorsLimits() {
+        SignedIn.as(jdbc, staff, "STAFF");
+        var first = generation.request(GenerationKind.IELTS_FULL_TEST, null);
+        SignedIn.out();
+        giveUpPendingJob(first.id(), "AI_JOB_EXPIRED");
+
+        SignedIn.as(jdbc, staff, "STAFF");
+        generation.request(GenerationKind.IELTS_FULL_TEST, null);
+        assertThatThrownBy(() -> generation.resume(first.id())).as("another request is running")
+                .hasFieldOrPropertyWithValue("code", "GENERATION_IN_PROGRESS");
+
+        jdbc.sql("update generation_requests set status = 'COMPLETED' where requested_by_user_id = :u and id <> :f")
+                .param("u", staff).param("f", first.id()).update();
+        insertRequest("COMPLETED");
+        insertRequest("COMPLETED");
+        assertThatThrownBy(() -> generation.resume(first.id())).as("today's three are used")
+                .hasFieldOrPropertyWithValue("code", "GENERATION_DAILY_LIMIT");
+
+        var finished = jdbc.sql(
+                "select id from generation_requests where requested_by_user_id = :u and status = 'COMPLETED' limit 1")
+                .param("u", staff).query(UUID.class).single();
+        assertThatThrownBy(() -> generation.resume(finished)).hasFieldOrPropertyWithValue("code",
+                "GENERATION_NOT_RESUMABLE");
+    }
+
+    /** What the worker does when the queue gives up on a step: the job fails and the request stops at it. */
+    private void giveUpPendingJob(UUID requestId, String code) {
+        var job = jdbc.sql("""
+                select id, input_payload::text as payload from ai_jobs
+                 where job_type = 'CONTENT_GENERATION' and status = 'PENDING' and target_id = :request
+                """).param("request", requestId)
+                .query((rs, n) -> new Object[] { rs.getObject("id", UUID.class), rs.getString("payload") }).single();
+        jdbc.sql("update ai_jobs set status = 'FAILED', error_code = :code where id = :id").param("code", code)
+                .param("id", job[0]).update();
+        handler.onGaveUp(requestId, (String) job[1], code);
+    }
+
     /** Plays the worker until no job of this request is pending. Returns how many it ran. */
     private int runAllJobs(UUID requestId) {
         return runUntil(requestId, null);

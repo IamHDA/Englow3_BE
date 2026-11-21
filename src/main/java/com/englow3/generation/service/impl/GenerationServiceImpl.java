@@ -70,6 +70,32 @@ public class GenerationServiceImpl implements GenerationService {
     }
 
     @Override
+    @Transactional
+    public GenerationRequestResult resume(UUID id) {
+        UUID requester = requestRepo.findById(id).map(GenerationRequest::getRequestedByUserId)
+                .orElseThrow(() -> notFound(id));
+        users.requireAuthorAccess(requester);
+        // The same lock as a new request takes: the limits below are the requester's, whoever presses resume.
+        requestRepo.lockUser("generation:" + requester);
+        GenerationRequest request = requestRepo.findByIdForUpdate(id).orElseThrow(() -> notFound(id));
+        request.requireResumable();
+        if (requestRepo.existsByRequestedByUserIdAndStatusIn(requester, IN_PROGRESS)) {
+            throw new ConflictException("GENERATION_IN_PROGRESS",
+                    "One of this author's requests is still running; wait for it to finish");
+        }
+        // A failed request does not count against the day it was made; running it again does.
+        if (!request.getCreatedAt().isBefore(calendar.startOfToday())
+                && requestRepo.countCountedSince(requester, calendar.startOfToday()) >= DAILY_LIMIT) {
+            throw new ConflictException("GENERATION_DAILY_LIMIT",
+                    "Today's %d requests are used; failed ones do not count".formatted(DAILY_LIMIT));
+        }
+        request.resume(clock.instant());
+        requestRepo.saveAndFlush(request);
+        steps.enqueue(request);
+        return toResult(request, users.displayNames(List.of(requester)));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<GenerationRequestResult> list(Pageable page) {
         UUID scope = users.authoringScope();
@@ -83,8 +109,7 @@ public class GenerationServiceImpl implements GenerationService {
     @Override
     @Transactional(readOnly = true)
     public GenerationRequestResult detail(UUID id) {
-        GenerationRequest request = requestRepo.findById(id).orElseThrow(
-                () -> new NotFoundException("GENERATION_REQUEST_NOT_FOUND", "No generation request %s".formatted(id)));
+        GenerationRequest request = requestRepo.findById(id).orElseThrow(() -> notFound(id));
         users.requireAuthorAccess(request.getRequestedByUserId());
         return toResult(request, users.displayNames(List.of(request.getRequestedByUserId())));
     }
@@ -108,8 +133,8 @@ public class GenerationServiceImpl implements GenerationService {
         return new GenerationRequestResult(r.getId(), r.getKind(), r.getStatus(), r.getStep(), r.getStepIndex(),
                 GenerationRequest.STEPS.size(), r.getAttempt(), r.getBrief(), r.getRequestedByUserId(),
                 names.get(r.getRequestedByUserId()), title, r.getExamId(), taskIds, r.getFullTestId(),
-                r.getFailureCode(), r.getFailureMessage(), problems, r.getCreatedAt(), r.getUpdatedAt(),
-                r.getCompletedAt());
+                r.getFailureCode(), r.getFailureMessage(), problems, r.getResumeCount(), r.isResumable(),
+                r.getCreatedAt(), r.getUpdatedAt(), r.getCompletedAt());
     }
 
     private JsonNode read(String json) {
@@ -118,5 +143,9 @@ public class GenerationServiceImpl implements GenerationService {
         } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
             return mapper.createObjectNode();
         }
+    }
+
+    private static NotFoundException notFound(UUID id) {
+        return new NotFoundException("GENERATION_REQUEST_NOT_FOUND", "No generation request %s".formatted(id));
     }
 }

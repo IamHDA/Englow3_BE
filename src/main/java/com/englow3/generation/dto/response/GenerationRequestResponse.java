@@ -16,12 +16,13 @@ public record GenerationRequestResponse(UUID id, GenerationKind kind, Generation
         @Schema(nullable = true) String requestedByName, @Schema(nullable = true) String title,
         @Schema(nullable = true) UUID examId, List<UUID> taskIds, @Schema(nullable = true) UUID fullTestId,
         @Schema(nullable = true) String failureCode, @Schema(nullable = true) String failureMessage,
-        List<String> lastProblems, Instant createdAt, Instant updatedAt, @Schema(nullable = true) Instant completedAt) {
+        List<String> lastProblems, int resumeCount, boolean resumable, Instant createdAt, Instant updatedAt,
+        @Schema(nullable = true) Instant completedAt) {
 
     public static GenerationRequestResponse from(GenerationRequestResult r) {
         return new GenerationRequestResponse(r.id(), r.kind(), r.status(), r.step(), r.stepIndex(), r.stepsTotal(),
                 r.attempt(), r.brief(), r.requestedByUserId(), r.requestedByName(), r.title(), r.examId(), r.taskIds(),
-                r.fullTestId(), r.failureCode(), r.failureMessage(), r.lastProblems(), r.createdAt(), r.updatedAt(),
-                r.completedAt());
+                r.fullTestId(), r.failureCode(), r.failureMessage(), r.lastProblems(), r.resumeCount(), r.resumable(),
+                r.createdAt(), r.updatedAt(), r.completedAt());
     }
 }
