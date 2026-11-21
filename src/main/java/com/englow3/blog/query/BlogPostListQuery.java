@@ -27,7 +27,8 @@ import lombok.RequiredArgsConstructor;
 /**
  * Read model for the post list: posts with their like and comment counts and whether the viewer liked and saved them,
  * filtered by tag, title and author, newest or most liked first. The same rows also come back for the viewer's saved
- * posts. SQL rather than JPA because the filters combine freely and the page must not cost a query per post.
+ * posts and for a given set of posts (the recommendations name theirs). SQL rather than JPA because the filters combine
+ * freely and the page must not cost a query per post.
  * <p>
  * The statement is put together from fixed fragments, one per filter that is present, and every value - the person, the
  * tags, the search text, the paging, even the status names - is bound as a parameter; nothing a user typed is ever part
@@ -107,6 +108,19 @@ public class BlogPostListQuery {
         Where where = savedWhere(filter);
         return jdbcClient.sql("select count(*) from blog_posts p" + where.sql()).params(where.params())
                 .query(Long.class).single();
+    }
+
+    /**
+     * Exactly these posts, in no particular order. No status or block condition is applied: whoever asks has chosen the
+     * ids by rules of their own, and a post that is not there is simply missing from the answer.
+     */
+    public List<PostSummaryRow> rowsOf(Collection<UUID> postIds, UUID viewerId) {
+        if (postIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcClient.sql(SELECT_SUMMARY + " where p.id in (:ids)").param("ids", postIds).param("viewer", viewerId)
+                .param("bodyHeadLength", BODY_HEAD_LENGTH).param("commentVisible", BlogCommentStatus.VISIBLE.name())
+                .query(BlogPostListQuery::summaryRow).list();
     }
 
     /** How many posts the filter matches in all, paging aside, for the page's total. */

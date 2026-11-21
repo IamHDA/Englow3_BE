@@ -44,12 +44,14 @@ import com.englow3.blog.dto.result.BlogCommentResult;
 import com.englow3.blog.dto.result.BlogImageUploadTicket;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
+import com.englow3.blog.dto.result.BlogRecommendationResult;
 import com.englow3.blog.entity.BlogCertificate;
 import com.englow3.blog.entity.BlogCommentStatus;
 import com.englow3.blog.entity.BlogLevel;
 import com.englow3.blog.entity.BlogPost;
 import com.englow3.blog.entity.BlogPostSort;
 import com.englow3.blog.entity.BlogPostStatus;
+import com.englow3.blog.entity.BlogRecommendationKind;
 import com.englow3.blog.entity.BlogSkill;
 import com.englow3.blog.entity.BlogTagKind;
 import com.englow3.blog.repository.BlogPostRepository;
@@ -57,6 +59,7 @@ import com.englow3.blog.service.BlogCommentService;
 import com.englow3.blog.service.BlogImageService;
 import com.englow3.blog.service.BlogLikeService;
 import com.englow3.blog.service.BlogPostService;
+import com.englow3.blog.service.BlogRecommendationService;
 import com.englow3.blog.service.BlogSaveService;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.ConflictException;
@@ -90,6 +93,8 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
     BlogImageService imageService;
     @Autowired
     BlogSaveService saveService;
+    @Autowired
+    BlogRecommendationService recommendationService;
     @Autowired
     BlogPostRepository postRepo;
     @Autowired
@@ -177,10 +182,33 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
                 .param("post", post).param("user", user).param("at", SqlTime.at(at)).update();
     }
 
+    private void likeAt(UUID post, UUID user, Instant at) {
+        jdbc.sql("insert into blog_post_likes (post_id, user_id, created_at) values (:post, :user, :at)")
+                .param("post", post).param("user", user).param("at", SqlTime.at(at)).update();
+    }
+
+    /** What the learner declared when they onboarded: the profile the recommendations read, through the user module. */
+    private void declare(UUID user, String level, String certificate, String... skills) {
+        jdbc.sql("""
+                insert into learner_profiles (id, user_id, current_level, target_certificate_type)
+                values (:id, :user, :level, :certificate)
+                """).param("id", UUID.randomUUID()).param("user", user).param("level", level)
+                .param("certificate", certificate).update();
+        for (String skill : skills) {
+            jdbc.sql("insert into user_target_skills (user_id, skill) values (:user, :skill)").param("user", user)
+                    .param("skill", skill).update();
+        }
+    }
+
     private List<UUID> savedIds(UUID as) {
         SignedIn.as(jdbc, as);
         return saveService.listSaved(PageRequest.of(0, 50)).getContent().stream().map(BlogPostSummaryResult::id)
                 .toList();
+    }
+
+    private List<UUID> recommendedIds(UUID as) {
+        SignedIn.as(jdbc, as);
+        return recommendationService.recommend(10).stream().map(result -> result.post().id()).toList();
     }
 
     private static SavePostCommand.Tag skill(BlogSkill skill) {
@@ -1243,6 +1271,103 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
         assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", deleted)).isZero();
         assertThat(count("select count(*) from blog_post_saves where post_id = :p", "p", kept)).isEqualTo(1);
         assertThat(savedIds(reader)).containsExactly(kept);
+    }
+
+    // --- recommendations -------------------------------------------------------------------------------------------
+
+    @Test
+    void aLearnerIsRecommendedWhatFitsTheirProfileAndNotTheirOwnSavedHiddenBlockedOldOrWeaklyMatchingPosts() {
+        UUID author = fixture.learner();
+        UUID blockedAuthor = fixture.learner();
+        UUID reader = fixture.learner();
+        declare(reader, "B1", "IELTS", "SPEAKING");
+        Instant recent = Instant.now().minus(3, ChronoUnit.DAYS);
+
+        UUID fits = insertPost(author, marker + " fits", "PUBLISHED", recent);
+        UUID alsoFits = insertPost(author, marker + " also fits", "PUBLISHED", recent.minusSeconds(60));
+        UUID own = insertPost(reader, marker + " own", "PUBLISHED", recent);
+        UUID saved = insertPost(author, marker + " saved", "PUBLISHED", recent);
+        UUID hidden = insertPost(author, marker + " hidden", "HIDDEN", recent);
+        UUID byBlocked = insertPost(blockedAuthor, marker + " by blocked", "PUBLISHED", recent);
+        UUID old = insertPost(author, marker + " old", "PUBLISHED", Instant.now().minus(100, ChronoUnit.DAYS));
+        UUID weak = insertPost(author, marker + " weak", "PUBLISHED", recent);
+        for (UUID post : List.of(fits, alsoFits, own, saved, hidden, byBlocked, old)) {
+            tag(post, "CERTIFICATE", "IELTS");
+            tag(post, "SKILL", "SPEAKING");
+            tag(post, "LEVEL", "B1");
+        }
+        // The level next to the reader's own is worth one point, and one point is not enough.
+        tag(weak, "LEVEL", "B2");
+        save(saved, reader, Instant.now());
+        block(reader, blockedAuthor);
+
+        SignedIn.as(jdbc, reader);
+        List<BlogRecommendationResult> results = recommendationService.recommend(10);
+
+        assertThat(results).extracting(result -> result.post().id()).contains(fits, alsoFits).doesNotContain(own, saved,
+                hidden, byBlocked, old, weak);
+        BlogRecommendationResult first = results.stream().filter(result -> result.post().id().equals(fits)).findFirst()
+                .orElseThrow();
+        assertThat(first.kind()).isEqualTo(BlogRecommendationKind.PROFILE);
+        assertThat(first.matchedTags()).extracting(tag -> tag.kind() + ":" + tag.value())
+                .containsExactly("SKILL:SPEAKING", "LEVEL:B1", "CERTIFICATE:IELTS");
+        assertThat(first.post().author()).isNotNull();
+    }
+
+    @Test
+    void aPostSavedAfterItWasRecommendedLeavesTheRecommendations() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        declare(reader, "B1", "IELTS", "SPEAKING");
+        UUID fits = insertPost(author, marker + " fits", "PUBLISHED", Instant.now().minus(1, ChronoUnit.DAYS));
+        tag(fits, "CERTIFICATE", "IELTS");
+        tag(fits, "SKILL", "SPEAKING");
+        tag(fits, "LEVEL", "B1");
+        assertThat(recommendedIds(reader)).contains(fits);
+
+        SignedIn.as(jdbc, reader);
+        saveService.save(fits);
+
+        assertThat(recommendedIds(reader)).doesNotContain(fits);
+    }
+
+    @Test
+    void whoeverHasNoProfileIsRecommendedThePostsMostLikedInTheLastWeek() {
+        UUID author = fixture.learner();
+        UUID staff = fixture.staff("Reviewer");
+        UUID fan = fixture.learner();
+        UUID anotherFan = fixture.learner();
+        UUID popular = insertPost(author, marker + " popular", "PUBLISHED", Instant.now().minus(200, ChronoUnit.DAYS));
+        UUID likedLongAgo = insertPost(author, marker + " liked long ago");
+        UUID unliked = insertPost(author, marker + " unliked");
+        UUID hiddenButLiked = insertPost(author, marker + " hidden", "HIDDEN", Instant.now());
+        // The week counts the day a like was given, not the day the post was written.
+        for (UUID liker : List.of(fan, anotherFan, fixture.learner(), fixture.learner(), fixture.learner())) {
+            likeAt(popular, liker, Instant.now().minus(1, ChronoUnit.DAYS));
+            likeAt(hiddenButLiked, liker, Instant.now().minus(1, ChronoUnit.DAYS));
+            likeAt(likedLongAgo, liker, Instant.now().minus(10, ChronoUnit.DAYS));
+        }
+
+        SignedIn.as(jdbc, staff);
+        List<BlogRecommendationResult> results = recommendationService.recommend(10);
+
+        assertThat(results).extracting(result -> result.post().id()).contains(popular).doesNotContain(likedLongAgo,
+                unliked, hiddenButLiked);
+        assertThat(results).allSatisfy(result -> {
+            assertThat(result.kind()).isEqualTo(BlogRecommendationKind.POPULAR_THIS_WEEK);
+            assertThat(result.matchedTags()).isEmpty();
+        });
+    }
+
+    @Test
+    void thePostsOfAnErasedAuthorCanBeRecommendedToo() {
+        UUID reader = fixture.learner();
+        declare(reader, "C1", null, "READING");
+        UUID orphan = insertPost(fixture.learner(), marker + " orphan", "PUBLISHED", Instant.now());
+        tag(orphan, "SKILL", "READING");
+        jdbc.sql("update blog_posts set author_id = null where id = :id").param("id", orphan).update();
+
+        assertThat(recommendedIds(reader)).contains(orphan);
     }
 
     // --- misc ------------------------------------------------------------------------------------------------------
