@@ -11,6 +11,7 @@ reads each chart into a data table here. A misread figure would mark correct ess
 set of notes has to be checked against the chart by a person before the task is approved.
 
     export OPENAI_API_KEY=...
+    export OPENAI_BASE_URL=...   # optional: another provider with an OpenAI-compatible API (Gemini, Groq)
     python generate_answers.py --input ~/Downloads/ielts-scrape --output answers --model <model>
 
 Reads each <collection>.json and writes <collection>.answers.json. Re-running skips what is
@@ -273,6 +274,13 @@ def main() -> int:
                 return report(generated, skipped, failures, stopped_early=True)
             try:
                 answer = make(client, args.model, item, band)
+            except openai.RateLimitError as e:
+                # Still refused after the SDK's retries: a daily quota (free tiers have one). Every later
+                # request would fail the same way, and a re-run picks up where this one stopped.
+                print(f"Stopping: the provider's rate limit is used up ({e}). Run the same command again "
+                      "once the quota resets.", file=sys.stderr)
+                failures.append(f"{path.stem}|{key}: rate limit")
+                return report(generated, skipped, failures, stopped_early=True)
             except (openai.AuthenticationError, openai.PermissionDeniedError, openai.NotFoundError) as e:
                 # Wrong key or model id: every later request would fail the same way.
                 print(f"Stopping: {e}", file=sys.stderr)

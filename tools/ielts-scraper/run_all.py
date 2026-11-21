@@ -4,6 +4,7 @@
     npm install && pip install -r requirements.txt        (once; ffmpeg must be on PATH)
 
     export OPENAI_API_KEY=...        # optional: without it, or without --model, the AI step is skipped
+    export OPENAI_BASE_URL=...       # optional: an OpenAI-compatible provider such as Gemini or Groq
     export SUPABASE_URL=... SUPABASE_PUBLISHABLE_KEY=... ENGLOW_EMAIL=... ENGLOW_PASSWORD=...
                                      # an ADMIN account when --publish is used (see supabase_auth.py)
     python run_all.py --base-url https://api.example.com --model <openai model> --publish [--match 2026] [--limit 2]

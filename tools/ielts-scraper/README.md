@@ -86,8 +86,27 @@ python supabase_auth.py
 Nếu đã có sẵn token, đặt `ENGLOW_TOKEN` thay cho bốn biến trên. Token đó được dùng nguyên, không
 tự gia hạn được.
 
-**`OPENAI_API_KEY`**: chỉ cần cho bước 2. Model chọn qua `--model` phải đọc được ảnh, vì
-Writing Task 1 gửi kèm biểu đồ.
+**Model AI cho bước 2** (không bắt buộc). Script dùng thư viện OpenAI nhưng chạy được với mọi
+nhà cung cấp có API kiểu OpenAI: đặt `OPENAI_API_KEY` là key của nhà cung cấp đó, và
+`OPENAI_BASE_URL` là địa chỉ API của họ. Model phải đọc được ảnh (biểu đồ Writing Task 1) và hỗ
+trợ structured output (`json_schema`).
+
+| Nhà cung cấp | `OPENAI_BASE_URL` | `--model` | Chi phí |
+|---|---|---|---|
+| Google Gemini (khuyên dùng) | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-4-hydrogen` | Miễn phí, có giới hạn request mỗi ngày |
+| Groq | `https://api.groq.com/openai/v1` | `qwen/qwen3.8-27b` | Miễn phí, 1.000 request và 200K token mỗi ngày |
+| OpenAI | không đặt | `gpt-6.1-terra` (hoặc `gpt-6-luna`, rẻ hơn) | Trả phí, cỡ vài chục USD (Luna: vài USD) cho cả thư viện |
+
+Bảng trên lấy từ tài liệu của từng nhà cung cấp ngày 21/11/2026.
+
+- **Gemini**: lấy key ở Google AI Studio. Giới hạn miễn phí của từng model xem ở trang Rate
+  limit trong AI Studio; quota ngày reset lúc nửa đêm giờ Thái Bình Dương. Dữ liệu gửi ở gói
+  miễn phí có thể được Google dùng để cải thiện sản phẩm.
+- **Groq**: lấy key ở console.groq.com. `qwen/qwen3.8-27b` đang là model preview. 200K token
+  mỗi ngày chỉ đủ cho khoảng vài chục đến một trăm request, nên cả thư viện (khoảng 4.400
+  request) sẽ mất nhiều tuần.
+- Khi hết quota ngày, script dừng lại và báo; chạy lại đúng lệnh cũ hôm sau, phần đã sinh không
+  bị sinh lại.
 
 Đặt biến môi trường. PowerShell:
 
@@ -96,7 +115,8 @@ $env:SUPABASE_URL = "https://<project-ref>.supabase.co"
 $env:SUPABASE_PUBLISHABLE_KEY = "..."
 $env:ENGLOW_EMAIL = "..."
 $env:ENGLOW_PASSWORD = "..."
-$env:OPENAI_API_KEY = "..."
+$env:OPENAI_API_KEY = "<key của Gemini, Groq hoặc OpenAI>"
+$env:OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 ```
 
 bash / zsh:
@@ -106,8 +126,11 @@ export SUPABASE_URL=https://<project-ref>.supabase.co
 export SUPABASE_PUBLISHABLE_KEY=...
 export ENGLOW_EMAIL=...
 export ENGLOW_PASSWORD=...
-export OPENAI_API_KEY=...
+export OPENAI_API_KEY=...       # key của Gemini, Groq hoặc OpenAI
+export OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 ```
+
+Dùng OpenAI thì bỏ dòng `OPENAI_BASE_URL`.
 
 ---
 
@@ -116,14 +139,14 @@ export OPENAI_API_KEY=...
 Thử trước với một collection:
 
 ```bash
-python run_all.py --base-url https://api.example.com --model <model-id> --match 2026-january --limit 1
+python run_all.py --base-url https://api.example.com --model gemini-4-hydrogen --match 2026-january --limit 1
 ```
 
 Không có `--publish` nên đề và task chỉ ở trạng thái chờ duyệt. Vào trang admin xem đề hiển
 thị đúng, nghe thử audio, rồi mới chạy toàn bộ:
 
 ```bash
-python run_all.py --base-url https://api.example.com --model <model-id> --publish
+python run_all.py --base-url https://api.example.com --model gemini-4-hydrogen --publish
 ```
 
 ### Tham số
@@ -131,7 +154,7 @@ python run_all.py --base-url https://api.example.com --model <model-id> --publis
 | Tham số | Ý nghĩa |
 |---|---|
 | `--base-url` | Địa chỉ backend. Bỏ đi thì luồng dừng sau bước 4, chưa nạp gì |
-| `--model` | Model OpenAI. Bỏ đi (hoặc không có `OPENAI_API_KEY`) thì bỏ qua bước 2 |
+| `--model` | Model AI cho bước 2 (xem bảng ở mục 0). Bỏ đi (hoặc không có `OPENAI_API_KEY`) thì bỏ qua bước 2 |
 | `--publish` | Duyệt luôn mọi thứ và tạo full test. **Đề lên cho học viên mà không ai duyệt** |
 | `--match` | Chỉ lấy collection có tên hoặc URL chứa chuỗi này; nhiều chuỗi cách nhau bằng dấu phẩy, ví dụ `2025,2026` |
 | `--limit` | Lấy tối đa N collection |
@@ -180,7 +203,7 @@ Mỗi file có mục `failures` liệt kê phần thi parse không trọn (thi�
 ### Bước 2. Sinh bài mẫu và rubric notes (không bắt buộc)
 
 ```bash
-python generate_answers.py --input data/scrape --output data/answers --model <model-id> --limit 5
+python generate_answers.py --input data/scrape --output data/answers --model gemini-4-hydrogen --limit 5
 ```
 
 - `--limit 5` để thử vài câu; bỏ đi khi chạy thật.
