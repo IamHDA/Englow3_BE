@@ -53,8 +53,9 @@ skills, and onboarding.
   `lockLearners` takes shared user-row locks in id order inside the caller's write transaction,
   protecting a social role check against a concurrent role change without exposing user entities.
   `PlacementRecorder.recordLevelCheck` records a level measured by the roadmap's
-  level check; `user.api.LearnerGoalReader` hands the roadmap the goal, level,
-  daily study minutes and purposes as plain values. User entities,
+  level check; `user.api.LearnerGoalReader` hands the roadmap and `blog` (for recommendations) the goal,
+  level, certificate, target skills, daily study minutes and purposes as plain values, as strings: the
+  reader maps them to its own enums. User entities,
   repositories, and service implementations remain internal.
 - **Files:** profile images use the shared storage client, while object-key meaning
   remains owned by this module.
@@ -702,19 +703,19 @@ new messages, recalls, read marks and typing. Owns one-to-one conversations betw
 
 ## `blog`
 
-Implemented: posts with Markdown, images and tags, flat comments, likes and the post list,
-behind `/api/blog`; reports of posts and comments (`/api/blog/.../reports`) and their moderation by
-Staff and Admin (`/api/admin/blog`). Owns knowledge-sharing posts, their comments, likes, reports
-and moderation.
+Implemented: posts with Markdown, images and tags, flat comments, likes, saved posts, recommendations
+and the post list, behind `/api/blog`; reports of posts and comments (`/api/blog/.../reports`) and their
+moderation by Staff and Admin (`/api/admin/blog`). Owns knowledge-sharing posts, their comments, likes,
+saves, reports and moderation.
 
 - **Subdomain:** supporting.
 - **Owns writes to:** `blog_posts` (title, Markdown body, author, status, version),
-  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`, `blog_reports`
+  `blog_post_tags`, `blog_post_images`, `blog_comments`, `blog_post_likes`, `blog_post_saves`, `blog_reports`
   (a reader's report of a post or a comment) and `blog_moderation_actions` (the append-only history
   of what moderators did). Comments are flat - no replies. A report and an action name their
   target by `(target_type, target_id)` with no foreign key, because the target is a post or a
   comment and its author may delete it.
-- **Who:** every signed-in account posts, comments and likes; nothing is readable
+- **Who:** every signed-in account posts, comments, likes and saves; nothing is readable
   without signing in (no route under `/api/blog` is public). Staff and Admin moderate through
   `/api/admin/blog`, a separate controller in this module - never content they wrote themselves.
 - **Publishing:** a post is visible as soon as it is posted; moderation follows
@@ -735,7 +736,8 @@ and moderation.
   cannot read is `BLOG_POST_NOT_FOUND`, not a refusal that would show it exists), listing and writing
   comments, editing a comment and liking; unliking, deleting one's own post and deleting one's own
   comment are allowed in every status (an unlike of a post the caller cannot read reports a like count
-  of 0). One package-private collaborator, `BlogReadRule`, answers the question for every service.
+  of 0). Saving follows the like: it needs a readable, published post, and an unsave is allowed in every
+  status. One package-private collaborator, `BlogReadRule`, answers the question for every service.
 - **Tags:** skill, level and certificate, as blog's own enums - never `exam`'s or
   `user`'s - used for filtering (a filter that is given must match; tags combine with AND).
   Attaching a specific exam or deck is not in this version.
@@ -750,7 +752,7 @@ and moderation.
   per reporter and target, closed once (resolved or dismissed); after it is closed the same
   reader may report that content again, because an edit can make dismissed content a problem
   later; the note is at most 500 characters. `BlogModerationAction` - recorded, never changed;
-  the reason is 1-500 characters. Likes and tags are plain rows; images are plain rows whose
+  the reason is 1-500 characters. Likes, saves and tags are plain rows; images are plain rows whose
   `post_id` is written only by a conditional update.
 - **Blocks:** posts and comments by anyone blocked either way are left out of a
   learner's lists, and neither side can comment on, like or open the other's posts, via
@@ -772,11 +774,36 @@ and moderation.
   opened it is `BLOG_POST_STALE` or `CONCURRENT_UPDATE`); the author's delete reads it with the
   lock too, so it waits for a hide in progress and removes the post as it then is, where the
   version check alone would have failed it. Writing a comment or a like while a post is being hidden
-  is a benign race and is not serialised. Like primary key `(post_id, user_id)` with
+  is a benign race and is not serialised. Like and save primary key `(post_id, user_id)` with
   an `on conflict do nothing` insert. Like and comment counts are counted for each page of posts,
   not stored: erasure removes likes by cascade, and a stored counter would drift. Unique
   `(reporter_id, target_type, target_id)` among open reports only (a partial unique index),
   filed with `on conflict ... where status = 'OPEN' do nothing`, so reporting twice is one report.
+- **Saved posts:** a reader's private shelf, `blog_post_saves (post_id, user_id, created_at)`, rows
+  made like likes (`insertIfAbsent`, primary key `(post_id, user_id)`, index `(user_id, created_at desc)`),
+  cascading from the post and from the account. `PUT` and `DELETE /api/blog/posts/{id}/save` answer
+  `{ saved }`; saving is rate limited (60 a minute), needs a post the caller may read
+  (`BlogReadRule`) and `ensureOpenForInteraction`, and unsaving needs only that the post exists.
+  `GET /api/blog/saved-posts` lists the caller's saves, latest save first, with the same summary as the
+  post list: a post hidden or removed since, or by someone the caller now has a block with, is left out
+  and comes back if that is undone (the save is not removed). Every summary carries `savedByMe`, and a
+  saved post is never recommended. Saves are the caller's alone: no count, no list of who saved a post.
+  They are not part of the account export (see Still open); they go with the account by cascade.
+- **Recommendations:** `GET /api/blog/recommendations?limit=3` (3 by default, at most 10) answers
+  `[{ post, reason: { kind, matchedTags } }]`, the best first, the same for the same data - nothing is
+  rotated or drawn. The reader's declared learning is read through `user.api.LearnerGoalReader` as
+  strings and mapped to blog's own enums in `helper/BlogRecommendationScore` (a value blog has no tag
+  for, such as `PRONUNCIATION`, is dropped). A post is considered when it is published, readable by the
+  caller, not theirs, not saved by them and posted in the last 90 days (at most the 500 newest are
+  weighed). Points: the target certificate +3, any target skill +2 (once), the current level +2 or the
+  level next to it +1; a post without a level tag neither gains nor loses for level. A post needs 2
+  points; of equal points the more liked comes first, then the newer. `matchedTags` are the post's tags
+  that equal what the reader declared (the neighbouring level scores but is not named). When no post
+  reaches the threshold - or the caller declared nothing blog can use, which is the case for Staff and
+  Admin - the answer is the eligible posts most liked in the last 7 days (counted by `blog_post_likes.created_at`,
+  a post with no like that week does not qualify), with kind `POPULAR_THIS_WEEK` and no matched tags;
+  when there are none, an empty list. `BlogRecommendationScore` is pure and has its own test;
+  `BlogRecommendationServiceImpl` takes a `Clock` so the 90 and 7 day windows can be tested.
 - **Images:** the Markdown refers to an image as `blog-image:<id>`, never by URL, so the
   `blog` bucket stays private, a link that expires cannot break a saved post, and moving the
   storage domain changes no data. The read API returns the body as written plus
@@ -800,7 +827,7 @@ and moderation.
   `blog-image:` fragment leaks.
 - **Erasure:** posts and comments stay and show as by a deleted user (`author_id`
   set to null) - confirmed by the product owner on 2026-11-16, the same choice as
-  chat; likes cascade; images stay with their post (an upload nobody used keeps a null
+  chat; likes and saves cascade; images stay with their post (an upload nobody used keeps a null
   `uploader_id` and is swept after a day); the erased user's reports are deleted by cascade,
   while the moderation history stays (an action then points at no report). `moderator_id` and
   `resolved_by_user_id` are `on delete restrict`: Staff accounts are removed by an Admin and cannot
@@ -820,9 +847,11 @@ and moderation.
   given the reason of the last hide or removal as `moderationNote` on the post (no one else
   is: Staff read content through the admin routes, which show every status).
 - **Talks to:** `friendship` via `FriendshipReader` (the blocked set for a list, whether two
-  accounts are blocked for one post); `user` via `UserDirectory` (the caller's id) and
-  `PublicProfileReader` (name and picture for a whole page of authors in one call).
+  accounts are blocked for one post); `user` via `UserDirectory` (the caller's id),
+  `PublicProfileReader` (name and picture for a whole page of authors in one call) and
+  `LearnerGoalReader` (the declared level, certificate and skills, for recommendations).
 - **Entry points:** `/api/blog` - `posts` (list, create, one, edit, delete), `posts/{id}/like`,
+  `posts/{id}/save`, `saved-posts`, `recommendations`,
   `posts/{id}/comments`, `comments/{id}`, `images`, `tags`, and the reports
   `posts/{id}/reports` and `comments/{id}/reports`. `/api/admin/blog` (Staff and Admin, in
   `AdminBlogModerationController`) - `queue`, `targets/{post|comment}/{id}` (the content in any
@@ -830,16 +859,23 @@ and moderation.
   (what moderators did).
 - **Read path:** the post list - optional tag, title, author and sort filters with paging -
   lives in `blog/query/BlogPostListQuery`, read-only, `JdbcClient`, every value bound and no empty
-  collection ever given to `in`; the moderation queue (open reports grouped by content, then the
+  collection ever given to `in`; the same query reads the saved list and the rows of the posts
+  chosen for recommendations, so every list shares one summary row (`BlogPostSummaries` turns rows into
+  summaries for all of them, one call for the tags and one for the profiles of a page). The posts
+  that may be recommended, and the popular ones, come from `blog/query/BlogRecommendationQuery` on the same
+  terms; the moderation queue (open reports grouped by content, then the
   start of each post and comment in one query each) lives in `blog/query/BlogModerationQueueQuery`
   on the same terms; everything else is repository. The comment list is a repository
   query that always passes at least one id to `not in`.
 - **Why:** posts, comments and moderation have their own lifecycle and reviewers;
   nothing here shares tables or vocabulary with the learning modules.
 - **Revisit if:** learners need search beyond tags and title, attaching learning
-  content, pre-moderation for new accounts, or saved posts. Sorting by likes is slow - it
+  content, pre-moderation for new accounts, or folders for saved posts. Sorting by likes is slow - it
   counts the likes of every matching post on each call: store a reconciled counter or a
-  statistics table. The comment count on a post card counts every visible comment whatever the
+  statistics table. The same holds for the recommendations: the candidates' like counts and the
+  week's likes are counted on each call, and up to 500 candidates are weighed in memory. Weighting
+  in the skill the learner scored lowest in a recent level check is a possible next step and is
+  not built. The comment count on a post card counts every visible comment whatever the
   viewer has blocked, so a block can leave it a little high; make it per viewer only if that is
   noticed.
 
@@ -952,7 +988,9 @@ gone rather than kept: all three describe a state that no longer exists.
   one's posts, and what moderators decided about a blog report or a post (the author finds
   the reason on the post, the reporter is not told). No module owns notifications yet; decide
   when the first one is built.
-- **Account export** covers `friendship`; `chat` and `blog` are not exported yet.
+- **Account export** covers `friendship`; `chat` and `blog` are not exported yet - which includes
+  `blog_post_saves`, the one table a reader owns there that nobody else can see. When blog is added to
+  the export, saves belong in it (`user_id = :u`).
 - **Privacy policy text** for erasure: chat messages, their images, blog posts and
   comments stay after an account is erased, shown as by a deleted user. Decided; the
   policy page still has to state it.
