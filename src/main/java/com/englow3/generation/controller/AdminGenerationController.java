@@ -41,6 +41,12 @@ public class AdminGenerationController {
                 .body(GenerationRequestResponse.from(service.request(r.kind(), r.brief())));
     }
 
+    /** Picks a failed request up again at the step it stopped at; what the model already wrote is kept. */
+    @PostMapping("/requests/{id}/resume")
+    public ResponseEntity<GenerationRequestResponse> resume(@PathVariable UUID id) {
+        return ResponseEntity.ok(GenerationRequestResponse.from(service.resume(id)));
+    }
+
     @GetMapping("/requests")
     public ResponseEntity<PageResponse<GenerationRequestResponse>> list(@PageableDefault(size = 20) Pageable page) {
         return ResponseEntity.ok(PageResponse.from(service.list(page).map(GenerationRequestResponse::from)));

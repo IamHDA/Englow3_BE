@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     generation_reasoning_effort: str | None = Field(
         default=None, pattern="^(none|minimal|low|medium|high|xhigh|max)?$"
     )
-    generation_timeout_seconds: float = Field(default=110.0, gt=0, le=300)
+    # One step's model call. Generation runs in the background, so this is generous enough for
+    # a reasoning model writing a full passage. The backend waits a little longer
+    # (AI_GENERATION_READ_TIMEOUT) and its worker longer still (AI_WORKER_GENERATION_MAX_RUN),
+    # so the timeout that fires and gets reported is this one.
+    generation_timeout_seconds: float = Field(default=240.0, gt=0, le=300)
 
     connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     read_timeout_seconds: float = Field(default=45.0, gt=0, le=300)

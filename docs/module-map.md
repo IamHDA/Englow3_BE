@@ -485,6 +485,13 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
   RUNNING -> COMPLETED | FAILED`); a step is tried at most three times, then the whole
   request fails with its reason. Version column: the worker and the requester can
   touch one row.
+- **Resume:** a `FAILED` request can be picked up again at the step it stopped at
+  (`POST /api/admin/generation/requests/{id}/resume`, the button "Chạy tiếp từ bước lỗi"),
+  at most three times (`resume_count`). The components, drafts and assembly already made are
+  kept, so the model is not asked again for parts it wrote; the step's attempts restart from
+  zero and its job key carries `:resume-<n>` so the queue makes a new job instead of handing
+  back the failed one. It runs as the requester, so their limits apply: one in progress, and a
+  request of today counts again once resumed (`GENERATION_DAILY_LIMIT`).
 - **Rules across rows (service, under a per-user lock):** at most three requests a day
   per user, counting queued, running and completed ones - a failed request does not
   count (decided 2026-11-07, accepting that repeated failures have no cost ceiling);
@@ -520,7 +527,8 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
 - **Revisit if:** generation stays IELTS-only for long (fold it into `exam`), or failed
   runs start costing real money (add a ceiling on failed requests).
 - **Left open:** cancelling a running request; regenerating one part of a finished
-  set; similarity checks between passages of different sets.
+  set (resuming covers only a failed request, from the step it stopped at); similarity checks
+  between passages of different sets.
 
 ## `friendship`
 

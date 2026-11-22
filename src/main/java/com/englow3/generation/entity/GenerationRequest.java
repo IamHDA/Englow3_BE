@@ -22,7 +22,8 @@ import lombok.Getter;
 /**
  * One press of "generate": the steps it runs through, what the model has written, and the drafts it produced.
  * <p>
- * The rules: status only moves forward ({@link GenerationStatus}); steps run in {@link #STEPS} order and a result is
+ * The rules: status only moves forward ({@link GenerationStatus}), with one exception: a failed request may be resumed
+ * from the step it stopped at, at most {@link #MAX_RESUMES} times; steps run in {@link #STEPS} order and a result is
  * accepted only for the step the request is at, so a late or repeated job cannot overwrite later work; a step that the
  * model gets wrong is tried at most {@link #MAX_ATTEMPTS} times, after which the whole request fails with the reason.
  * The JSON columns are data the service fills in; the entity guards when they may change.
@@ -34,6 +35,8 @@ public class GenerationRequest extends BasePersistedEntity {
 
     public static final int MAX_ATTEMPTS = 3;
     public static final int MAX_BRIEF_LENGTH = 1000;
+    /** Resumes of one failed request. Each can spend provider calls again, so they are bounded. */
+    public static final int MAX_RESUMES = 3;
 
     /** The steps of an IELTS full test, in order. The model writes the first eleven; the rest build and record. */
     public static final List<String> STEPS = List.of("plan", "listening-1", "listening-2", "listening-3", "listening-4",
@@ -86,6 +89,9 @@ public class GenerationRequest extends BasePersistedEntity {
 
     @Column(name = "full_test_id")
     private UUID fullTestId;
+
+    @Column(name = "resume_count", nullable = false)
+    private int resumeCount;
 
     @Column(name = "failure_code")
     private String failureCode;
@@ -198,6 +204,40 @@ public class GenerationRequest extends BasePersistedEntity {
         this.completedAt = now;
         this.updatedAt = now;
         this.retryContext = null;
+    }
+
+    /** Whether {@link #resume} would be accepted now. */
+    public boolean isResumable() {
+        return status == GenerationStatus.FAILED && resumeCount < MAX_RESUMES;
+    }
+
+    /**
+     * Picks a failed request up again at the step it stopped at, with that step's attempts back to zero. Everything
+     * written before the step - the components, the drafts, the assembly - is kept, so the model is not asked again for
+     * work it already did.
+     */
+    public void resume(Instant now) {
+        requireResumable();
+        this.resumeCount++;
+        this.status = GenerationStatus.QUEUED;
+        this.attempt = 0;
+        this.lastProblems = null;
+        this.retryContext = null;
+        this.failureCode = null;
+        this.failureMessage = null;
+        this.completedAt = null;
+        this.updatedAt = now;
+    }
+
+    /** Refuses, with the reason, a request that {@link #resume} would refuse; changes nothing. */
+    public void requireResumable() {
+        if (status != GenerationStatus.FAILED) {
+            throw new ConflictException("GENERATION_NOT_RESUMABLE", "Only a failed request can be resumed");
+        }
+        if (resumeCount >= MAX_RESUMES) {
+            throw new ConflictException("GENERATION_RESUME_LIMIT",
+                    "This request has already been resumed %d times; start a new one".formatted(MAX_RESUMES));
+        }
     }
 
     private void advance(Instant now) {

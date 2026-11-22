@@ -46,13 +46,19 @@ public class GenerationSteps {
         }
     }
 
-    /** Asks for the step the request is at. Called in the transaction that recorded the step before it. */
+    /**
+     * Asks for the step the request is at. Called in the transaction that recorded the step before it, or that resumed
+     * the request. A resumed request starts the step's attempts again from zero, so its jobs carry the resume count in
+     * their key; without it the key would name the failed job and the queue would hand that back instead.
+     */
     void enqueue(GenerationRequest request) {
         ObjectNode payload = mapper.createObjectNode().put("step", request.getStep()).put("attempt",
                 request.getAttempt());
-        queue.enqueueContentGeneration(request.getId(), payload.toString(),
-                "generation:%s:%s:%d".formatted(request.getId(), request.getStep(), request.getAttempt()),
-                request.getRequestedByUserId());
+        String key = "generation:%s:%s:%d".formatted(request.getId(), request.getStep(), request.getAttempt());
+        if (request.getResumeCount() > 0) {
+            key += ":resume-" + request.getResumeCount();
+        }
+        queue.enqueueContentGeneration(request.getId(), payload.toString(), key, request.getRequestedByUserId());
     }
 
     /** Null when the request has moved on or finished: a late or repeated job then does nothing. */

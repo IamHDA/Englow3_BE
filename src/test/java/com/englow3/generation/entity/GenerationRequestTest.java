@@ -106,4 +106,46 @@ class GenerationRequestTest {
         assertThat(request.getFailureCode()).isEqualTo("AI_PROVIDER_HTTP_401");
         assertThat(request.isAt("plan")).isFalse();
     }
+
+    @Test
+    void aFailedRequestResumesAtTheStepItStoppedAtKeepingWhatWasWritten() {
+        GenerationRequest request = fresh();
+        request.recordWritten("plan", "{\"plan\":{\"title\":\"Rivers\"}}", NOW);
+        request.recordProblems("listening-1", "[\"a\"]", "{}", NOW);
+        request.fail("AI_JOB_EXPIRED", "A step stopped", NOW);
+        assertThat(request.isResumable()).isTrue();
+
+        request.resume(NOW.plusSeconds(60));
+
+        assertThat(request.getStatus()).isEqualTo(GenerationStatus.QUEUED);
+        assertThat(request.getStep()).isEqualTo("listening-1");
+        assertThat(request.getComponents()).contains("Rivers");
+        assertThat(request.getAttempt()).isZero();
+        assertThat(request.getLastProblems()).isNull();
+        assertThat(request.getFailureCode()).isNull();
+        assertThat(request.getCompletedAt()).isNull();
+        assertThat(request.getResumeCount()).isEqualTo(1);
+    }
+
+    @Test
+    void onlyAFailedRequestResumes() {
+        GenerationRequest running = fresh();
+
+        assertThatThrownBy(() -> running.resume(NOW)).hasFieldOrPropertyWithValue("code", "GENERATION_NOT_RESUMABLE");
+        assertThat(running.isResumable()).isFalse();
+    }
+
+    /** Every resume can spend provider calls again, so a request that keeps failing stops being offered. */
+    @Test
+    void aRequestResumesAtMostThreeTimes() {
+        GenerationRequest request = fresh();
+        for (int i = 0; i < GenerationRequest.MAX_RESUMES; i++) {
+            request.fail("AI_JOB_EXPIRED", "A step stopped", NOW);
+            request.resume(NOW);
+        }
+        request.fail("AI_JOB_EXPIRED", "A step stopped", NOW);
+
+        assertThat(request.isResumable()).isFalse();
+        assertThatThrownBy(() -> request.resume(NOW)).hasFieldOrPropertyWithValue("code", "GENERATION_RESUME_LIMIT");
+    }
 }
