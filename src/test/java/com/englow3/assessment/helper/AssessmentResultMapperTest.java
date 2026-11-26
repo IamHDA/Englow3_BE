@@ -1,5 +1,6 @@
 package com.englow3.assessment.helper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -13,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.englow3.assessment.entity.AssessmentAttempt;
 import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.assessment.entity.AssessmentSkill;
+import com.englow3.assessment.entity.AssessmentTaskPurpose;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +32,10 @@ class AssessmentResultMapperTest {
             """;
 
     private String reportSeenBy(String role, boolean backOffice) {
+        return seenBy(role, backOffice).report();
+    }
+
+    private com.englow3.assessment.dto.result.AssessmentAttemptResult seenBy(String role, boolean backOffice) {
         CurrentUser user = mock(CurrentUser.class);
         when(user.hasRole(role == null ? "NONE" : role)).thenReturn(true);
         var mapper = new AssessmentResultMapper(new ObjectMapper(), mock(ObjectStorageClient.class), user,
@@ -41,7 +47,14 @@ class AssessmentResultMapperTest {
                 UUID.randomUUID(), AssessmentSkill.WRITING, TASK, null, null, null);
         ReflectionTestUtils.setField(attempt, "report", REPORT);
         ReflectionTestUtils.setField(attempt, "status", AssessmentAttemptStatus.COMPLETED);
-        return mapper.from(attempt, backOffice).report();
+        return mapper.from(attempt, backOffice);
+    }
+
+    @Test
+    void aSnapshotStoredBeforeTasksHadAPurposeReadsAsPractice() {
+        // TASK has no "purpose": snapshots written before V075 look like this, and the BFF declares the field
+        // non-null, so a null here failed the learner's whole history query.
+        assertEquals(AssessmentTaskPurpose.PRACTICE, seenBy("LEARNER", false).task().purpose());
     }
 
     @Test
