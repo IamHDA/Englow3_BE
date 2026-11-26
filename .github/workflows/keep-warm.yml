@@ -1,0 +1,41 @@
+name: Keep testing backend warm
+
+# The testing backend runs on Render's free plan, which stops an idle service
+# after 15 minutes. Waking it takes 70-160 s, far past the BFF's 10 s backend
+# timeout, so the first learner after a quiet spell gets "Failed to reach the
+# backend service" on every query of the page.
+#
+# A ping every 10 minutes keeps it up. Only from 06:00 to 24:00 Vietnam time
+# (23:00-17:00 UTC): the free plan has 750 instance hours a month for the whole
+# workspace, and a service kept up around the clock would use almost all of it.
+#
+# Scheduled workflows run from the default branch only, so this takes effect
+# once it is on `dev`. GitHub may start a scheduled run a few minutes late.
+on:
+  schedule:
+    - cron: "*/10 23 * * *"
+    - cron: "*/10 0-16 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the testing backend
+        env:
+          URL: https://englow3-backend-testing.onrender.com/actuator/health/liveness
+        # A cold start can take more than two minutes; the generous timeout
+        # lets the ping itself be what wakes the service.
+        run: |
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 180 --retry 2 "$URL" || true)
+          echo "liveness: HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::warning::Testing backend answered HTTP $code"
+          fi
