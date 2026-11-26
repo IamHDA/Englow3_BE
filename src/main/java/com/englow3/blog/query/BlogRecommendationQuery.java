@@ -18,10 +18,10 @@ import com.englow3.shared.persistence.SqlTime;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The posts that may be recommended to a viewer, before any of them is weighed: published, by someone else, not saved
- * by the viewer and not by anyone they have a block with. Reads only, bound values only, like
- * {@link BlogPostListQuery}. What a post is worth to a reader is decided by the caller; this only hands over the posts
- * that are eligible, and the order of the popular ones.
+ * The posts that may be recommended to a viewer, before any of them is weighed: published, by someone else, neither
+ * saved nor liked by the viewer - they have found it already - and not by anyone they have a block with. Reads only,
+ * bound values only, like {@link BlogPostListQuery}. What a post is worth to a reader is decided by the caller; this
+ * only hands over the posts that are eligible, and the order of the popular ones.
  */
 @Component
 @RequiredArgsConstructor
@@ -74,6 +74,20 @@ public class BlogRecommendationQuery {
                 """).params(params).query((rs, rowNum) -> rs.getObject("id", UUID.class)).list();
     }
 
+    /**
+     * The newest eligible posts, at most {@code limit}, whenever they were written: what is left to show when nothing
+     * fits and nothing was liked this week.
+     */
+    public List<UUID> latest(RecommendationFilter filter, int limit) {
+        Eligible eligible = eligible(filter);
+        Map<String, Object> params = new HashMap<>(eligible.params());
+        params.put("limit", limit);
+        return jdbcClient
+                .sql("select p.id from blog_posts p where" + eligible.sql()
+                        + " order by p.created_at desc, p.id limit :limit")
+                .params(params).query((rs, rowNum) -> rs.getObject("id", UUID.class)).list();
+    }
+
     /** The conditions every recommended post meets; the values - even the status - are bound. */
     private static Eligible eligible(RecommendationFilter filter) {
         List<String> conditions = new ArrayList<>();
@@ -86,6 +100,8 @@ public class BlogRecommendationQuery {
         params.put("viewer", filter.viewerId());
         conditions
                 .add("not exists (select 1 from blog_post_saves sv where sv.post_id = p.id and sv.user_id = :viewer)");
+        conditions
+                .add("not exists (select 1 from blog_post_likes lk where lk.post_id = p.id and lk.user_id = :viewer)");
         if (!filter.hiddenAuthors().isEmpty()) {
             // Only added when there is something to hide - "not in ()" with no values is not valid SQL.
             conditions.add("(p.author_id is null or p.author_id not in (:hiddenAuthors))");

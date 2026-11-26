@@ -44,9 +44,10 @@ import com.englow3.user.api.PublicProfileReader;
 import com.englow3.user.api.UserDirectory;
 
 /**
- * Orchestration only: which questions are asked, of whom, over how long a time, and when the answer of the profile is
- * given up for the week's favourites. What a post is worth to a reader, and the order of the best, are
- * {@code BlogRecommendationScore}'s and have their own test; here the posts are only made to fit or not to fit.
+ * Orchestration only: which questions are asked, of whom, over how long a time, and how a list the profile leaves short
+ * is filled with the week's favourites and then the newest. What a post is worth to a reader, and the order of the
+ * best, are {@code BlogRecommendationScore}'s and have their own test; here the posts are only made to fit or not to
+ * fit.
  */
 class BlogRecommendationServiceTest {
 
@@ -106,15 +107,21 @@ class BlogRecommendationServiceTest {
         return filter.getValue();
     }
 
+    private RecommendationFilter filterPassedToTheLatestQuery() {
+        ArgumentCaptor<RecommendationFilter> filter = ArgumentCaptor.forClass(RecommendationFilter.class);
+        verify(recommendationQuery).latest(filter.capture(), anyInt());
+        return filter.getValue();
+    }
+
     @Test
-    void postsThatFitAreRecommendedWithTheTagsThatMatchedAndNothingElseIsAsked() {
+    void postsThatFitAreRecommendedWithTheTagsThatMatchedAndWhenTheyFillTheListNothingElseIsAsked() {
         declared(goal("B1", "IELTS"));
         List<RecommendationCandidate> candidates = List.of(ieltsPost(1), ieltsPost(2));
         when(recommendationQuery.candidates(any(), any(), anyInt())).thenReturn(candidates);
         areAllIelts(candidates);
         rowsExist(candidates.stream().map(RecommendationCandidate::postId).toList());
 
-        List<BlogRecommendationResult> results = service.recommend(3);
+        List<BlogRecommendationResult> results = service.recommend(2);
 
         assertThat(results).hasSize(2);
         assertThat(results).allSatisfy(result -> {
@@ -122,6 +129,66 @@ class BlogRecommendationServiceTest {
             assertThat(result.matchedTags()).containsExactly(new BlogTagResult(BlogTagKind.CERTIFICATE, "IELTS"));
         });
         verify(recommendationQuery, never()).likedSince(any(), any(), anyInt());
+        verify(recommendationQuery, never()).latest(any(), anyInt());
+    }
+
+    /**
+     * Fewer posts fit than were asked for: the gap is filled with the week's most liked, then the newest, and a post
+     * already chosen is not chosen again under another reason.
+     */
+    @Test
+    void theGapLeftByThePostsThatFitIsFilledWithTheWeeksMostLikedThenTheNewestWithoutRepeatingAPost() {
+        declared(goal("B1", "IELTS"));
+        RecommendationCandidate fits = ieltsPost(1);
+        when(recommendationQuery.candidates(any(), any(), anyInt())).thenReturn(List.of(fits));
+        areAllIelts(List.of(fits));
+        UUID popular = UUID.randomUUID();
+        UUID newest = UUID.randomUUID();
+        UUID nextNewest = UUID.randomUUID();
+        UUID notNeeded = UUID.randomUUID();
+        when(recommendationQuery.likedSince(any(), any(), anyInt())).thenReturn(List.of(fits.postId(), popular));
+        when(recommendationQuery.latest(any(), anyInt())).thenReturn(List.of(popular, newest, nextNewest, notNeeded));
+        rowsExist(List.of(fits.postId(), popular, newest, nextNewest, notNeeded));
+
+        List<BlogRecommendationResult> results = service.recommend(4);
+
+        assertThat(results).extracting(result -> result.post().id()).containsExactly(fits.postId(), popular, newest,
+                nextNewest);
+        assertThat(results).extracting(BlogRecommendationResult::kind).containsExactly(BlogRecommendationKind.PROFILE,
+                BlogRecommendationKind.POPULAR_THIS_WEEK, BlogRecommendationKind.LATEST, BlogRecommendationKind.LATEST);
+        assertThat(results.subList(1, 4)).allSatisfy(result -> assertThat(result.matchedTags()).isEmpty());
+        verify(recommendationQuery).likedSince(any(), any(), eq(4));
+        verify(recommendationQuery).latest(any(), eq(4));
+    }
+
+    @Test
+    void whenNothingFitsAndNothingWasLikedThisWeekTheNewestPostsAreRecommended() {
+        when(goalReader.read(me)).thenReturn(Optional.empty());
+        UUID newest = UUID.randomUUID();
+        when(recommendationQuery.latest(any(), anyInt())).thenReturn(List.of(newest));
+        rowsExist(List.of(newest));
+
+        List<BlogRecommendationResult> results = service.recommend(3);
+
+        assertThat(results).singleElement().satisfies(result -> {
+            assertThat(result.post().id()).isEqualTo(newest);
+            assertThat(result.kind()).isEqualTo(BlogRecommendationKind.LATEST);
+            assertThat(result.matchedTags()).isEmpty();
+        });
+        RecommendationFilter filter = filterPassedToTheLatestQuery();
+        assertThat(filter.viewerId()).isEqualTo(me);
+    }
+
+    @Test
+    void whenTheWeeksMostLikedFillTheListTheNewestAreNotAskedFor() {
+        when(goalReader.read(me)).thenReturn(Optional.empty());
+        List<UUID> popular = List.of(UUID.randomUUID(), UUID.randomUUID());
+        when(recommendationQuery.likedSince(any(), any(), anyInt())).thenReturn(popular);
+        rowsExist(popular);
+
+        assertThat(service.recommend(2)).hasSize(2);
+
+        verify(recommendationQuery, never()).latest(any(), anyInt());
     }
 
     @Test

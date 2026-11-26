@@ -44,6 +44,7 @@ import com.englow3.blog.dto.result.BlogCommentResult;
 import com.englow3.blog.dto.result.BlogImageUploadTicket;
 import com.englow3.blog.dto.result.BlogPostDetailResult;
 import com.englow3.blog.dto.result.BlogPostSummaryResult;
+import com.englow3.blog.dto.projection.RecommendationFilter;
 import com.englow3.blog.dto.result.BlogRecommendationResult;
 import com.englow3.blog.entity.BlogCertificate;
 import com.englow3.blog.entity.BlogCommentStatus;
@@ -54,6 +55,7 @@ import com.englow3.blog.entity.BlogPostStatus;
 import com.englow3.blog.entity.BlogRecommendationKind;
 import com.englow3.blog.entity.BlogSkill;
 import com.englow3.blog.entity.BlogTagKind;
+import com.englow3.blog.query.BlogRecommendationQuery;
 import com.englow3.blog.repository.BlogPostRepository;
 import com.englow3.blog.service.BlogCommentService;
 import com.englow3.blog.service.BlogImageService;
@@ -95,6 +97,8 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
     BlogSaveService saveService;
     @Autowired
     BlogRecommendationService recommendationService;
+    @Autowired
+    BlogRecommendationQuery recommendationQuery;
     @Autowired
     BlogPostRepository postRepo;
     @Autowired
@@ -1275,8 +1279,9 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
 
     // --- recommendations -------------------------------------------------------------------------------------------
 
+    /** Other posts can fill the rest of the list as the newest; what is checked is what is recommended as a fit. */
     @Test
-    void aLearnerIsRecommendedWhatFitsTheirProfileAndNotTheirOwnSavedHiddenBlockedOldOrWeaklyMatchingPosts() {
+    void aLearnerIsRecommendedWhatFitsTheirProfileAndNotTheirOwnSavedLikedHiddenBlockedOldOrWeaklyMatchingPosts() {
         UUID author = fixture.learner();
         UUID blockedAuthor = fixture.learner();
         UUID reader = fixture.learner();
@@ -1291,7 +1296,8 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
         UUID byBlocked = insertPost(blockedAuthor, marker + " by blocked", "PUBLISHED", recent);
         UUID old = insertPost(author, marker + " old", "PUBLISHED", Instant.now().minus(100, ChronoUnit.DAYS));
         UUID weak = insertPost(author, marker + " weak", "PUBLISHED", recent);
-        for (UUID post : List.of(fits, alsoFits, own, saved, hidden, byBlocked, old)) {
+        UUID liked = insertPost(author, marker + " liked", "PUBLISHED", recent);
+        for (UUID post : List.of(fits, alsoFits, own, saved, liked, hidden, byBlocked, old)) {
             tag(post, "CERTIFICATE", "IELTS");
             tag(post, "SKILL", "SPEAKING");
             tag(post, "LEVEL", "B1");
@@ -1299,13 +1305,16 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
         // The level next to the reader's own is worth one point, and one point is not enough.
         tag(weak, "LEVEL", "B2");
         save(saved, reader, Instant.now());
+        like(liked, reader);
         block(reader, blockedAuthor);
 
         SignedIn.as(jdbc, reader);
         List<BlogRecommendationResult> results = recommendationService.recommend(10);
 
         assertThat(results).extracting(result -> result.post().id()).contains(fits, alsoFits).doesNotContain(own, saved,
-                hidden, byBlocked, old, weak);
+                liked, hidden, byBlocked);
+        assertThat(results).filteredOn(result -> result.kind() == BlogRecommendationKind.PROFILE)
+                .extracting(result -> result.post().id()).doesNotContain(old, weak);
         BlogRecommendationResult first = results.stream().filter(result -> result.post().id().equals(fits)).findFirst()
                 .orElseThrow();
         assertThat(first.kind()).isEqualTo(BlogRecommendationKind.PROFILE);
@@ -1351,12 +1360,38 @@ class BlogIntegrationTest extends PostgresIntegrationTest {
         SignedIn.as(jdbc, staff);
         List<BlogRecommendationResult> results = recommendationService.recommend(10);
 
-        assertThat(results).extracting(result -> result.post().id()).contains(popular).doesNotContain(likedLongAgo,
-                unliked, hiddenButLiked);
-        assertThat(results).allSatisfy(result -> {
-            assertThat(result.kind()).isEqualTo(BlogRecommendationKind.POPULAR_THIS_WEEK);
-            assertThat(result.matchedTags()).isEmpty();
-        });
+        // The newest posts may fill the rest of the list; the week's favourites are the ones named as such.
+        List<BlogRecommendationResult> popularOnes = results.stream()
+                .filter(result -> result.kind() == BlogRecommendationKind.POPULAR_THIS_WEEK).toList();
+        assertThat(popularOnes).extracting(result -> result.post().id()).contains(popular).doesNotContain(likedLongAgo,
+                unliked);
+        assertThat(results).extracting(result -> result.post().id()).doesNotContain(hiddenButLiked);
+        assertThat(results).allSatisfy(result -> assertThat(result.matchedTags()).isEmpty());
+    }
+
+    /** What fills a list nothing else filled: the newest eligible posts, of any age, newest first. */
+    @Test
+    void theNewestEligiblePostsAreTheLastToFillTheList() {
+        UUID author = fixture.learner();
+        UUID reader = fixture.learner();
+        // Ahead of whatever other tests wrote, so it is the first of the newest.
+        Instant ahead = Instant.now().plus(1, ChronoUnit.HOURS);
+        UUID newest = insertPost(author, marker + " newest", "PUBLISHED", ahead);
+        UUID nextNewest = insertPost(author, marker + " next newest", "PUBLISHED", ahead.minusSeconds(60));
+        UUID likedByReader = insertPost(author, marker + " liked by reader", "PUBLISHED", ahead.plusSeconds(60));
+        UUID hidden = insertPost(author, marker + " hidden", "HIDDEN", ahead.plusSeconds(60));
+        UUID own = insertPost(reader, marker + " own", "PUBLISHED", ahead.plusSeconds(60));
+        like(likedByReader, reader);
+
+        try {
+            List<UUID> latest = recommendationQuery.latest(new RecommendationFilter(reader, Set.of()), 2);
+
+            assertThat(latest).containsExactly(newest, nextNewest).doesNotContain(likedByReader, hidden, own);
+        } finally {
+            // Dated ahead, they would be the newest posts for every test that runs after this one.
+            jdbc.sql("delete from blog_posts where id in (:ids)")
+                    .param("ids", List.of(newest, nextNewest, likedByReader, hidden, own)).update();
+        }
     }
 
     @Test

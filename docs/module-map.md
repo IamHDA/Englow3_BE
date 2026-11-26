@@ -804,15 +804,17 @@ saves, reports and moderation.
   rotated or drawn. The reader's declared learning is read through `user.api.LearnerGoalReader` as
   strings and mapped to blog's own enums in `helper/BlogRecommendationScore` (a value blog has no tag
   for, such as `PRONUNCIATION`, is dropped). A post is considered when it is published, readable by the
-  caller, not theirs, not saved by them and posted in the last 90 days (at most the 500 newest are
+  caller, not theirs, neither saved nor liked by them and posted in the last 90 days (at most the 500 newest are
   weighed). Points: the target certificate +3, any target skill +2 (once), the current level +2 or the
   level next to it +1; a post without a level tag neither gains nor loses for level. A post needs 2
   points; of equal points the more liked comes first, then the newer. `matchedTags` are the post's tags
-  that equal what the reader declared (the neighbouring level scores but is not named). When no post
-  reaches the threshold - or the caller declared nothing blog can use, which is the case for Staff and
-  Admin - the answer is the eligible posts most liked in the last 7 days (counted by `blog_post_likes.created_at`,
-  a post with no like that week does not qualify), with kind `POPULAR_THIS_WEEK` and no matched tags;
-  when there are none, an empty list. `BlogRecommendationScore` is pure and has its own test;
+  that equal what the reader declared (the neighbouring level scores but is not named). When fewer
+  posts reach the threshold than were asked for - or the caller declared nothing blog can use, which
+  is the case for Staff and Admin - the rest of the list is filled, without repeating a post, first
+  with the eligible posts most liked in the last 7 days (counted by `blog_post_likes.created_at`, index
+  `idx_blog_post_likes_created`, V103; a post with no like that week does not qualify), kind
+  `POPULAR_THIS_WEEK`, then with the newest eligible posts of any age, kind `LATEST`; both carry no
+  matched tags. The list is short of the limit only when no eligible post is left. `BlogRecommendationScore` is pure and has its own test;
   `BlogRecommendationServiceImpl` takes a `Clock` so the 90 and 7 day windows can be tested.
 - **Images:** the Markdown refers to an image as `blog-image:<id>`, never by URL, so the
   `blog` bucket stays private, a link that expires cannot break a saved post, and moving the

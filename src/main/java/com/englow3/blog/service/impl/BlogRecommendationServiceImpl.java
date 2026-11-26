@@ -3,6 +3,7 @@ package com.englow3.blog.service.impl;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,9 +37,10 @@ import com.englow3.user.api.UserDirectory;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Reads what the caller declared, asks for the posts that may be recommended, lets {@link BlogRecommendationScore}
- * weigh them, and falls back to what readers liked this week when nothing fits. How a post is weighed is the helper's;
- * what is here is the order of the questions and when to give up on the first answer.
+ * Reads what the caller declared, asks for the posts that may be recommended and lets {@link BlogRecommendationScore}
+ * weigh them. When fewer fit than were asked for, the rest of the list is filled with what readers liked this week, and
+ * then with the newest posts, so the list is only short when there is nothing left to show. How a post is weighed is
+ * the helper's; what is here is the order of the questions and when to move on to the next.
  */
 @Service
 @RequiredArgsConstructor
@@ -72,11 +74,31 @@ public class BlogRecommendationServiceImpl implements BlogRecommendationService 
         Instant now = Instant.now(clock);
         RecommendationFilter filter = new RecommendationFilter(me, friendshipReader.blockedEitherWay(me));
 
-        List<Chosen> chosen = byProfile(me, filter, now, size);
-        if (chosen.isEmpty()) {
-            chosen = popularThisWeek(filter, now, size);
+        List<Chosen> chosen = new ArrayList<>(byProfile(me, filter, now, size));
+        if (chosen.size() < size) {
+            fill(chosen, recommendationQuery.likedSince(filter, now.minus(POPULAR_WINDOW), size),
+                    BlogRecommendationKind.POPULAR_THIS_WEEK, size);
+        }
+        if (chosen.size() < size) {
+            fill(chosen, recommendationQuery.latest(filter, size), BlogRecommendationKind.LATEST, size);
         }
         return results(me, chosen);
+    }
+
+    /**
+     * Adds the posts not chosen yet, in their order, until there are {@code size}. Asking each source for {@code size}
+     * is enough: at most {@code chosen.size()} of its answer can be chosen already, which leaves at least the gap.
+     */
+    private static void fill(List<Chosen> chosen, List<UUID> postIds, BlogRecommendationKind kind, int size) {
+        Set<UUID> taken = chosen.stream().map(Chosen::postId).collect(Collectors.toSet());
+        for (UUID postId : postIds) {
+            if (chosen.size() >= size) {
+                return;
+            }
+            if (taken.add(postId)) {
+                chosen.add(new Chosen(postId, kind, List.of()));
+            }
+        }
     }
 
     private List<Chosen> byProfile(UUID me, RecommendationFilter filter, Instant now, int size) {
@@ -100,11 +122,6 @@ public class BlogRecommendationServiceImpl implements BlogRecommendationService 
         return BlogRecommendationScore.rank(profile.get(), weighed, size).stream()
                 .map((Pick pick) -> new Chosen(pick.postId(), BlogRecommendationKind.PROFILE, pick.matchedTags()))
                 .toList();
-    }
-
-    private List<Chosen> popularThisWeek(RecommendationFilter filter, Instant now, int size) {
-        return recommendationQuery.likedSince(filter, now.minus(POPULAR_WINDOW), size).stream()
-                .map(postId -> new Chosen(postId, BlogRecommendationKind.POPULAR_THIS_WEEK, List.of())).toList();
     }
 
     /** The summaries of the chosen posts, in the order they were chosen; one that has vanished since is skipped. */
