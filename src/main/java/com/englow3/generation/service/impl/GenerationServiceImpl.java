@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,8 +39,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class GenerationServiceImpl implements GenerationService {
 
-    /** Requests a day per user. A failed request does not count (docs/module-map.md, `generation`). */
-    public static final int DAILY_LIMIT = 3;
     private static final List<GenerationStatus> IN_PROGRESS = List.of(GenerationStatus.QUEUED,
             GenerationStatus.RUNNING);
 
@@ -51,6 +50,13 @@ public class GenerationServiceImpl implements GenerationService {
     private final Clock clock;
     private final ObjectMapper mapper;
 
+    /**
+     * Requests one user may start in a day, counted on the day each was made or last resumed. A failed request does not
+     * count (docs/module-map.md, `generation`).
+     */
+    @Value("${app.generation.daily-limit:3}")
+    private int dailyLimit;
+
     @Override
     @Transactional
     public GenerationRequestResult request(GenerationKind kind, String brief) {
@@ -60,9 +66,9 @@ public class GenerationServiceImpl implements GenerationService {
             throw new ConflictException("GENERATION_IN_PROGRESS",
                     "One of your requests is still running; wait for it to finish");
         }
-        if (requestRepo.countCountedSince(userId, calendar.startOfToday()) >= DAILY_LIMIT) {
+        if (requestRepo.countCountedSince(userId, calendar.startOfToday()) >= dailyLimit) {
             throw new ConflictException("GENERATION_DAILY_LIMIT",
-                    "You have used today's %d requests; failed ones do not count".formatted(DAILY_LIMIT));
+                    "You have used today's %d requests; failed ones do not count".formatted(dailyLimit));
         }
         GenerationRequest request = requestRepo.save(GenerationRequest.create(kind, userId, brief, clock.instant()));
         steps.enqueue(request);
@@ -83,11 +89,10 @@ public class GenerationServiceImpl implements GenerationService {
             throw new ConflictException("GENERATION_IN_PROGRESS",
                     "One of this author's requests is still running; wait for it to finish");
         }
-        // A failed request does not count against the day it was made; running it again does.
-        if (!request.getCreatedAt().isBefore(calendar.startOfToday())
-                && requestRepo.countCountedSince(requester, calendar.startOfToday()) >= DAILY_LIMIT) {
+        // A failed request counts on no day; resumed, it runs again today and counts today, whenever it was made.
+        if (requestRepo.countCountedSince(requester, calendar.startOfToday()) >= dailyLimit) {
             throw new ConflictException("GENERATION_DAILY_LIMIT",
-                    "Today's %d requests are used; failed ones do not count".formatted(DAILY_LIMIT));
+                    "Today's %d requests are used; failed ones do not count".formatted(dailyLimit));
         }
         request.resume(clock.instant());
         requestRepo.saveAndFlush(request);
@@ -119,7 +124,7 @@ public class GenerationServiceImpl implements GenerationService {
     public GenerationAllowanceResult allowance() {
         UUID userId = users.requireCurrentUserId();
         long used = requestRepo.countCountedSince(userId, calendar.startOfToday());
-        return new GenerationAllowanceResult(DAILY_LIMIT, used, Math.max(0, DAILY_LIMIT - used),
+        return new GenerationAllowanceResult(dailyLimit, used, Math.max(0, dailyLimit - used),
                 requestRepo.existsByRequestedByUserIdAndStatusIn(userId, IN_PROGRESS));
     }
 

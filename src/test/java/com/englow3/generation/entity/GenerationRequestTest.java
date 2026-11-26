@@ -26,6 +26,7 @@ class GenerationRequestTest {
         assertThat(request.getStatus()).isEqualTo(GenerationStatus.QUEUED);
         assertThat(request.getStep()).isEqualTo("plan");
         assertThat(request.getBrief()).isEqualTo("science topics");
+        assertThat(request.getStartedAt()).as("counts on the day it was made").isEqualTo(NOW);
         assertThat(GenerationRequest.create(GenerationKind.IELTS_FULL_TEST, UUID.randomUUID(), "  ", NOW).getBrief())
                 .isNull();
     }
@@ -125,6 +126,21 @@ class GenerationRequestTest {
         assertThat(request.getFailureCode()).isNull();
         assertThat(request.getCompletedAt()).isNull();
         assertThat(request.getResumeCount()).isEqualTo(1);
+    }
+
+    /**
+     * The daily limit counts a request on the day it last started, so a resumed request counts on the day it resumes.
+     */
+    @Test
+    void aResumedRequestStartsAgainWhenItIsResumed() {
+        GenerationRequest request = fresh();
+        request.fail("AI_JOB_EXPIRED", "A step stopped", NOW);
+        Instant nextDay = NOW.plus(java.time.Duration.ofDays(1));
+
+        request.resume(nextDay);
+
+        assertThat(request.getStartedAt()).isEqualTo(nextDay);
+        assertThat(request.getCreatedAt()).as("still made when it was made").isEqualTo(NOW);
     }
 
     @Test

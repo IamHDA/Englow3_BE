@@ -28,10 +28,13 @@ public interface GenerationRequestRepository extends JpaRepository<GenerationReq
     @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:key,0)) as text)", nativeQuery = true)
     String lockUser(@Param("key") String key);
 
-    /** Requests that count against today's limit: everything but a failed one. */
+    /**
+     * Requests that count against the limit of the day starting at {@code from}: those started (made or resumed) since,
+     * except a failed one.
+     */
     @Query("""
             select count(r) from GenerationRequest r
-             where r.requestedByUserId = :userId and r.createdAt >= :from
+             where r.requestedByUserId = :userId and r.startedAt >= :from
                and r.status <> com.englow3.generation.entity.GenerationStatus.FAILED
             """)
     long countCountedSince(@Param("userId") UUID userId, @Param("from") Instant from);

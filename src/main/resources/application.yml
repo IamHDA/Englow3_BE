@@ -185,6 +185,10 @@ app:
       # The only frame a client sends is a tiny typing signal.
       max-text-message-bytes: 1024
 
+  generation:
+    # Requests one author may start (make or resume) in a day. A failed request does not count.
+    daily-limit: ${GENERATION_DAILY_LIMIT:3}
+
   blog:
     # Removes images that were uploaded and never put in a saved post.
     cleanup-enabled: ${BLOG_CLEANUP_ENABLED:true}

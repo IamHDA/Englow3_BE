@@ -490,12 +490,14 @@ general because TOEIC papers, flashcards or quizzes are the next likely kinds.
   at most three times (`resume_count`). The components, drafts and assembly already made are
   kept, so the model is not asked again for parts it wrote; the step's attempts restart from
   zero and its job key carries `:resume-<n>` so the queue makes a new job instead of handing
-  back the failed one. It runs as the requester, so their limits apply: one in progress, and a
-  request of today counts again once resumed (`GENERATION_DAILY_LIMIT`).
+  back the failed one. It runs as the requester, so their limits apply: one in progress, and the
+  resumed request counts against today's limit, whenever it was made (`started_at`, V102;
+  `GENERATION_DAILY_LIMIT`).
 - **Rules across rows (service, under a per-user lock):** at most three requests a day
-  per user, counting queued, running and completed ones - a failed request does not
-  count (decided 2026-11-07, accepting that repeated failures have no cost ceiling);
-  one request in progress per user at a time.
+  per user by default (`app.generation.daily-limit`, `GENERATION_DAILY_LIMIT`), counting
+  queued, running and completed ones on the day each started (`started_at`: made, or
+  last resumed) - a failed request does not count (decided 2026-11-07, accepting that
+  repeated failures have no cost ceiling); one request in progress per user at a time.
 - **Talks to:** `ai` by enqueueing one job per step (`CONTENT_GENERATION`, outside the
   learners' daily allowance); `exam` and `assessment` through module APIs taking an
   explicit author id, because the worker has no signed-in user; `ai_service` over the

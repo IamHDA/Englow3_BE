@@ -255,6 +255,37 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
                 "GENERATION_NOT_RESUMABLE");
     }
 
+    /**
+     * A request that failed on an earlier day used to skip the limit when resumed, and then counted on no day at all.
+     * Resumed, it runs again today, so today's limit is asked and it counts today.
+     */
+    @Test
+    void aFailedRequestOfAnEarlierDayCountsAgainstTodayOnceResumed() {
+        SignedIn.as(jdbc, staff, "STAFF");
+        var old = generation.request(GenerationKind.IELTS_FULL_TEST, null);
+        SignedIn.out();
+        giveUpPendingJob(old.id(), "AI_JOB_EXPIRED");
+        jdbc.sql("""
+                update generation_requests set created_at = created_at - interval '3 days',
+                                               started_at = started_at - interval '3 days'
+                 where id = :id
+                """).param("id", old.id()).update();
+        insertRequest("COMPLETED");
+        insertRequest("COMPLETED");
+
+        SignedIn.as(jdbc, staff, "STAFF");
+        assertThat(generation.allowance().used()).isEqualTo(2);
+        generation.resume(old.id());
+        assertThat(generation.allowance().used()).as("the resumed request counts today").isEqualTo(3);
+        SignedIn.out();
+
+        jdbc.sql("update generation_requests set status = 'FAILED' where id = :id").param("id", old.id()).update();
+        insertRequest("COMPLETED");
+        SignedIn.as(jdbc, staff, "STAFF");
+        assertThatThrownBy(() -> generation.resume(old.id())).as("today's three are used")
+                .hasFieldOrPropertyWithValue("code", "GENERATION_DAILY_LIMIT");
+    }
+
     /** What the worker does when the queue gives up on a step: the job fails and the request stops at it. */
     private void giveUpPendingJob(UUID requestId, String code) {
         var job = jdbc.sql("""
@@ -377,8 +408,9 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
 
     private void insertRequest(String status) {
         jdbc.sql("""
-                insert into generation_requests (id, kind, requested_by_user_id, status, step, created_at, updated_at)
-                values (:id, 'IELTS_FULL_TEST', :u, :status, 'plan', :now, :now)
+                insert into generation_requests (id, kind, requested_by_user_id, status, step, created_at, updated_at,
+                                                 started_at)
+                values (:id, 'IELTS_FULL_TEST', :u, :status, 'plan', :now, :now, :now)
                 """).param("id", UUID.randomUUID()).param("u", staff).param("status", status)
                 .param("now", java.sql.Timestamp.from(Instant.now())).update();
     }

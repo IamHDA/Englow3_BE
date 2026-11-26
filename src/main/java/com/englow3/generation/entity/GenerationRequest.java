@@ -105,6 +105,13 @@ public class GenerationRequest extends BasePersistedEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * When the request last started running: when it was made, or when it was last resumed. The daily limit counts a
+     * request on this day, so a resumed request counts on the day it runs again.
+     */
+    @Column(name = "started_at", nullable = false)
+    private Instant startedAt;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 
@@ -131,6 +138,7 @@ public class GenerationRequest extends BasePersistedEntity {
         request.components = "{}";
         request.createdAt = now;
         request.updatedAt = now;
+        request.startedAt = now;
         return request;
     }
 
@@ -214,7 +222,7 @@ public class GenerationRequest extends BasePersistedEntity {
     /**
      * Picks a failed request up again at the step it stopped at, with that step's attempts back to zero. Everything
      * written before the step - the components, the drafts, the assembly - is kept, so the model is not asked again for
-     * work it already did.
+     * work it already did. It starts again now, so it counts against today's limit.
      */
     public void resume(Instant now) {
         requireResumable();
@@ -227,6 +235,7 @@ public class GenerationRequest extends BasePersistedEntity {
         this.failureMessage = null;
         this.completedAt = null;
         this.updatedAt = now;
+        this.startedAt = now;
     }
 
     /** Refuses, with the reason, a request that {@link #resume} would refuse; changes nothing. */
