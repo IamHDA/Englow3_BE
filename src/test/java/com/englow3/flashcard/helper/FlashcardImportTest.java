@@ -7,7 +7,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reading a generated batch.
@@ -22,7 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class FlashcardImportTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapper.builderWithJackson2Defaults().build();
 
     private static final String ONE_GOOD_CARD = """
             [{"lemma":"agenda","pos":"noun","sense_label_en":"agenda (meeting)","ipa_us":"/əˈdʒendə/",

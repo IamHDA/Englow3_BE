@@ -11,7 +11,7 @@ import com.englow3.assessment.entity.AssessmentAttempt;
 import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 

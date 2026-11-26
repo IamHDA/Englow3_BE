@@ -30,7 +30,7 @@ import com.englow3.support.ExamFixture;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 import com.englow3.support.SignedIn;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * A roadmap from the request to the finish, against the real schema: the plan goes out as a queued job with everything

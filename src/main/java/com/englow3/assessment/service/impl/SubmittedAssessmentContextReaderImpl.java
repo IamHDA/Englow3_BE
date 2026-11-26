@@ -9,8 +9,8 @@ import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.shared.error.*;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -36,26 +36,26 @@ public class SubmittedAssessmentContextReaderImpl implements SubmittedAssessment
             StringBuilder feedback = new StringBuilder();
             for (String key : java.util.List.of("summary", "strengths", "improvements", "nextSteps")) {
                 JsonNode value = report.path(key);
-                if (value.isTextual())
-                    feedback.append(key).append(": ").append(value.asText()).append('\n');
+                if (value.isString())
+                    feedback.append(key).append(": ").append(value.asString("")).append('\n');
                 else if (value.isArray())
                     for (JsonNode item : value)
-                        if (item.isTextual())
-                            feedback.append(item.asText()).append('\n');
+                        if (item.isString())
+                            feedback.append(item.asString("")).append('\n');
             }
             for (JsonNode criterion : report.path("criteria")) {
-                feedback.append(criterion.path("key").asText()).append(": ").append(criterion.path("feedback").asText())
-                        .append('\n');
+                feedback.append(criterion.path("key").asString("")).append(": ")
+                        .append(criterion.path("feedback").asString("")).append('\n');
             }
-            Double overall = report.path("overall").isNumber() ? report.path("overall").asDouble() : null;
+            Double overall = report.path("overall").isNumber() ? report.path("overall").asDouble(0) : null;
             if (overall != null && (!Double.isFinite(overall) || overall < 0 || overall > 9))
                 overall = null;
-            return new Review(attemptId, attempt.getSkill().name(), clip(task.path("title").asText(), 160),
-                    clip(task.path("instructions").asText(), 1200),
+            return new Review(attemptId, attempt.getSkill().name(), clip(task.path("title").asString(""), 160),
+                    clip(task.path("instructions").asString(""), 1200),
                     clip(attempt.getSkill() == AssessmentSkill.SPEAKING ? attempt.getRecognizedText()
                             : attempt.getAnswerText(), 1800),
                     clip(feedback.toString(), 1400), overall, attempt.getSource(), attempt.getAssessedAt());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+        } catch (tools.jackson.core.JacksonException invalid) {
             throw new ConflictException("TUTOR_CONTEXT_UNAVAILABLE", "The stored assessment cannot be read");
         }
     }

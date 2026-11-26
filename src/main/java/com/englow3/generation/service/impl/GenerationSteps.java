@@ -12,10 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.englow3.ai.api.AiJobQueue;
 import com.englow3.generation.entity.GenerationRequest;
 import com.englow3.generation.repository.GenerationRequestRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -69,7 +69,7 @@ public class GenerationSteps {
             return null;
         }
         List<UUID> taskIds = new ArrayList<>();
-        read(r.getTaskIds()).forEach(id -> taskIds.add(UUID.fromString(id.asText())));
+        read(r.getTaskIds()).forEach(id -> taskIds.add(UUID.fromString(id.asString(""))));
         return new Work(r.getId(), step, r.getAttempt(), r.getRequestedByUserId(), r.getBrief(),
                 read(r.getComponents()), r.getRetryContext() == null ? null : read(r.getRetryContext()),
                 r.getAssembly() == null ? null : read(r.getAssembly()), r.getExamId(), taskIds,
@@ -92,10 +92,10 @@ public class GenerationSteps {
                 ObjectNode assembly = mapper.createObjectNode();
                 assembly.set("chart_png_base64", output.path("chart_png_base64"));
                 assembly.set("listening", output.path("listening"));
-                request.recordAssembled(UUID.fromString(output.path("examId").asText()),
+                request.recordAssembled(UUID.fromString(output.path("examId").asString("")),
                         output.path("taskIds").toString(), assembly.toString(), now);
             }
-            case "finish" -> request.complete(UUID.fromString(output.path("fullTestId").asText()), now);
+            case "finish" -> request.complete(UUID.fromString(output.path("fullTestId").asString("")), now);
             default -> {
                 if (GenerationRequest.STEPS.indexOf(step) >= WRITING_STEPS) {
                     request.recordDone(step, now);
@@ -140,11 +140,11 @@ public class GenerationSteps {
         List<String> topics = new ArrayList<>();
         for (String plan : requestRepo.recentPlans()) {
             JsonNode node = read(plan);
-            node.path("listening").forEach(t -> topics.add(t.asText()));
-            node.path("reading").forEach(t -> topics.add(t.asText()));
+            node.path("listening").forEach(t -> topics.add(t.asString("")));
+            node.path("reading").forEach(t -> topics.add(t.asString("")));
             for (String field : List.of("writing_task1", "writing_task2", "speaking")) {
                 if (node.hasNonNull(field)) {
-                    topics.add(node.get(field).asText());
+                    topics.add(node.get(field).asString(""));
                 }
             }
         }
@@ -154,7 +154,7 @@ public class GenerationSteps {
     private JsonNode read(String json) {
         try {
             return json == null ? mapper.createArrayNode() : mapper.readTree(json);
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             return mapper.createObjectNode();
         }
     }

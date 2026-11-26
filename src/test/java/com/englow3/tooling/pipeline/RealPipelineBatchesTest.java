@@ -14,7 +14,8 @@ import com.englow3.dictation.helper.DictationImport;
 import com.englow3.flashcard.helper.FlashcardImport;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The importers run over the batches the pipeline actually produced, not fixtures written to look like them.
@@ -29,7 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @EnabledIfEnvironmentVariable(named = "ENGLOW3_PIPELINE_OUTPUT", matches = ".+")
 class RealPipelineBatchesTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapper.builderWithJackson2Defaults().build();
 
     private static Path output() {
         return Path.of(System.getenv("ENGLOW3_PIPELINE_OUTPUT"));

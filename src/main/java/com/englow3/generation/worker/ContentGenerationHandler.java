@@ -14,10 +14,10 @@ import com.englow3.generation.service.GenerationArtifacts;
 import com.englow3.generation.service.impl.GenerationSteps;
 import com.englow3.generation.service.impl.GenerationSteps.Work;
 import com.englow3.shared.error.DomainException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,9 +51,9 @@ public class ContentGenerationHandler implements AiJobHandler {
     public Outcome run(UUID jobId, UUID requestId, String inputPayload) {
         try {
             var payload = mapper.readTree(inputPayload);
-            String step = payload.path("step").asText();
+            String step = payload.path("step").asString("");
             Work work = steps.work(requestId, step);
-            if (work == null || work.attempt() != payload.path("attempt").asInt()) {
+            if (work == null || work.attempt() != payload.path("attempt").asInt(0)) {
                 return Outcome.succeeded("{\"stale\":true}");
             }
             return Outcome.succeeded(work.writes() ? write(work) : switch (step) {
@@ -69,7 +69,7 @@ public class ContentGenerationHandler implements AiJobHandler {
                     : Outcome.permanentFailure(e.getCode(), "The AI service refused the step");
         } catch (DomainException e) {
             return Outcome.permanentFailure(e.getCode(), e.getMessage());
-        } catch (JsonProcessingException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException e) {
             return Outcome.permanentFailure("GENERATION_RESULT_UNREADABLE", "A step's result could not be read");
         }
     }
@@ -78,8 +78,8 @@ public class ContentGenerationHandler implements AiJobHandler {
     public void complete(UUID requestId, String inputPayload, String outputPayload) {
         try {
             var payload = mapper.readTree(inputPayload);
-            steps.apply(requestId, payload.path("step").asText(), payload.path("attempt").asInt(), outputPayload);
-        } catch (JsonProcessingException unreadable) {
+            steps.apply(requestId, payload.path("step").asString(""), payload.path("attempt").asInt(0), outputPayload);
+        } catch (JacksonException unreadable) {
             throw new IllegalArgumentException("Invalid generation job payload", unreadable);
         }
     }
@@ -88,14 +88,14 @@ public class ContentGenerationHandler implements AiJobHandler {
     public void onGaveUp(UUID requestId, String inputPayload, String errorCode) {
         try {
             var payload = mapper.readTree(inputPayload);
-            steps.failAt(requestId, payload.path("step").asText(), payload.path("attempt").asInt(), errorCode);
-        } catch (JsonProcessingException unreadable) {
+            steps.failAt(requestId, payload.path("step").asString(""), payload.path("attempt").asInt(0), errorCode);
+        } catch (JacksonException unreadable) {
             throw new IllegalArgumentException("Invalid generation job payload", unreadable);
         }
     }
 
     /** One model call; the adapter returns the component with any rule problems, which complete() acts on. */
-    private String write(Work work) throws JsonProcessingException {
+    private String write(Work work) throws JacksonException {
         ObjectNode body = mapper.createObjectNode().put("step", work.step());
         if (!"plan".equals(work.step())) {
             body.set("plan", work.components().path("plan"));
@@ -111,7 +111,7 @@ public class ContentGenerationHandler implements AiJobHandler {
     }
 
     /** Builds the set and creates its drafts: the paper and the five tasks, authored by whoever asked. */
-    private String assemble(Work work) throws JsonProcessingException {
+    private String assemble(Work work) throws JacksonException {
         ObjectNode body = mapper.createObjectNode();
         body.set("components", work.components());
         JsonNode built = mapper.readTree(client.assemble(body.toString()));
@@ -124,19 +124,19 @@ public class ContentGenerationHandler implements AiJobHandler {
 
     /** The Task 1 chart, uploaded and attached to the first task. */
     private String chart(Work work) {
-        byte[] png = Base64.getDecoder().decode(work.assembly().path("chart_png_base64").asText());
+        byte[] png = Base64.getDecoder().decode(work.assembly().path("chart_png_base64").asString(""));
         UUID task1 = work.taskIds().getFirst();
         tasks.attachImage(task1, tasks.uploadImage(task1, png));
         return "{}";
     }
 
     /** One Listening part recorded, uploaded and attached to the draft paper. */
-    private String record(Work work) throws JsonProcessingException {
+    private String record(Work work) throws JacksonException {
         String part = work.step().substring("audio-".length());
         ObjectNode body = mapper.createObjectNode();
         body.set("segments", work.assembly().path("listening").path(part));
         byte[] mp3 = Base64.getDecoder()
-                .decode(mapper.readTree(client.audio(body.toString())).path("mp3_base64").asText());
+                .decode(mapper.readTree(client.audio(body.toString())).path("mp3_base64").asString(""));
         papers.attachListeningAudio(work.requestedByUserId(), work.examId(), Integer.parseInt(part),
                 papers.uploadAudio(work.examId(), mp3));
         return "{}";

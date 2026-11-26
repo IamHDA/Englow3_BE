@@ -34,9 +34,9 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 import com.englow3.support.SignedIn;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A generation request from the press of the button to a set waiting for review, on the real schema and the real exam
@@ -85,7 +85,7 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         when(client.step(anyString())).thenAnswer(call -> {
             JsonNode body = mapper.readTree((String) call.getArgument(0));
             stepBodies.add(body);
-            String step = body.path("step").asText();
+            String step = body.path("step").asString();
             ObjectNode reply = mapper.createObjectNode().put("topic", step);
             if (step.equals("plan")) {
                 reply.put("title", "Rivers and cities");
@@ -136,10 +136,10 @@ class GenerationFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(jobs).isEqualTo(19); // 18 steps, one of them twice
 
         // The wrong Listening Part 1 went back with its problems, and the brief reached every writing step.
-        JsonNode retry = stepBodies.stream().filter(b -> b.path("step").asText().equals("listening-1"))
+        JsonNode retry = stepBodies.stream().filter(b -> b.path("step").asString().equals("listening-1"))
                 .filter(b -> b.has("previous")).findFirst().orElseThrow();
-        assertThat(retry.path("previous").path("problems").get(0).asText()).contains("give 2 speakers");
-        assertThat(stepBodies).allSatisfy(b -> assertThat(b.path("brief").asText()).isEqualTo("Rivers, please"));
+        assertThat(retry.path("previous").path("problems").get(0).asString()).contains("give 2 speakers");
+        assertThat(stepBodies).allSatisfy(b -> assertThat(b.path("brief").asString()).isEqualTo("Rivers, please"));
 
         assertThat(status("exams", done.examId())).isEqualTo("PENDING_REVIEW");
         assertThat(column("select created_by_user_id::text from exams where id = :id", done.examId()))

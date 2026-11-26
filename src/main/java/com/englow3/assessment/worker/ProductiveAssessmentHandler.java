@@ -17,8 +17,8 @@ import com.englow3.assessment.helper.AssessmentRubric;
 import com.englow3.assessment.service.AssessmentResultWriter;
 import com.englow3.shared.error.DomainException;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,20 +41,20 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
     public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
         try {
             JsonNode input = mapper.readTree(inputPayload);
-            if (!targetId.toString().equals(input.path("attemptId").asText())) {
+            if (!targetId.toString().equals(input.path("attemptId").asString(""))) {
                 return Outcome.permanentFailure("ASSESSMENT_PAYLOAD_INVALID", "Submission identity does not match");
             }
-            AssessmentSkill skill = AssessmentSkill.valueOf(input.path("skill").asText());
+            AssessmentSkill skill = AssessmentSkill.valueOf(input.path("skill").asString(""));
             String transcript = null;
             JsonNode acoustic = null;
             if (skill == AssessmentSkill.SPEAKING) {
-                byte[] audio = storage.download(bucket, input.path("objectKey").asText());
+                byte[] audio = storage.download(bucket, input.path("objectKey").asString(""));
                 if (audio.length < 44 || audio[0] != 'R' || audio[1] != 'I' || audio[2] != 'F' || audio[3] != 'F'
                         || audio[8] != 'W' || audio[9] != 'A' || audio[10] != 'V' || audio[11] != 'E') {
                     return Outcome.permanentFailure("RECORDING_INVALID", "The file is not WAV audio");
                 }
-                acoustic = mapper.readTree(speech.assess(audio, input.path("contentType").asText(), "en-US", null));
-                transcript = acoustic.path("recognized_text").asText();
+                acoustic = mapper.readTree(speech.assess(audio, input.path("contentType").asString(""), "en-US", null));
+                transcript = acoustic.path("recognized_text").asString("");
                 if (transcript.isBlank() || !acoustic.path("pronunciation").isNumber()
                         || !acoustic.path("fluency").isNumber()) {
                     return Outcome.permanentFailure("SPEECH_EVIDENCE_MISSING",
@@ -62,8 +62,9 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
                 }
             }
             var evidence = mapper.createObjectNode();
-            evidence.set("task", mapper.readTree(input.path("taskSnapshot").asText()));
-            evidence.put("response", skill == AssessmentSkill.WRITING ? input.path("answerText").asText() : transcript);
+            evidence.set("task", mapper.readTree(input.path("taskSnapshot").asString("")));
+            evidence.put("response",
+                    skill == AssessmentSkill.WRITING ? input.path("answerText").asString("") : transcript);
             if (acoustic != null) {
                 var speechEvidence = mapper.createObjectNode();
                 for (String field : List.of("accuracy", "fluency", "prosody", "pronunciation")) {
@@ -78,7 +79,7 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
             }
             String raw = llm.generateStructured(AssessmentRubric.systemPrompt(skill),
                     mapper.writeValueAsString(evidence), 3000);
-            String content = mapper.readTree(raw).path("content").asText("");
+            String content = mapper.readTree(raw).path("content").asString("");
             String normalized = AssessmentRubric.validate(mapper, skill, content);
             var result = mapper.createObjectNode();
             result.set("report", mapper.readTree(normalized));
@@ -95,7 +96,7 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
                     : Outcome.permanentFailure(e.getCode(), "Speech could not be assessed");
         } catch (DomainException e) {
             return Outcome.permanentFailure(e.getCode(), e.getMessage());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException e) {
+        } catch (tools.jackson.core.JacksonException | IllegalArgumentException e) {
             return Outcome.permanentFailure("ASSESSMENT_PAYLOAD_INVALID", "The grading response is invalid");
         }
     }
@@ -105,9 +106,9 @@ public class ProductiveAssessmentHandler implements AiJobHandler {
         try {
             JsonNode input = mapper.readTree(inputPayload);
             JsonNode result = mapper.readTree(outputPayload);
-            writer.complete(targetId, input.path("revision").asInt(), result.path("report").toString(),
-                    result.path("transcript").isTextual() ? result.path("transcript").asText() : null);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            writer.complete(targetId, input.path("revision").asInt(0), result.path("report").toString(),
+                    result.path("transcript").isString() ? result.path("transcript").asString("") : null);
+        } catch (tools.jackson.core.JacksonException invalid) {
             throw new IllegalArgumentException("Invalid assessment completion", invalid);
         }
     }

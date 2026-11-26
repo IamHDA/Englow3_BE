@@ -33,7 +33,7 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.services.s3.model.S3Exception;

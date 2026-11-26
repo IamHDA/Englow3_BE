@@ -41,7 +41,8 @@ import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
 import com.englow3.speaking.service.impl.SpeakingAttemptServiceImpl;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -58,7 +59,7 @@ class SpeakingAttemptServiceTest {
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
     private final SpeakingAttemptService service = new SpeakingAttemptServiceImpl(promptRepo, attemptRepo, wordRepo,
-            aiJobQueue, userDirectory, objectStorage, presignedUrls, new ObjectMapper(),
+            aiJobQueue, userDirectory, objectStorage, presignedUrls, JsonMapper.builderWithJackson2Defaults().build(),
             new UserRateLimiter(Clock.systemUTC()), Clock.systemUTC());
 
     private final UUID userId = UUID.randomUUID();

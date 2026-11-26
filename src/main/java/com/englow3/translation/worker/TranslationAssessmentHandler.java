@@ -11,9 +11,9 @@ import com.englow3.ai.client.LlmException;
 import com.englow3.shared.error.DomainException;
 import com.englow3.translation.helper.TranslationRubric;
 import com.englow3.translation.service.TranslationGradeWriter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,18 +38,18 @@ public class TranslationAssessmentHandler implements AiJobHandler {
     public Outcome run(UUID jobId, UUID targetId, String inputPayload) {
         try {
             JsonNode input = mapper.readTree(inputPayload);
-            if (!targetId.toString().equals(input.path("attemptId").asText())) {
+            if (!targetId.toString().equals(input.path("attemptId").asString(""))) {
                 return Outcome.permanentFailure("TRANSLATION_PAYLOAD_INVALID", "Attempt identity does not match");
             }
             // The id stays behind: the grader needs the sentences, not this system's keys.
             var evidence = mapper.createObjectNode();
-            evidence.put("sourceVi", input.path("sourceVi").asText());
-            evidence.put("referenceEn", input.path("referenceEn").asText());
-            evidence.put("learnerTranslation", input.path("learnerTranslation").asText());
+            evidence.put("sourceVi", input.path("sourceVi").asString(""));
+            evidence.put("referenceEn", input.path("referenceEn").asString(""));
+            evidence.put("learnerTranslation", input.path("learnerTranslation").asString(""));
 
             String raw = llm.generateStructured(TranslationRubric.systemPrompt(), mapper.writeValueAsString(evidence),
                     MAX_OUTPUT_TOKENS);
-            String content = mapper.readTree(raw).path("content").asText("");
+            String content = mapper.readTree(raw).path("content").asString("");
             return Outcome.succeeded(TranslationRubric.validate(mapper, content));
         } catch (LlmException e) {
             return e.isRetryable()
@@ -59,7 +59,7 @@ public class TranslationAssessmentHandler implements AiJobHandler {
         } catch (DomainException e) {
             // An unusable report is worth one more try: the next sample of the same model is usually well formed.
             return Outcome.transientFailure(e.getCode(), e.getMessage());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return Outcome.permanentFailure("TRANSLATION_PAYLOAD_INVALID", "The grading request is invalid");
         }
     }

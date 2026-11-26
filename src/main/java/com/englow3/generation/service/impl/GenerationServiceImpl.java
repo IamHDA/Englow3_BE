@@ -24,8 +24,8 @@ import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -130,11 +130,11 @@ public class GenerationServiceImpl implements GenerationService {
 
     private GenerationRequestResult toResult(GenerationRequest r, Map<UUID, String> names) {
         JsonNode components = read(r.getComponents());
-        String title = components.path("plan").path("title").asText(null);
+        String title = components.path("plan").path("title").asString(null);
         List<UUID> taskIds = new ArrayList<>();
-        read(r.getTaskIds()).forEach(id -> taskIds.add(UUID.fromString(id.asText())));
+        read(r.getTaskIds()).forEach(id -> taskIds.add(UUID.fromString(id.asString(""))));
         List<String> problems = new ArrayList<>();
-        read(r.getLastProblems()).forEach(p -> problems.add(p.asText()));
+        read(r.getLastProblems()).forEach(p -> problems.add(p.asString("")));
         return new GenerationRequestResult(r.getId(), r.getKind(), r.getStatus(), r.getStep(), r.getStepIndex(),
                 GenerationRequest.STEPS.size(), r.getAttempt(), r.getBrief(), r.getRequestedByUserId(),
                 names.get(r.getRequestedByUserId()), title, r.getExamId(), taskIds, r.getFullTestId(),
@@ -145,7 +145,7 @@ public class GenerationServiceImpl implements GenerationService {
     private JsonNode read(String json) {
         try {
             return json == null ? mapper.createObjectNode() : mapper.readTree(json);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
+        } catch (tools.jackson.core.JacksonException unreadable) {
             return mapper.createObjectNode();
         }
     }

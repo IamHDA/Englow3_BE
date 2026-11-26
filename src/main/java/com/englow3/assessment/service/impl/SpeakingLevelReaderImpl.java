@@ -14,9 +14,9 @@ import com.englow3.assessment.entity.AssessmentAttempt;
 import com.englow3.assessment.entity.AssessmentAttemptStatus;
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.assessment.repository.AssessmentAttemptRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -59,7 +59,7 @@ public class SpeakingLevelReaderImpl implements SpeakingLevelReader {
         try {
             JsonNode value = report == null ? null : mapper.readTree(report).path("overall");
             return value != null && value.isNumber() ? value.decimalValue() : null;
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             return null;
         }
     }

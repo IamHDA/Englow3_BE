@@ -9,9 +9,9 @@ import java.util.Set;
 import com.englow3.flashcard.dto.command.AddFlashcardsCommand.NewCard;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.storage.PipelineObjectKey;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reads the data pipeline's flashcard JSON into cards this module can store.
@@ -208,7 +208,7 @@ public final class FlashcardImport {
     }
 
     private static String text(JsonNode row, String field) {
-        return blankToNull(row.path(field).asText(null));
+        return blankToNull(row.path(field).asString(null));
     }
 
     private static String blankToNull(String value) {
@@ -218,7 +218,7 @@ public final class FlashcardImport {
     private static JsonNode parse(ObjectMapper objectMapper, String json) {
         try {
             return objectMapper.readTree(json);
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             throw new BadRequestException("FLASHCARD_IMPORT_UNREADABLE", "The file is not valid JSON");
         }
     }

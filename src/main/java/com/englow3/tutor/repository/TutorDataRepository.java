@@ -5,8 +5,8 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 /** Owner-scoped Tutor data only. Queue content is erased through the owning AI API. */
@@ -47,7 +47,7 @@ public class TutorDataRepository {
                 .query(String.class).list().stream().map(value -> {
                     try {
                         return mapper.readTree(value);
-                    } catch (com.fasterxml.jackson.core.JsonProcessingException impossible) {
+                    } catch (tools.jackson.core.JacksonException impossible) {
                         throw new IllegalStateException(impossible);
                     }
                 }).toList();

@@ -29,7 +29,8 @@ import com.englow3.tutor.service.TutorTranscriptionWriter;
 import com.englow3.tutor.service.impl.TutorAudioServiceImpl;
 import com.englow3.tutor.worker.TutorTranscriptionHandler;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TutorAudioIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -57,8 +58,8 @@ class TutorAudioIntegrationTest extends PostgresIntegrationTest {
     void setup() {
         user = new LearnerFixture(jdbc).learner();
         SignedIn.as(jdbc, user);
-        audio = new TutorAudioServiceImpl(recordingRepo, users, jobs, storage, transactions, new ObjectMapper(),
-                Clock.systemUTC(), policy);
+        audio = new TutorAudioServiceImpl(recordingRepo, users, jobs, storage, transactions,
+                JsonMapper.builderWithJackson2Defaults().build(), Clock.systemUTC(), policy);
         ReflectionTestUtils.setField(audio, "enabled", true);
         ReflectionTestUtils.setField(audio, "aiEnabled", true);
         ReflectionTestUtils.setField(audio, "bucket", "speaking");
@@ -83,7 +84,8 @@ class TutorAudioIntegrationTest extends PostgresIntegrationTest {
         when(storage.download(anyString(), anyString())).thenReturn(wav);
         when(speech.assess(any(), eq("audio/wav"), eq("en-US"), isNull()))
                 .thenReturn("{\"recognized_text\":\"Explain the past perfect.\"}");
-        var handler = new TutorTranscriptionHandler(recordingRepo, storage, speech, writer, new ObjectMapper());
+        var handler = new TutorTranscriptionHandler(recordingRepo, storage, speech, writer,
+                JsonMapper.builderWithJackson2Defaults().build());
         ReflectionTestUtils.setField(handler, "bucket", "speaking");
         var job = worker.claimBatch(1000, List.of("TUTOR_TRANSCRIPTION"), Duration.ofMinutes(3)).stream()
                 .filter(row -> row.getTargetId().equals(first.id())).findFirst().orElseThrow();

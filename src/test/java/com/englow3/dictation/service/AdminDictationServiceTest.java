@@ -38,7 +38,8 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Authoring dictation lessons. The flashcard and quiz equivalents were already covered; this is the third of the three,
@@ -54,7 +55,7 @@ class AdminDictationServiceTest {
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminDictationService service = new AdminDictationServiceImpl(lessonRepo, sentenceRepo, userDirectory,
-            currentUser, new ObjectMapper(), CLOCK, mock(PresignedUrlResolver.class));
+            currentUser, JsonMapper.builderWithJackson2Defaults().build(), CLOCK, mock(PresignedUrlResolver.class));
 
     private final UUID adminId = UUID.randomUUID();
     private DictationLesson lesson;

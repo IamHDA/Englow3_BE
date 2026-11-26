@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.hibernate.query.sqm.UnknownPathException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.data.mapping.PropertyReferenceException;
-import org.springframework.data.util.TypeInformation;
+import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.data.core.TypeInformation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 

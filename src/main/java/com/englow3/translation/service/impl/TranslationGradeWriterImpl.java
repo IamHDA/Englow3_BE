@@ -8,8 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.translation.repository.TranslationAttemptRepository;
 import com.englow3.translation.service.TranslationGradeWriter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,8 +26,8 @@ public class TranslationGradeWriterImpl implements TranslationGradeWriter {
     public void storeGrade(UUID attemptId, String report) {
         int score;
         try {
-            score = mapper.readTree(report).path("score").asInt();
-        } catch (JsonProcessingException e) {
+            score = mapper.readTree(report).path("score").asInt(0);
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Invalid translation report", e);
         }
         attemptRepo.findById(attemptId).ifPresent(attempt -> attempt.recordGrade(score, report, clock.instant()));

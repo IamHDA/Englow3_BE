@@ -94,7 +94,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private final String examBucket;
     private final Duration mediaUrlTtl;
     private final ExamAttemptDraftRepository draftRepo;
-    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
+    private final tools.jackson.databind.ObjectMapper mapper;
     private final ExamOutlineQuery outlineQuery;
     private final Duration fullAttemptGrace;
     private final ApplicationEventPublisher events;
@@ -110,7 +110,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
             PlacementRecorder placementRecorder, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.exam-bucket}") String examBucket,
             @Value("${app.storage.exam-media-url-ttl:PT1H}") Duration mediaUrlTtl, ExamAttemptDraftRepository draftRepo,
-            com.fasterxml.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery,
+            tools.jackson.databind.ObjectMapper mapper, ExamOutlineQuery outlineQuery,
             @Value("${app.exam.full-attempt-grace:PT2M}") Duration fullAttemptGrace, ApplicationEventPublisher events,
             ScoreConversionRepository conversionRepo, AttemptSectionResultRepository sectionResultRepo) {
         this.examRepo = examRepo;
@@ -483,7 +483,7 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
         var draft = draftRepo.findById(c.attemptId()).orElseGet(() -> ExamAttemptDraft.empty(c.attemptId(), now));
         try {
             draft.replace(c.version(), mapper.writeValueAsString(c.answers()), now);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+        } catch (tools.jackson.core.JacksonException failure) {
             throw new IllegalStateException("Cannot serialize exam draft");
         }
         draftRepo.saveAndFlush(draft);
@@ -541,9 +541,9 @@ public class ExamAttemptServiceImpl implements ExamAttemptService {
     private List<SubmittedAnswer> storedAnswers(UUID id) {
         String json = draftRepo.findById(id).map(d -> d.getAnswers()).orElse("[]");
         try {
-            return mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<SubmittedAnswer>>() {
+            return mapper.readValue(json, new tools.jackson.core.type.TypeReference<List<SubmittedAnswer>>() {
             });
-        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+        } catch (tools.jackson.core.JacksonException failure) {
             throw new IllegalStateException("Stored exam draft is invalid");
         }
     }

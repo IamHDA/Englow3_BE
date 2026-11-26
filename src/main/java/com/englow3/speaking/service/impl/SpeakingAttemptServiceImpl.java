@@ -30,9 +30,9 @@ import com.englow3.speaking.repository.SpeakingPromptRepository;
 import com.englow3.speaking.service.SpeakingAttemptService;
 import com.englow3.speaking.service.SpeakingAudioKeys;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -177,7 +177,7 @@ public class SpeakingAttemptServiceImpl implements SpeakingAttemptService {
 
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Could not serialise a speech assessment request", impossible);
         }
     }

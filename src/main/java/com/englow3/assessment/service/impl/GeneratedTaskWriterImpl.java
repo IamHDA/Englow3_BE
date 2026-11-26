@@ -13,8 +13,8 @@ import com.englow3.assessment.helper.TaskImages;
 import com.englow3.assessment.repository.AssessmentTaskRepository;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.NotFoundException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class GeneratedTaskWriterImpl implements GeneratedTaskWriter {
         AssessmentTaskRequest request;
         try {
             request = mapper.readValue(taskJson, AssessmentTaskRequest.class);
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             throw new BadRequestException("GENERATED_TASK_UNREADABLE", "The generated task is not valid JSON");
         }
         var violations = validator.validate(request);

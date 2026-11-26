@@ -30,7 +30,7 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.support.ExamFixture;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Erasing an account against the real schema. The foreign keys are the point: some cascade, some restrict, and a delete
@@ -231,11 +231,11 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
         Map<String, JsonNode> data = account.exportData();
 
         assertThat(data.get("friendships")).hasSize(3);
-        assertThat(data.get("friendships")).extracting(row -> row.get("id").asText())
+        assertThat(data.get("friendships")).extracting(row -> row.get("id").asString())
                 .containsExactlyInAnyOrder(sentId.toString(), receivedId.toString(), acceptedId.toString());
         assertThat(data.get("userBlocks")).hasSize(1);
-        assertThat(data.get("userBlocks").get(0).get("blocker_id").asText()).isEqualTo(userId.toString());
-        assertThat(data.get("userBlocks").get(0).get("blocked_id").asText()).isEqualTo(blockedByMe.toString());
+        assertThat(data.get("userBlocks").get(0).get("blocker_id").asString()).isEqualTo(userId.toString());
+        assertThat(data.get("userBlocks").get(0).get("blocked_id").asString()).isEqualTo(blockedByMe.toString());
         assertThat(data.get("userBlocks").toString()).doesNotContain(blockedMe.toString(), unrelated.toString());
         assertThat(data.get("exportMetadata").get("rowLimitPerKind").asInt()).isEqualTo(20_000);
     }
@@ -249,9 +249,9 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
 
         Map<String, JsonNode> data = account.exportData();
 
-        assertThat(data.get("account").get(0).get("email").asText()).isEqualTo(email);
+        assertThat(data.get("account").get(0).get("email").asString()).isEqualTo(email);
         assertThat(data.get("examAttempts")).hasSize(2);
-        data.get("examAttempts").forEach(row -> assertThat(row.get("user_id").asText()).isEqualTo(userId.toString()));
+        data.get("examAttempts").forEach(row -> assertThat(row.get("user_id").asString()).isEqualTo(userId.toString()));
         assertThat(data.get("subscription")).isEmpty();
         assertThat(data).containsKeys("flashcardReviews", "dictationAttempts", "tutorMessages", "assessmentAttempts");
     }

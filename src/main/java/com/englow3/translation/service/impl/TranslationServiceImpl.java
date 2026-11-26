@@ -32,9 +32,9 @@ import com.englow3.translation.repository.TranslationItemRepository;
 import com.englow3.translation.repository.TranslationSetRepository;
 import com.englow3.translation.service.TranslationService;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -151,15 +151,15 @@ public class TranslationServiceImpl implements TranslationService {
             JsonNode parts = report.path("parts");
             List<TranslationAttemptResult.Mistake> errors = new java.util.ArrayList<>();
             for (JsonNode error : report.path("errors")) {
-                errors.add(new TranslationAttemptResult.Mistake(error.path("type").asText(),
-                        error.path("original").asText(), error.path("correction").asText(),
-                        error.path("explanation").asText()));
+                errors.add(new TranslationAttemptResult.Mistake(error.path("type").asString(""),
+                        error.path("original").asString(""), error.path("correction").asString(""),
+                        error.path("explanation").asString("")));
             }
-            return new TranslationAttemptResult.Feedback(report.path("verdict").asText(),
-                    new TranslationAttemptResult.Parts(parts.path("meaning").asInt(), parts.path("grammar").asInt(),
-                            parts.path("vocabulary").asInt(), parts.path("naturalness").asInt()),
-                    report.path("summary").asText(), report.path("improved").asText(), errors);
-        } catch (JsonProcessingException e) {
+            return new TranslationAttemptResult.Feedback(report.path("verdict").asString(""),
+                    new TranslationAttemptResult.Parts(parts.path("meaning").asInt(0), parts.path("grammar").asInt(0),
+                            parts.path("vocabulary").asInt(0), parts.path("naturalness").asInt(0)),
+                    report.path("summary").asString(""), report.path("improved").asString(""), errors);
+        } catch (JacksonException e) {
             throw new IllegalStateException("Stored translation feedback is not JSON", e);
         }
     }
@@ -169,7 +169,7 @@ public class TranslationServiceImpl implements TranslationService {
             return mapper
                     .writeValueAsString(Map.of("attemptId", attempt.getId().toString(), "sourceVi", item.getSourceVi(),
                             "referenceEn", item.getReferenceEn(), "learnerTranslation", attempt.getResponse()));
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Could not serialise a grading request", impossible);
         }
     }

@@ -20,7 +20,8 @@ import com.englow3.ai.client.LlmException;
 import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.api.AiJobHandler.Outcome;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * One queued question. Every branch answers the same two things - is this worth retrying, and does the learner get told
@@ -31,7 +32,8 @@ class TutorReplyHandlerTest {
     private final LlmClient llmClient = mock(LlmClient.class);
     private final TutorReplyWriter writer = mock(TutorReplyWriter.class);
 
-    private final TutorReplyHandler handler = new TutorReplyHandler(llmClient, writer, new ObjectMapper());
+    private final TutorReplyHandler handler = new TutorReplyHandler(llmClient, writer,
+            JsonMapper.builderWithJackson2Defaults().build());
 
     private final UUID messageId = UUID.randomUUID();
 

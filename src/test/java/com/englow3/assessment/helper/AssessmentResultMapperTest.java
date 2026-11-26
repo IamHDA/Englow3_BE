@@ -17,7 +17,8 @@ import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.assessment.entity.AssessmentTaskPurpose;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class AssessmentResultMapperTest {
     private static final String TASK = """
@@ -38,7 +39,8 @@ class AssessmentResultMapperTest {
     private com.englow3.assessment.dto.result.AssessmentAttemptResult seenBy(String role, boolean backOffice) {
         CurrentUser user = mock(CurrentUser.class);
         when(user.hasRole(role == null ? "NONE" : role)).thenReturn(true);
-        var mapper = new AssessmentResultMapper(new ObjectMapper(), mock(ObjectStorageClient.class), user,
+        var mapper = new AssessmentResultMapper(JsonMapper.builderWithJackson2Defaults().build(),
+                mock(ObjectStorageClient.class), user,
                 new com.englow3.assessment.helper.TaskImages(
                         mock(com.englow3.shared.storage.PresignedUrlResolver.class),
                         mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",

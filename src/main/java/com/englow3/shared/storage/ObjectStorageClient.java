@@ -34,8 +34,8 @@ public class ObjectStorageClient {
     }
 
     public void copy(String bucket, String sourceKey, String targetKey) {
-        s3Client.copyObject(software.amazon.awssdk.services.s3.model.CopyObjectRequest.builder().bucket(bucket)
-                .key(targetKey).copySource(bucket + "/" + sourceKey).build());
+        s3Client.copyObject(software.amazon.awssdk.services.s3.model.CopyObjectRequest.builder().sourceBucket(bucket)
+                .sourceKey(sourceKey).destinationBucket(bucket).destinationKey(targetKey).build());
     }
 
     public URL presignGet(String bucket, String key, Duration ttl) {

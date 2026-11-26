@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.web.client.RestClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /** A sleeping adapter is deferred without spending the provider retry budget. */
 @Component
@@ -18,7 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class AiServiceReadiness {
     private final RestClient client;
     private final LongSupplier nanoTime;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
     private boolean checked;
     private boolean live;
     private long expiresAt;
@@ -49,7 +50,7 @@ public class AiServiceReadiness {
             return live;
         try {
             String result = client.get().uri("/health/live").retrieve().body(String.class);
-            live = "up".equals(mapper.readTree(result).path("status").asText());
+            live = "up".equals(mapper.readTree(result).path("status").asString(""));
         } catch (Exception unavailable) {
             live = false;
         }

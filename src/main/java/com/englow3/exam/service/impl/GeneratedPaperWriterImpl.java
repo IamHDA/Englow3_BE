@@ -21,8 +21,8 @@ import com.englow3.exam.service.AdminExamService;
 import com.englow3.exam.service.ExamContentService;
 import com.englow3.exam.service.ExamReviewService;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -45,7 +45,7 @@ public class GeneratedPaperWriterImpl implements GeneratedPaperWriter {
         SaveAuthoringRequest request;
         try {
             request = mapper.readValue(authoringJson, SaveAuthoringRequest.class);
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             throw new BadRequestException("GENERATED_PAPER_UNREADABLE", "The generated paper is not valid JSON");
         }
         var violations = validator.validate(request);

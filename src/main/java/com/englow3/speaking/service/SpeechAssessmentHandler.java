@@ -13,9 +13,9 @@ import com.englow3.ai.client.SpeechAssessmentException;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.shared.error.DomainException;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -58,11 +58,11 @@ public class SpeechAssessmentHandler implements AiJobHandler {
                     "The job payload is not the shape this handler writes");
         }
 
-        UUID attemptId = UUID.fromString(request.path("speakingAttemptId").asText());
+        UUID attemptId = UUID.fromString(request.path("speakingAttemptId").asString(""));
 
         byte[] audio;
         try {
-            audio = objectStorage.download(speakingBucket, request.path("objectKey").asText());
+            audio = objectStorage.download(speakingBucket, request.path("objectKey").asString(""));
         } catch (RuntimeException storageFailure) {
             // Object storage being unreachable is worth another go; the recording itself is fine.
             log.warn("Could not read the recording for speaking attempt {}", attemptId, storageFailure);
@@ -70,8 +70,8 @@ public class SpeechAssessmentHandler implements AiJobHandler {
         }
 
         try {
-            String response = speechClient.assess(audio, request.path("contentType").asText(),
-                    request.path("locale").asText(), request.path("referenceText").asText());
+            String response = speechClient.assess(audio, request.path("contentType").asString(""),
+                    request.path("locale").asString(""), request.path("referenceText").asString(""));
             SpeechAssessmentParser.parse(objectMapper, response);
 
             return Outcome.succeeded(response);
@@ -112,7 +112,7 @@ public class SpeechAssessmentHandler implements AiJobHandler {
         try {
             JsonNode request = objectMapper.readTree(inputPayload);
             return request.hasNonNull("speakingAttemptId") ? request : null;
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             log.error("AI job {} carries an unreadable payload", jobId, malformed);
             return null;
         }

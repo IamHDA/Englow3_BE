@@ -15,8 +15,8 @@ import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatSocketRegistry;
 import com.englow3.shared.error.DomainException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -73,7 +73,7 @@ public class ChatSocketHandler extends TextWebSocketHandler {
             rateLimiter.check(me, "chat-typing", MAX_TYPING_FRAMES_PER_WINDOW, TYPING_WINDOW);
             conversationService.typingRecipient(me, frame.conversationId()).ifPresent(other -> registry.sendTo(other,
                     new ChatSocketFrame.Typing(frame.conversationId(), me, frame.active())));
-        } catch (JsonProcessingException | DomainException ignored) {
+        } catch (JacksonException | DomainException ignored) {
             // A typing signal is disposable: a lost one is covered by the viewer's own timer.
         } catch (RuntimeException failure) {
             // Not the client's doing (the database, say). Left to escape it would close the socket for a signal that

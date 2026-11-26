@@ -21,7 +21,8 @@ import com.englow3.ai.entity.AiJob;
 import com.englow3.ai.entity.AiJobType;
 import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * One attempt at one assessment. Every branch here answers the same question twice - is this worth retrying, and does
@@ -34,7 +35,7 @@ class SpeechAssessmentHandlerTest {
     private final SpeakingAssessmentWriter writer = mock(SpeakingAssessmentWriter.class);
 
     private final SpeechAssessmentHandler handler = new SpeechAssessmentHandler(speechClient, objectStorage, writer,
-            new ObjectMapper());
+            JsonMapper.builderWithJackson2Defaults().build());
 
     private final UUID attemptId = UUID.randomUUID();
 

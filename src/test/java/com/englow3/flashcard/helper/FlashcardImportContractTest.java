@@ -9,8 +9,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * That the importer reads the shape the pipeline actually writes.
@@ -37,14 +38,14 @@ class FlashcardImportContractTest {
     @BeforeAll
     static void load() throws Exception {
         if (schemaIsPresent()) {
-            schema = new ObjectMapper().readTree(Files.readString(SCHEMA));
+            schema = JsonMapper.builderWithJackson2Defaults().build().readTree(Files.readString(SCHEMA));
         }
     }
 
     /** Follows a {@code $ref} into {@code $defs}, which is how the generator writes its nested shapes. */
     private static JsonNode definitionOf(String property) {
         JsonNode node = schema.path("properties").path(property);
-        String ref = node.path("$ref").asText(null);
+        String ref = node.path("$ref").asString(null);
         if (ref == null) {
             return node;
         }
@@ -56,11 +57,11 @@ class FlashcardImportContractTest {
     void readsTheDefinitionAsAnEnglishVietnamesePair() {
         JsonNode definition = definitionOf("definition");
 
-        assertThat(definition.path("type").asText()).isEqualTo("object");
-        assertThat(definition.path("properties").fieldNames()).toIterable().contains("en", "vi");
+        assertThat(definition.path("type").asString()).isEqualTo("object");
+        assertThat(definition.path("properties").propertyNames()).contains("en", "vi");
         // Both required, which is why the importer can insist on a Vietnamese definition without turning away
         // well-formed generated content.
-        assertThat(definition.path("required")).extracting(JsonNode::asText).contains("en", "vi");
+        assertThat(definition.path("required")).extracting(JsonNode::asString).contains("en", "vi");
     }
 
     @Test
@@ -68,16 +69,16 @@ class FlashcardImportContractTest {
     void readsAnExampleAsASentenceWithItsTranslation() {
         JsonNode example = schema.path("$defs").path("Example");
 
-        assertThat(example.path("properties").fieldNames()).toIterable().contains("sentence", "translation");
-        assertThat(example.path("required")).extracting(JsonNode::asText).contains("sentence", "translation");
+        assertThat(example.path("properties").propertyNames()).contains("sentence", "translation");
+        assertThat(example.path("required")).extracting(JsonNode::asString).contains("sentence", "translation");
     }
 
     /** The flat fields the importer reads straight off a row. A rename here silently empties a column. */
     @Test
     @EnabledIf("schemaIsPresent")
     void readsTheFlatFieldsByTheNamesTheSchemaGivesThem() {
-        assertThat(schema.path("properties").fieldNames()).toIterable().contains("lemma", "pos", "sense_label_en",
-                "ipa_us", "ipa_uk", "audio_url_us", "audio_url_uk", "cefr_level", "mnemonic_tip_vi", "examples");
+        assertThat(schema.path("properties").propertyNames()).contains("lemma", "pos", "sense_label_en", "ipa_us",
+                "ipa_uk", "audio_url_us", "audio_url_uk", "cefr_level", "mnemonic_tip_vi", "examples");
     }
 
     /**
@@ -88,7 +89,7 @@ class FlashcardImportContractTest {
     @Test
     @EnabledIf("schemaIsPresent")
     void requiresNothingThePipelineDoesNotPromise() {
-        assertThat(schema.path("required")).extracting(JsonNode::asText).contains("lemma", "pos", "sense_label_en",
+        assertThat(schema.path("required")).extracting(JsonNode::asString).contains("lemma", "pos", "sense_label_en",
                 "ipa_us", "definition", "examples");
     }
 
@@ -112,8 +113,8 @@ class FlashcardImportContractTest {
     @Test
     @EnabledIf("batchSchemaIsPresent")
     void readsTheCardsOutOfTheArrayTheBatchSchemaNames() throws Exception {
-        JsonNode batch = new ObjectMapper().readTree(Files.readString(BATCH_SCHEMA));
+        JsonNode batch = JsonMapper.builderWithJackson2Defaults().build().readTree(Files.readString(BATCH_SCHEMA));
 
-        assertThat(batch.path("properties").path("flashcards").path("type").asText()).isEqualTo("array");
+        assertThat(batch.path("properties").path("flashcards").path("type").asString()).isEqualTo("array");
     }
 }

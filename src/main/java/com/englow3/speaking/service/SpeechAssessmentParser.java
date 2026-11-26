@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Turns what {@code ai_service} answered into the numbers a learner sees.
@@ -57,7 +57,7 @@ public final class SpeechAssessmentParser {
     private static JsonNode read(ObjectMapper mapper, String json) {
         try {
             return mapper.readTree(json);
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             // The adapter answered 200 with something that is not its own schema. Retrying is pointless: it will
             // answer the same way, so this reads as a permanent failure rather than a blip.
             throw new BadRequestException("SPEECH_ASSESSMENT_UNREADABLE",
@@ -107,11 +107,11 @@ public final class SpeechAssessmentParser {
 
     private static Integer integer(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        return value.isNumber() ? value.asInt() : null;
+        return value.isNumber() ? value.asInt(0) : null;
     }
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        return value.isTextual() ? value.asText() : null;
+        return value.isString() ? value.asString("") : null;
     }
 }

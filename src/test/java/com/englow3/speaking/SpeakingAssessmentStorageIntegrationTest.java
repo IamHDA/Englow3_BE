@@ -20,7 +20,8 @@ import com.englow3.speaking.service.SpeakingAssessmentWriter;
 import com.englow3.speaking.service.SpeechAssessmentParser;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The far end of a speaking assessment: what the provider said, written where the learner will read it.
@@ -31,7 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class SpeakingAssessmentStorageIntegrationTest extends PostgresIntegrationTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapper.builderWithJackson2Defaults().build();
 
     private static final String PROVIDER_ANSWER = """
             {"recognized_text":"Please sit on this seat.","accuracy":81.5,"fluency":90,"completeness":100,

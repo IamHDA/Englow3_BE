@@ -21,7 +21,7 @@ import com.englow3.translation.dto.command.SaveTranslationSetCommand;
 import com.englow3.translation.dto.command.SubmitTranslationCommand;
 import com.englow3.translation.entity.TranslationAttemptStatus;
 import com.englow3.translation.helper.TranslationRubric;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The whole loop against the real schema: a set authored and published, a learner translating a sentence, the grading

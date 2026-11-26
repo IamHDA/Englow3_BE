@@ -7,7 +7,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import com.englow3.user.api.UserDirectory;
 import com.englow3.shared.error.ApiErrorResponse;
 import com.englow3.shared.logging.TraceIdFilter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

@@ -22,8 +22,8 @@ import com.englow3.roadmap.repository.RoadmapItemRepository;
 import com.englow3.roadmap.repository.RoadmapMilestoneRepository;
 import com.englow3.roadmap.repository.RoadmapStageRepository;
 import com.englow3.roadmap.service.RoadmapPlanWriter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 
 import lombok.RequiredArgsConstructor;
 

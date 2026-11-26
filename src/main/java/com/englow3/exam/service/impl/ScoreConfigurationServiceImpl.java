@@ -14,7 +14,7 @@ import com.englow3.exam.helper.ToeicScoring;
 import com.englow3.exam.service.ScoreConfigurationService;
 import com.englow3.shared.error.*;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -51,7 +51,7 @@ public class ScoreConfigurationServiceImpl implements ScoreConfigurationService 
         String json;
         try {
             json = mapper.writeValueAsString(command.rows());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("Cannot encode score configuration");
         }
         conversionRepo.insertToeicTable(json, command.effectiveFrom(), command.sourceReference().strip(),

@@ -18,7 +18,7 @@ import com.englow3.tutor.helper.*;
 import com.englow3.tutor.repository.TutorRecordingRepository;
 import com.englow3.tutor.service.TutorAudioService;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -99,7 +99,7 @@ public class TutorAudioServiceImpl implements TutorAudioService {
                     String payload = mapper.writeValueAsString(Map.of("recordingId", locked.getId(), "objectKey",
                             locked.getObjectKey(), "locale", locale));
                     jobs.enqueueTutorTranscription(locked.getId(), payload, "TUTOR_AUDIO:" + locked.getId(), user);
-                } catch (com.fasterxml.jackson.core.JsonProcessingException impossible) {
+                } catch (tools.jackson.core.JacksonException impossible) {
                     throw new IllegalStateException(impossible);
                 }
                 locked.queued();

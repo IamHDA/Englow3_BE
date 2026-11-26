@@ -27,9 +27,9 @@ import com.englow3.user.entity.User;
 import com.englow3.user.helper.AvatarPreset;
 import com.englow3.user.repository.UserRepository;
 import com.englow3.user.service.AccountService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -133,7 +133,7 @@ public class AccountServiceImpl implements AccountService {
                 .param("u", userId).query(String.class).single();
         try {
             return json.readTree(text);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Postgres returned JSON that does not parse for " + table, e);
         }
     }

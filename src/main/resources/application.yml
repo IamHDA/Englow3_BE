@@ -6,6 +6,12 @@ spring:
       pageable:
         max-page-size: 100
 
+  jackson:
+    # Jackson 3 (Boot 4) changed several defaults: properties sorted alphabetically, null rejected for primitive
+    # fields, and more. The API's JSON was written against Jackson 2's behaviour, which the BFF and the stored
+    # payloads rely on, so the application keeps it. Hand-made mappers use JsonMapper.builderWithJackson2Defaults().
+    use-jackson2-defaults: true
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/englow3}
     username: ${DB_USERNAME:postgres}
@@ -69,6 +75,9 @@ springdoc:
   # Local development and BFF type generation set API_DOCS_ENABLED=true.
   api-docs:
     enabled: ${API_DOCS_ENABLED:false}
+    # springdoc 3 publishes OpenAPI 3.1 by default. The BFF's generated types (backend-openapi.ts) were built from
+    # the 3.0 document; staying on 3.0 keeps that file, and every nullable field in it, exactly as it was.
+    version: openapi-3-0
   swagger-ui:
     enabled: ${API_DOCS_ENABLED:false}
   use-fqn: true

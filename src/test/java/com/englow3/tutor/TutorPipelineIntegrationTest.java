@@ -28,7 +28,8 @@ import com.englow3.tutor.dto.command.SendTutorMessageCommand;
 import com.englow3.tutor.service.TutorReplyHandler;
 import com.englow3.tutor.service.TutorReplyWriter;
 import com.englow3.tutor.service.TutorService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A question asked, queued, answered and read back, against a real database.
@@ -66,7 +67,7 @@ class TutorPipelineIntegrationTest extends PostgresIntegrationTest {
         when(llm.generateTurns(anyString(), anyString(), org.mockito.ArgumentMatchers.anyList(), anyDouble(), anyInt()))
                 .thenAnswer(call -> llm.generate(call.getArgument(0), call.getArgument(1), call.getArgument(3),
                         call.getArgument(4)));
-        handler = new TutorReplyHandler(llm, writer, new ObjectMapper());
+        handler = new TutorReplyHandler(llm, writer, JsonMapper.builderWithJackson2Defaults().build());
     }
 
     @AfterEach

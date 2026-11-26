@@ -16,7 +16,8 @@ import com.englow3.quiz.service.QuizAttemptService;
 import com.englow3.quiz.dto.command.SubmitQuizAttemptCommand;
 import com.englow3.tutor.service.TutorService;
 import com.englow3.tutor.dto.command.SendTutorMessageCommand;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TutorStudyContextIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -59,8 +60,8 @@ class TutorStudyContextIntegrationTest extends PostgresIntegrationTest {
                 "GENERAL", false, attempt.id(), question));
         var payload = jdbc.sql("select input_payload::text from ai_jobs where target_id=:id")
                 .param("id", accepted.messages().get(1).id()).query(String.class).single();
-        var data = new ObjectMapper().readTree(payload);
-        assertThat(data.path("systemPrompt").asText()).doesNotContain("has lived");
+        var data = JsonMapper.builderWithJackson2Defaults().build().readTree(payload);
+        assertThat(data.path("systemPrompt").asString()).doesNotContain("has lived");
         assertThat(data.path("messages").toString()).contains("has lived");
         SignedIn.as(jdbc, fixture.learner());
         assertThatThrownBy(() -> context.read(attempt.id(), question)).hasMessageContaining("quiz attempt");

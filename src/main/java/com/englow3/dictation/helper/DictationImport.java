@@ -10,9 +10,9 @@ import java.util.regex.Pattern;
 
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.storage.PipelineObjectKey;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reads the data pipeline's shadowing batch into dictation lessons.
@@ -203,18 +203,18 @@ public final class DictationImport {
 
     private static Integer integer(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        return value.isIntegralNumber() ? value.asInt() : null;
+        return value.isIntegralNumber() ? value.asInt(0) : null;
     }
 
     private static String text(JsonNode node, String field) {
-        String value = node.path(field).asText(null);
+        String value = node.path(field).asString(null);
         return value == null || value.isBlank() ? null : value.strip();
     }
 
     private static JsonNode parse(ObjectMapper objectMapper, String json) {
         try {
             return objectMapper.readTree(json);
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             throw new BadRequestException("DICTATION_IMPORT_UNREADABLE", "The file is not valid JSON");
         }
     }

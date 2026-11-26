@@ -25,7 +25,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.englow3.shared.error.ApiErrorResponse;
 import com.englow3.shared.logging.TraceIdFilter;
 import com.englow3.shared.security.SupabaseRoleConverter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
 

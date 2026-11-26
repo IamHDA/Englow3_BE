@@ -36,7 +36,8 @@ import com.englow3.tutor.repository.TutorConversationRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
 import com.englow3.tutor.service.impl.TutorServiceImpl;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Asking a question. What has to be true before anyone is charged for an answer, and whose conversation a learner is
@@ -56,7 +57,8 @@ class TutorServiceTest {
     private final com.englow3.tutor.service.TutorPolicyService policy = mock(
             com.englow3.tutor.service.TutorPolicyService.class);
     private final TutorService service = new TutorServiceImpl(conversationRepo, messageRepo, aiJobQueue, userDirectory,
-            new ObjectMapper(), CLOCK, mock(com.englow3.tutor.repository.TutorRequestRepository.class),
+            JsonMapper.builderWithJackson2Defaults().build(), CLOCK,
+            mock(com.englow3.tutor.repository.TutorRequestRepository.class),
             mock(com.englow3.tutor.repository.TutorReplyVersionRepository.class),
             mock(com.englow3.user.api.LearnerContextReader.class),
             mock(com.englow3.tutor.service.TutorKnowledgeService.class),

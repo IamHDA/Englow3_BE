@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
 /**
@@ -29,7 +29,7 @@ import org.testcontainers.utility.MountableFile;
 @Tag("integration")
 public abstract class PostgresIntegrationTest {
 
-    private static PostgreSQLContainer<?> postgres;
+    private static PostgreSQLContainer postgres;
     private static final String TEST_QUEUE_SCOPE = "test_" + java.util.UUID.randomUUID().toString().replace("-", "");
 
     /**
@@ -61,10 +61,10 @@ public abstract class PostgresIntegrationTest {
      * Lazy rather than a static initialiser: the class is loaded to evaluate the condition above, so starting a
      * container there would start one even on a machine that has just said it has no Docker.
      */
-    private static synchronized PostgreSQLContainer<?> container() {
+    private static synchronized PostgreSQLContainer container() {
         if (postgres == null) {
-            postgres = new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("englow3")
-                    .withUsername("englow3").withPassword("englow3")
+            postgres = new PostgreSQLContainer("postgres:16-alpine").withDatabaseName("englow3").withUsername("englow3")
+                    .withPassword("englow3")
                     // The migrations put triggers on auth.users, which Supabase owns in production. Creating the slice
                     // they touch before Flyway runs is what lets the real migration files run here unchanged - the
                     // alternative is a test-only copy of the schema, which stops being the schema the first time one

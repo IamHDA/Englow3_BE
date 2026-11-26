@@ -5,10 +5,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -36,6 +38,29 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 @SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
 class OpenApiConfig {
 
+    private static final String ANY_JSON = com.fasterxml.jackson.databind.JsonNode.class.getName();
+
+    static {
+        // Jackson 3's JsonNode is documented under Jackson 2's name, which swagger-core already treats as a value
+        // rather than a bean; otherwise its getters (isArray, isEmpty, ...) would be listed as if they were the
+        // payload.
+        // Jackson 2 is on the classpath through swagger-core itself.
+        SpringDocUtils.getConfig().replaceWithClass(tools.jackson.databind.JsonNode.class,
+                com.fasterxml.jackson.databind.JsonNode.class);
+    }
+
+    /** A JsonNode holds whatever JSON was stored, so its schema says nothing - not even "object". */
+    @Bean
+    OpenApiCustomizer anyJsonSchema() {
+        return openApi -> {
+            Schema<?> node = openApi.getComponents().getSchemas().get(ANY_JSON);
+            if (node != null) {
+                node.setType(null);
+                node.setTypes(null);
+            }
+        };
+    }
+
     /** 401 and 500 are the two answers every endpoint can give, so they are documented once here, not per method. */
     @Bean
     OpenApiCustomizer commonErrorResponses() {
@@ -47,6 +72,39 @@ class OpenApiConfig {
                     .orElseThrow(() -> new IllegalStateException("ApiErrorResponse schema not registered"));
             openApi.getPaths().values().stream().flatMap(pathItem -> pathItem.readOperations().stream())
                     .forEach(operation -> addCommonErrorResponses(operation, errorSchemaRef));
+        };
+    }
+
+    /**
+     * {@code @Schema(nullable = true)} on a field whose type is another record marks that record's component nullable,
+     * which OpenAPI 3.0 reads as "this type is never an object". What is nullable is the field: each reference to such
+     * a component becomes {@code allOf: [$ref], nullable: true}, and the component describes the object again.
+     */
+    @Bean
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    OpenApiCustomizer nullableReferences() {
+        return openApi -> {
+            Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+            Set<String> nullableRefs = new LinkedHashSet<>();
+            schemas.forEach((name, schema) -> {
+                if (Boolean.TRUE.equals(schema.getNullable()) && schema.getProperties() != null) {
+                    schema.setNullable(null);
+                    nullableRefs.add("#/components/schemas/" + name);
+                }
+            });
+            if (nullableRefs.isEmpty()) {
+                return;
+            }
+            schemas.values().stream().filter(schema -> schema.getProperties() != null)
+                    .forEach(schema -> ((Map<String, Schema>) schema.getProperties()).replaceAll((property, value) -> {
+                        if (value.get$ref() == null || !nullableRefs.contains(value.get$ref())) {
+                            return value;
+                        }
+                        Schema wrapped = new Schema<>().allOf(List.of(new Schema<>().$ref(value.get$ref())))
+                                .nullable(true);
+                        wrapped.setDescription(value.getDescription());
+                        return wrapped;
+                    }));
         };
     }
 

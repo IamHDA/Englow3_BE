@@ -30,7 +30,8 @@ import com.englow3.generation.entity.GenerationRequest;
 import com.englow3.generation.repository.GenerationRequestRepository;
 import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Orchestration of starting and resuming: which limits are asked, against which day, and that nothing is queued when
@@ -50,7 +51,7 @@ class GenerationServiceTest {
     private final Instant startOfToday = Instant.parse("2026-11-25T17:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final GenerationServiceImpl service = new GenerationServiceImpl(requestRepo, steps, queue, users, calendar,
-            clock, new ObjectMapper());
+            clock, JsonMapper.builderWithJackson2Defaults().build());
 
     private final UUID author = UUID.randomUUID();
     private final UUID requestId = UUID.randomUUID();

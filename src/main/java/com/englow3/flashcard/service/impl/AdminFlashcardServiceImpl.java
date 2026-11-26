@@ -36,7 +36,7 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 

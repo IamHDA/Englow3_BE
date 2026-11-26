@@ -71,7 +71,8 @@ public class LlmClient {
             body.put("messages", turns);
         if (turns != null)
             body.put("reasoning_effort", "low");
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        tools.jackson.databind.ObjectMapper mapper = tools.jackson.databind.json.JsonMapper
+                .builderWithJackson2Defaults().build();
         try {
             return restClient.post().uri("/internal/v1/llm/stream").contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.TEXT_EVENT_STREAM).body(body).exchange((request, response) -> {
@@ -94,19 +95,19 @@ public class LlmClient {
                                     var error = event.path("error");
                                     LlmException failure = new LlmException(
                                             AiServiceFailure.code(error, "AI_STREAM_FAILED"), "AI stream failed",
-                                            error.path("retryable").asBoolean());
+                                            error.path("retryable").asBoolean(false));
                                     if (error.path("retry_after_seconds").canConvertToInt())
-                                        failure.retryAfter(error.path("retry_after_seconds").asText());
+                                        failure.retryAfter(error.path("retry_after_seconds").asString(""));
                                     throw failure;
                                 }
                                 if (event.has("delta")) {
-                                    text.append(event.path("delta").asText());
+                                    text.append(event.path("delta").asString(""));
                                     if (text.length() > 200000)
                                         throw new LlmException("TUTOR_REPLY_UNREADABLE", "Reply too large", false);
                                     partial.accept(text.toString());
                                 }
                                 if (event.has("result")) {
-                                    if (!text.toString().equals(event.path("result").path("content").asText()))
+                                    if (!text.toString().equals(event.path("result").path("content").asString("")))
                                         throw new LlmException("TUTOR_STREAM_INTERRUPTED", "Incomplete stream", true);
                                     return mapper.writeValueAsString(event.path("result"));
                                 }

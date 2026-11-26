@@ -18,7 +18,7 @@ import com.englow3.assessment.service.AssessmentNotificationService;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,7 +39,7 @@ public class AssessmentNotificationServiceImpl implements AssessmentNotification
                         var task = mapper.readValue(a.getTaskSnapshot(), AssessmentTaskResult.class);
                         return new AssessmentNotificationResult(a.getId(), task.title(), a.getSkill().name(),
                                 a.getVersion(), a.getAssessedAt());
-                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                    } catch (tools.jackson.core.JacksonException e) {
                         throw new IllegalStateException("Invalid stored task snapshot", e);
                     }
                 });

@@ -12,9 +12,9 @@ import com.englow3.ai.client.LlmException;
 import com.englow3.ai.api.AiJobHandler;
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.shared.error.DomainException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -67,9 +67,9 @@ public class TutorReplyHandler implements AiJobHandler {
                     "The job payload is not the shape this handler writes");
         }
 
-        UUID messageId = UUID.fromString(request.path("messageId").asText());
+        UUID messageId = UUID.fromString(request.path("messageId").asString(""));
 
-        if (request.has("revision") && !writer.isPending(messageId, request.path("revision").asInt())) {
+        if (request.has("revision") && !writer.isPending(messageId, request.path("revision").asInt(0))) {
             return Outcome.permanentFailure("TUTOR_REPLY_SUPERSEDED", "This reply was cancelled or replaced");
         }
 
@@ -78,15 +78,15 @@ public class TutorReplyHandler implements AiJobHandler {
             if (request.path("messages").isArray()) {
                 java.util.List<LlmClient.Turn> turns = new java.util.ArrayList<>();
                 for (JsonNode turn : request.path("messages"))
-                    turns.add(new LlmClient.Turn(turn.path("role").asText(), turn.path("content").asText()));
+                    turns.add(new LlmClient.Turn(turn.path("role").asString(""), turn.path("content").asString("")));
                 if (streamingEnabled) {
-                    int revision = request.path("revision").asInt();
+                    int revision = request.path("revision").asInt(0);
                     UUID epoch = writer.startStream(messageId, revision);
                     if (epoch == null)
                         return Outcome.permanentFailure("TUTOR_REPLY_SUPERSEDED", "Reply no longer pending");
                     long[] last = { System.nanoTime(), 0 };
-                    response = llmClient.generateStreaming(request.path("systemPrompt").asText(),
-                            request.path("userPrompt").asText(), turns, TEMPERATURE, MAX_OUTPUT_TOKENS, text -> {
+                    response = llmClient.generateStreaming(request.path("systemPrompt").asString(""),
+                            request.path("userPrompt").asString(""), turns, TEMPERATURE, MAX_OUTPUT_TOKENS, text -> {
                                 if (text.length() - last[1] >= 256 || System.nanoTime() - last[0] >= 500_000_000L) {
                                     if (!writer.partial(messageId, revision, epoch, text))
                                         throw new LlmException("TUTOR_REPLY_SUPERSEDED", "Reply was stopped", false);
@@ -95,12 +95,12 @@ public class TutorReplyHandler implements AiJobHandler {
                                 }
                             });
                 } else {
-                    response = llmClient.generateTurns(request.path("systemPrompt").asText(),
-                            request.path("userPrompt").asText(), turns, TEMPERATURE, MAX_OUTPUT_TOKENS);
+                    response = llmClient.generateTurns(request.path("systemPrompt").asString(""),
+                            request.path("userPrompt").asString(""), turns, TEMPERATURE, MAX_OUTPUT_TOKENS);
                 }
             } else
-                response = llmClient.generate(request.path("systemPrompt").asText(),
-                        request.path("userPrompt").asText(), TEMPERATURE, MAX_OUTPUT_TOKENS);
+                response = llmClient.generate(request.path("systemPrompt").asString(""),
+                        request.path("userPrompt").asString(""), TEMPERATURE, MAX_OUTPUT_TOKENS);
             Reply reply = parse(response);
             var citations = java.util.regex.Pattern.compile("\\[S(\\d+)\\]").matcher(reply.content());
             while (citations.find()) {
@@ -130,12 +130,12 @@ public class TutorReplyHandler implements AiJobHandler {
     public void complete(UUID targetId, String inputPayload, String outputPayload) {
         Reply reply = parse(outputPayload);
         JsonNode request = readRequest(targetId, inputPayload);
-        if (request != null && "MEMORY".equals(request.path("purpose").asText())) {
-            writer.storeSummaryReply(targetId, request.path("revision").asInt(), request.path("memoryEpoch").asLong(),
-                    request.path("memoryThroughOrder").asInt(), reply.content(), reply.model(), reply.inputTokens(),
+        if (request != null && "MEMORY".equals(request.path("purpose").asString(""))) {
+            writer.storeSummaryReply(targetId, request.path("revision").asInt(0), request.path("memoryEpoch").asLong(0),
+                    request.path("memoryThroughOrder").asInt(0), reply.content(), reply.model(), reply.inputTokens(),
                     reply.outputTokens());
         } else if (request != null && request.has("revision")) {
-            writer.storeReply(targetId, request.path("revision").asInt(), reply.content(), reply.model(),
+            writer.storeReply(targetId, request.path("revision").asInt(0), reply.content(), reply.model(),
                     reply.inputTokens(), reply.outputTokens());
         } else {
             writer.storeReply(targetId, reply.content(), reply.model(), reply.inputTokens(), reply.outputTokens());
@@ -172,26 +172,26 @@ public class TutorReplyHandler implements AiJobHandler {
         JsonNode answer;
         try {
             answer = objectMapper.readTree(response);
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             throw new BadRequestException("TUTOR_REPLY_UNREADABLE",
                     "ai_service answered with something that is not JSON");
         }
 
-        String content = answer.path("content").asText(null);
+        String content = answer.path("content").asString(null);
         if (content == null || content.isBlank()) {
             throw new BadRequestException("TUTOR_REPLY_EMPTY", "The tutor returned nothing to show");
         }
 
-        return new Reply(content, answer.path("model").asText(llmClient.defaultModel()),
-                answer.hasNonNull("input_tokens") ? answer.get("input_tokens").asInt() : null,
-                answer.hasNonNull("output_tokens") ? answer.get("output_tokens").asInt() : null);
+        return new Reply(content, answer.path("model").asString(llmClient.defaultModel()),
+                answer.hasNonNull("input_tokens") ? answer.get("input_tokens").asInt(0) : null,
+                answer.hasNonNull("output_tokens") ? answer.get("output_tokens").asInt(0) : null);
     }
 
     private JsonNode readRequest(UUID jobId, String inputPayload) {
         try {
             JsonNode request = objectMapper.readTree(inputPayload);
             return request.hasNonNull("messageId") ? request : null;
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             log.error("AI job {} carries an unreadable payload", jobId, malformed);
             return null;
         }

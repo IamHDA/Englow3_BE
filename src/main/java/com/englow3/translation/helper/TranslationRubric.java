@@ -5,10 +5,10 @@ import java.util.Map;
 import java.util.Set;
 
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * What the grader is asked for and what is accepted back.
@@ -76,8 +76,8 @@ public final class TranslationRubric {
                 if (!value.canConvertToInt() || value.isBoolean()) {
                     throw invalid();
                 }
-                int score = value.asInt();
-                if (score < 0 || score > PARTS.get(part) || value.asDouble() != score) {
+                int score = value.asInt(0);
+                if (score < 0 || score > PARTS.get(part) || value.asDouble(0) != score) {
                     throw invalid();
                 }
                 parts.put(part, score);
@@ -96,7 +96,7 @@ public final class TranslationRubric {
             // The model sometimes lists one mistake twice; a learner reading it twice learns nothing more.
             Set<String> seen = new java.util.HashSet<>();
             for (JsonNode error : errors) {
-                String type = error.path("type").asText("");
+                String type = error.path("type").asString("");
                 if (!error.isObject() || !ERROR_TYPES.contains(type)) {
                     throw invalid();
                 }
@@ -114,7 +114,7 @@ public final class TranslationRubric {
             }
             normalized.put("rubricVersion", VERSION);
             return mapper.writeValueAsString(normalized);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw invalid();
         }
     }
@@ -135,10 +135,10 @@ public final class TranslationRubric {
 
     private static String requireText(JsonNode root, String key, int maximum) {
         JsonNode value = root.path(key);
-        if (!value.isTextual() || value.asText().isBlank() || value.asText().length() > maximum) {
+        if (!value.isString() || value.asString("").isBlank() || value.asString("").length() > maximum) {
             throw invalid();
         }
-        return value.asText().strip();
+        return value.asString("").strip();
     }
 
     private static BadRequestException invalid() {

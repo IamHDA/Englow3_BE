@@ -32,7 +32,8 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -58,7 +59,8 @@ class AssessmentServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new AssessmentServiceImpl(tasks, results, attempts, users, queue, new ObjectMapper(), storage, tx,
+        service = new AssessmentServiceImpl(tasks, results, attempts, users, queue,
+                JsonMapper.builderWithJackson2Defaults().build(), storage, tx,
                 new com.englow3.assessment.helper.TaskImages(
                         mock(com.englow3.shared.storage.PresignedUrlResolver.class),
                         mock(com.englow3.shared.storage.ObjectStorageClient.class), "learning",

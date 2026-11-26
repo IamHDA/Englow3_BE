@@ -1,6 +1,6 @@
 # Englow3 Backend (BE)
 
-Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, được xây dựng trên nền tảng **Java 21** và **Spring Boot 3**, triển khai tự động qua **Docker**, **GitHub Actions (CI/CD)** và **Render Cloud**.
+Backend RESTful API service cho nền tảng học tiếng Anh **Englow3**, được xây dựng trên nền tảng **Java 21** và **Spring Boot 4**, triển khai tự động qua **Docker**, **GitHub Actions (CI/CD)** và **Render Cloud**.
 
 Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipeline sinh/kiểm định học liệu nằm tại [`data_pipeline/`](data_pipeline/); tài liệu kỹ thuật nằm tại [`docs/`](docs/).
 
@@ -21,7 +21,7 @@ Nền tảng hỗ trợ học tiếng Anh A1–C1 và luyện thi TOEIC. Pipelin
 
 ## 🛠 Công nghệ sử dụng (Tech Stack)
 
-* **Core Backend:** Java 21, Spring Boot 3.x (Spring Web, Spring Security, Spring Data JPA).
+* **Core Backend:** Java 21, Spring Boot 4.x (Spring Web MVC, Spring Security, Spring Data JPA, Jackson 3).
 * **Xác thực (Authentication):** Supabase Auth (JWT Resource Server with ES256).
 * **Cơ sở dữ liệu (Database):** PostgreSQL (Supabase) + Schema Migration với **Flyway**.
 * **Lưu trữ tệp (Object Storage):** S3-compatible Storage (MinIO / Supabase Storage).

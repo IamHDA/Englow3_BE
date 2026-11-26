@@ -19,13 +19,14 @@ import com.englow3.ai.api.AiJobHandler.Outcome;
 import com.englow3.ai.client.LlmClient;
 import com.englow3.ai.client.LlmException;
 import com.englow3.translation.service.TranslationGradeWriter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TranslationAssessmentHandlerTest {
 
     private final LlmClient llm = mock(LlmClient.class);
     private final TranslationGradeWriter writer = mock(TranslationGradeWriter.class);
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
     private final TranslationAssessmentHandler handler = new TranslationAssessmentHandler(llm, writer, mapper);
     private final UUID attemptId = UUID.randomUUID();
 
@@ -38,7 +39,8 @@ class TranslationAssessmentHandlerTest {
 
     /** What ai_service answers: the model's text inside "content". */
     private static String adapterAnswer(String content) throws Exception {
-        return new ObjectMapper().writeValueAsString(java.util.Map.of("content", content));
+        return JsonMapper.builderWithJackson2Defaults().build()
+                .writeValueAsString(java.util.Map.of("content", content));
     }
 
     @Test

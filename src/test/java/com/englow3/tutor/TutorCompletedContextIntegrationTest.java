@@ -20,7 +20,8 @@ import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.exam.dto.command.SubmitExamAttemptCommand;
 import com.englow3.tutor.service.TutorService;
 import com.englow3.tutor.dto.command.SendTutorMessageCommand;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TutorCompletedContextIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -54,7 +55,7 @@ class TutorCompletedContextIntegrationTest extends PostgresIntegrationTest {
         var task = tasks.saveAndFlush(AssessmentTask.draft(new AssessmentTaskCommand(skill, "Synthetic context",
                 skill == AssessmentSkill.WRITING ? "TASK_2" : "PART_2", "Explain a favourite activity.",
                 "Private rubric", "HIDDEN_SAMPLE", 1, 60, null, null, null), user));
-        var mapper = new ObjectMapper();
+        var mapper = JsonMapper.builderWithJackson2Defaults().build();
         String snapshot = mapper
                 .writeValueAsString(com.englow3.assessment.dto.result.AssessmentTaskResult.from(task, true));
         var attempt = assessments.saveAndFlush(AssessmentAttempt.draft(UUID.randomUUID(), user, task.getId(),
@@ -80,7 +81,7 @@ class TutorCompletedContextIntegrationTest extends PostgresIntegrationTest {
                 UUID.randomUUID(), "GENERAL", false, null, null, id, null, null));
         var payload = jdbc.sql("select input_payload::text from ai_jobs where target_id=:id")
                 .param("id", sent.messages().get(1).id()).query(String.class).single();
-        assertThat(mapper.readTree(payload).path("systemPrompt").asText()).doesNotContain("Check verb forms");
+        assertThat(mapper.readTree(payload).path("systemPrompt").asString()).doesNotContain("Check verb forms");
         assertThat(mapper.readTree(payload).path("messages").toString()).contains("Check verb forms")
                 .doesNotContain("PRIVATE_AUDIO_KEY", "PRIVATE_EMAIL");
         SignedIn.as(jdbc, fixture.learner());

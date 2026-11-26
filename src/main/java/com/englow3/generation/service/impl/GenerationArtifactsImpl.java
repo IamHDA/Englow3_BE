@@ -11,10 +11,10 @@ import com.englow3.assessment.api.GeneratedTaskWriter;
 import com.englow3.exam.api.GeneratedPaperWriter;
 import com.englow3.generation.repository.GenerationRequestRepository;
 import com.englow3.generation.service.GenerationArtifacts;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,7 +40,7 @@ public class GenerationArtifactsImpl implements GenerationArtifacts {
         UUID examId = papers.createDraft(work.requestedByUserId(), built.path("paper").toString());
         List<UUID> taskIds = new ArrayList<>();
         for (JsonNode task : built.path("tasks")) {
-            ObjectNode body = task.deepCopy();
+            ObjectNode body = (ObjectNode) task.deepCopy();
             body.remove("chart");
             taskIds.add(tasks.createDraft(work.requestedByUserId(), body.toString()));
         }
@@ -61,7 +61,7 @@ public class GenerationArtifactsImpl implements GenerationArtifacts {
         var work = steps.work(requestId, "finish");
         papers.submitForReview(work.examId());
         work.taskIds().forEach(tasks::submitForReview);
-        String title = "IELTS Academic AI Set: " + work.components().path("plan").path("title").asText("Untitled");
+        String title = "IELTS Academic AI Set: " + work.components().path("plan").path("title").asString("Untitled");
         UUID fullTestId = papers.createFullTestDraft(work.requestedByUserId(),
                 title.substring(0, Math.min(title.length(), 100)),
                 "Written with AI. Review the paper and every task before approving.", work.examId(), work.taskIds());
@@ -72,7 +72,7 @@ public class GenerationArtifactsImpl implements GenerationArtifacts {
     private JsonNode read(String json) {
         try {
             return mapper.readTree(json);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Invalid generated assembly", e);
         }
     }

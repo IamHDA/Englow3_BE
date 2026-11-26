@@ -43,8 +43,9 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 import com.englow3.support.SignedIn;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The whole path, over a real socket on a real port: a ticket asked for over the service, redeemed by the handshake, a
@@ -79,7 +80,7 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
     @MockitoBean
     ObjectStorageClient objectStorage;
 
-    private final ObjectMapper json = new ObjectMapper();
+    private final ObjectMapper json = JsonMapper.builderWithJackson2Defaults().build();
     private final List<Client> clients = new ArrayList<>();
     private LearnerFixture fixture;
 
@@ -216,21 +217,21 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
         ChatMessageResult sent = send(a, conversation, "hello b");
 
         JsonNode toB = next(forB);
-        assertThat(toB.get("type").asText()).isEqualTo("message");
+        assertThat(toB.get("type").asString()).isEqualTo("message");
         JsonNode message = toB.get("message");
         assertThat(message.get("seq").asLong()).isEqualTo(sent.seq()).isEqualTo(1);
-        assertThat(message.get("body").asText()).isEqualTo("hello b");
-        assertThat(message.get("id").asText()).isEqualTo(sent.id().toString());
-        assertThat(message.get("conversationId").asText()).isEqualTo(conversation.toString());
-        assertThat(message.get("senderId").asText()).isEqualTo(a.toString());
+        assertThat(message.get("body").asString()).isEqualTo("hello b");
+        assertThat(message.get("id").asString()).isEqualTo(sent.id().toString());
+        assertThat(message.get("conversationId").asString()).isEqualTo(conversation.toString());
+        assertThat(message.get("senderId").asString()).isEqualTo(a.toString());
         assertThat(message.get("recalled").asBoolean()).isFalse();
         assertThat(message.get("imageUrl").isNull()).isTrue();
         assertThat(message.get("clientId").isNull()).as("not b's own message").isTrue();
 
         JsonNode toA = next(forA);
-        assertThat(toA.get("type").asText()).isEqualTo("message");
+        assertThat(toA.get("type").asString()).isEqualTo("message");
         assertThat(toA.get("message").get("seq").asLong()).isEqualTo(1);
-        assertThat(toA.get("message").get("clientId").asText()).as("a's own message").isEqualTo(sent.clientId());
+        assertThat(toA.get("message").get("clientId").asString()).as("a's own message").isEqualTo(sent.clientId());
     }
 
     @Test
@@ -274,9 +275,9 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .sendMessage(new TextMessage("{\"conversationId\":\"%s\",\"active\":true}".formatted(conversation)));
 
         JsonNode typing = next(forB);
-        assertThat(typing.get("type").asText()).isEqualTo("typing");
-        assertThat(typing.get("conversationId").asText()).isEqualTo(conversation.toString());
-        assertThat(typing.get("userId").asText()).isEqualTo(a.toString());
+        assertThat(typing.get("type").asString()).isEqualTo("typing");
+        assertThat(typing.get("conversationId").asString()).isEqualTo(conversation.toString());
+        assertThat(typing.get("userId").asString()).isEqualTo(a.toString());
         assertThat(typing.get("active").asBoolean()).isTrue();
         assertThat(forA.frames.poll(500, TimeUnit.MILLISECONDS)).as("not echoed to the one typing").isNull();
         assertThat(jdbc.sql("select count(*) from chat_messages where conversation_id = :c").param("c", conversation)
@@ -302,7 +303,7 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(forStranger.session.isOpen()).isTrue();
         // And the socket still works afterwards.
         send(a, conversation, "still here");
-        assertThat(next(forB).get("type").asText()).isEqualTo("message");
+        assertThat(next(forB).get("type").asString()).isEqualTo("message");
     }
 
     @Test
@@ -319,20 +320,20 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
         conversationService.markRead(conversation, 1);
 
         JsonNode readSeenByA = next(forA);
-        assertThat(readSeenByA.get("type").asText()).isEqualTo("read");
-        assertThat(readSeenByA.get("conversationId").asText()).isEqualTo(conversation.toString());
-        assertThat(readSeenByA.get("userId").asText()).isEqualTo(b.toString());
+        assertThat(readSeenByA.get("type").asString()).isEqualTo("read");
+        assertThat(readSeenByA.get("conversationId").asString()).isEqualTo(conversation.toString());
+        assertThat(readSeenByA.get("userId").asString()).isEqualTo(b.toString());
         assertThat(readSeenByA.get("upToSeq").asLong()).isEqualTo(1);
-        assertThat(next(forB).get("type").asText()).as("b's other tabs follow the unread badge").isEqualTo("read");
+        assertThat(next(forB).get("type").asString()).as("b's other tabs follow the unread badge").isEqualTo("read");
 
         SignedIn.as(jdbc, a);
         messageService.recall(sent.id());
 
         for (Client client : List.of(forB, forA)) {
             JsonNode recalled = next(client);
-            assertThat(recalled.get("type").asText()).isEqualTo("recalled");
-            assertThat(recalled.get("conversationId").asText()).isEqualTo(conversation.toString());
-            assertThat(recalled.get("messageId").asText()).isEqualTo(sent.id().toString());
+            assertThat(recalled.get("type").asString()).isEqualTo("recalled");
+            assertThat(recalled.get("conversationId").asString()).isEqualTo(conversation.toString());
+            assertThat(recalled.get("messageId").asString()).isEqualTo(sent.id().toString());
             assertThat(recalled.get("seq").asLong()).isEqualTo(1);
         }
     }
@@ -354,7 +355,7 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
             }
         });
         JsonNode afterCommit = next(forB);
-        assertThat(afterCommit.get("type").asText()).isEqualTo("read");
+        assertThat(afterCommit.get("type").asString()).isEqualTo("read");
         assertThat(afterCommit.get("upToSeq").asLong()).isEqualTo(5);
 
         transactions.executeWithoutResult(tx -> {
@@ -419,7 +420,7 @@ class ChatSocketEndToEndIntegrationTest extends PostgresIntegrationTest {
 
         send(a, conversation, "private");
 
-        assertThat(next(forB).get("type").asText()).isEqualTo("message");
+        assertThat(next(forB).get("type").asString()).isEqualTo("message");
         assertThat(forStranger.frames.poll(800, TimeUnit.MILLISECONDS)).isNull();
     }
 }

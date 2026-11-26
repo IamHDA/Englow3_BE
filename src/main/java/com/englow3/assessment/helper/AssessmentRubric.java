@@ -8,9 +8,9 @@ import java.util.Set;
 
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public final class AssessmentRubric {
     private AssessmentRubric() {
@@ -35,7 +35,7 @@ public final class AssessmentRubric {
             Set<String> seen = new HashSet<>();
             BigDecimal total = BigDecimal.ZERO;
             for (JsonNode criterion : criteria) {
-                String key = criterion.path("key").asText();
+                String key = criterion.path("key").asString("");
                 if (!keys(skill).contains(key) || !seen.add(key) || !criterion.path("score").isNumber()) {
                     throw invalid();
                 }
@@ -54,7 +54,7 @@ public final class AssessmentRubric {
                     throw invalid();
                 }
                 for (JsonNode item : list)
-                    if (!item.isTextual() || item.asText().isBlank() || item.asText().length() > 1500) {
+                    if (!item.isString() || item.asString("").isBlank() || item.asString("").length() > 1500) {
                         throw invalid();
                     }
             }
@@ -69,14 +69,14 @@ public final class AssessmentRubric {
             normalized.put("rubricVersion", "productive-v1");
             normalized.put("estimated", true);
             return mapper.writeValueAsString(normalized);
-        } catch (JsonProcessingException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException e) {
             throw invalid();
         }
     }
 
     private static void requireText(JsonNode root, String key, int maximum) {
         JsonNode value = root.path(key);
-        if (!value.isTextual() || value.asText().isBlank() || value.asText().length() > maximum) {
+        if (!value.isString() || value.asString("").isBlank() || value.asString("").length() > maximum) {
             throw invalid();
         }
     }

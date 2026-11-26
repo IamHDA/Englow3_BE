@@ -24,14 +24,13 @@ import org.springframework.web.socket.WebSocketSession;
 
 import com.englow3.chat.dto.response.ChatSocketFrame;
 import com.englow3.chat.service.impl.ChatSocketRegistryImpl;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
 
 class ChatSocketRegistryImplTest {
 
-    private final ChatSocketRegistryImpl registry = new ChatSocketRegistryImpl(new ObjectMapper()
-            .registerModule(new JavaTimeModule()).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
+    private final ChatSocketRegistryImpl registry = new ChatSocketRegistryImpl(
+            JsonMapper.builderWithJackson2Defaults().disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS).build());
 
     private final UUID user = UUID.randomUUID();
     private final UUID conversationId = UUID.randomUUID();

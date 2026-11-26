@@ -16,8 +16,8 @@ import com.englow3.speaking.repository.SpeakingAttemptWordRepository;
 import com.englow3.speaking.service.SpeechAssessmentParser.Assessment;
 import com.englow3.speaking.service.SpeechAssessmentParser;
 import com.englow3.speaking.service.SpeakingAssessmentWriter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -75,7 +75,7 @@ public class SpeakingAssessmentWriterImpl implements SpeakingAssessmentWriter {
     private String phonemesJson(SpeechAssessmentParser.Word word) {
         try {
             return objectMapper.writeValueAsString(word.phonemes());
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             // A list of records holding a String and a BigDecimal; there is nothing here Jackson can refuse.
             throw new IllegalStateException("Could not serialise a phoneme breakdown", impossible);
         }

@@ -27,7 +27,7 @@ class PresignedUrlResolverTest {
     @Test
     void delegatesBucketKeyAndTtl() throws MalformedURLException {
         Duration ttl = Duration.ofHours(3);
-        URL url = new URL("https://example.test/audio");
+        URL url = java.net.URI.create("https://example.test/audio").toURL();
         when(objectStorageClient.presignGet("learning", "audio/key.mp3", ttl)).thenReturn(url);
 
         assertThat(resolver.resolve("learning", "audio/key.mp3", ttl)).isEqualTo(url.toString());

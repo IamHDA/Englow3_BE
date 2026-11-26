@@ -13,7 +13,8 @@ import com.englow3.tutor.entity.*;
 import com.englow3.tutor.repository.*;
 import com.englow3.tutor.service.*;
 import com.englow3.tutor.dto.command.SendTutorMessageCommand;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TutorMemoryIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -70,9 +71,10 @@ class TutorMemoryIntegrationTest extends PostgresIntegrationTest {
         SignedIn.out();
     }
 
-    private com.fasterxml.jackson.databind.JsonNode payload(UUID answer) throws Exception {
-        return new ObjectMapper().readTree(jdbc.sql("select input_payload::text from ai_jobs where target_id=:id")
-                .param("id", answer).query(String.class).single());
+    private tools.jackson.databind.JsonNode payload(UUID answer) throws Exception {
+        return JsonMapper.builderWithJackson2Defaults().build()
+                .readTree(jdbc.sql("select input_payload::text from ai_jobs where target_id=:id").param("id", answer)
+                        .query(String.class).single());
     }
 
     private void finish(UUID answer, String text) throws Exception {
@@ -100,7 +102,7 @@ class TutorMemoryIntegrationTest extends PostgresIntegrationTest {
         var followup = tutor.send(new SendTutorMessageCommand(conversation, "Continue practising", null,
                 UUID.randomUUID(), "GENERAL", false));
         var input = payload(followup.messages().get(1).id());
-        assertThat(input.path("systemPrompt").asText()).doesNotContain("Notes: practise");
+        assertThat(input.path("systemPrompt").asString()).doesNotContain("Notes: practise");
         assertThat(input.path("messages").toString()).contains("Unverified AI conversation notes", "past tense")
                 .doesNotContain("Synthetic lesson 1\"");
         assertThatThrownBy(() -> tutor.restart(conversation, answer, UUID.randomUUID(), true))
@@ -178,7 +180,7 @@ class TutorMemoryIntegrationTest extends PostgresIntegrationTest {
         UUID answer = tutor.summarize(conversation, UUID.randomUUID()).messages().get(1).id();
         finish(answer, "Synthetic study notes");
         assertThat(data.export("MEMORY", 0).items())
-                .anyMatch(row -> row.path("content").asText().contains("Synthetic study notes"));
+                .anyMatch(row -> row.path("content").asString().contains("Synthetic study notes"));
         SignedIn.as(jdbc, new LearnerFixture(jdbc).learner());
         assertThatThrownBy(() -> tutor.memory(conversation)).hasMessageContaining("not found");
         SignedIn.as(jdbc, user);

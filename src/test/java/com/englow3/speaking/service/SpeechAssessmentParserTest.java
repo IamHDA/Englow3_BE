@@ -9,11 +9,12 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.shared.error.BadRequestException;
 import com.englow3.speaking.service.SpeechAssessmentParser.Assessment;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class SpeechAssessmentParserTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
 
     private Assessment parse(String json) {
         return SpeechAssessmentParser.parse(mapper, json);

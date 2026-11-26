@@ -24,7 +24,7 @@ import com.englow3.roadmap.helper.RoadmapPlan.ProposedItem;
 import com.englow3.roadmap.helper.RoadmapPlan.ProposedMilestone;
 import com.englow3.roadmap.helper.RoadmapPlan.ProposedStage;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Reads the AI's proposal and refuses it unless every claim it makes can be checked and holds. The model chooses; it
@@ -183,7 +183,7 @@ public final class RoadmapPlanValidator {
         List<String> skills = new ArrayList<>();
         if (node.isArray()) {
             for (JsonNode skill : node) {
-                String value = skill.asText("").strip().toUpperCase(Locale.ROOT);
+                String value = skill.asString("").strip().toUpperCase(Locale.ROOT);
                 if (value.matches("[A-Z_]{2,30}") && !skills.contains(value)) {
                     skills.add(value);
                 }
@@ -194,19 +194,19 @@ public final class RoadmapPlanValidator {
 
     private static RoadmapContentKind kind(JsonNode node) {
         try {
-            return RoadmapContentKind.valueOf(node.asText(""));
+            return RoadmapContentKind.valueOf(node.asString(""));
         } catch (IllegalArgumentException unknown) {
-            throw invalid("unknown content kind " + node.asText(""));
+            throw invalid("unknown content kind " + node.asString(""));
         }
     }
 
     private static CefrLevel level(JsonNode node, String field) {
-        return CefrLevel.parse(node.asText(null)).orElseThrow(() -> invalid(field + " is not a CEFR level"));
+        return CefrLevel.parse(node.asString(null)).orElseThrow(() -> invalid(field + " is not a CEFR level"));
     }
 
     private static LocalDate date(JsonNode node, String field) {
         try {
-            return LocalDate.parse(node.asText(""));
+            return LocalDate.parse(node.asString(""));
         } catch (java.time.format.DateTimeParseException bad) {
             throw invalid(field + " is not a date");
         }
@@ -214,14 +214,14 @@ public final class RoadmapPlanValidator {
 
     private static UUID uuid(JsonNode node, String field) {
         try {
-            return UUID.fromString(node.asText(""));
+            return UUID.fromString(node.asString(""));
         } catch (IllegalArgumentException bad) {
             throw invalid(field + " is not an id");
         }
     }
 
     private static String text(JsonNode node, int max) {
-        String value = node.asText("").strip();
+        String value = node.asString("").strip();
         return value.length() > max ? value.substring(0, max) : value;
     }
 

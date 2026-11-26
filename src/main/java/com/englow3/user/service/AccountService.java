@@ -2,7 +2,7 @@ package com.englow3.user.service;
 
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /**
  * What a person may ask of their own data: a copy of it, and its removal.

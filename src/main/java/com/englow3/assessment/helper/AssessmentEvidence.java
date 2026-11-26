@@ -2,8 +2,8 @@ package com.englow3.assessment.helper;
 
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Evidence is optional, but references must describe the submitted response. */
 public final class AssessmentEvidence {
@@ -16,9 +16,9 @@ public final class AssessmentEvidence {
             for (JsonNode c : mapper.readTree(report).path("criteria")) {
                 JsonNode quote = c.path("quote");
                 if (!quote.isMissingNode() && !quote.isNull()
-                        && (!quote.isTextual() || quote.asText().isBlank() || quote.asText().length() > 500
+                        && (!quote.isString() || quote.asString("").isBlank() || quote.asString("").length() > 500
                                 || skill != AssessmentSkill.WRITING || answer == null
-                                || !answer.contains(quote.asText()))) {
+                                || !answer.contains(quote.asString("")))) {
                     throw invalid();
                 }
                 JsonNode start = c.path("audioStart"), end = c.path("audioEnd");
@@ -26,12 +26,13 @@ public final class AssessmentEvidence {
                     // Learner recordings are PCM16 mono WAV at 16 kHz, encoded by the recording flow.
                     double maximum = wavBytes == null ? 0 : Math.max(0, (wavBytes - 44) / 32000.0);
                     if (skill != AssessmentSkill.SPEAKING || !start.isNumber() || !end.isNumber()
-                            || start.asDouble() < 0 || end.asDouble() <= start.asDouble() || end.asDouble() > maximum) {
+                            || start.asDouble(0) < 0 || end.asDouble(0) <= start.asDouble(0)
+                            || end.asDouble(0) > maximum) {
                         throw invalid();
                     }
                 }
             }
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw invalid();
         }
     }

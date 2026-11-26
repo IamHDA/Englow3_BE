@@ -15,10 +15,10 @@ import com.englow3.roadmap.helper.RoadmapPlanValidator;
 import com.englow3.roadmap.helper.RoadmapPrompt;
 import com.englow3.roadmap.service.RoadmapPlanWriter;
 import com.englow3.shared.error.DomainException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,11 +49,11 @@ public class RoadmapGenerationHandler implements AiJobHandler {
         Context context;
         try {
             input = mapper.readTree(inputPayload);
-            if (!targetId.toString().equals(input.path("roadmapId").asText())) {
+            if (!targetId.toString().equals(input.path("roadmapId").asString(""))) {
                 return Outcome.permanentFailure("ROADMAP_PAYLOAD_INVALID", "Roadmap identity does not match");
             }
             context = mapper.treeToValue(input.path("context"), Context.class);
-        } catch (JsonProcessingException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException e) {
             return Outcome.permanentFailure("ROADMAP_PAYLOAD_INVALID", "The roadmap request is unreadable");
         }
         try {
@@ -63,11 +63,11 @@ public class RoadmapGenerationHandler implements AiJobHandler {
             String raw = llm.generateStructured(RoadmapPrompt.SYSTEM, mapper.writeValueAsString(prompt),
                     MAX_OUTPUT_TOKENS);
             JsonNode response = mapper.readTree(raw);
-            JsonNode proposal = mapper.readTree(response.path("content").asText(""));
+            JsonNode proposal = mapper.readTree(response.path("content").asString(""));
             List<ProposedStage> stages = RoadmapPlanValidator.validate(proposal, context);
             ObjectNode result = mapper.createObjectNode();
             result.set("stages", mapper.valueToTree(stages));
-            result.put("model", response.path("model").asText(null));
+            result.put("model", response.path("model").asString(null));
             return Outcome.succeeded(result.toString());
         } catch (LlmException e) {
             return e.isRetryable()
@@ -77,7 +77,7 @@ public class RoadmapGenerationHandler implements AiJobHandler {
         } catch (DomainException e) {
             // A plan that breaks a rule: the model may well get it right on another go.
             return Outcome.transientFailure(e.getCode(), e.getMessage());
-        } catch (JsonProcessingException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException e) {
             return Outcome.transientFailure("ROADMAP_PLAN_INVALID", "The proposed roadmap is not valid JSON");
         }
     }
@@ -88,9 +88,9 @@ public class RoadmapGenerationHandler implements AiJobHandler {
             JsonNode input = mapper.readTree(inputPayload);
             JsonNode output = mapper.readTree(outputPayload);
             List<ProposedStage> stages = mapper.readerForListOf(ProposedStage.class).readValue(output.path("stages"));
-            writer.apply(targetId, UUID.fromString(input.path("token").asText()), stages,
-                    output.path("model").isTextual() ? output.path("model").asText() : null, RoadmapPrompt.VERSION);
-        } catch (java.io.IOException invalid) {
+            writer.apply(targetId, UUID.fromString(input.path("token").asString("")), stages,
+                    output.path("model").isString() ? output.path("model").asString("") : null, RoadmapPrompt.VERSION);
+        } catch (JacksonException invalid) {
             throw new IllegalArgumentException("Invalid roadmap completion", invalid);
         }
     }

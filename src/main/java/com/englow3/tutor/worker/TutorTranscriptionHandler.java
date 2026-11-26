@@ -11,8 +11,8 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.tutor.helper.TutorWav;
 import com.englow3.tutor.repository.TutorRecordingRepository;
 import com.englow3.tutor.service.TutorTranscriptionWriter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 /** Reads only the owned immutable recording, never an arbitrary URL from a job payload. */
@@ -45,14 +45,14 @@ public class TutorTranscriptionHandler implements AiJobHandler {
             byte[] audio = storage.download(bucket, row.getObjectKey());
             TutorWav.validate(audio);
             String response = speech.assess(audio, "audio/wav", row.getLocale(), null);
-            String transcript = mapper.readTree(response).path("recognized_text").asText("").strip();
+            String transcript = mapper.readTree(response).path("recognized_text").asString("").strip();
             if (transcript.isBlank() || transcript.length() > 4000)
                 return Outcome.permanentFailure("TUTOR_TRANSCRIPT_EMPTY", "No usable speech was recognized");
             return Outcome.succeeded(mapper.writeValueAsString(java.util.Map.of("transcript", transcript)));
         } catch (SpeechAssessmentException failure) {
             return new Outcome(false, null, failure.getCode(), "Speech service could not transcribe this recording",
                     failure.isRetryable()).retryAfter(failure.getRetryAfter());
-        } catch (JsonProcessingException malformed) {
+        } catch (JacksonException malformed) {
             return Outcome.permanentFailure("TUTOR_TRANSCRIPT_INVALID", "Speech service returned invalid text");
         } catch (com.englow3.shared.error.DomainException invalid) {
             return Outcome.permanentFailure(invalid.getCode(), "Recording is invalid");
@@ -62,8 +62,8 @@ public class TutorTranscriptionHandler implements AiJobHandler {
     @Override
     public void complete(UUID targetId, String input, String output) {
         try {
-            writer.complete(targetId, mapper.readTree(output).path("transcript").asText());
-        } catch (JsonProcessingException invalid) {
+            writer.complete(targetId, mapper.readTree(output).path("transcript").asString(""));
+        } catch (JacksonException invalid) {
             throw new IllegalStateException("Invalid transcription result", invalid);
         }
     }

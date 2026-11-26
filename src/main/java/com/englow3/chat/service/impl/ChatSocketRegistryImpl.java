@@ -19,8 +19,8 @@ import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorato
 
 import com.englow3.chat.dto.response.ChatSocketFrame;
 import com.englow3.chat.service.ChatSocketRegistry;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +92,7 @@ public class ChatSocketRegistryImpl implements ChatSocketRegistry {
         try {
             // Once, however many sockets the person has open.
             message = new TextMessage(objectMapper.writerFor(ChatSocketFrame.class).writeValueAsString(frame));
-        } catch (JsonProcessingException failure) {
+        } catch (JacksonException failure) {
             log.warn("Could not serialise a chat socket frame of type {}", frame.getClass().getSimpleName(), failure);
             return;
         }

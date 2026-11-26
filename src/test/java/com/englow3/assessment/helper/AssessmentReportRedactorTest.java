@@ -7,11 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class AssessmentReportRedactorTest {
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
 
     private static final String REPORT = """
             {"overall":6.5,"estimated":true,"rubricVersion":"productive-v1",
@@ -32,13 +33,13 @@ class AssessmentReportRedactorTest {
 
         for (JsonNode criterion : r.path("criteria")) {
             assertFalse(criterion.has("score"));
-            assertTrue(criterion.path("feedback").isTextual());
+            assertTrue(criterion.path("feedback").isString());
         }
-        assertEquals("I believe", r.path("criteria").get(0).path("quote").asText());
+        assertEquals("I believe", r.path("criteria").get(0).path("quote").asString());
         assertEquals(6.5, r.path("overall").asDouble());
-        assertEquals("A clear answer", r.path("summary").asText());
-        assertEquals("Clear position", r.path("strengths").get(0).asText());
-        assertEquals("Vary linking words", r.path("improvements").get(0).asText());
+        assertEquals("A clear answer", r.path("summary").asString());
+        assertEquals("Clear position", r.path("strengths").get(0).asString());
+        assertEquals("Vary linking words", r.path("improvements").get(0).asString());
         assertTrue(r.path("scoresHidden").asBoolean());
         assertFalse(AssessmentReportRedactor.forLearner(mapper, REPORT).contains("5.5"));
     }
@@ -46,7 +47,7 @@ class AssessmentReportRedactorTest {
     /** Two criteria share the lowest band; the earlier one in the rubric is the one to practise first. */
     @Test
     void namesTheWeakestCriterionAndKeepsTheRubricOrderOnATie() throws Exception {
-        assertEquals("COHERENCE_COHESION", redacted(REPORT).path("focusCriterion").asText());
+        assertEquals("COHERENCE_COHESION", redacted(REPORT).path("focusCriterion").asString());
     }
 
     @Test

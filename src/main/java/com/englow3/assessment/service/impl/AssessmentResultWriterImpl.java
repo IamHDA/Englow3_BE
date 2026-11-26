@@ -12,7 +12,7 @@ import com.englow3.ai.api.AiJobQueue;
 import com.englow3.assessment.helper.AssessmentRubric;
 import com.englow3.assessment.repository.AssessmentAttemptRepository;
 import com.englow3.assessment.service.AssessmentResultWriter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 

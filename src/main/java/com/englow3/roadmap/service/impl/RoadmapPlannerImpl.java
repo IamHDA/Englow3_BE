@@ -32,9 +32,9 @@ import com.englow3.roadmap.service.RoadmapPlanner;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.shared.time.StudyCalendar;
 import com.englow3.user.api.LearnerGoalReader;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -157,7 +157,7 @@ public class RoadmapPlannerImpl implements RoadmapPlanner {
                 });
         try {
             return Optional.of(mapper.writeValueAsString(payload));
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Roadmap payload could not be written", impossible);
         }
     }

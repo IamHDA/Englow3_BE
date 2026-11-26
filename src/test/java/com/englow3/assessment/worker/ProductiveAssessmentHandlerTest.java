@@ -17,7 +17,8 @@ import com.englow3.ai.client.LlmException;
 import com.englow3.ai.client.SpeechAssessmentClient;
 import com.englow3.assessment.service.AssessmentResultWriter;
 import com.englow3.shared.storage.ObjectStorageClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class ProductiveAssessmentHandlerTest {
@@ -29,7 +30,7 @@ class ProductiveAssessmentHandlerTest {
     ObjectStorageClient storage;
     @Mock
     AssessmentResultWriter writer;
-    ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
     ProductiveAssessmentHandler handler;
     UUID id = UUID.randomUUID();
 

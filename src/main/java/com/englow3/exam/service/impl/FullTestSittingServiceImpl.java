@@ -66,7 +66,7 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     private final FullTestService fullTests;
     private final com.englow3.exam.repository.FullTestComponentAttemptRepository bindingRepo;
     private final com.englow3.exam.repository.FullTestBandRevisionRepository revisionRepo;
-    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
+    private final tools.jackson.databind.ObjectMapper mapper;
 
     @Override
     @Transactional
@@ -236,7 +236,7 @@ public class FullTestSittingServiceImpl implements FullTestSittingService {
     private String bandsJson(FullTestSitting sitting) {
         try {
             return mapper.writeValueAsString(sitting.bandSnapshot());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("Cannot encode band audit", e);
         }
     }

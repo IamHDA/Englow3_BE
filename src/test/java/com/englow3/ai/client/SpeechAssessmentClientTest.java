@@ -22,8 +22,8 @@ class SpeechAssessmentClientTest {
     @Test
     void givesUpWhenTheRequestItselfWasRefused() {
         assertThat(SpeechAssessmentClient.retryable(HttpStatus.UNSUPPORTED_MEDIA_TYPE)).isFalse();
-        assertThat(SpeechAssessmentClient.retryable(HttpStatus.PAYLOAD_TOO_LARGE)).isFalse();
-        assertThat(SpeechAssessmentClient.retryable(HttpStatus.UNPROCESSABLE_ENTITY)).isFalse();
+        assertThat(SpeechAssessmentClient.retryable(HttpStatus.CONTENT_TOO_LARGE)).isFalse();
+        assertThat(SpeechAssessmentClient.retryable(HttpStatus.UNPROCESSABLE_CONTENT)).isFalse();
     }
 
     /**

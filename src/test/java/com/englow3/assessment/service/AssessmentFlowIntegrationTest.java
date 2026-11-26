@@ -31,7 +31,8 @@ import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired
@@ -127,7 +128,8 @@ class AssessmentFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(graded.source()).isEqualTo("HUMAN");
         signIn(user, "LEARNER");
         assertThat(learner.attempt(attempt).task().sampleAnswer()).isEqualTo("Sample answer");
-        assertThat(new ObjectMapper().readTree(learner.attempt(attempt).report()).path("overall").asInt()).isEqualTo(6);
+        assertThat(JsonMapper.builderWithJackson2Defaults().build().readTree(learner.attempt(attempt).report())
+                .path("overall").asInt()).isEqualTo(6);
         // The learner reads the overall band and the feedback, but not the band of each criterion.
         assertThat(learner.attempt(attempt).report()).doesNotContain("\"score\"").contains("An argument is present");
         assertThat(graded.report()).contains("\"score\"");

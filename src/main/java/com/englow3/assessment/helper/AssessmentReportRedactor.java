@@ -1,9 +1,9 @@
 package com.englow3.assessment.helper;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * What a learner is allowed to read of a grading report: the overall band and the written feedback, but not the band of
@@ -36,9 +36,9 @@ public final class AssessmentReportRedactor {
             double lowest = Double.MAX_VALUE;
             for (JsonNode criterion : criteria) {
                 // Strictly lower, so a tie keeps the criterion that comes first in the rubric.
-                if (criterion.path("score").isNumber() && criterion.path("score").asDouble() < lowest) {
-                    lowest = criterion.path("score").asDouble();
-                    focus = criterion.path("key").asText(null);
+                if (criterion.path("score").isNumber() && criterion.path("score").asDouble(0) < lowest) {
+                    lowest = criterion.path("score").asDouble(0);
+                    focus = criterion.path("key").asString(null);
                 }
                 ((ObjectNode) criterion).remove("score");
             }

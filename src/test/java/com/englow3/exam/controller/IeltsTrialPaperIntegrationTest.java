@@ -47,9 +47,9 @@ import com.englow3.shared.storage.ObjectStorageClient;
 import com.englow3.support.LearnerFixture;
 import com.englow3.support.PostgresIntegrationTest;
 import com.englow3.support.SignedIn;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.validation.Validator;
 
@@ -176,7 +176,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         List<UUID> taskIds = new ArrayList<>();
         for (JsonNode task : mapper.readTree(read(TASKS))) {
             ObjectNode body = (ObjectNode) task.deepCopy();
-            String chart = body.has("chart") ? body.remove("chart").asText() : null;
+            String chart = body.has("chart") ? body.remove("chart").asString() : null;
             UUID id = tasks.create(mapper.treeToValue(body, AssessmentTaskRequest.class)).getBody().id();
             if (chart != null) {
                 byte[] png = read(CHART);
@@ -284,7 +284,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         List<UUID> taskIds = new ArrayList<>();
         for (JsonNode task : mapper.readTree(read(set + "tasks.json"))) {
             ObjectNode body = (ObjectNode) task.deepCopy();
-            String chart = body.has("chart") ? body.remove("chart").asText() : null;
+            String chart = body.has("chart") ? body.remove("chart").asString() : null;
             AssessmentTaskRequest taskRequest = mapper.treeToValue(body, AssessmentTaskRequest.class);
             assertThat(validator.validate(taskRequest)).isEmpty();
             UUID id = tasks.create(taskRequest).getBody().id();
@@ -337,7 +337,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
                 for (var set : part.questionSets()) {
                     for (var question : set.questions()) {
                         JsonNode key = keys.get(items.size());
-                        assertThat(question.content()).isEqualTo(key.path("content").asText());
+                        assertThat(question.content()).isEqualTo(key.path("content").asString());
                         items.add(new Item(section.sectionType(), set, question, key));
                     }
                 }
@@ -368,7 +368,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
             return null;
         }
         if (q.questionType() == QuestionType.TEXT_ENTRY) {
-            String right = item.key().path("acceptedAnswers").get(0).path("text").asText();
+            String right = item.key().path("acceptedAnswers").get(0).path("text").asString();
             String text = listening && number == 1 ? "Kowalsky"
                     : listening && number >= 31 && number <= 34 || !listening && (number == 37 || number == 38)
                             ? "wrong"
@@ -376,7 +376,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
             return new SubmittedAnswer(q.id(), List.of(), text);
         }
         if (q.questionType() == QuestionType.MATCHING) {
-            String right = item.key().path("matchingLabels").get(0).asText();
+            String right = item.key().path("matchingLabels").get(0).asString();
             String label = listening && number == 25 || !listening && number == 14 ? item.set().setOptions().stream()
                     .map(o -> o.label()).filter(l -> !l.equals(right)).findFirst().orElseThrow() : right;
             return new SubmittedAnswer(q.id(), List.of(item.set().setOptions().stream()
@@ -399,10 +399,10 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
         var q = item.question();
         if (q.questionType() == QuestionType.TEXT_ENTRY) {
             return new SubmittedAnswer(q.id(), List.of(),
-                    item.key().path("acceptedAnswers").get(0).path("text").asText());
+                    item.key().path("acceptedAnswers").get(0).path("text").asString());
         }
         if (q.questionType() == QuestionType.MATCHING) {
-            String label = item.key().path("matchingLabels").get(0).asText();
+            String label = item.key().path("matchingLabels").get(0).asString();
             return new SubmittedAnswer(q.id(), List.of(item.set().setOptions().stream()
                     .filter(o -> o.label().equals(label)).findFirst().orElseThrow().id()), null);
         }
@@ -450,7 +450,7 @@ class IeltsTrialPaperIntegrationTest extends PostgresIntegrationTest {
     private static long count(JsonNode tree, String field) {
         long found = tree.has(field) ? tree.path(field).size() : 0;
         for (JsonNode child : tree) {
-            found += child.isContainerNode() ? count(child, field) : 0;
+            found += child.isContainer() ? count(child, field) : 0;
         }
         return found;
     }

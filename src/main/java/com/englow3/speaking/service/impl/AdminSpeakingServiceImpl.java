@@ -21,8 +21,8 @@ import com.englow3.speaking.entity.SpeakingPromptStatus;
 import com.englow3.speaking.repository.SpeakingPromptRepository;
 import com.englow3.speaking.service.AdminSpeakingService;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -117,7 +117,7 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
     private String tipsJson(CreateSpeakingPromptCommand command) {
         try {
             return objectMapper.writeValueAsString(command.tips() == null ? List.of() : command.tips());
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Could not serialise the prompt tips", impossible);
         }
     }
@@ -154,9 +154,9 @@ public class AdminSpeakingServiceImpl implements AdminSpeakingService {
 
     private List<String> parseTips(String json) {
         try {
-            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+            return objectMapper.readValue(json, new tools.jackson.core.type.TypeReference<List<String>>() {
             });
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("Invalid stored coaching notes", e);
         }
     }

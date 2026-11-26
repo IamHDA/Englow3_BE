@@ -9,12 +9,13 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class TranslationRubricTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
 
     private static String report(String parts, String errors) {
         return """
@@ -33,10 +34,10 @@ class TranslationRubricTest {
                         """)));
 
         assertThat(result.path("score").asInt()).isEqualTo(77);
-        assertThat(result.path("verdict").asText()).isEqualTo("GOOD");
+        assertThat(result.path("verdict").asString()).isEqualTo("GOOD");
         assertThat(result.path("parts").path("grammar").asInt()).isEqualTo(20);
         assertThat(result.path("errors")).hasSize(1);
-        assertThat(result.path("rubricVersion").asText()).isEqualTo(TranslationRubric.VERSION);
+        assertThat(result.path("rubricVersion").asString()).isEqualTo(TranslationRubric.VERSION);
     }
 
     /** A total the model states is ignored: only the parts count, and they are added here. */
@@ -46,7 +47,7 @@ class TranslationRubricTest {
                 report(FULL_MARKS + ",\"score\":12,\"verdict\":\"NEEDS_WORK\"", "[]")));
 
         assertThat(result.path("score").asInt()).isEqualTo(100);
-        assertThat(result.path("verdict").asText()).isEqualTo("EXCELLENT");
+        assertThat(result.path("verdict").asString()).isEqualTo("EXCELLENT");
     }
 
     @ParameterizedTest

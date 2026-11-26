@@ -77,7 +77,8 @@ class ExamAttemptServiceTest {
             com.englow3.exam.repository.AttemptSectionResultRepository.class);
     private final ExamAttemptService service = new ExamAttemptServiceImpl(examRepo, attemptRepo, answerRepo,
             answerOptionRepo, paperQuery, gradingQuery, userDirectory, placementRecorder, presignedUrls, CLOCK, "exams",
-            Duration.ofHours(1), draftRepo, new com.fasterxml.jackson.databind.ObjectMapper(), outlineQuery,
+            Duration.ofHours(1), draftRepo,
+            tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults().build(), outlineQuery,
             Duration.ofMinutes(2), mock(org.springframework.context.ApplicationEventPublisher.class), conversionRepo,
             sectionResultRepo);
 
@@ -286,8 +287,9 @@ class ExamAttemptServiceTest {
         var question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
         var draft = ExamAttemptDraft.empty(attempt.getId(), CLOCK.instant().minusSeconds(1));
-        draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
-                List.of(new SubmittedAnswer(questionId, List.of(correct)))), CLOCK.instant().minusSeconds(1));
+        draft.replace(0, tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults().build()
+                .writeValueAsString(List.of(new SubmittedAnswer(questionId, List.of(correct)))),
+                CLOCK.instant().minusSeconds(1));
         when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
         when(examRepo.findById(exam.getId())).thenReturn(Optional.of(exam));
@@ -442,7 +444,7 @@ class ExamAttemptServiceTest {
         var question = graded(questionId, QuestionType.SINGLE_CHOICE, BigDecimal.ONE, null,
                 List.of(new GradingOption(correct, true, null), new GradingOption(wrong, false, null)));
         var draft = ExamAttemptDraft.empty(attempt.getId(), left);
-        draft.replace(0, new com.fasterxml.jackson.databind.ObjectMapper()
+        draft.replace(0, tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults().build()
                 .writeValueAsString(List.of(new SubmittedAnswer(questionId, List.of(correct)))), left);
         when(draftRepo.findById(attempt.getId())).thenReturn(Optional.of(draft));
         when(attemptRepo.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));

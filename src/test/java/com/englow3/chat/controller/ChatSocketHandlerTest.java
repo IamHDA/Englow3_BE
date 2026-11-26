@@ -29,7 +29,8 @@ import com.englow3.chat.service.ChatConversationService;
 import com.englow3.chat.service.ChatSocketRegistry;
 import com.englow3.shared.error.TooManyRequestsException;
 import com.englow3.shared.ratelimit.UserRateLimiter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -40,7 +41,7 @@ class ChatSocketHandlerTest {
     private final ChatConversationService conversationService = mock(ChatConversationService.class);
     private final UserRateLimiter rateLimiter = mock(UserRateLimiter.class);
     private final ChatSocketHandler handler = new ChatSocketHandler(registry, conversationService, rateLimiter,
-            new ObjectMapper(), Validation.buildDefaultValidatorFactory().getValidator());
+            JsonMapper.builderWithJackson2Defaults().build(), Validation.buildDefaultValidatorFactory().getValidator());
 
     private final WebSocketSession session = mock(WebSocketSession.class);
     private final UUID me = UUID.randomUUID();
@@ -109,8 +110,8 @@ class ChatSocketHandlerTest {
     void aJsonNullFrameIsDroppedBeforeItIsValidated() {
         // Validating null throws, and the failure would be logged for every such frame before the rate limiter ran.
         Validator validator = mock(Validator.class);
-        ChatSocketHandler strict = new ChatSocketHandler(registry, conversationService, rateLimiter, new ObjectMapper(),
-                validator);
+        ChatSocketHandler strict = new ChatSocketHandler(registry, conversationService, rateLimiter,
+                JsonMapper.builderWithJackson2Defaults().build(), validator);
 
         assertThatCode(() -> strict.handleTextMessage(session, new TextMessage("null"))).doesNotThrowAnyException();
 

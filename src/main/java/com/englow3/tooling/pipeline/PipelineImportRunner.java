@@ -35,7 +35,7 @@ import com.englow3.flashcard.service.AdminFlashcardService;
 import com.englow3.flashcard.helper.FlashcardImport;
 import com.englow3.shared.error.ConflictException;
 import com.englow3.user.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 

@@ -34,7 +34,8 @@ import com.englow3.shared.error.ForbiddenException;
 import com.englow3.shared.security.CurrentUser;
 import com.englow3.shared.storage.PresignedUrlResolver;
 import com.englow3.user.api.UserDirectory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Orchestration only. The publish and archive rules live in FlashcardSet and are covered there; this asserts which
@@ -50,7 +51,7 @@ class AdminFlashcardServiceTest {
     private final CurrentUser currentUser = mock(CurrentUser.class);
 
     private final AdminFlashcardService service = new AdminFlashcardServiceImpl(setRepo, cardRepo, userDirectory,
-            currentUser, new ObjectMapper(), CLOCK, mock(PresignedUrlResolver.class));
+            currentUser, JsonMapper.builderWithJackson2Defaults().build(), CLOCK, mock(PresignedUrlResolver.class));
 
     private final UUID authorId = UUID.randomUUID();
     private FlashcardSet set;

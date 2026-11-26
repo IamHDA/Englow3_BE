@@ -12,8 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reading a generated shadowing batch.
@@ -24,7 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 class DictationImportTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapper.builderWithJackson2Defaults().build();
 
     private static final String ONE_CLIP = """
             {"batch_metadata":{"batch_id":"b1","module_type":"shadowing","generated_by":"pipeline",
@@ -218,10 +219,10 @@ class DictationImportTest {
         void readsAClipByTheFieldsTheSchemaGivesIt() throws Exception {
             JsonNode clip = schema().path("$defs").path("ShadowingClip");
 
-            assertThat(clip.path("properties").fieldNames()).toIterable().contains("clip_id", "cefr_level", "script",
-                    "segments", "audio_url", "duration_ms", "topic", "title");
+            assertThat(clip.path("properties").propertyNames()).contains("clip_id", "cefr_level", "script", "segments",
+                    "audio_url", "duration_ms", "topic", "title");
             // audio_url is not required, which is why a clip without one is a rejection rather than a broken row.
-            assertThat(clip.path("required")).extracting(JsonNode::asText).contains("clip_id", "cefr_level", "script",
+            assertThat(clip.path("required")).extracting(JsonNode::asString).contains("clip_id", "cefr_level", "script",
                     "segments");
         }
 
@@ -230,9 +231,9 @@ class DictationImportTest {
         void readsASegmentByTheFieldsTheSchemaGivesIt() throws Exception {
             JsonNode segment = schema().path("$defs").path("ShadowingSegment");
 
-            assertThat(segment.path("properties").fieldNames()).toIterable().contains("order", "text", "start_ms",
-                    "end_ms", "translation_vi");
-            assertThat(segment.path("required")).extracting(JsonNode::asText).contains("order", "text");
+            assertThat(segment.path("properties").propertyNames()).contains("order", "text", "start_ms", "end_ms",
+                    "translation_vi");
+            assertThat(segment.path("required")).extracting(JsonNode::asString).contains("order", "text");
         }
 
         /** The topics a batch may name are exactly the ones the library filters by. */
@@ -241,7 +242,7 @@ class DictationImportTest {
         void namesTheSameTopicsAsTheLibrary() throws Exception {
             JsonNode topic = schema().path("$defs").path("ShadowingClip").path("properties").path("topic");
             var names = new HashSet<String>();
-            topic.findValues("enum").forEach(values -> values.forEach(value -> names.add(value.asText())));
+            topic.findValues("enum").forEach(values -> values.forEach(value -> names.add(value.asString())));
 
             assertThat(names).isEqualTo(DictationImport.TOPICS);
         }
@@ -250,7 +251,7 @@ class DictationImportTest {
         @Test
         @EnabledIf("schemaIsPresent")
         void readsTheBatchAsAnObjectWithClips() throws Exception {
-            assertThat(schema().path("properties").fieldNames()).toIterable().contains("clips");
+            assertThat(schema().path("properties").propertyNames()).contains("clips");
         }
     }
 }

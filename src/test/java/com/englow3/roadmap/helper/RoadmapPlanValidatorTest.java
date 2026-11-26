@@ -17,13 +17,14 @@ import com.englow3.roadmap.helper.RoadmapPlan.Candidate;
 import com.englow3.roadmap.helper.RoadmapPlan.Context;
 import com.englow3.roadmap.helper.RoadmapPlan.MockPaper;
 import com.englow3.roadmap.helper.RoadmapPlan.ProposedStage;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class RoadmapPlanValidatorTest {
 
     private static final LocalDate TODAY = LocalDate.parse("2026-11-02");
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
     private final UUID quiz = UUID.randomUUID();
     private final UUID lesson = UUID.randomUUID();
     private final UUID heavy = UUID.randomUUID();

@@ -8,10 +8,11 @@ import org.junit.jupiter.api.Test;
 
 import com.englow3.assessment.entity.AssessmentSkill;
 import com.englow3.shared.error.BadRequestException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class AssessmentRubricTest {
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builderWithJackson2Defaults().build();
 
     @Test
     void rejectsEmptyAndNullProviderReports() {

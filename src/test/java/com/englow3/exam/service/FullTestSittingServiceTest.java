@@ -65,7 +65,7 @@ class FullTestSittingServiceTest {
             attemptRepo, sectionResultRepo, assessments, goals, placements, userDirectory, events, CLOCK,
             mock(FullTestService.class), bindingRepo,
             mock(com.englow3.exam.repository.FullTestBandRevisionRepository.class),
-            new com.fasterxml.jackson.databind.ObjectMapper());
+            tools.jackson.databind.json.JsonMapper.builderWithJackson2Defaults().build());
 
     private final UUID userId = UUID.randomUUID();
     private FullTest test;
