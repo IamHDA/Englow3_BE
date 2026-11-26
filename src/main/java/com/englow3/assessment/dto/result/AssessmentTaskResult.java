@@ -13,6 +13,16 @@ public record AssessmentTaskResult(UUID id, AssessmentSkill skill, String title,
         String imageObjectKey, String imageUrl) {
 
     /**
+     * Attempt snapshots written before V075 carry no purpose. Every task then was a practice task (V075 backfilled the
+     * column the same way), and the field is non-null downstream, so an old attempt must not read back as null.
+     */
+    public AssessmentTaskResult {
+        if (purpose == null) {
+            purpose = AssessmentTaskPurpose.PRACTICE;
+        }
+    }
+
+    /**
      * The key is what a snapshot keeps; the URL is signed fresh each time the task is shown, so an attempt's copy never
      * holds a link that has expired.
      */
