@@ -7,6 +7,9 @@ import com.englow3.exam.api.SubmittedExamContextReader;
 import com.englow3.exam.repository.ExamAttemptRepository;
 import com.englow3.exam.repository.QuestionRepository;
 import com.englow3.exam.repository.QuestionOptionRepository;
+import com.englow3.exam.repository.QuestionSetOptionRepository;
+import com.englow3.exam.repository.QuestionSetRepository;
+import com.englow3.exam.repository.SectionPartRepository;
 import com.englow3.exam.entity.ExamAttemptStatus;
 import com.englow3.exam.service.ExamAttemptService;
 import com.englow3.shared.error.*;
@@ -16,12 +19,12 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class SubmittedExamContextReaderImpl implements SubmittedExamContextReader {
-    private final ExamAttemptRepository attempts;
-    private final QuestionRepository questions;
-    private final QuestionOptionRepository options;
-    private final com.englow3.exam.repository.QuestionSetRepository sets;
-    private final com.englow3.exam.repository.QuestionSetOptionRepository setOptions;
-    private final com.englow3.exam.repository.SectionPartRepository parts;
+    private final ExamAttemptRepository attemptRepo;
+    private final QuestionRepository questionRepo;
+    private final QuestionOptionRepository optionRepo;
+    private final QuestionSetRepository questionSetRepo;
+    private final QuestionSetOptionRepository setOptionRepo;
+    private final SectionPartRepository sectionPartRepo;
     private final ExamAttemptService exams;
     private final UserDirectory users;
 
@@ -29,7 +32,7 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
     @Transactional
     public Question read(UUID attemptId, UUID questionId) {
         UUID user = users.requireCurrentUserId();
-        var attempt = attempts.findById(attemptId).filter(a -> a.getUserId().equals(user))
+        var attempt = attemptRepo.findById(attemptId).filter(a -> a.getUserId().equals(user))
                 .orElseThrow(() -> new NotFoundException("ATTEMPT_NOT_FOUND", "Exam attempt not found"));
         // Do not call result() for an active attempt: it may finalize an expired exam.
         if (attempt.getStatus() != ExamAttemptStatus.SCORED)
@@ -37,13 +40,13 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
         var review = exams.result(attemptId).questions().stream().filter(q -> q.questionId().equals(questionId))
                 .findFirst().orElseThrow(() -> new NotFoundException("TUTOR_CONTEXT_QUESTION",
                         "Question not in this completed attempt"));
-        var question = questions.findById(questionId)
+        var question = questionRepo.findById(questionId)
                 .orElseThrow(() -> new NotFoundException("TUTOR_CONTEXT_QUESTION", "Question unavailable"));
-        var choices = options.findAllById(java.util.stream.Stream
+        var choices = optionRepo.findAllById(java.util.stream.Stream
                 .concat(review.selectedOptionIds().stream(), review.correctOptionIds().stream()).distinct().toList());
-        var set = sets.findById(question.getQuestionSetId())
+        var set = questionSetRepo.findById(question.getQuestionSetId())
                 .orElseThrow(() -> new NotFoundException("TUTOR_CONTEXT_QUESTION", "Question stimulus unavailable"));
-        var part = parts.findById(set.getSectionPartId())
+        var part = sectionPartRepo.findById(set.getSectionPartId())
                 .orElseThrow(() -> new NotFoundException("TUTOR_CONTEXT_QUESTION", "Question part unavailable"));
         String selected = choices.stream()
                 .filter(o -> o.getQuestionId().equals(questionId) && review.selectedOptionIds().contains(o.getId()))
@@ -53,7 +56,7 @@ public class SubmittedExamContextReaderImpl implements SubmittedExamContextReade
                 .map(o -> o.getContent()).collect(java.util.stream.Collectors.joining("; "));
         if (question.getQuestionType() == com.englow3.exam.entity.QuestionType.MATCHING) {
             // The choice came from the set's shared list, not from options of the question itself.
-            var entries = setOptions.findAllById(java.util.stream.Stream
+            var entries = setOptionRepo.findAllById(java.util.stream.Stream
                     .concat(review.selectedOptionIds().stream(), review.correctOptionIds().stream()).distinct()
                     .toList());
             selected = entries.stream().filter(e -> review.selectedOptionIds().contains(e.getId()))

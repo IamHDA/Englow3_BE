@@ -49,7 +49,7 @@ public class TutorServiceImpl implements TutorService {
     private final com.englow3.tutor.service.TutorPolicyService policy;
     private final com.englow3.assessment.api.SubmittedAssessmentContextReader assessmentContextReader;
     private final com.englow3.exam.api.SubmittedExamContextReader examContextReader;
-    private final TutorMemoryRepository memories;
+    private final TutorMemoryRepository memoryRepo;
     @Value("${app.tutor.memory-enabled:false}")
     private boolean memoryEnabled;
 
@@ -64,7 +64,7 @@ public class TutorServiceImpl implements TutorService {
     @Transactional(readOnly = true)
     public TutorMemoryResult memory(UUID id) {
         var conversation = requireOwned(id, userDirectory.requireCurrentUserId());
-        var memory = memories.read(id);
+        var memory = memoryRepo.read(id);
         UUID pending = memory.pendingMessageId() == null ? null
                 : messageRepo.findById(memory.pendingMessageId())
                         .filter(m -> m.getStatus() == TutorMessageStatus.PENDING).map(TutorMessage::getId).orElse(null);
@@ -81,7 +81,7 @@ public class TutorServiceImpl implements TutorService {
         UUID user = userDirectory.requireCurrentUserId();
         aiJobQueue.lockBudget(user);
         lockOwned(id, user);
-        memories.clear(id);
+        memoryRepo.clear(id);
     }
 
     @Override
@@ -105,8 +105,8 @@ public class TutorServiceImpl implements TutorService {
         if (messageRepo.existsByTutorConversationIdAndStatus(id, TutorMessageStatus.PENDING))
             throw new ConflictException("TUTOR_REPLY_PENDING", "Wait for the current answer");
         requireQuota(user);
-        memories.lock(id);
-        var previous = memories.read(id);
+        memoryRepo.lock(id);
+        var previous = memoryRepo.read(id);
         var batch = messageRepo.memoryBatch(id, previous.throughOrder(),
                 org.springframework.data.domain.PageRequest.of(0, 20));
         if (batch.isEmpty())
@@ -122,7 +122,7 @@ public class TutorServiceImpl implements TutorService {
         answer.markSummary();
         answer = messageRepo.save(answer);
         conversation.recordTurn(now);
-        long epoch = memories.queue(id, answer.getId(), through);
+        long epoch = memoryRepo.queue(id, answer.getId(), through);
         var payload = objectMapper.createObjectNode();
         payload.put("messageId", answer.getId().toString());
         payload.put("revision", answer.getRevision());
@@ -492,7 +492,7 @@ public class TutorServiceImpl implements TutorService {
             String question, String mode, UUID user, boolean personalized) {
         if (!policy.allowedModes().contains(mode))
             throw new ConflictException("TUTOR_MODE_DISABLED", "This learning mode is temporarily unavailable");
-        var memory = memoryEnabled ? memories.read(conversation.getId())
+        var memory = memoryEnabled ? memoryRepo.read(conversation.getId())
                 : new TutorMemoryRepository.Row(null, 0, 0, null);
         boolean useMemory = memory.content() != null && !memory.content().isBlank();
         history = history.stream().filter(m -> (!m.isSummary() || m.getCorrection() != null)

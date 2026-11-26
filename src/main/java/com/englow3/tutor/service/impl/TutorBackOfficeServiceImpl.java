@@ -24,7 +24,7 @@ public class TutorBackOfficeServiceImpl implements TutorBackOfficeService {
     private final TutorAuditRepository auditRepo;
     private final TutorMessageRepository messageRepo;
     private final TutorReplyVersionRepository versionRepo;
-    private final TutorMemoryRepository memories;
+    private final TutorMemoryRepository memoryRepo;
     private final UserDirectory users;
     private final CurrentUser currentUser;
     private final Clock clock;
@@ -179,7 +179,7 @@ public class TutorBackOfficeServiceImpl implements TutorBackOfficeService {
                                 : m.getCorrection()));
         if (resolved && report.getProposedCorrection() != null) {
             messageRepo.flush();
-            memories.invalidateForMessage(report.getMessageId());
+            memoryRepo.invalidateForMessage(report.getMessageId());
         }
         audit(id, "REPORT_" + command.action(), command.note());
         return TutorReportResult.of(report, true);

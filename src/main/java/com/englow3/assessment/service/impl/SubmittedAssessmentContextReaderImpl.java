@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class SubmittedAssessmentContextReaderImpl implements SubmittedAssessmentContextReader {
-    private final AssessmentAttemptRepository attempts;
+    private final AssessmentAttemptRepository attemptRepo;
     private final UserDirectory users;
     private final ObjectMapper mapper;
 
@@ -24,7 +24,7 @@ public class SubmittedAssessmentContextReaderImpl implements SubmittedAssessment
     @Transactional(readOnly = true)
     public Review read(UUID attemptId) {
         UUID user = users.requireCurrentUserId();
-        var attempt = attempts.findById(attemptId).filter(a -> a.getUserId().equals(user))
+        var attempt = attemptRepo.findById(attemptId).filter(a -> a.getUserId().equals(user))
                 .orElseThrow(() -> new NotFoundException("ASSESSMENT_NOT_FOUND", "Submission not found"));
         if (attempt.getStatus() != AssessmentAttemptStatus.COMPLETED)
             throw new ConflictException("TUTOR_CONTEXT_NOT_READY", "This submission has not been assessed yet");

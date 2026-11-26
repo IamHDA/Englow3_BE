@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.englow3.tutor.entity.TutorMessageStatus;
+import com.englow3.tutor.repository.TutorMemoryRepository;
 import com.englow3.tutor.repository.TutorMessageRepository;
 import com.englow3.tutor.service.TutorPrompt;
 import com.englow3.tutor.service.TutorReplyWriter;
@@ -26,7 +27,7 @@ public class TutorReplyWriterImpl implements TutorReplyWriter {
 
     private final TutorMessageRepository messageRepo;
     private final Clock clock;
-    private final com.englow3.tutor.repository.TutorMemoryRepository memories;
+    private final TutorMemoryRepository memoryRepo;
     private final com.englow3.ai.api.AiJobQueue aiJobQueue;
 
     @Transactional
@@ -41,7 +42,7 @@ public class TutorReplyWriterImpl implements TutorReplyWriter {
                             outputTokens, clock.instant());
                 });
         messageRepo.flush();
-        memories.complete(messageId, revision, epoch, throughOrder,
+        memoryRepo.complete(messageId, revision, epoch, throughOrder,
                 com.englow3.tutor.helper.TutorMemoryText.clip(content, 4000));
     }
 
