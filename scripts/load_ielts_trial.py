@@ -15,6 +15,9 @@ Parts 1-4, and only then is it sent for review. Without them the paper goes in s
 --set-dir loads an AI-written set from data_pipeline/generators/generate_ielts_set.py instead of the
 trial paper: its folder holds paper.json, tasks.json, task1-chart.png and audio/part-N.mp3.
 
+--exam-id carries on with a paper an earlier run created but did not finish (it stopped before the
+paper was sent for review): the audio is attached to that draft instead of creating another copy.
+
 --skip-tasks loads the paper alone, for when the five tasks are already in (a published paper cannot be
 edited, so adding audio to one already loaded means loading a new copy and building a new full test).
 
@@ -27,6 +30,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -37,22 +41,47 @@ PAPER = RESOURCES / "academic-trial-paper-1.json"
 TASKS = RESOURCES / "academic-trial-tasks.json"
 AUDIO = Path(__file__).resolve().parent.parent / "data_pipeline" / "output" / "audio" / "ielts"
 AUDIO_STEM = "academic-trial-paper-1-part-{}.mp3"
+TIMEOUT = 300  # seconds; uploading a part's audio to a small instance can take a while
 
 
-def call(base, token, method, path, body=None, content_type="application/json"):
+def call(base, token, method, path, body=None, content_type="application/json", retries=0):
+    """One request. Requests that are safe to repeat (reading, uploading a file) pass retries: a busy
+    instance can time out, or answer 401 when it cannot fetch the keys to check the token in time."""
     data = None
     if body is not None:
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
-    request = urllib.request.Request(base + path, data=data, method=method)
-    request.add_header("Authorization", "Bearer " + token)
-    if data is not None:
-        request.add_header("Content-Type", content_type)
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            text = response.read().decode()
-            return json.loads(text) if text else None
-    except urllib.error.HTTPError as error:
-        sys.exit(f"{method} {path} failed with {error.code}: {error.read().decode()[:500]}")
+    for attempt in range(retries + 1):
+        request = urllib.request.Request(base + path, data=data, method=method)
+        request.add_header("Authorization", "Bearer " + token)
+        if data is not None:
+            request.add_header("Content-Type", content_type)
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+                text = response.read().decode()
+                return json.loads(text) if text else None
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode()[:500]
+            if error.code in (401, 502, 503, 504) and attempt < retries:
+                print(f"{method} {path} answered {error.code}; trying again", flush=True)
+                time.sleep(20)
+                continue
+            sys.exit(f"{method} {path} failed with {error.code}: {detail}")
+        except (TimeoutError, urllib.error.URLError) as error:
+            if attempt < retries:
+                print(f"{method} {path} did not answer ({error}); trying again", flush=True)
+                time.sleep(20)
+                continue
+            sys.exit(f"{method} {path} did not answer: {error}")
+
+
+def upload_direct(exam_id, path, bucket="exams"):
+    """What POST /media does (it only stores the file), straight to the bucket: the same key layout."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "data_pipeline" / "generators"))
+    from record_toeic_listening import s3_client
+
+    key = f"{exam_id}/audios/{uuid.uuid4()}.mp3"
+    s3_client().upload_file(str(path), bucket, key, ExtraArgs={"ContentType": "audio/mpeg"})
+    return key
 
 
 def multipart(field, filename, content_type, payload):
@@ -68,6 +97,9 @@ def main():
     parser.add_argument("--skip-tasks", action="store_true", help="load the paper only")
     parser.add_argument("--audio-dir", type=Path, default=AUDIO, help="where the part MP3s are")
     parser.add_argument("--set-dir", type=Path, help="an AI-written set folder to load instead of the trial")
+    parser.add_argument("--exam-id", help="finish this draft from an earlier, interrupted run instead of creating one")
+    parser.add_argument("--direct-upload", action="store_true",
+                        help="put the audio straight into the bucket (S3_* in .env) when the backend is too slow")
     args = parser.parse_args()
     paper_file, tasks_file, assets, audio_dir, audio_stem = PAPER, TASKS, RESOURCES, args.audio_dir, AUDIO_STEM
     if args.set_dir:
@@ -85,11 +117,20 @@ def main():
     if missing:
         print(f"No audio for {', '.join(missing)}: the Listening section goes in silent.")
 
-    exam = call(base, token, "POST", "/api/admin/exams/authoring", paper)
+    if args.exam_id:
+        exam = call(base, token, "GET", f"/api/admin/exams/{args.exam_id}/authoring", retries=3)
+        print(f"Carrying on with draft {exam['id']}")
+    else:
+        exam = call(base, token, "POST", "/api/admin/exams/authoring", paper)
+        print(f"Draft created: {exam['id']} (if this run stops, carry on with --exam-id {exam['id']})", flush=True)
     if not missing:
         for part, path in zip(listening["parts"], audio):
             body, content_type = multipart("file", path.name, "audio/mpeg", path.read_bytes())
-            uploaded = call(base, token, "POST", f"/api/admin/exams/{exam['id']}/media", body, content_type)
+            if args.direct_upload:
+                part["audioObjectKey"] = upload_direct(exam["id"], path)
+                continue
+            uploaded = call(base, token, "POST", f"/api/admin/exams/{exam['id']}/media", body, content_type,
+                            retries=3)
             part["audioObjectKey"] = uploaded["objectKey"]
         exam = call(base, token, "PUT", f"/api/admin/exams/{exam['id']}/authoring",
                     {**paper, "version": exam["version"]})
