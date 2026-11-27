@@ -1,12 +1,552 @@
 [
-  {"set": "academic-trial-paper-1", "slot": "listening-1", "topic": "booking a beginners' pottery course at an arts centre"},
-  {"set": "academic-trial-paper-1", "slot": "listening-2", "topic": "guided introduction to a woodland nature reserve"},
-  {"set": "academic-trial-paper-1", "slot": "listening-3", "topic": "students discussing a survey project on food waste"},
-  {"set": "academic-trial-paper-1", "slot": "listening-4", "topic": "history of lighthouse lamps and lenses"},
-  {"set": "academic-trial-paper-1", "slot": "reading-1", "topic": "community fruit orchards returning to European cities"},
-  {"set": "academic-trial-paper-1", "slot": "reading-2", "topic": "footbridges that sway under crowds and how engineers fixed them"},
-  {"set": "academic-trial-paper-1", "slot": "reading-3", "topic": "the psychological value of boredom"},
-  {"set": "academic-trial-paper-1", "slot": "writing-1", "topic": "household waste recycling rates in four cities"},
-  {"set": "academic-trial-paper-1", "slot": "writing-2", "topic": "working from home: benefits and problems"},
-  {"set": "academic-trial-paper-1", "slot": "speaking", "topic": "home, free time and learning useful skills"}
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "listening-1",
+    "topic": "booking a beginners' pottery course at an arts centre"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "listening-2",
+    "topic": "guided introduction to a woodland nature reserve"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "listening-3",
+    "topic": "students discussing a survey project on food waste"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "listening-4",
+    "topic": "history of lighthouse lamps and lenses"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "reading-1",
+    "topic": "community fruit orchards returning to European cities"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "reading-2",
+    "topic": "footbridges that sway under crowds and how engineers fixed them"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "reading-3",
+    "topic": "the psychological value of boredom"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "writing-1",
+    "topic": "household waste recycling rates in four cities"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "writing-2",
+    "topic": "working from home: benefits and problems"
+  },
+  {
+    "set": "academic-trial-paper-1",
+    "slot": "speaking",
+    "topic": "home, free time and learning useful skills"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "listening-1",
+    "topic": "joining a community choir: a membership enquiry by phone"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "listening-2",
+    "topic": "orientation talk for new volunteers at a city farm"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "listening-3",
+    "topic": "two students and a tutor planning a presentation on urban heat islands"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "listening-4",
+    "topic": "lecture on the marine chronometer and the problem of longitude at sea"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "reading-1",
+    "topic": "the history of the umbrella from status symbol to disposable object"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "reading-2",
+    "topic": "competing scientific explanations of why animals sleep"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "reading-3",
+    "topic": "the scientific and ethical debate over de-extinction"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "writing-1",
+    "topic": "international students enrolled in four countries between 2005 and 2020"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "writing-2",
+    "topic": "whether museums and art galleries should be free for everyone to enter"
+  },
+  {
+    "set": "authored-test-01",
+    "slot": "speaking",
+    "topic": "neighbourhoods and local places"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "listening-1",
+    "topic": "hiring camping equipment for a group trip"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "listening-2",
+    "topic": "a local radio feature about a newly opened community library"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "listening-3",
+    "topic": "two students discussing their research into music and concentration"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "listening-4",
+    "topic": "lecture on bioluminescence in deep-sea animals"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "reading-1",
+    "topic": "the building of the canal network in eighteenth-century England"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "reading-2",
+    "topic": "the arguments for and against beekeeping in cities"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "reading-3",
+    "topic": "decision fatigue and the psychology of making choices"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "writing-1",
+    "topic": "average weekly hours spent on leisure activities by different age groups"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "writing-2",
+    "topic": "whether children should begin formal schooling at a very early age"
+  },
+  {
+    "set": "authored-test-02",
+    "slot": "speaking",
+    "topic": "music in everyday life"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "listening-1",
+    "topic": "enquiring about swimming lessons for a child at a leisure centre"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "listening-2",
+    "topic": "a guided tour of a historic country house and its gardens"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "listening-3",
+    "topic": "students and a tutor discussing a business case study of a family-run bakery"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "listening-4",
+    "topic": "lecture on how red foxes have adapted to life in cities"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "reading-1",
+    "topic": "the history of glass-making from ancient times to the industrial age"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "reading-2",
+    "topic": "the four-day working week: trials, evidence and opinions"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "reading-3",
+    "topic": "the role of chance and accident in scientific discovery"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "writing-1",
+    "topic": "electricity generation by source in one country between 1990 and 2020"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "writing-2",
+    "topic": "whether older people should be encouraged to keep working beyond the usual retirement age"
+  },
+  {
+    "set": "authored-test-03",
+    "slot": "speaking",
+    "topic": "food, cooking and eating habits"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "listening-1",
+    "topic": "booking a function room for a birthday party"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "listening-2",
+    "topic": "a talk to parents about a summer activity programme for teenagers"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "listening-3",
+    "topic": "two students discussing the results of a survey on public transport use"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "listening-4",
+    "topic": "lecture on the history of paper-making"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "reading-1",
+    "topic": "the long-distance migration of the Arctic tern"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "reading-2",
+    "topic": "the debate over the value of homework for school pupils"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "reading-3",
+    "topic": "language extinction and efforts to revive endangered languages"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "writing-1",
+    "topic": "percentage of households with internet access in three regions in 2000, 2010 and 2020"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "writing-2",
+    "topic": "whether advertising aimed at children should be banned"
+  },
+  {
+    "set": "authored-test-04",
+    "slot": "speaking",
+    "topic": "travel and getting around"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "listening-1",
+    "topic": "reporting a lost bag at a railway lost property office"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "listening-2",
+    "topic": "a talk introducing a city's new bicycle-sharing scheme"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "listening-3",
+    "topic": "students and a tutor discussing a project on the history of a local market"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "listening-4",
+    "topic": "lecture on earthworms and their role in soil health"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "reading-1",
+    "topic": "the early history of hot-air balloon flight"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "reading-2",
+    "topic": "how scientists study and predict the behaviour of crowds"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "reading-3",
+    "topic": "the place of failure in education and learning"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "writing-1",
+    "topic": "monthly numbers of visitors to a national park in two different years"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "writing-2",
+    "topic": "whether modern technology has made people less sociable"
+  },
+  {
+    "set": "authored-test-05",
+    "slot": "speaking",
+    "topic": "friends and social life"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "listening-1",
+    "topic": "a phone call about a part-time job in a hotel restaurant"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "listening-2",
+    "topic": "an introduction to the new galleries of a science museum"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "listening-3",
+    "topic": "two students discussing a marketing assignment on eco-labelled products"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "listening-4",
+    "topic": "lecture on how glaciers shape the landscape"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "reading-1",
+    "topic": "the development of refrigeration and its effect on daily life"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "reading-2",
+    "topic": "the effects of human-made noise on wild animals"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "reading-3",
+    "topic": "the slow city movement and the pace of urban life"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "writing-1",
+    "topic": "average weekly household spending on four categories of food in three countries"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "writing-2",
+    "topic": "whether university education should be free for all students"
+  },
+  {
+    "set": "authored-test-06",
+    "slot": "speaking",
+    "topic": "weather and the seasons"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "listening-1",
+    "topic": "booking a guided sea kayaking tour"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "listening-2",
+    "topic": "a talk at a careers fair about volunteering overseas"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "listening-3",
+    "topic": "students and a tutor discussing an essay on the history of advertising"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "listening-4",
+    "topic": "lecture on the ecology and importance of mangrove forests"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "reading-1",
+    "topic": "the origins and spread of the game of chess"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "reading-2",
+    "topic": "growing crops indoors in vertical farms: promise and problems"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "reading-3",
+    "topic": "the nature of expert intuition and when it can be trusted"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "writing-1",
+    "topic": "average house prices in four cities between 2000 and 2020"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "writing-2",
+    "topic": "whether famous people have a responsibility to act as role models for young people"
+  },
+  {
+    "set": "authored-test-07",
+    "slot": "speaking",
+    "topic": "books and reading"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "listening-1",
+    "topic": "enquiring about renting a flat through a letting agent"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "listening-2",
+    "topic": "a guide's commentary on a river boat trip"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "listening-3",
+    "topic": "two students discussing a teaching placement at a primary school"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "listening-4",
+    "topic": "lecture on how elephants communicate using low-frequency sound"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "reading-1",
+    "topic": "the history of salt as a valuable commodity"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "reading-2",
+    "topic": "the advantages and disadvantages of open-plan offices"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "reading-3",
+    "topic": "the reliability of eyewitness memory in criminal cases"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "writing-1",
+    "topic": "the ways people travel to work in five cities"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "writing-2",
+    "topic": "whether governments should spend more on public transport than on building roads"
+  },
+  {
+    "set": "authored-test-08",
+    "slot": "speaking",
+    "topic": "technology and mobile phones"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "listening-1",
+    "topic": "enrolling on an evening language course at a local college"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "listening-2",
+    "topic": "a public talk about plans for a new town park"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "listening-3",
+    "topic": "students and a tutor discussing a geography project on water supply in a dry region"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "listening-4",
+    "topic": "lecture on the medieval wool trade and its effect on towns"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "reading-1",
+    "topic": "the early development of the bicycle"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "reading-2",
+    "topic": "the causes and consequences of light pollution"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "reading-3",
+    "topic": "the growth of citizen science and its value to research"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "writing-1",
+    "topic": "life expectancy at birth in three countries from 1960 to 2020"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "writing-2",
+    "topic": "whether young people should be required to do unpaid community service"
+  },
+  {
+    "set": "authored-test-09",
+    "slot": "speaking",
+    "topic": "sport and exercise"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "listening-1",
+    "topic": "arranging a pet-sitting service while on holiday"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "listening-2",
+    "topic": "a talk introducing a city's summer festival programme"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "listening-3",
+    "topic": "students and a tutor discussing research on traffic-calming measures"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "listening-4",
+    "topic": "lecture on termite mounds and natural ventilation in buildings"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "reading-1",
+    "topic": "the development of national postal services"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "reading-2",
+    "topic": "what research has discovered about human happiness"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "reading-3",
+    "topic": "whether artificial intelligence can be genuinely creative"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "writing-1",
+    "topic": "water consumption by agriculture, industry and households in four countries"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "writing-2",
+    "topic": "whether international tourism does more harm than good to the places people visit"
+  },
+  {
+    "set": "authored-test-10",
+    "slot": "speaking",
+    "topic": "art and creativity"
+  }
 ]

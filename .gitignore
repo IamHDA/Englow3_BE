@@ -22,6 +22,7 @@ env.local
 .ruff_cache/
 .checkpoints/
 data_pipeline/output/audio/
+data_pipeline/output/ielts/
 
 # Data pipeline local/generated artifacts
 data_pipeline/.venv/

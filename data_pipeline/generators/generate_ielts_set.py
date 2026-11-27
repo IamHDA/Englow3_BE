@@ -90,18 +90,35 @@ def generate(writer: Writer, out_root: Path = OUTPUT, rejects_root: Path = REJEC
             encoding="utf-8")
         raise SystemExit(f"{rejected.component} still failed after {attempts} attempts; see {folder}") from rejected
 
-    plan = components[steps.PLAN]
-    listening = {int(s[-1]): components[s] for s in steps.LISTENING}
-    reading = {int(s[-1]): components[s] for s in steps.READING}
-    task1, task2, speaking = components[steps.WRITING_1], components[steps.WRITING_2], components[steps.SPEAKING]
-    mix = rules.check_paper_mix(listening, reading)
+    mix = rules.check_paper_mix(*split(components)[1:3])
     if mix:
         raise SystemExit("The paper misses question types: " + "; ".join(mix))
+    plan = components[steps.PLAN]
+    folder = save_set(components, out_root / set_id, set_id, f"IELTS Academic AI Set: {plan['title']}", log,
+                      draw_chart=draw_chart)
+    slots = {f"listening-{i + 1}": t for i, t in enumerate(plan["listening"])}
+    slots |= {f"reading-{i + 1}": t for i, t in enumerate(plan["reading"])}
+    slots |= {"writing-1": plan["writing_task1"], "writing-2": plan["writing_task2"], "speaking": plan["speaking"]}
+    topics.record(set_id, slots, registry)
+    return folder
 
-    title = f"IELTS Academic AI Set: {plan['title']}"
-    folder = out_root / set_id
+
+def split(components: dict[str, dict]) -> tuple[dict, dict[int, dict], dict[int, dict], dict, dict, dict]:
+    """The step-keyed components as plan, listening and reading by number, task 1, task 2, speaking."""
+    return (components[steps.PLAN],
+            {int(s[-1]): components[s] for s in steps.LISTENING},
+            {int(s[-1]): components[s] for s in steps.READING},
+            components[steps.WRITING_1], components[steps.WRITING_2], components[steps.SPEAKING])
+
+
+def save_set(components: dict[str, dict], folder: Path, set_id: str, title: str, log: list[str],
+             description: str | None = None, draw_chart: bool = True) -> Path:
+    """Write a checked set's files: paper.json, tasks.json, transcript.md, voices.json, chart, report."""
+    plan, listening, reading, task1, task2, speaking = split(components)
     folder.mkdir(parents=True, exist_ok=True)
     paper = build.build_paper(f"{title} - Listening and Reading", listening, reading)
+    if description:
+        paper["metadata"]["description"] = description
     tasks = build.build_tasks(plan["title"], task1, task2, speaking, "task1-chart.png")
     (folder / "paper.json").write_text(json.dumps(paper, indent=2, ensure_ascii=False), encoding="utf-8")
     (folder / "tasks.json").write_text(json.dumps(tasks, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -116,11 +133,6 @@ def generate(writer: Writer, out_root: Path = OUTPUT, rejects_root: Path = REJEC
         f"# {title}\n\nSet `{set_id}`, written {datetime.now(UTC):%Y-%m-%d %H:%M} UTC.\n\n"
         "## Topics\n\n" + "\n".join(f"- {k}: {v}" for k, v in plan.items() if k != "title") +
         "\n\n## Checks\n\n" + "\n".join(f"- {line}" for line in log) + "\n", encoding="utf-8")
-
-    slots = {f"listening-{i + 1}": t for i, t in enumerate(plan["listening"])}
-    slots |= {f"reading-{i + 1}": t for i, t in enumerate(plan["reading"])}
-    slots |= {"writing-1": plan["writing_task1"], "writing-2": plan["writing_task2"], "speaking": plan["speaking"]}
-    topics.record(set_id, slots, registry)
     return folder
 
 
