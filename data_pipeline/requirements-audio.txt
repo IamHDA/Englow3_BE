@@ -1,0 +1,16 @@
+# Recording Listening audio on this machine (generators/record_*_listening.py with --engine kokoro)
+# and listening back to check it (verify_listening_audio.py, record_toeic_listening.py verify).
+# Kept apart from requirements.txt because torch is large. ffmpeg must also be on PATH.
+#
+#   py -3.11 -m venv data_pipeline/.venv
+#   data_pipeline/.venv/Scripts/python -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   data_pipeline/.venv/Scripts/python -m pip install -r data_pipeline/requirements-audio.txt
+#
+# (Leave out the --index-url line to get the CPU build of torch: slower, but works without an NVIDIA GPU.)
+
+-r requirements.txt
+kokoro>=0.9.4
+soundfile>=0.12
+openai-whisper>=20240930
+rapidfuzz>=3.6
+boto3>=1.34
