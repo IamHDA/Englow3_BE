@@ -151,6 +151,31 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
         }
     }
 
+    /**
+     * A learner's own flashcard set points at the user row with a restricting key, so erasure has to remove it first -
+     * cards, shares and other learners' progress go with it by cascade. A catalogue set is staff content and stays.
+     */
+    @Test
+    void removesTheLearnersOwnFlashcardSetsButNotTheCatalogue() {
+        LearnerFixture fixture = new LearnerFixture(jdbc);
+        UUID other = fixture.learner();
+        UUID personal = fixture.publishedFlashcardSet("Mine", userId);
+        jdbc.sql("update flashcard_sets set kind = 'PERSONAL', visibility = 'SELECTED_FRIENDS' where id = :id")
+                .param("id", personal).update();
+        UUID card = fixture.flashcard(personal, 1, "ticket");
+        fixture.review(other, card, "LEARNING", java.time.Instant.now());
+        jdbc.sql("insert into flashcard_set_shares (flashcard_set_id, user_id) values (:s, :u)").param("s", personal)
+                .param("u", other).update();
+        UUID catalogue = fixture.publishedFlashcardSet("Catalogue", other);
+
+        account.erase(email);
+
+        assertThat(count("flashcard_sets", "id", personal)).isZero();
+        assertThat(count("flashcard_reviews", "flashcard_id", card)).isZero();
+        assertThat(count("flashcard_set_shares", "flashcard_set_id", personal)).isZero();
+        assertThat(count("flashcard_sets", "id", catalogue)).isEqualTo(1);
+    }
+
     @Test
     void leavesOtherPeopleAndSharedContentAlone() {
         UUID other = new LearnerFixture(jdbc).learner();

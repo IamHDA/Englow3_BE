@@ -31,7 +31,7 @@ public class AdminOverviewQuery {
                        count(*) filter (where status = 'DRAFT') as drafts,
                        count(*) filter (where status = 'PENDING_REVIEW') as pending,
                        count(*) filter (where status = 'PUBLISHED') as published
-                  from flashcard_sets
+                  from flashcard_sets where kind = 'CATALOGUE'
                 union all
                 select 'QUIZ', count(*) filter (where status = 'DRAFT'),
                        count(*) filter (where status = 'PENDING_REVIEW'), count(*) filter (where status = 'PUBLISHED')

@@ -207,7 +207,7 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
     }
 
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set) {
-        return FlashcardSetSummaryResult.of(set, cardRepo.countByFlashcardSetId(set.getId()), 0L, 0L, null);
+        return FlashcardSetSummaryResult.of(set, null, cardRepo.countByFlashcardSetId(set.getId()), 0L, 0L, null);
     }
 
     @Transactional(readOnly = true)
@@ -254,8 +254,9 @@ public class AdminFlashcardServiceImpl implements AdminFlashcardService {
         return authoringDetail(id);
     }
 
+    /** A learner's own set is not staff content: authoring answers "not found" for it rather than touch it. */
     private FlashcardSet requireSet(UUID setId) {
-        FlashcardSet set = setRepo.findById(setId).orElseThrow(
+        FlashcardSet set = setRepo.findById(setId).filter(found -> !found.isPersonal()).orElseThrow(
                 () -> new NotFoundException("FLASHCARD_SET_NOT_FOUND", "No flashcard set with id %s".formatted(setId)));
         if (set.getStatus() != FlashcardSetStatus.PUBLISHED)
             userDirectory.requireAuthorAccess(set.getCreatedByUserId());

@@ -31,6 +31,12 @@ public class FriendshipReaderImpl implements FriendshipReader {
 
     @Override
     @Transactional(readOnly = true)
+    public Set<UUID> friendIdsOf(UUID userId) {
+        return new HashSet<>(friendshipRepo.findFriendIdsOf(userId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean isBlockedEitherWay(UUID a, UUID b) {
         return userBlockRepo.existsEitherWay(a, b);
     }

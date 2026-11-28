@@ -188,6 +188,30 @@ history, learner statistics, and flashcard batch import.
   study/rating lifecycle, and flashcard statistics.
 - **Import:** `flashcard.helper.FlashcardImport` validates generated batches and
   `AdminFlashcardService` writes accepted cards into a draft set.
+- **Learner-authored (personal) sets:** `flashcard_sets.kind` is `CATALOGUE` (staff
+  content, reviewed) or `PERSONAL` (a learner's own). A personal set lives in the same
+  tables so study, rating, SRS and statistics work on it unchanged; it is created
+  `PUBLISHED`, never enters review (`FlashcardSet` refuses every lifecycle method), and
+  authoring, the admin overview and the roadmap catalogue read `kind = 'CATALOGUE'` only.
+  Editor: `/api/flashcards/my-sets` (create with cards in one batch, then cards one at a
+  time - edited in place, because review rows hang off the card id). Shelves:
+  `GET /api/flashcards/sets?scope=CATALOGUE|MINE|COMMUNITY`.
+- **Visibility of a personal set:** `PRIVATE`, `PUBLIC`, or `SELECTED_FRIENDS` with the
+  chosen readers in `flashcard_set_shares` (written only by this module). The rule is
+  `FlashcardSet.isVisibleTo(viewer, blockedEitherWay, selectedFriend)`: the owner always;
+  nobody blocked either way; a share row counts only while the reader is still the
+  owner's friend, so unfriending withdraws access without touching the row and
+  befriending again restores it. Every read path - detail, summary, study queue,
+  rating - goes through it and answers `FLASHCARD_SET_NOT_FOUND` otherwise.
+  `FlashcardCatalogueQuery.VISIBLE` is the same rule in SQL for lists; keep the two in
+  step. A friend list must be non-empty for `SELECTED_FRIENDS`, empty otherwise, and
+  every id on it a current friend when saved (`FLASHCARD_SHARE_NOT_FRIEND`).
+- **Talks to:** `friendship` via `FriendshipReader` (`friendIdsOf`, `areFriends`,
+  `isBlockedEitherWay`, `blockedEitherWay`) and `user` via `PublicProfileReader` (owner
+  and shared-with names for a page in one call). It reads neither module's tables.
+- **Erasure and export:** a learner's personal sets (with cards, shares and everyone's
+  progress on them, by cascade) are deleted by `AccountServiceImpl` before the user row,
+  because `created_by_user_id` restricts; the export includes them.
 
 ## `quiz`
 
@@ -570,9 +594,10 @@ Implemented: friend requests, friendships, blocks and the learner search, behind
 - **Talks to:** `user` via `user.api.PublicProfileReader` (name and picture for a whole
   page of people in one call, whether an id is a learner, and the learner search by
   display name - never by email) and `UserDirectory` (the caller's id). Publishes
-  `friendship.api.FriendshipReader` - are two learners friends, is either blocked,
-  which ids has a learner blocked or been blocked by - for `chat` and `blog`. It
-  depends on neither of them.
+  `friendship.api.FriendshipReader` - are two learners friends, who are a learner's
+  friends, is either blocked, which ids has a learner blocked or been blocked by - for
+  `chat`, `blog` and `flashcard` (sets shared with selected friends). It depends on
+  none of them.
 - **Erasure:** both tables cascade from `users`.
 - **Read path:** repository only. Active list/count/relationship queries make a declared
   read-only join to `users.role` for both participants; only `user` writes those roles.

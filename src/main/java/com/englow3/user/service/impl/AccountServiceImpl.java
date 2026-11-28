@@ -106,6 +106,13 @@ public class AccountServiceImpl implements AccountService {
                 "quiz_attempt_id in (select id from quiz_attempts where user_id=:u)", userId));
         out.put("tours", rows("user_tour_completions", "user_id=:u", userId));
         out.put("translationAttempts", rows("translation_attempts", "user_id = :u", userId));
+        out.put("flashcardSets", rows("flashcard_sets", "created_by_user_id = :u and kind = 'PERSONAL'", userId));
+        out.put("flashcards", rows("flashcards",
+                "flashcard_set_id in (select id from flashcard_sets where created_by_user_id = :u and kind = 'PERSONAL')",
+                userId));
+        out.put("flashcardSetShares", rows("flashcard_set_shares",
+                "flashcard_set_id in (select id from flashcard_sets where created_by_user_id = :u and kind = 'PERSONAL')",
+                userId));
         out.put("flashcardReviews", rows("flashcard_reviews", "user_id = :u", userId));
         out.put("flashcardReviewLogs", rows("flashcard_review_logs", "user_id = :u", userId));
         out.put("tutorConversations", rows("tutor_conversations", "user_id = :u", userId));
@@ -201,6 +208,9 @@ public class AccountServiceImpl implements AccountService {
                 id);
         delete("delete from exam_attempts where user_id = :u", id);
         delete("delete from ai_jobs where requested_by_user_id = :u", id);
+        // A learner's own flashcard sets; cards, shares and others' progress on them go by cascade. Catalogue sets are
+        // staff content, and staff accounts cannot be erased here.
+        delete("delete from flashcard_sets where created_by_user_id = :u and kind = 'PERSONAL'", id);
         delete("delete from user_learning_purposes where user_id = :u", id);
         delete("delete from user_target_skills where user_id = :u", id);
         delete("delete from learner_profiles where user_id = :u", id);

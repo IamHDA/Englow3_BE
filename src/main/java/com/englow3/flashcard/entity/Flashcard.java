@@ -2,6 +2,8 @@ package com.englow3.flashcard.entity;
 
 import java.util.UUID;
 
+import com.englow3.flashcard.dto.command.PersonalCardCommand;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -95,5 +97,37 @@ public class Flashcard {
         card.mnemonicTipVi = mnemonicTipVi;
         card.cefrLevel = cefrLevel;
         return card;
+    }
+
+    /**
+     * A card a learner wrote for their own set: a term and its Vietnamese meaning, the rest optional. No sense label,
+     * level or audio - those are catalogue fields filled by the data pipeline, not something a learner is asked for.
+     */
+    public static Flashcard personal(UUID flashcardSetId, int orderNo, PersonalCardCommand content) {
+        Flashcard card = new Flashcard();
+        card.id = UUID.randomUUID();
+        card.flashcardSetId = flashcardSetId;
+        card.orderNo = orderNo;
+        card.apply(content);
+        return card;
+    }
+
+    /**
+     * Rewrites a personal card in place. In place rather than delete-and-recreate, because review rows hang off the
+     * card id: replacing the card would wipe everyone's progress on it for the sake of a typo.
+     */
+    public void revise(PersonalCardCommand content) {
+        apply(content);
+    }
+
+    private void apply(PersonalCardCommand content) {
+        this.lemma = content.lemma();
+        this.definitionVi = content.definitionVi();
+        this.partOfSpeech = content.partOfSpeech();
+        this.ipaUs = content.ipaUs();
+        this.definitionEn = content.definitionEn();
+        this.exampleSentence = content.exampleSentence();
+        this.exampleTranslationVi = content.exampleTranslationVi();
+        this.mnemonicTipVi = content.mnemonicTipVi();
     }
 }

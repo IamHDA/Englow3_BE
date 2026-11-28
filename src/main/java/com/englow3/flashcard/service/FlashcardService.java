@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.englow3.flashcard.dto.command.FlashcardSetScope;
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
 import com.englow3.flashcard.dto.result.FlashcardResult;
 import com.englow3.flashcard.dto.result.FlashcardReviewResult;
@@ -13,7 +14,9 @@ import com.englow3.flashcard.dto.result.FlashcardSetDetailResult;
 import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
 
 public interface FlashcardService {
-    Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, String sort, Pageable pageable);
+    /** One shelf of sets the caller may open: the catalogue, their own, or what other learners let them see. */
+    Page<FlashcardSetSummaryResult> searchSets(FlashcardSetScope scope, String topic, String title, String sort,
+            Pageable pageable);
 
     FlashcardSetDetailResult setDetail(UUID setId, Pageable pageable);
 

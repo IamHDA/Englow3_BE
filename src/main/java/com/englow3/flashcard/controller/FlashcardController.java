@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.englow3.flashcard.dto.command.FlashcardSetScope;
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
 import com.englow3.flashcard.dto.request.RateFlashcardRequest;
 import com.englow3.flashcard.dto.response.FlashcardResponse;
@@ -53,11 +54,17 @@ public class FlashcardController {
     }
 
     @GetMapping("/sets")
-    public ResponseEntity<PageResponse<FlashcardSetResponse>> sets(@RequestParam(required = false) String topic,
-            @RequestParam(required = false) String title, @RequestParam(defaultValue = "due") String sortBy,
+    /**
+     * One shelf of sets: {@code CATALOGUE} (the default), {@code MINE} for the caller's own sets, or {@code COMMUNITY}
+     * for what other learners made public or shared with the caller.
+     */
+    public ResponseEntity<PageResponse<FlashcardSetResponse>> sets(@RequestParam(required = false) String scope,
+            @RequestParam(required = false) String topic, @RequestParam(required = false) String title,
+            @RequestParam(defaultValue = "due") String sortBy,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(flashcardService
-                .searchPublishedSets(topic, title, sortBy, StablePage.of(pageable)).map(FlashcardSetResponse::from)));
+                .searchSets(FlashcardSetScope.parse(scope), topic, title, sortBy, StablePage.of(pageable))
+                .map(FlashcardSetResponse::from)));
     }
 
     @GetMapping("/sets/catalogue-info")

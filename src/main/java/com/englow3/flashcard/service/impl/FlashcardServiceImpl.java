@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -14,10 +16,12 @@ import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.englow3.flashcard.dto.command.FlashcardSetScope;
 import com.englow3.flashcard.dto.command.RateFlashcardCommand;
 import com.englow3.flashcard.dto.result.FlashcardResult;
 import com.englow3.flashcard.dto.result.FlashcardReviewResult;
@@ -27,15 +31,19 @@ import com.englow3.flashcard.entity.Flashcard;
 import com.englow3.flashcard.entity.FlashcardReview;
 import com.englow3.flashcard.entity.FlashcardReviewLog;
 import com.englow3.flashcard.entity.FlashcardSet;
-import com.englow3.flashcard.entity.FlashcardSetStatus;
+import com.englow3.flashcard.entity.FlashcardSetShareId;
+import com.englow3.flashcard.entity.FlashcardSetVisibility;
 import com.englow3.flashcard.helper.FlashcardSrs;
 import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardReviewLogRepository;
 import com.englow3.flashcard.repository.FlashcardReviewRepository;
 import com.englow3.flashcard.repository.FlashcardSetRepository;
+import com.englow3.flashcard.repository.FlashcardSetShareRepository;
 import com.englow3.flashcard.service.FlashcardService;
+import com.englow3.friendship.api.FriendshipReader;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
+import com.englow3.user.api.PublicProfileReader;
 import com.englow3.user.api.UserDirectory;
 
 /**
@@ -55,13 +63,17 @@ public class FlashcardServiceImpl implements FlashcardService {
     private final String learningBucket;
     private final Duration mediaUrlTtl;
     private final com.englow3.flashcard.query.FlashcardCatalogueQuery catalogueQuery;
+    private final FlashcardSetShareRepository shareRepo;
+    private final FriendshipReader friendshipReader;
+    private final PublicProfileReader publicProfileReader;
 
     public FlashcardServiceImpl(FlashcardSetRepository setRepo, FlashcardRepository cardRepo,
             FlashcardReviewRepository reviewRepo, FlashcardReviewLogRepository reviewLogRepo,
             UserDirectory userDirectory, PresignedUrlResolver presignedUrls, Clock clock,
             @Value("${app.storage.learning-bucket}") String learningBucket,
             @Value("${app.storage.learning-media-url-ttl:PT3H}") Duration mediaUrlTtl,
-            com.englow3.flashcard.query.FlashcardCatalogueQuery catalogueQuery) {
+            com.englow3.flashcard.query.FlashcardCatalogueQuery catalogueQuery, FlashcardSetShareRepository shareRepo,
+            FriendshipReader friendshipReader, PublicProfileReader publicProfileReader) {
         this.setRepo = setRepo;
         this.cardRepo = cardRepo;
         this.reviewRepo = reviewRepo;
@@ -72,22 +84,30 @@ public class FlashcardServiceImpl implements FlashcardService {
         this.learningBucket = learningBucket;
         this.mediaUrlTtl = mediaUrlTtl;
         this.catalogueQuery = catalogueQuery;
+        this.shareRepo = shareRepo;
+        this.friendshipReader = friendshipReader;
+        this.publicProfileReader = publicProfileReader;
     }
 
     @Transactional(readOnly = true)
-    public Page<FlashcardSetSummaryResult> searchPublishedSets(String topic, String title, String sort,
+    public Page<FlashcardSetSummaryResult> searchSets(FlashcardSetScope scope, String topic, String title, String sort,
             Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = clock.instant();
+        // Friends and blocks only decide what other learners' sets are visible; the catalogue and one's own shelf need
+        // neither, so those two lists are not fetched for them.
+        boolean community = scope == FlashcardSetScope.COMMUNITY;
+        Set<UUID> friends = community ? friendshipReader.friendIdsOf(userId) : Set.of();
+        Set<UUID> blocked = community ? friendshipReader.blockedEitherWay(userId) : Set.of();
 
-        return catalogueQuery.search(userId, now, topic, title, sort, pageable);
+        return withOwners(catalogueQuery.search(userId, friends, blocked, now, scope, topic, title, sort, pageable));
     }
 
     @Transactional(readOnly = true)
     public FlashcardSetDetailResult setDetail(UUID setId, Pageable pageable) {
         UUID userId = userDirectory.requireCurrentUserId();
         Instant now = clock.instant();
-        FlashcardSet set = requirePublishedSet(setId);
+        FlashcardSet set = requireVisibleSet(setId, userId);
 
         var cardPage = cardRepo.findByFlashcardSetId(setId, pageable);
         List<Flashcard> cards = cardPage.getContent();
@@ -101,12 +121,15 @@ public class FlashcardServiceImpl implements FlashcardService {
     @Transactional(readOnly = true)
     public FlashcardSetSummaryResult setSummary(UUID setId) {
         UUID userId = userDirectory.requireCurrentUserId();
-        return summaryOf(requirePublishedSet(setId), userId, cardRepo.countByFlashcardSetId(setId), clock.instant());
+        return summaryOf(requireVisibleSet(setId, userId), userId, cardRepo.countByFlashcardSetId(setId),
+                clock.instant());
     }
 
     @Transactional(readOnly = true)
     public com.englow3.flashcard.dto.result.FlashcardCatalogueInfoResult catalogueInfo() {
-        return catalogueQuery.information(userDirectory.requireCurrentUserId(), clock.instant());
+        UUID userId = userDirectory.requireCurrentUserId();
+        return catalogueQuery.information(userId, friendshipReader.friendIdsOf(userId),
+                friendshipReader.blockedEitherWay(userId), clock.instant());
     }
 
     /**
@@ -117,7 +140,7 @@ public class FlashcardServiceImpl implements FlashcardService {
     @Transactional(readOnly = true)
     public List<FlashcardResult> studyQueue(UUID setId, int limit) {
         UUID userId = userDirectory.requireCurrentUserId();
-        requirePublishedSet(setId);
+        requireVisibleSet(setId, userId);
         Instant now = clock.instant();
 
         // Due cards first, then ones never seen, each asked of the database with the session's limit rather than
@@ -144,10 +167,10 @@ public class FlashcardServiceImpl implements FlashcardService {
         Flashcard card = cardRepo.findById(command.flashcardId())
                 .orElseThrow(() -> new NotFoundException("FLASHCARD_NOT_FOUND",
                         "No flashcard with id %s".formatted(command.flashcardId())));
-        // The set has to be published, not just the card to exist. Without this a guessed id puts a card from someone
-        // else's draft into this learner's review schedule, and the same refusal for "not yours" and "not there" is
-        // what stops an id being a way to find out which drafts exist.
-        requirePublishedSet(card.getFlashcardSetId());
+        // The set has to be one this learner may open, not just the card to exist. Without this a guessed id puts a
+        // card from someone else's draft or private set into this learner's review schedule, and the same refusal for
+        // "not yours" and "not there" is what stops an id being a way to find out which ones exist.
+        requireVisibleSet(card.getFlashcardSetId(), userId);
         Instant now = clock.instant();
 
         FlashcardReview review = reviewRepo.findByUserIdAndFlashcardId(userId, card.getId())
@@ -165,9 +188,31 @@ public class FlashcardServiceImpl implements FlashcardService {
     }
 
     private FlashcardSetSummaryResult summaryOf(FlashcardSet set, UUID userId, long cardCount, Instant now) {
-        return FlashcardSetSummaryResult.of(set, cardCount, reviewRepo.countDueInSet(userId, set.getId(), now),
-                reviewRepo.countMasteredInSet(userId, set.getId()),
+        FlashcardSetSummaryResult summary = FlashcardSetSummaryResult.of(set, userId, cardCount,
+                reviewRepo.countDueInSet(userId, set.getId(), now), reviewRepo.countMasteredInSet(userId, set.getId()),
                 lastStudiedFor(userId, List.of(set.getId())).get(set.getId()));
+        return set.isPersonal() ? withOwners(List.of(summary)).getFirst() : summary;
+    }
+
+    /** Owner names for a whole page in one call to the user module, never one call per set. */
+    private Page<FlashcardSetSummaryResult> withOwners(Page<FlashcardSetSummaryResult> page) {
+        List<FlashcardSetSummaryResult> named = withOwners(page.getContent());
+        return new PageImpl<>(named, page.getPageable(), page.getTotalElements());
+    }
+
+    private List<FlashcardSetSummaryResult> withOwners(List<FlashcardSetSummaryResult> sets) {
+        Set<UUID> ownerIds = sets.stream().map(FlashcardSetSummaryResult::ownerId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ownerIds.isEmpty()) {
+            return sets;
+        }
+        Map<UUID, PublicProfileReader.PublicProfile> profiles = publicProfileReader.profiles(ownerIds);
+        return sets.stream().map(set -> {
+            PublicProfileReader.PublicProfile profile = set.ownerId() == null ? null : profiles.get(set.ownerId());
+            return profile == null ? set
+                    : set.withOwner(new FlashcardSetSummaryResult.Owner(profile.id(), profile.displayName(),
+                            profile.avatarUrl()));
+        }).toList();
     }
 
     private Map<UUID, Instant> lastStudiedFor(UUID userId, Collection<UUID> setIds) {
@@ -186,10 +231,22 @@ public class FlashcardServiceImpl implements FlashcardService {
                 .collect(Collectors.toMap(FlashcardReview::getFlashcardId, Function.identity()));
     }
 
-    private FlashcardSet requirePublishedSet(UUID setId) {
-        return setRepo.findById(setId).filter(set -> set.getStatus() == FlashcardSetStatus.PUBLISHED)
-                .orElseThrow(() -> new NotFoundException("FLASHCARD_SET_NOT_FOUND",
-                        "No published flashcard set with id %s".formatted(setId)));
+    /**
+     * The set, if {@code userId} may open it. Whether is the set's decision; the two facts it needs about people are
+     * looked up here, and only for someone else's personal set - the catalogue and one's own sets need neither.
+     */
+    private FlashcardSet requireVisibleSet(UUID setId, UUID userId) {
+        return setRepo.findById(setId).filter(set -> {
+            if (!set.isPersonal() || set.isOwnedBy(userId)) {
+                return set.isVisibleTo(userId, false, false);
+            }
+            UUID ownerId = set.getCreatedByUserId();
+            boolean selectedFriend = set.getVisibility() == FlashcardSetVisibility.SELECTED_FRIENDS
+                    && shareRepo.existsById(new FlashcardSetShareId(setId, userId))
+                    && friendshipReader.areFriends(ownerId, userId);
+            return set.isVisibleTo(userId, friendshipReader.isBlockedEitherWay(ownerId, userId), selectedFriend);
+        }).orElseThrow(
+                () -> new NotFoundException("FLASHCARD_SET_NOT_FOUND", "No flashcard set with id %s".formatted(setId)));
     }
 
     private FlashcardResult resultOf(Flashcard card, FlashcardReview review) {

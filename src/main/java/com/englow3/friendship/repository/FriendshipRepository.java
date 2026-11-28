@@ -86,6 +86,14 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     boolean existsByStatusAndRequesterIdAndAddresseeId(@Param("status") FriendshipStatus status,
             @Param("requester") UUID requesterId, @Param("addressee") UUID addresseeId);
 
+    /** The other side of every active accepted friendship of {@code user}. */
+    @Query("select case when f.requesterId = :user then f.addresseeId else f.requesterId end from Friendship f where "
+            + ACTIVE_LEARNERS + " and " + """
+                    f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED
+                      and (f.requesterId = :user or f.addresseeId = :user)
+                    """)
+    List<UUID> findFriendIdsOf(@Param("user") UUID userId);
+
     /** Accepted friendships on either side; a pending request is not a friend yet. */
     @Query("select count(f) from Friendship f where " + ACTIVE_LEARNERS + " and " + """
             f.status = com.englow3.friendship.entity.FriendshipStatus.ACCEPTED

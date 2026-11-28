@@ -39,7 +39,8 @@ public class ContentCatalogQuery {
                         least(30, greatest(5, (select count(*) from flashcards f where f.flashcard_set_id = s.id) / 2))
                           as minutes
                    from flashcard_sets s
-                  where s.status = 'PUBLISHED' and (s.target_level is null or s.target_level between :from and :to)
+                  where s.status = 'PUBLISHED' and s.kind = 'CATALOGUE'
+                    and (s.target_level is null or s.target_level between :from and :to)
                   order by s.target_level is null, s.target_level, s.published_at desc nulls last
                   limit :perKind)
                 union all

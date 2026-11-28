@@ -13,7 +13,7 @@ import com.englow3.flashcard.entity.FlashcardSet;
 import com.englow3.flashcard.entity.FlashcardSetStatus;
 
 public interface FlashcardSetRepository extends JpaRepository<FlashcardSet, UUID> {
-    @Query("select c from FlashcardSet c where (:status is null or c.status = :status) and (:title is null or lower(c.name) like lower(concat('%', cast(:title as String), '%'))) and (c.createdByUserId = :author or c.status = com.englow3.flashcard.entity.FlashcardSetStatus.PUBLISHED)")
+    @Query("select c from FlashcardSet c where c.kind = com.englow3.flashcard.entity.FlashcardSetKind.CATALOGUE and (:status is null or c.status = :status) and (:title is null or lower(c.name) like lower(concat('%', cast(:title as String), '%'))) and (c.createdByUserId = :author or c.status = com.englow3.flashcard.entity.FlashcardSetStatus.PUBLISHED)")
     Page<FlashcardSet> searchVisibleForAuthoring(@Param("status") FlashcardSetStatus status,
             @Param("title") String title, @Param("author") UUID author, Pageable pageable);
 
@@ -26,7 +26,7 @@ public interface FlashcardSetRepository extends JpaRepository<FlashcardSet, UUID
 
     @Query("""
             select s from FlashcardSet s
-            where s.status = :status
+            where s.kind = com.englow3.flashcard.entity.FlashcardSetKind.CATALOGUE and s.status = :status
               and (:topic is null or s.topic = :topic)
               and (:title is null or lower(s.name) like lower(concat('%', cast(:title as String), '%')))
             """)
@@ -34,13 +34,14 @@ public interface FlashcardSetRepository extends JpaRepository<FlashcardSet, UUID
             @Param("title") String title, Pageable pageable);
 
     /**
-     * The authoring list, which unlike the catalogue must show every status - an administrator with no way to see a
-     * draft has no way to review one. A null status means "all", so one query serves both the full list and the review
-     * queue.
+     * The authoring list - catalogue sets only; a learner's own set is theirs, not staff content - which unlike the
+     * catalogue must show every status - an administrator with no way to see a draft has no way to review one. A null
+     * status means "all", so one query serves both the full list and the review queue.
      */
     @Query("""
             select c from FlashcardSet c
-            where (:status is null or c.status = :status)
+            where c.kind = com.englow3.flashcard.entity.FlashcardSetKind.CATALOGUE
+              and (:status is null or c.status = :status)
               and (:title is null or lower(c.name) like lower(concat('%', cast(:title as String), '%')))
             """)
     Page<FlashcardSet> searchForAuthoring(@Param("status") FlashcardSetStatus status, @Param("title") String title,

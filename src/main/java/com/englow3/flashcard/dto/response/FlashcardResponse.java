@@ -10,13 +10,17 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /**
  * Audio arrives as a signed URL, not an object key: the browser has to be able to fetch it, and a key would mean a
  * second round trip per card just to turn it into something playable.
+ * <p>
+ * A catalogue card fills every field; a card a learner wrote for their own set may carry only the term and its
+ * Vietnamese meaning, hence the nullable ones.
  */
-public record FlashcardResponse(UUID id, int orderNo, String lemma, String partOfSpeech, String senseLabel,
-        String ipaUs, @Schema(nullable = true) String ipaUk, @Schema(nullable = true) String audioUsUrl,
-        @Schema(nullable = true) String audioUkUrl, String definitionEn, String definitionVi, String exampleSentence,
-        @Schema(nullable = true) String exampleTranslationVi, @Schema(nullable = true) String mnemonicTipVi,
-        @Schema(nullable = true) String cefrLevel, FlashcardReviewStatus status, @Schema(nullable = true) Instant dueAt,
-        int lapseCount) {
+public record FlashcardResponse(UUID id, int orderNo, String lemma, @Schema(nullable = true) String partOfSpeech,
+        @Schema(nullable = true) String senseLabel, @Schema(nullable = true) String ipaUs,
+        @Schema(nullable = true) String ipaUk, @Schema(nullable = true) String audioUsUrl,
+        @Schema(nullable = true) String audioUkUrl, @Schema(nullable = true) String definitionEn, String definitionVi,
+        @Schema(nullable = true) String exampleSentence, @Schema(nullable = true) String exampleTranslationVi,
+        @Schema(nullable = true) String mnemonicTipVi, @Schema(nullable = true) String cefrLevel,
+        FlashcardReviewStatus status, @Schema(nullable = true) Instant dueAt, int lapseCount) {
 
     public static FlashcardResponse from(FlashcardResult result) {
         return new FlashcardResponse(result.id(), result.orderNo(), result.lemma(), result.partOfSpeech(),

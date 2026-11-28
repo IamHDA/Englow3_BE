@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +35,15 @@ import com.englow3.flashcard.repository.FlashcardRepository;
 import com.englow3.flashcard.repository.FlashcardReviewLogRepository;
 import com.englow3.flashcard.repository.FlashcardReviewRepository;
 import com.englow3.flashcard.repository.FlashcardSetRepository;
+import com.englow3.flashcard.repository.FlashcardSetShareRepository;
+import com.englow3.flashcard.query.FlashcardCatalogueQuery;
+import com.englow3.flashcard.dto.command.FlashcardSetScope;
+import com.englow3.flashcard.dto.result.FlashcardSetSummaryResult;
+import com.englow3.flashcard.entity.FlashcardSetKind;
+import com.englow3.flashcard.entity.FlashcardSetShareId;
+import com.englow3.flashcard.entity.FlashcardSetVisibility;
+import com.englow3.friendship.api.FriendshipReader;
+import com.englow3.user.api.PublicProfileReader;
 import com.englow3.flashcard.service.impl.FlashcardServiceImpl;
 import com.englow3.shared.error.NotFoundException;
 import com.englow3.shared.storage.PresignedUrlResolver;
@@ -52,9 +64,14 @@ class FlashcardServiceTest {
     private final UserDirectory userDirectory = mock(UserDirectory.class);
     private final PresignedUrlResolver presignedUrls = mock(PresignedUrlResolver.class);
 
+    private final FlashcardCatalogueQuery catalogueQuery = mock(FlashcardCatalogueQuery.class);
+    private final FlashcardSetShareRepository shareRepo = mock(FlashcardSetShareRepository.class);
+    private final FriendshipReader friendshipReader = mock(FriendshipReader.class);
+    private final PublicProfileReader publicProfileReader = mock(PublicProfileReader.class);
+
     private final FlashcardService service = new FlashcardServiceImpl(setRepo, cardRepo, reviewRepo, reviewLogRepo,
-            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3),
-            mock(com.englow3.flashcard.query.FlashcardCatalogueQuery.class));
+            userDirectory, presignedUrls, CLOCK, "learning", Duration.ofHours(3), catalogueQuery, shareRepo,
+            friendshipReader, publicProfileReader);
 
     private final UUID userId = UUID.randomUUID();
     private Flashcard card;
@@ -206,5 +223,113 @@ class FlashcardServiceTest {
         var saved = org.mockito.ArgumentCaptor.forClass(FlashcardReviewLog.class);
         verify(reviewLogRepo).save(saved.capture());
         assertThat(saved.getValue().getTimeSpentSeconds()).isZero();
+    }
+
+    /**
+     * Someone else's personal set. The set decides; the service's part is to hand it the right facts - looked up from
+     * the share list and the friendship module - and to refuse when the answer is no.
+     */
+    private FlashcardSet othersPersonalSet(FlashcardSetVisibility visibility, UUID ownerId) {
+        FlashcardSet set = mock(FlashcardSet.class);
+        when(set.getId()).thenReturn(card.getFlashcardSetId());
+        when(set.isPersonal()).thenReturn(true);
+        when(set.isOwnedBy(userId)).thenReturn(false);
+        when(set.getCreatedByUserId()).thenReturn(ownerId);
+        when(set.getVisibility()).thenReturn(visibility);
+        when(set.getKind()).thenReturn(FlashcardSetKind.PERSONAL);
+        when(setRepo.findById(card.getFlashcardSetId())).thenReturn(Optional.of(set));
+        return set;
+    }
+
+    @Test
+    void tellsASelectedFriendsSetThatTheReaderIsOnItsListAndStillAFriend() {
+        UUID ownerId = UUID.randomUUID();
+        FlashcardSet set = othersPersonalSet(FlashcardSetVisibility.SELECTED_FRIENDS, ownerId);
+        when(shareRepo.existsById(new FlashcardSetShareId(card.getFlashcardSetId(), userId))).thenReturn(true);
+        when(friendshipReader.areFriends(ownerId, userId)).thenReturn(true);
+        when(set.isVisibleTo(userId, false, true)).thenReturn(true);
+
+        service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.GOOD, 5));
+
+        verify(set).isVisibleTo(userId, false, true);
+        verify(reviewLogRepo).save(any());
+    }
+
+    /** The share row outlives an unfriending; it is the live friendship that counts. */
+    @Test
+    void aShareRowWithoutAFriendshipIsNotPassedOnAsASelectedFriend() {
+        UUID ownerId = UUID.randomUUID();
+        FlashcardSet set = othersPersonalSet(FlashcardSetVisibility.SELECTED_FRIENDS, ownerId);
+        when(shareRepo.existsById(new FlashcardSetShareId(card.getFlashcardSetId(), userId))).thenReturn(true);
+        when(friendshipReader.areFriends(ownerId, userId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.setSummary(card.getFlashcardSetId())).isInstanceOf(NotFoundException.class);
+
+        verify(set).isVisibleTo(userId, false, false);
+    }
+
+    @Test
+    void aPublicSetIsNotLookedUpInTheShareListButBlocksAreStillAsked() {
+        UUID ownerId = UUID.randomUUID();
+        FlashcardSet set = othersPersonalSet(FlashcardSetVisibility.PUBLIC, ownerId);
+        when(friendshipReader.isBlockedEitherWay(ownerId, userId)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.setSummary(card.getFlashcardSetId())).isInstanceOf(NotFoundException.class);
+
+        verify(set).isVisibleTo(userId, true, false);
+        verifyNoInteractions(shareRepo);
+    }
+
+    /** Same refusal as a missing set, and nothing written on the way - a guessed id must not reveal a private set. */
+    @Test
+    void refusesToRateACardInASetTheLearnerMayNotSee() {
+        othersPersonalSet(FlashcardSetVisibility.PRIVATE, UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.GOOD, 12)))
+                .isInstanceOf(NotFoundException.class).extracting(e -> ((NotFoundException) e).getCode())
+                .isEqualTo("FLASHCARD_SET_NOT_FOUND");
+        verify(reviewRepo, never()).save(any());
+        verify(reviewLogRepo, never()).save(any());
+    }
+
+    @Test
+    void theCatalogueNeverAsksAboutFriendsOrBlocks() {
+        setIsPublished(true);
+
+        service.rate(new RateFlashcardCommand(card.getId(), ReviewRating.GOOD, 12));
+
+        verifyNoInteractions(friendshipReader, shareRepo);
+    }
+
+    @Test
+    void theCommunityShelfIsFilteredByTheLearnersFriendsAndBlocksAndNamesItsOwners() {
+        UUID friend = UUID.randomUUID();
+        UUID blocked = UUID.randomUUID();
+        var pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+        var shared = new FlashcardSetSummaryResult(UUID.randomUUID(), "personal-x", "Travel", "", "travel", null, 3, 0,
+                0, null, FlashcardSetKind.PERSONAL, FlashcardSetVisibility.SELECTED_FRIENDS, friend, null, false);
+        when(friendshipReader.friendIdsOf(userId)).thenReturn(Set.of(friend));
+        when(friendshipReader.blockedEitherWay(userId)).thenReturn(Set.of(blocked));
+        when(catalogueQuery.search(eq(userId), eq(Set.of(friend)), eq(Set.of(blocked)), any(),
+                eq(FlashcardSetScope.COMMUNITY), any(), any(), eq("recent"), eq(pageable)))
+                        .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(shared), pageable, 1));
+        when(publicProfileReader.profiles(Set.of(friend)))
+                .thenReturn(Map.of(friend, new PublicProfileReader.PublicProfile(friend, "Lan", null)));
+
+        var page = service.searchSets(FlashcardSetScope.COMMUNITY, null, null, "recent", pageable);
+
+        assertThat(page.getContent()).singleElement()
+                .satisfies(set -> assertThat(set.owner().displayName()).isEqualTo("Lan"));
+    }
+
+    @Test
+    void theCatalogueShelfFetchesNoFriendsOrBlocks() {
+        var pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+        when(catalogueQuery.search(eq(userId), eq(Set.of()), eq(Set.of()), any(), eq(FlashcardSetScope.CATALOGUE),
+                any(), any(), any(), any())).thenReturn(org.springframework.data.domain.Page.empty(pageable));
+
+        service.searchSets(FlashcardSetScope.CATALOGUE, null, null, "due", pageable);
+
+        verifyNoInteractions(friendshipReader, publicProfileReader);
     }
 }
